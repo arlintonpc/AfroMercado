@@ -1,0 +1,66 @@
+// ============================================================
+//  Servicio de Comercios — lógica de negocio
+//  Orquesta las operaciones sobre comercios.
+//  No habla directo con la BD; usa el repositorio.
+// ============================================================
+const ComercioRepository = require("../repositories/comercio.repository");
+const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
+
+const CAMPOS_EDITABLES = ["nombre", "descripcion", "municipio", "historia", "whatsapp", "logoUrl"];
+
+const ComercioService = {
+  async registrar(usuarioId, datos) {
+    const { nombre, municipio } = datos;
+
+    if (!nombre || !municipio) {
+      throw new ErrorValidacion("El nombre y el municipio son obligatorios");
+    }
+
+    const existente = await ComercioRepository.buscarPorUsuarioId(usuarioId);
+    if (existente) {
+      throw new ErrorValidacion("Este usuario ya tiene un comercio registrado");
+    }
+
+    return ComercioRepository.crear({ usuarioId, nombre, municipio,
+      descripcion: datos.descripcion ?? null,
+      historia: datos.historia ?? null,
+      whatsapp: datos.whatsapp ?? null,
+    });
+  },
+
+  async obtenerMiComercio(usuarioId) {
+    const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
+    if (!comercio) {
+      throw new ErrorNoEncontrado("No tienes un comercio registrado");
+    }
+    return comercio;
+  },
+
+  async obtenerPorId(id) {
+    const comercio = await ComercioRepository.buscarPorId(id);
+    if (!comercio) {
+      throw new ErrorNoEncontrado("Comercio no encontrado");
+    }
+    return comercio;
+  },
+
+  async actualizar(usuarioId, datos) {
+    const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
+    if (!comercio) {
+      throw new ErrorNoEncontrado("No tienes un comercio registrado");
+    }
+
+    const cambios = {};
+    for (const campo of CAMPOS_EDITABLES) {
+      if (datos[campo] !== undefined) cambios[campo] = datos[campo];
+    }
+
+    if (Object.keys(cambios).length === 0) {
+      throw new ErrorValidacion("No se enviaron campos válidos para actualizar");
+    }
+
+    return ComercioRepository.actualizar(comercio.id, cambios);
+  },
+};
+
+module.exports = ComercioService;

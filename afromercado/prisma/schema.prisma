@@ -1,0 +1,293 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────
+
+enum Rol {
+  COMPRADOR
+  COMERCIANTE
+  REPARTIDOR
+  ADMIN
+}
+
+enum UnidadVenta {
+  KG
+  UNIDAD
+  LITRO
+  PAQUETE
+  DOCENA
+  MANOJO
+}
+
+enum AlcanceVenta {
+  LOCAL
+  NACIONAL
+  AMBOS
+}
+
+enum EstadoPedido {
+  PENDIENTE_PAGO
+  VERIFICANDO_PAGO
+  PAGO_FALLIDO
+  CONFIRMADO
+  CANCELADO
+  ENTREGADO
+}
+
+enum EstadoSubPedido {
+  CONFIRMADO
+  EN_PREPARACION
+  LISTO
+  EN_CAMINO
+  ENTREGADO
+  CANCELADO
+}
+
+enum EstadoPago {
+  PENDIENTE
+  VERIFICANDO
+  CONFIRMADO
+  FALLIDO
+  REEMBOLSADO
+}
+
+enum MetodoPago {
+  NEQUI
+  DAVIPLATA
+  TRANSFERENCIA
+  EFECTIVO
+}
+
+enum EstadoEntrega {
+  ASIGNADA
+  RECOGIDA
+  EN_CAMINO
+  ENTREGADA
+  FALLIDA
+}
+
+// ─── MODELOS ──────────────────────────────────────────────────
+
+model Usuario {
+  id           Int       @id @default(autoincrement())
+  nombre       String
+  email        String    @unique
+  telefono     String?
+  passwordHash String
+  rol          Rol       @default(COMPRADOR)
+  activo       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  comercio    Comercio?
+  pedidos     Pedido[]
+  direcciones Direccion[]
+  carrito     CarritoItem[]
+  reviews     Review[]
+}
+
+model Comercio {
+  id           Int       @id @default(autoincrement())
+  usuarioId    Int       @unique
+  nombre       String
+  municipio    String
+  descripcion  String?
+  historia     String?
+  whatsapp     String?
+  logoUrl      String?
+  calificacion Decimal   @default(0) @db.Decimal(3, 2)
+  totalReviews Int       @default(0)
+  totalVentas  Int       @default(0)
+  verificado   Boolean   @default(false)
+  activo       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  usuario    Usuario     @relation(fields: [usuarioId], references: [id])
+  productos  Producto[]
+  subPedidos SubPedido[]
+  reviews    Review[]
+}
+
+model Categoria {
+  id       Int       @id @default(autoincrement())
+  nombre   String    @unique
+  slug     String    @unique
+  icono    String?
+  activa   Boolean   @default(true)
+
+  productos Producto[]
+}
+
+model Producto {
+  id                  Int          @id @default(autoincrement())
+  comercioId          Int
+  categoriaId         Int?
+  nombre              String
+  descripcion         String?
+  precio              Decimal      @db.Decimal(12, 2)
+  unidad              UnidadVenta
+  stock               Int          @default(0)
+  stockReservado      Int          @default(0)
+  fotoUrl             String?
+  activo              Boolean      @default(true)
+  diasAlistamientoMin Int          @default(1)
+  diasAlistamientoMax Int          @default(3)
+  alcance             AlcanceVenta @default(LOCAL)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  deletedAt           DateTime?
+
+  comercio         Comercio          @relation(fields: [comercioId], references: [id])
+  categoria        Categoria?        @relation(fields: [categoriaId], references: [id])
+  carrito          CarritoItem[]
+  pedidoItems      PedidoItem[]
+  historialPrecios PrecioHistorial[]
+
+  @@index([comercioId, activo])
+  @@index([categoriaId, activo])
+  @@index([alcance, activo])
+}
+
+model PrecioHistorial {
+  id          Int      @id @default(autoincrement())
+  productoId  Int
+  precio      Decimal  @db.Decimal(12, 2)
+  cambiadoPor Int
+  createdAt   DateTime @default(now())
+
+  producto Producto @relation(fields: [productoId], references: [id])
+}
+
+model Direccion {
+  id           Int       @id @default(autoincrement())
+  usuarioId    Int
+  alias        String
+  linea1       String
+  municipio    String
+  departamento String
+  referencia   String?
+  esPrincipal  Boolean   @default(false)
+  deletedAt    DateTime?
+
+  usuario Usuario  @relation(fields: [usuarioId], references: [id])
+  pedidos Pedido[]
+}
+
+model CarritoItem {
+  id              Int      @id @default(autoincrement())
+  usuarioId       Int
+  productoId      Int
+  cantidad        Int
+  precioAlAgregar Decimal  @db.Decimal(12, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  usuario  Usuario  @relation(fields: [usuarioId], references: [id])
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@unique([usuarioId, productoId])
+}
+
+model Pedido {
+  id             Int          @id @default(autoincrement())
+  compradorId    Int
+  direccionId    Int?
+  direccionTexto String
+  estado         EstadoPedido @default(PENDIENTE_PAGO)
+  subtotal       Decimal      @db.Decimal(12, 2)
+  comisionTotal  Decimal      @db.Decimal(12, 2)
+  total          Decimal      @db.Decimal(12, 2)
+  notas          String?
+  expiresAt      DateTime
+  deletedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  comprador  Usuario    @relation(fields: [compradorId], references: [id])
+  direccion  Direccion? @relation(fields: [direccionId], references: [id])
+  subPedidos SubPedido[]
+  pagos      Pago[]
+}
+
+model SubPedido {
+  id         Int             @id @default(autoincrement())
+  pedidoId   Int
+  comercioId Int
+  estado     EstadoSubPedido @default(CONFIRMADO)
+  subtotal   Decimal         @db.Decimal(12, 2)
+  comision   Decimal         @db.Decimal(12, 2)
+  neto       Decimal         @db.Decimal(12, 2)
+  notas      String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  pedido   Pedido      @relation(fields: [pedidoId], references: [id])
+  comercio Comercio    @relation(fields: [comercioId], references: [id])
+  items    PedidoItem[]
+  entrega  Entrega?
+}
+
+model PedidoItem {
+  id             Int     @id @default(autoincrement())
+  subPedidoId    Int
+  productoId     Int
+  cantidad       Int
+  precioUnitario Decimal @db.Decimal(12, 2)
+  subtotal       Decimal @db.Decimal(12, 2)
+
+  subPedido SubPedido @relation(fields: [subPedidoId], references: [id])
+  producto  Producto  @relation(fields: [productoId], references: [id])
+}
+
+model Pago {
+  id             Int        @id @default(autoincrement())
+  pedidoId       Int
+  monto          Decimal    @db.Decimal(12, 2)
+  metodo         MetodoPago
+  estado         EstadoPago @default(PENDIENTE)
+  referencia     String?
+  comprobanteUrl String?
+  idempotencyKey String     @unique
+  verificadoPor  Int?
+  verificadoAt   DateTime?
+  notas          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  pedido Pedido @relation(fields: [pedidoId], references: [id])
+}
+
+model Entrega {
+  id           Int           @id @default(autoincrement())
+  subPedidoId  Int           @unique
+  repartidorId Int?
+  estado       EstadoEntrega @default(ASIGNADA)
+  direccion    String
+  notas        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  subPedido SubPedido @relation(fields: [subPedidoId], references: [id])
+}
+
+model Review {
+  id           Int      @id @default(autoincrement())
+  comercioId   Int
+  compradorId  Int
+  pedidoId     Int      @unique
+  calificacion Int
+  comentario   String?
+  createdAt    DateTime @default(now())
+
+  comercio  Comercio @relation(fields: [comercioId], references: [id])
+  comprador Usuario  @relation(fields: [compradorId], references: [id])
+}

@@ -1,0 +1,26 @@
+# ── Raíz del monorepo AfroMercado ──
+# Cada subproyecto tiene su propio .gitignore; esto cubre lo común.
+
+# Dependencias
+**/node_modules/
+
+# Variables de entorno (¡nunca subir secretos!)
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Build / cache
+**/.next/
+**/dist/
+**/build/
+
+# Comprobantes subidos
+afromercado/uploads/
+
+# Logs
+**/*.log
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+.idea/

@@ -1,0 +1,29 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (¡nunca subir secretos!)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build
+dist/
+build/
+
+# Prisma
+prisma/migrations/dev.db*
+
+# Comprobantes de pago subidos por usuarios (no versionar)
+uploads/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

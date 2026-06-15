@@ -1,0 +1,120 @@
+'use client'
+
+import { useEffect } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
+import { Button } from '@/components/ui/Button'
+
+/** Loader a pantalla completa mientras se valida la sesión. */
+function PantallaCargando() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#F8F5F0]">
+      <div className="flex flex-col items-center gap-3">
+        <svg
+          className="animate-spin text-[#2D6A4F]"
+          width="32"
+          height="32"
+          viewBox="0 0 18 18"
+          fill="none"
+          aria-hidden="true"
+        >
+          <circle
+            cx="9"
+            cy="9"
+            r="7"
+            stroke="currentColor"
+            strokeOpacity="0.25"
+            strokeWidth="2"
+          />
+          <path
+            d="M9 2a7 7 0 0 1 7 7"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+        <p className="text-sm text-[#1A1A1A]/50">Cargando panel…</p>
+      </div>
+    </div>
+  )
+}
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const { usuario, cargando, logout } = useAuth()
+
+  // La página de login no está protegida (evita un bucle de redirección).
+  const esRutaLogin = pathname === '/admin/ingresar'
+  const esAdmin = usuario?.rol === 'ADMIN'
+
+  useEffect(() => {
+    if (cargando || esRutaLogin) return
+    if (!esAdmin) {
+      router.replace('/admin/ingresar')
+    }
+  }, [cargando, esRutaLogin, esAdmin, router])
+
+  // La pantalla de login se renderiza con su propio chrome, sin protección.
+  if (esRutaLogin) {
+    return <>{children}</>
+  }
+
+  // Mientras restauramos la sesión, o si aún no hay admin (antes de redirigir).
+  if (cargando || !esAdmin) {
+    return <PantallaCargando />
+  }
+
+  function manejarLogout() {
+    logout()
+    router.replace('/admin/ingresar')
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col bg-[#F8F5F0] text-[#1A1A1A]">
+      {/* Topbar propio del área admin (no hereda Header/Footer públicos) */}
+      <header className="sticky top-0 z-30 border-b border-[#1A1A1A]/8 bg-[#2D6A4F] text-white">
+        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-baseline gap-3">
+            <span
+              className="text-2xl leading-none"
+              style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
+            >
+              AfroMercado
+            </span>
+            <span className="hidden text-sm font-medium text-white/70 sm:inline">
+              Panel de administración
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-semibold leading-tight">
+                {usuario?.nombre}
+              </p>
+              <p className="text-xs leading-tight text-white/70">
+                {usuario?.email}
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={manejarLogout}
+              className="border-white/40 bg-white/10 text-white hover:bg-white/20 active:bg-white/30"
+            >
+              Cerrar sesión
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+        {children}
+      </main>
+    </div>
+  )
+}
