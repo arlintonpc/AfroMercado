@@ -1,11 +1,19 @@
-export type RolUsuario = 'CLIENTE' | 'COMERCIANTE' | 'ADMIN'
+export type RolUsuario = 'COMPRADOR' | 'COMERCIANTE' | 'ADMIN' | 'REPARTIDOR'
+
+export type TipoDocumento = 'CC' | 'TI' | 'CE' | 'PEP' | 'PASAPORTE' | 'NIT'
 
 export interface Usuario {
   id: string
   nombre: string
   email: string
-  telefono?: string
+  telefono?: string | null
   rol: RolUsuario
+  activo: boolean
+  tipoDocumento?: TipoDocumento | null
+  numeroDocumento?: string | null
+  autorizacionDatos: boolean
+  autorizacionFecha?: string | null
+  createdAt?: string
 }
 
 export interface DatosRegistro {
@@ -14,9 +22,12 @@ export interface DatosRegistro {
   password: string
   telefono?: string
   rol?: RolUsuario
+  autorizacionDatos: boolean
+  tipoDocumento?: TipoDocumento
+  numeroDocumento?: string
 }
 
 export interface RespuestaAuth {
-  usuario: Usuario
   token: string
+  usuario: Usuario
 }

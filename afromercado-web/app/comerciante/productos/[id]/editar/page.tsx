@@ -9,6 +9,7 @@ import {
   actualizarProducto,
   type ProductoComerciante,
 } from '@/components/comerciante/api'
+import SubidorImagenes from '@/components/comerciante/SubidorImagenes'
 import { ALCANCES, etiquetaUnidad, type Alcance } from '@/components/comerciante/constantes'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
@@ -29,6 +30,13 @@ export default function EditarProductoPage() {
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
+  const [esNuevo, setEsNuevo] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setEsNuevo(new URLSearchParams(window.location.search).get('nuevo') === '1')
+    }
+  }, [])
 
   useEffect(() => {
     let activo = true
@@ -142,11 +150,28 @@ export default function EditarProductoPage() {
         )}
       </div>
 
+      {esNuevo && (
+        <div className="mb-4 rounded-xl bg-[#52B788]/12 border border-[#52B788]/30 px-4 py-3 text-sm text-[#2D6A4F]">
+          ✅ ¡Producto publicado! Agrega algunas fotos para que se vea mejor.
+        </div>
+      )}
+
       <form
         onSubmit={manejarSubmit}
         className="flex flex-col gap-5 rounded-2xl border border-[#1A1A1A]/5 bg-white p-5 sm:p-6 shadow-sm"
         noValidate
       >
+        {producto && (
+          <>
+            <SubidorImagenes
+              productoId={producto.id}
+              fotoUrlInicial={producto.fotoUrl}
+              imagenesIniciales={producto.imagenes ?? []}
+            />
+            <div className="h-px bg-[#1A1A1A]/10" />
+          </>
+        )}
+
         <CampoArea
           label="Descríbelo"
           name="descripcion"

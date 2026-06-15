@@ -6,7 +6,7 @@
 const ComercioRepository = require("../repositories/comercio.repository");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 
-const CAMPOS_EDITABLES = ["nombre", "descripcion", "municipio", "historia", "whatsapp", "logoUrl"];
+const CAMPOS_EDITABLES = ["nombre", "descripcion", "municipio", "historia", "whatsapp", "logoUrl", "vereda", "fotoDocumentoUrl"];
 
 const ComercioService = {
   async registrar(usuarioId, datos) {
@@ -25,6 +25,8 @@ const ComercioService = {
       descripcion: datos.descripcion ?? null,
       historia: datos.historia ?? null,
       whatsapp: datos.whatsapp ?? null,
+      vereda: datos.vereda?.trim() ?? null,
+      fotoDocumentoUrl: datos.fotoDocumentoUrl ?? null,
     });
   },
 

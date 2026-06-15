@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
+    // El optimizador de Next no sirve imágenes http://localhost; además, en
+    // producción las imágenes irán a Cloudinary (con su propia optimización).
+    // Para el MVP cargamos las imágenes tal cual (sin el optimizador).
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
@@ -14,10 +18,9 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
       {
-        // Imágenes/comprobantes servidos por el backend local
+        // Imágenes servidas por el backend local (cualquier puerto)
         protocol: "http",
         hostname: "localhost",
-        port: "3001",
         pathname: "/**",
       },
     ],

@@ -14,6 +14,8 @@ import {
   type AdminEstadisticas,
   type PagoPendiente,
 } from '@/components/admin/api'
+import WhatsAppPanel from '@/components/admin/WhatsAppPanel'
+import EmailPanel from '@/components/admin/EmailPanel'
 
 // ——————————————————————————————————————————————————————————————
 // Utilidades
@@ -446,6 +448,15 @@ export default function AdminDashboardPage() {
           onCerrar={() => setComprobante(null)}
         />
       )}
+
+      {/* Canales de notificación */}
+      <section className="mt-6">
+        <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">Canales de notificación</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <WhatsAppPanel />
+          <EmailPanel />
+        </div>
+      </section>
     </div>
   )
 }

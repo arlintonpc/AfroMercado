@@ -10,13 +10,17 @@ const { ErrorValidacion, ErrorNoAutorizado } = require("../utils/errores");
 const ROLES_VALIDOS = ["COMPRADOR", "COMERCIANTE", "REPARTIDOR"];
 
 const AuthService = {
-  async registrar({ nombre, email, telefono, password, rol }) {
+  async registrar(datos) {
+    const { nombre, email, telefono, password, rol } = datos;
     // Validaciones de negocio
     if (!nombre || !email || !telefono || !password) {
       throw new ErrorValidacion("Nombre, email, teléfono y contraseña son obligatorios");
     }
     if (password.length < 6) {
       throw new ErrorValidacion("La contraseña debe tener al menos 6 caracteres");
+    }
+    if (!datos.autorizacionDatos) {
+      throw new ErrorValidacion("Debes aceptar la autorización de tratamiento de datos personales.");
     }
     const rolFinal = rol && ROLES_VALIDOS.includes(rol) ? rol : "COMPRADOR";
 
@@ -30,7 +34,15 @@ const AuthService = {
 
     const passwordHash = await hashearPassword(password);
     const usuario = await UsuarioRepository.crear({
-      nombre, email, telefono, passwordHash, rol: rolFinal,
+      nombre: nombre.trim(),
+      email: email.toLowerCase().trim(),
+      telefono: telefono?.trim(),
+      passwordHash,
+      rol: rolFinal,
+      autorizacionDatos: true,
+      autorizacionFecha: new Date(),
+      tipoDocumento: datos.tipoDocumento || null,
+      numeroDocumento: datos.numeroDocumento ? datos.numeroDocumento.trim() : null,
     });
 
     return this._respuestaConToken(usuario);

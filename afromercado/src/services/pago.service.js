@@ -9,6 +9,7 @@ const {
   ErrorNoEncontrado,
   ErrorProhibido,
 } = require("../utils/errores");
+const NotificacionService = require("./notificacion.service");
 
 const METODOS_VALIDOS = ["NEQUI", "DAVIPLATA", "TRANSFERENCIA", "EFECTIVO"];
 
@@ -87,10 +88,29 @@ const PagoService = {
       throw new ErrorProhibido("Este pago no te pertenece");
     }
 
-    return PagoRepository.actualizar(pago.id, {
+    const pagoActualizado = await PagoRepository.actualizar(pago.id, {
       comprobanteUrl,
       estado: "VERIFICANDO",
     });
+
+    setImmediate(async () => {
+      try {
+        const pedidoCompleto = await prisma.pedido.findUnique({
+          where: { id: pago.pedidoId },
+          include: { comprador: { select: { nombre: true, email: true, telefono: true } } }
+        });
+        if (pedidoCompleto) {
+          await NotificacionService.comprobanteSubido({
+            pedido: pedidoCompleto,
+            comprador: pedidoCompleto.comprador,
+          });
+        }
+      } catch (e) {
+        console.error("[NOTIF] Error en comprobanteSubido:", e.message);
+      }
+    });
+
+    return pagoActualizado;
   },
 
   /**

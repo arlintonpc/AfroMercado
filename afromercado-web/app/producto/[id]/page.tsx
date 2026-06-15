@@ -1,8 +1,8 @@
 'use client'
 
 import { use, useEffect, useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
+import ProductoGaleria from '@/components/catalogo/ProductoGaleria'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -121,7 +121,6 @@ export default function PaginaProducto({
   const [noEncontrado, setNoEncontrado] = useState(false)
 
   const [cantidad, setCantidad] = useState(1)
-  const [imgError, setImgError] = useState(false)
   const [agregando, setAgregando] = useState(false)
   const [agregado, setAgregado] = useState(false)
   const [historiaExpandida, setHistoriaExpandida] = useState(false)
@@ -221,15 +220,19 @@ export default function PaginaProducto({
     )
   }
 
+  const disponible = Math.max(0, producto.stock - (producto.stockReservado ?? 0))
   const gradiente = GRADIENTES[producto.nombre.length % GRADIENTES.length]
-  const mostrarPlaceholder = !producto.fotoUrl || imgError
+  // Galería: foto principal + imágenes adicionales (sin duplicar la principal).
+  const galeria = (producto.fotoUrl ? [producto.fotoUrl] : []).concat(
+    (producto.imagenes ?? []).filter((u) => u && u !== producto.fotoUrl),
+  )
   const historia = producto.historia ?? producto.comercio.historia
 
   function decrementar() {
     setCantidad((v) => Math.max(1, v - 1))
   }
   function incrementar() {
-    setCantidad((v) => Math.min(producto!.stock, v + 1))
+    setCantidad((v) => Math.min(disponible, v + 1))
   }
 
   async function handleAgregar() {
@@ -275,40 +278,14 @@ export default function PaginaProducto({
         <div className="max-w-6xl mx-auto w-full px-4 md:px-6 py-4">
           <div className="md:grid md:grid-cols-2 md:gap-10 lg:gap-16">
 
-            {/* ——— IMAGEN PRINCIPAL ——— */}
-            <div className="w-full rounded-3xl overflow-hidden mb-6 md:mb-0 aspect-[4/3] relative ring-1 ring-[#1A1A1A]/5 shadow-sm">
-
-              {mostrarPlaceholder ? (
-                <div className={`absolute inset-0 bg-gradient-to-br ${gradiente} flex flex-col items-center justify-center gap-3`}>
-                  {/* Patrón decorativo */}
-                  <div className="absolute inset-0 opacity-10">
-                    <svg width="100%" height="100%">
-                      <defs>
-                        <pattern id={`p-${producto.id}`} width="30" height="30" patternUnits="userSpaceOnUse">
-                          <circle cx="15" cy="15" r="6" fill="none" stroke="white" strokeWidth="0.8" />
-                        </pattern>
-                      </defs>
-                      <rect width="100%" height="100%" fill={`url(#p-${producto.id})`} />
-                    </svg>
-                  </div>
-                  <div className="relative z-10 w-20 h-20 rounded-full bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-sm">
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
-                      <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
-                    </svg>
-                  </div>
-                  <span className="relative z-10 text-white/50 text-sm">Sin imagen</span>
-                </div>
-              ) : (
-                <Image
-                  src={producto.fotoUrl!}
-                  alt={producto.nombre}
-                  fill
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-cover"
-                  onError={() => setImgError(true)}
-                />
-              )}
+            {/* ——— GALERÍA ——— */}
+            <div className="mb-6 md:mb-0">
+              <ProductoGaleria
+                imagenes={galeria}
+                nombre={producto.nombre}
+                productoId={producto.id}
+                gradiente={gradiente}
+              />
             </div>
 
             {/* ——— INFO ——— */}
@@ -367,7 +344,7 @@ export default function PaginaProducto({
                   </span>
                   <button
                     onClick={incrementar}
-                    disabled={cantidad >= producto.stock}
+                    disabled={cantidad >= disponible}
                     className="w-10 h-10 rounded-r-xl border border-[#1A1A1A]/15 bg-white flex items-center justify-center text-[#1A1A1A] disabled:opacity-30 hover:bg-[#F8F5F0] transition-colors"
                     aria-label="Aumentar cantidad"
                   >
@@ -376,13 +353,19 @@ export default function PaginaProducto({
                     </svg>
                   </button>
                 </div>
-                <span className="text-xs text-[#1A1A1A]/40">{producto.stock} disponibles</span>
+                {disponible === 0 ? (
+                  <span className="text-xs font-medium text-[#C0392B]">Sin stock</span>
+                ) : disponible <= 10 ? (
+                  <span className="text-xs font-medium text-[#B7800A]">Solo quedan {disponible}</span>
+                ) : (
+                  <span className="text-xs text-[#1A1A1A]/40">{disponible} disponibles</span>
+                )}
               </div>
 
               {/* 7. Botón Agregar al pedido */}
               <button
                 onClick={handleAgregar}
-                disabled={agregando || producto.stock <= 0}
+                disabled={agregando || disponible <= 0}
                 aria-busy={agregando}
                 className={`w-full min-h-[56px] font-bold text-base rounded-2xl transition-all duration-200 flex items-center justify-center gap-2 ${
                   agregado
@@ -554,7 +537,7 @@ export default function PaginaProducto({
         </div>
         <button
           onClick={handleAgregar}
-          disabled={agregando || producto.stock <= 0}
+          disabled={agregando || disponible <= 0}
           aria-busy={agregando}
           className={`flex-shrink-0 min-h-[44px] px-6 font-bold text-sm rounded-xl transition-colors flex items-center gap-1.5 ${
             agregado

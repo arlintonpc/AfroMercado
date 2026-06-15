@@ -6,6 +6,7 @@ const CarritoRepository = require("../repositories/carrito.repository");
 const PedidoRepository = require("../repositories/pedido.repository");
 const { calcularDesglose } = require("../utils/comision");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
+const NotificacionService = require("./notificacion.service");
 
 const ESTADOS_CANCELABLES = ["PENDIENTE_PAGO", "VERIFICANDO_PAGO"];
 
@@ -107,7 +108,7 @@ const PedidoService = {
       return nuevoPedido;
     });
 
-    return {
+    const resultado = {
       pedido,
       instruccionesPago: {
         mensaje: "Tienes 30 minutos para completar el pago antes de que el pedido expire.",
@@ -115,6 +116,25 @@ const PedidoService = {
         total: pedido.total,
       },
     };
+
+    // Notificar de forma asincrónica sin bloquear el response
+    setImmediate(async () => {
+      try {
+        const compradorCompleto = await prisma.usuario.findUnique({
+          where: { id: resultado.pedido.compradorId },
+          select: { id: true, nombre: true, email: true, telefono: true }
+        });
+        await NotificacionService.checkoutCompletado({
+          pedido: resultado.pedido,
+          comprador: compradorCompleto,
+          comerciantes: resultado.pedido.subPedidos?.map(sp => sp.comercio) || [],
+        });
+      } catch (e) {
+        console.error("[NOTIF] Error en checkoutCompletado:", e.message);
+      }
+    });
+
+    return resultado;
   },
 
   async cancelar(usuarioId, pedidoId) {

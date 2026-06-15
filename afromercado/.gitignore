@@ -27,3 +27,6 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+
+# WhatsApp session (credenciales locales de Baileys)
+config/whatsapp-session/

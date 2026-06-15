@@ -1,0 +1,5 @@
+CREATE TABLE "Config" (
+    "clave"     TEXT NOT NULL PRIMARY KEY,
+    "valor"     TEXT NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

@@ -34,6 +34,8 @@ function FormularioIngresar() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
+  const [autorizacionDatos, setAutorizacionDatos] = useState(false)
+
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
@@ -86,7 +88,8 @@ function FormularioIngresar() {
           email: email.trim(),
           password,
           telefono: telefono.replace(/\D/g, ''),
-          rol: 'CLIENTE',
+          rol: 'COMPRADOR',
+          autorizacionDatos: true,
         })
       }
       router.replace(redirect)
@@ -167,16 +170,24 @@ function FormularioIngresar() {
                   onChange={(e) => setNombre(e.target.value)}
                   error={errores.nombre}
                 />
-                <Input
-                  label="Celular"
-                  name="telefono"
-                  type="tel"
-                  placeholder="300 123 4567"
-                  value={telefono}
-                  onChange={(e) => setTelefono(e.target.value)}
-                  error={errores.telefono}
-                  hint="10 dígitos. Lo usamos para coordinar tu pedido."
-                />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-[#1A1A1A]">Celular</label>
+                  <div className="flex items-center border border-[#1A1A1A]/15 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[#2D6A4F]/30 focus-within:border-[#2D6A4F] transition-colors bg-white">
+                    <span className="px-3 text-sm text-[#1A1A1A]/50 border-r border-[#1A1A1A]/10 bg-[#F8F5F0] h-11 flex items-center">+57</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      placeholder="3XXXXXXXXX"
+                      className="flex-1 h-11 px-3 bg-transparent text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 focus:outline-none"
+                    />
+                  </div>
+                  {errores.telefono && (
+                    <p className="text-xs text-red-600">{errores.telefono}</p>
+                  )}
+                  <p className="text-xs text-[#1A1A1A]/50">10 dígitos. Lo usamos para coordinar tu pedido.</p>
+                </div>
               </>
             )}
 
@@ -200,6 +211,32 @@ function FormularioIngresar() {
               error={errores.password}
             />
 
+            {modo === 'login' && (
+              <div className="flex justify-end">
+                <Link href="/recuperar-password" className="text-xs text-[#2D6A4F] hover:underline">
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
+            )}
+
+            {modo === 'registro' && (
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autorizacionDatos}
+                  onChange={(e) => setAutorizacionDatos(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-[#2D6A4F] flex-shrink-0"
+                />
+                <span className="text-xs text-[#1A1A1A]/60 leading-relaxed">
+                  Acepto la{' '}
+                  <a href="/privacidad" target="_blank" className="text-[#2D6A4F] hover:underline font-medium">
+                    política de tratamiento de datos personales
+                  </a>{' '}
+                  de AfroMercado conforme a la Ley 1581 de 2012.
+                </span>
+              </label>
+            )}
+
             {errorGeneral && (
               <div
                 role="alert"
@@ -209,7 +246,12 @@ function FormularioIngresar() {
               </div>
             )}
 
-            <Button type="submit" loading={enviando} className="w-full mt-1">
+            <Button
+              type="submit"
+              loading={enviando}
+              disabled={enviando || (modo === 'registro' && !autorizacionDatos)}
+              className="w-full mt-1"
+            >
               {modo === 'login' ? 'Ingresar' : 'Crear cuenta'}
             </Button>
           </form>

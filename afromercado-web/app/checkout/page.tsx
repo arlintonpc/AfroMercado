@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { apiFetch } from '@/lib/api/client'
+import { listarDirecciones, crearDireccion } from '@/lib/api/direccion'
 import { useCarrito } from '@/context/CarritoContext'
 import { useAuth } from '@/context/AuthContext'
 import { agruparPorComercio } from '@/components/carrito/agrupar'
@@ -15,13 +16,19 @@ import {
   desenvolver,
   type RespuestaCheckout,
 } from '@/components/checkout/tiposPedido'
+import type { Direccion } from '@/types/direccion'
 
 export default function PaginaCheckout() {
   const router = useRouter()
   const { autenticado, cargando: cargandoAuth, usuario } = useAuth()
   const { items, subtotal, cantidadTotal, cargando: cargandoCarrito } = useCarrito()
 
-  // Campos de dirección
+  // Direcciones guardadas
+  const [direcciones, setDirecciones] = useState<Direccion[]>([])
+  const [cargandoDirs, setCargandoDirs] = useState(true)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+
+  // Campos del formulario
   const [departamento, setDepartamento] = useState('')
   const [municipio, setMunicipio] = useState('')
   const [barrio, setBarrio] = useState('')
@@ -30,25 +37,68 @@ export default function PaginaCheckout() {
   const [telefono, setTelefono] = useState(usuario?.telefono ?? '')
   const [notas, setNotas] = useState('')
 
+  // Guardar nueva dirección
+  const [guardarDir, setGuardarDir] = useState(false)
+  const [alias, setAlias] = useState('')
+
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
 
   const grupos = useMemo(() => agruparPorComercio(items), [items])
 
-  // Protección de ruta: si no está autenticado, a /ingresar.
   useEffect(() => {
     if (!cargandoAuth && !autenticado) {
       router.replace('/ingresar?redirect=/checkout')
     }
   }, [cargandoAuth, autenticado, router])
 
-  // Carrito vacío: de vuelta al carrito.
   useEffect(() => {
     if (!cargandoAuth && autenticado && !cargandoCarrito && items.length === 0) {
       router.replace('/carrito')
     }
   }, [cargandoAuth, autenticado, cargandoCarrito, items.length, router])
+
+  // Cargar direcciones guardadas
+  useEffect(() => {
+    if (!autenticado) return
+    listarDirecciones()
+      .then((dirs) => {
+        setDirecciones(dirs)
+        // Pre-seleccionar la dirección principal si existe
+        const principal = dirs.find((d) => d.esPrincipal) ?? dirs[0]
+        if (principal) {
+          seleccionarDireccion(principal)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setCargandoDirs(false))
+  }, [autenticado])
+
+  function seleccionarDireccion(dir: Direccion) {
+    setSelectedId(dir.id)
+    setDepartamento(dir.departamento)
+    setMunicipio(dir.municipio)
+    setBarrio(dir.barrio ?? '')
+    setLinea1(dir.linea1)
+    setReferencia(dir.referencia ?? '')
+    setTelefono(dir.telefono ?? usuario?.telefono ?? '')
+    setGuardarDir(false)
+    setErrores({})
+  }
+
+  function seleccionarNueva() {
+    setSelectedId(null)
+    setDepartamento('')
+    setMunicipio('')
+    setBarrio('')
+    setLinea1('')
+    setReferencia('')
+    setTelefono(usuario?.telefono ?? '')
+    setAlias('')
+    setGuardarDir(false)
+    setErrores({})
+  }
 
   function validar(): boolean {
     const e: Record<string, string> = {}
@@ -58,6 +108,7 @@ export default function PaginaCheckout() {
     const tel = telefono.replace(/\D/g, '')
     if (!tel) e.telefono = 'Indica un teléfono de contacto.'
     else if (tel.length !== 10) e.telefono = 'El celular debe tener 10 dígitos.'
+    if (guardarDir && !alias.trim()) e.alias = 'Escribe un nombre para esta dirección (ej: Casa).'
     setErrores(e)
     return Object.keys(e).length === 0
   }
@@ -82,11 +133,29 @@ export default function PaginaCheckout() {
 
     setEnviando(true)
     try {
+      let direccionId: number | undefined = selectedId ?? undefined
+
+      // Si solicitó guardar como nueva dirección
+      if (!selectedId && guardarDir && alias.trim()) {
+        const nueva = await crearDireccion({
+          alias: alias.trim(),
+          linea1: linea1.trim(),
+          barrio: barrio.trim() || undefined,
+          municipio: municipio.trim(),
+          departamento: departamento.trim(),
+          referencia: referencia.trim() || undefined,
+          telefono: telefono.replace(/\D/g, '') || undefined,
+        })
+        direccionId = nueva.id
+        setDirecciones((prev) => [...prev, nueva])
+      }
+
       const direccionTexto = construirDireccionTexto()
       const raw = await apiFetch<unknown>('/pedidos/checkout', {
         method: 'POST',
         body: {
           direccionTexto,
+          ...(direccionId !== undefined ? { direccionId } : {}),
           ...(notas.trim() ? { notas: notas.trim() } : {}),
         },
       })
@@ -106,7 +175,6 @@ export default function PaginaCheckout() {
     }
   }
 
-  // Mientras valida auth / redirige.
   if (cargandoAuth || !autenticado) {
     return (
       <div className="min-h-screen flex flex-col bg-[#F8F5F0]">
@@ -137,7 +205,7 @@ export default function PaginaCheckout() {
           className="md:grid md:grid-cols-[1fr_320px] md:gap-6 md:items-start"
           noValidate
         >
-          {/* Columna izquierda: dirección + notas */}
+          {/* Columna izquierda */}
           <div className="flex flex-col gap-5">
             <section className="bg-white rounded-2xl border border-[#1A1A1A]/5 p-5">
               <h2 className="font-bold text-[#1A1A1A] mb-1">Dirección de entrega</h2>
@@ -145,6 +213,84 @@ export default function PaginaCheckout() {
                 El productor coordinará el envío contigo con estos datos.
               </p>
 
+              {/* Selector de direcciones guardadas */}
+              {!cargandoDirs && direcciones.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-xs font-semibold text-[#1A1A1A]/60 uppercase tracking-wide mb-2">
+                    Mis direcciones guardadas
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {direcciones.map((dir) => (
+                      <button
+                        key={dir.id}
+                        type="button"
+                        onClick={() => seleccionarDireccion(dir)}
+                        className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
+                          selectedId === dir.id
+                            ? 'border-[#2D6A4F] bg-[#2D6A4F]/5'
+                            : 'border-[#1A1A1A]/10 hover:border-[#2D6A4F]/40 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`flex-shrink-0 w-4 h-4 rounded-full border-2 mt-0.5 ${
+                              selectedId === dir.id
+                                ? 'border-[#2D6A4F] bg-[#2D6A4F]'
+                                : 'border-[#1A1A1A]/30'
+                            }`}>
+                              {selectedId === dir.id && (
+                                <span className="block w-full h-full rounded-full scale-50 bg-white" />
+                              )}
+                            </span>
+                            <div className="min-w-0">
+                              <span className="text-sm font-semibold text-[#1A1A1A]">
+                                {dir.alias}
+                              </span>
+                              {dir.esPrincipal && (
+                                <span className="ml-2 text-xs bg-[#2D6A4F]/10 text-[#2D6A4F] font-medium px-1.5 py-0.5 rounded-full">
+                                  Principal
+                                </span>
+                              )}
+                              <p className="text-xs text-[#1A1A1A]/55 truncate mt-0.5">
+                                {dir.linea1}{dir.barrio ? `, Barrio ${dir.barrio}` : ''} — {dir.municipio}, {dir.departamento}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+
+                    {/* Nueva dirección */}
+                    <button
+                      type="button"
+                      onClick={seleccionarNueva}
+                      className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
+                        selectedId === null
+                          ? 'border-[#2D6A4F] bg-[#2D6A4F]/5'
+                          : 'border-[#1A1A1A]/10 hover:border-[#2D6A4F]/40 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`flex-shrink-0 w-4 h-4 rounded-full border-2 ${
+                          selectedId === null
+                            ? 'border-[#2D6A4F] bg-[#2D6A4F]'
+                            : 'border-[#1A1A1A]/30'
+                        }`}>
+                          {selectedId === null && (
+                            <span className="block w-full h-full rounded-full scale-50 bg-white" />
+                          )}
+                        </span>
+                        <span className="text-sm font-semibold text-[#1A1A1A]">
+                          + Nueva dirección
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+                  <div className="h-px bg-[#1A1A1A]/8 mt-4 mb-4" />
+                </div>
+              )}
+
+              {/* Formulario de dirección */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="Departamento"
@@ -207,13 +353,40 @@ export default function PaginaCheckout() {
                   hint="10 dígitos. Para coordinar la entrega."
                 />
               </div>
+
+              {/* Guardar como nueva dirección (solo en modo "nueva dirección") */}
+              {selectedId === null && (
+                <div className="mt-5 pt-4 border-t border-[#1A1A1A]/8">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={guardarDir}
+                      onChange={(e) => setGuardarDir(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 accent-[#2D6A4F] flex-shrink-0"
+                    />
+                    <span className="text-sm text-[#1A1A1A]/70">
+                      Guardar esta dirección para futuras compras
+                    </span>
+                  </label>
+
+                  {guardarDir && (
+                    <div className="mt-3">
+                      <Input
+                        label="Nombre para esta dirección"
+                        name="alias"
+                        placeholder="Casa, Oficina, Trabajo…"
+                        value={alias}
+                        onChange={(e) => setAlias(e.target.value)}
+                        error={errores.alias}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
 
             <section className="bg-white rounded-2xl border border-[#1A1A1A]/5 p-5">
-              <label
-                htmlFor="notas"
-                className="font-bold text-[#1A1A1A] block mb-2"
-              >
+              <label htmlFor="notas" className="font-bold text-[#1A1A1A] block mb-2">
                 Notas para el productor (opcional)
               </label>
               <textarea
@@ -241,10 +414,7 @@ export default function PaginaCheckout() {
                     </p>
                     <ul className="flex flex-col gap-1.5">
                       {grupo.items.map((it) => (
-                        <li
-                          key={it.productoId}
-                          className="flex justify-between gap-2 text-sm"
-                        >
+                        <li key={it.productoId} className="flex justify-between gap-2 text-sm">
                           <span className="text-[#1A1A1A]/70 truncate">
                             {it.cantidad}× {it.producto?.nombre ?? 'Producto'}
                           </span>

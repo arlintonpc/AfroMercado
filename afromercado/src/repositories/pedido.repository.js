@@ -55,8 +55,8 @@ const PedidoRepository = {
       include: {
         subPedidos: {
           include: {
-            items: true,
-            comercio: true,
+            items: { include: { producto: { select: { nombre: true } } } },
+            comercio: { include: { usuario: { select: { nombre: true } } } },
           },
         },
       },

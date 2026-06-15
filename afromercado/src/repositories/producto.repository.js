@@ -134,11 +134,11 @@ const ProductoRepository = {
   },
 
   async actualizar(id, data) {
-    return prisma.producto.update({ where: { id }, data });
+    return prisma.producto.update({ where: { id: Number(id) }, data });
   },
 
   async desactivar(id) {
-    return prisma.producto.update({ where: { id }, data: { activo: false } });
+    return prisma.producto.update({ where: { id: Number(id) }, data: { activo: false } });
   },
 };
 

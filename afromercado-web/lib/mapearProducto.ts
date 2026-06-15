@@ -36,10 +36,12 @@ export interface ProductoCrudo {
   precio?: number | string
   unidad?: string
   stock?: number
+  stockReservado?: number
   diasAlistamientoMin?: number
   diasAlistamientoMax?: number
   alcance?: Producto['alcance']
   fotoUrl?: string | null
+  imagenes?: string[] | null
   activo?: boolean
   comercio?: ComercioCrudo | null
 }
@@ -74,10 +76,12 @@ export function mapearProducto(crudo: ProductoCrudo): Producto {
     precio: aNumero(crudo.precio),
     unidad: crudo.unidad ?? '',
     stock: aNumero(crudo.stock),
+    stockReservado: aNumero(crudo.stockReservado),
     diasAlistamientoMin: aNumero(crudo.diasAlistamientoMin),
     diasAlistamientoMax: aNumero(crudo.diasAlistamientoMax),
     alcance: crudo.alcance ?? 'LOCAL',
     fotoUrl: crudo.fotoUrl ?? undefined,
+    imagenes: Array.isArray(crudo.imagenes) ? crudo.imagenes : undefined,
     activo: crudo.activo ?? true,
     comercio: {
       nombre: comercio.nombre ?? '',

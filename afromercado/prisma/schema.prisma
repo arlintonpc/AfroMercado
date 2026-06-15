@@ -72,6 +72,15 @@ enum EstadoEntrega {
   FALLIDA
 }
 
+enum TipoDocumento {
+  CC
+  TI
+  CE
+  PEP
+  PASAPORTE
+  NIT
+}
+
 // ─── MODELOS ──────────────────────────────────────────────────
 
 model Usuario {
@@ -85,6 +94,14 @@ model Usuario {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
+
+  tipoDocumento      TipoDocumento?
+  numeroDocumento    String?
+  autorizacionDatos  Boolean   @default(false)
+  autorizacionFecha  DateTime?
+  passwordCambiadoAt DateTime?
+  tokensRecuperacion TokenRecuperacion[]
+  sesionesReset      SesionReset[]
 
   comercio    Comercio?
   pedidos     Pedido[]
@@ -106,6 +123,8 @@ model Comercio {
   totalReviews Int       @default(0)
   totalVentas  Int       @default(0)
   verificado   Boolean   @default(false)
+  vereda           String?
+  fotoDocumentoUrl String?
   activo       Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -138,6 +157,7 @@ model Producto {
   stock               Int          @default(0)
   stockReservado      Int          @default(0)
   fotoUrl             String?
+  imagenes            String[]     @default([])
   activo              Boolean      @default(true)
   diasAlistamientoMin Int          @default(1)
   diasAlistamientoMax Int          @default(3)
@@ -172,9 +192,11 @@ model Direccion {
   usuarioId    Int
   alias        String
   linea1       String
+  barrio       String?
   municipio    String
   departamento String
   referencia   String?
+  telefono     String?
   esPrincipal  Boolean   @default(false)
   deletedAt    DateTime?
 
@@ -290,4 +312,38 @@ model Review {
 
   comercio  Comercio @relation(fields: [comercioId], references: [id])
   comprador Usuario  @relation(fields: [compradorId], references: [id])
+}
+
+model TokenRecuperacion {
+  id            Int       @id @default(autoincrement())
+  usuarioId     Int
+  codigoHash    String
+  intentos      Int       @default(0)
+  expiresAt     DateTime
+  usadoEn       DateTime?
+  reemplazadoEn DateTime?
+  createdAt     DateTime  @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId])
+}
+
+model SesionReset {
+  id        Int       @id @default(autoincrement())
+  usuarioId Int
+  tokenHash String
+  expiresAt DateTime
+  usadoEn   DateTime?
+  createdAt DateTime  @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId])
+}
+
+model Config {
+  clave     String   @id
+  valor     String
+  updatedAt DateTime @updatedAt
 }

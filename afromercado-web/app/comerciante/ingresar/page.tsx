@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
 import { CampoTexto } from '@/components/comerciante/Campos'
 import { obtenerMiComercio } from '@/components/comerciante/api'
+import type { TipoDocumento } from '@/types/usuario'
 
 type Modo = 'login' | 'registro'
 
@@ -20,6 +21,9 @@ export default function ComercianteIngresarPage() {
   const [telefono, setTelefono] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento>('CC')
+  const [numeroDocumento, setNumeroDocumento] = useState('')
+  const [autorizacionDatos, setAutorizacionDatos] = useState(false)
 
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
@@ -73,6 +77,9 @@ export default function ComercianteIngresarPage() {
           password,
           telefono: telefono.replace(/\D/g, ''),
           rol: 'COMERCIANTE',
+          autorizacionDatos: true,
+          tipoDocumento,
+          numeroDocumento: numeroDocumento.trim(),
         })
       }
 
@@ -175,17 +182,73 @@ export default function ComercianteIngresarPage() {
                   onChange={setNombre}
                   error={errores.nombre}
                 />
-                <CampoTexto
-                  label="Tu celular"
-                  name="telefono"
-                  type="tel"
-                  inputMode="numeric"
-                  placeholder="300 123 4567"
-                  value={telefono}
-                  onChange={setTelefono}
-                  error={errores.telefono}
-                  hint="10 números. Lo usamos para contactarte."
-                />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-[#1A1A1A]">Tu celular</label>
+                  <div className="flex items-center border border-[#1A1A1A]/15 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[#2D6A4F]/30 focus-within:border-[#2D6A4F] transition-colors bg-white">
+                    <span className="px-3 text-sm text-[#1A1A1A]/50 border-r border-[#1A1A1A]/10 bg-[#F8F5F0] h-11 flex items-center">+57</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      placeholder="3XXXXXXXXX"
+                      className="flex-1 h-11 px-3 bg-transparent text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 focus:outline-none"
+                    />
+                  </div>
+                  {errores.telefono && (
+                    <p className="text-xs text-red-600">{errores.telefono}</p>
+                  )}
+                  <p className="text-xs text-[#1A1A1A]/50">10 números. Lo usamos para contactarte.</p>
+                </div>
+
+                {/* Tipo de documento */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-[#1A1A1A]">Tipo de documento</label>
+                  <select
+                    value={tipoDocumento}
+                    onChange={(e) => setTipoDocumento(e.target.value as TipoDocumento)}
+                    required
+                    className="w-full h-11 px-4 rounded-xl border border-[#1A1A1A]/15 bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] transition-colors"
+                  >
+                    <option value="CC">Cédula de Ciudadanía (CC)</option>
+                    <option value="TI">Tarjeta de Identidad (TI)</option>
+                    <option value="CE">Cédula de Extranjería (CE)</option>
+                    <option value="PEP">Permiso Especial de Permanencia (PEP)</option>
+                    <option value="PASAPORTE">Pasaporte</option>
+                    <option value="NIT">NIT</option>
+                  </select>
+                </div>
+
+                {/* Número de documento */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-[#1A1A1A]">Número de documento</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={numeroDocumento}
+                    onChange={(e) => setNumeroDocumento(e.target.value.replace(/[^0-9A-Za-z-]/g, ''))}
+                    placeholder="Ej: 1234567890"
+                    required
+                    className="w-full h-11 px-4 rounded-xl border border-[#1A1A1A]/15 bg-white text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] transition-colors"
+                  />
+                </div>
+
+                {/* Autorización de datos */}
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autorizacionDatos}
+                    onChange={(e) => setAutorizacionDatos(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-[#2D6A4F] flex-shrink-0"
+                  />
+                  <span className="text-xs text-[#1A1A1A]/60 leading-relaxed">
+                    Acepto la{' '}
+                    <a href="/privacidad" target="_blank" className="text-[#2D6A4F] hover:underline font-medium">
+                      política de tratamiento de datos personales
+                    </a>{' '}
+                    de AfroMercado conforme a la Ley 1581 de 2012.
+                  </span>
+                </label>
               </>
             )}
 
@@ -223,6 +286,7 @@ export default function ComercianteIngresarPage() {
               type="submit"
               size="lg"
               loading={enviando}
+              disabled={enviando || (modo === 'registro' && (!autorizacionDatos || !numeroDocumento.trim()))}
               className="w-full mt-1"
             >
               {modo === 'login' ? 'Ingresar' : 'Crear mi cuenta de vendedor'}

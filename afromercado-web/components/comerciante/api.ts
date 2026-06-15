@@ -12,7 +12,9 @@
  *  - POST /productos               → { ok, producto }
  *  - GET  /categorias              → { ok, categorias }
  */
-import { apiFetch } from '@/lib/api/client'
+import { apiFetch, obtenerToken } from '@/lib/api/client'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
 
 /** Comercio tal como lo devuelve el backend. */
 export interface Comercio {
@@ -45,6 +47,7 @@ export interface ProductoComerciante {
   stock: number
   stockReservado: number
   fotoUrl: string | null
+  imagenes: string[]
   activo: boolean
   diasAlistamientoMin: number
   diasAlistamientoMax: number
@@ -184,4 +187,59 @@ export async function listarCategorias(): Promise<CategoriaComerciante[]> {
     categorias?: CategoriaComerciante[]
   }>('/categorias', { auth: false })
   return datos.categorias ?? []
+}
+
+/**
+ * Sube una o varias imágenes a un producto (multipart, campo "imagenes").
+ * POST /productos/:id/imagenes → { ok, producto }
+ */
+export async function subirImagenesProducto(
+  id: number,
+  files: File[],
+): Promise<ProductoComerciante> {
+  const fd = new FormData()
+  files.forEach((f) => fd.append('imagenes', f))
+  const token = obtenerToken()
+  const res = await fetch(`${API_URL}/productos/${id}/imagenes`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: fd,
+  })
+  if (!res.ok) {
+    let msg = 'No pudimos subir las imágenes.'
+    try {
+      const j = await res.json()
+      if (j?.error) msg = j.error
+      else if (j?.message) msg = j.message
+    } catch {
+      // sin cuerpo
+    }
+    throw new Error(msg)
+  }
+  const j = await res.json()
+  return j.producto
+}
+
+/** Quita una imagen del producto. DELETE /productos/:id/imagenes */
+export async function quitarImagenProducto(
+  id: number,
+  url: string,
+): Promise<ProductoComerciante> {
+  const resp = await apiFetch<{ ok: boolean; producto: ProductoComerciante }>(
+    `/productos/${id}/imagenes`,
+    { method: 'DELETE', body: { url } },
+  )
+  return resp.producto
+}
+
+/** Marca una imagen como principal. PATCH /productos/:id/foto-principal */
+export async function fotoPrincipalProducto(
+  id: number,
+  url: string,
+): Promise<ProductoComerciante> {
+  const resp = await apiFetch<{ ok: boolean; producto: ProductoComerciante }>(
+    `/productos/${id}/foto-principal`,
+    { method: 'PATCH', body: { url } },
+  )
+  return resp.producto
 }

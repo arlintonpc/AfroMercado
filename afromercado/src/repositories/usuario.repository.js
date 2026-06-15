@@ -21,6 +21,13 @@ const UsuarioRepository = {
   async buscarPorId(id) {
     return prisma.usuario.findUnique({ where: { id } });
   },
+
+  async actualizar(id, datos) {
+    return prisma.usuario.update({
+      where: { id },
+      data: datos,
+    });
+  },
 };
 
 module.exports = UsuarioRepository;

@@ -134,6 +134,34 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                     <p className="text-sm font-semibold text-[#1A1A1A] truncate">{usuario?.nombre}</p>
                     <p className="text-xs text-[#1A1A1A]/50 truncate">{usuario?.email}</p>
                   </div>
+                  {usuario?.rol === 'ADMIN' && (
+                    <Link
+                      href="/admin"
+                      role="menuitem"
+                      onClick={() => setMenuAbierto(false)}
+                      className="block px-4 py-2 text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10"
+                    >
+                      Panel de administración
+                    </Link>
+                  )}
+                  {usuario?.rol === 'COMERCIANTE' && (
+                    <Link
+                      href="/comerciante"
+                      role="menuitem"
+                      onClick={() => setMenuAbierto(false)}
+                      className="block px-4 py-2 text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10"
+                    >
+                      Mi tienda
+                    </Link>
+                  )}
+                  <Link
+                    href="/perfil"
+                    role="menuitem"
+                    onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10"
+                  >
+                    Mi perfil
+                  </Link>
                   <Link
                     href="/mis-pedidos"
                     role="menuitem"

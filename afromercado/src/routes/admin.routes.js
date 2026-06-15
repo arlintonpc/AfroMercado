@@ -21,4 +21,14 @@ router.get("/pagos/:id/comprobante", ...soloAdmin, AdminController.comprobante);
 // Métricas globales del marketplace
 router.get("/estadisticas", ...soloAdmin, AdminController.estadisticas);
 
+// WhatsApp
+router.get("/whatsapp/estado", ...soloAdmin, AdminController.estadoWhatsApp);
+router.post("/whatsapp/conectar", ...soloAdmin, AdminController.conectarWhatsApp);
+
+// Email
+router.get("/email/estado", ...soloAdmin, AdminController.estadoEmail);
+router.put("/email/smtp", ...soloAdmin, AdminController.guardarConfigSmtp);
+router.put("/email/config", ...soloAdmin, AdminController.actualizarConfigEmail);
+router.post("/email/test", ...soloAdmin, AdminController.enviarEmailTest);
+
 module.exports = router;

@@ -8,6 +8,7 @@ const {
   ErrorValidacion,
   ErrorNoEncontrado,
 } = require("../utils/errores");
+const NotificacionService = require("./notificacion.service");
 
 const ACCIONES_VALIDAS = ["APROBAR", "RECHAZAR"];
 
@@ -57,7 +58,7 @@ const AdminService = {
     if (!pedido) throw new ErrorNoEncontrado("Pedido asociado no encontrado");
 
     if (accion === "APROBAR") {
-      return prisma.$transaction(async (tx) => {
+      const resultadoAprobar = await prisma.$transaction(async (tx) => {
         // 1. Descontar stock real y liberar el reservado de cada item, de forma
         //    atómica. Cada item pertenece a un subPedido del pedido.
         for (const sub of pedido.subPedidos) {
@@ -117,10 +118,42 @@ const AdminService = {
           mensaje: "Pago aprobado, pedido confirmado y stock descontado",
         };
       });
+
+      // Notificar fuera de la transacción
+      const pedidoId = pedido.id;
+      setImmediate(async () => {
+        try {
+          const pedidoCompleto = await prisma.pedido.findUnique({
+            where: { id: pedidoId },
+            include: {
+              comprador: { select: { id: true, nombre: true, email: true, telefono: true } },
+              subPedidos: {
+                include: {
+                  comercio: {
+                    include: { usuario: { select: { nombre: true, email: true, telefono: true } } }
+                  },
+                  items: { include: { producto: { select: { nombre: true } } } }
+                }
+              }
+            }
+          });
+          if (pedidoCompleto) {
+            await NotificacionService.pagoAprobado({
+              pedido: pedidoCompleto,
+              comprador: pedidoCompleto.comprador,
+              comerciantes: pedidoCompleto.subPedidos.map(sp => sp.comercio),
+            });
+          }
+        } catch (e) {
+          console.error("[NOTIF] Error en pagoAprobado:", e.message);
+        }
+      });
+
+      return resultadoAprobar;
     }
 
     // accion === "RECHAZAR"
-    return prisma.$transaction(async (tx) => {
+    const resultadoRechazar = await prisma.$transaction(async (tx) => {
       // Liberar el stock reservado de cada item.
       for (const sub of pedido.subPedidos) {
         for (const item of sub.items) {
@@ -151,6 +184,28 @@ const AdminService = {
         mensaje: "Pago rechazado y stock liberado",
       };
     });
+
+    // Notificar fuera de la transacción
+    const pedidoIdRechazado = pedido.id;
+    setImmediate(async () => {
+      try {
+        const pedidoCompleto = await prisma.pedido.findUnique({
+          where: { id: pedidoIdRechazado },
+          include: { comprador: { select: { nombre: true, email: true, telefono: true } } }
+        });
+        if (pedidoCompleto) {
+          await NotificacionService.pagoRechazado({
+            pedido: pedidoCompleto,
+            comprador: pedidoCompleto.comprador,
+            motivo: notas || null,
+          });
+        }
+      } catch (e) {
+        console.error("[NOTIF] Error en pagoRechazado:", e.message);
+      }
+    });
+
+    return resultadoRechazar;
   },
 
   /**

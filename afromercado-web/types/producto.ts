@@ -6,10 +6,13 @@ export interface Producto {
   precio: number
   unidad: string
   stock: number
+  stockReservado?: number
   diasAlistamientoMin: number
   diasAlistamientoMax: number
   alcance: 'LOCAL' | 'NACIONAL' | 'AMBOS'
   fotoUrl?: string
+  /** Galería: imágenes adicionales del producto (además de fotoUrl). */
+  imagenes?: string[]
   activo: boolean
   comercio: {
     nombre: string

@@ -104,7 +104,7 @@ export default function PublicarProductoPage() {
 
     setEnviando(true)
     try {
-      await crearProducto({
+      const nuevo = await crearProducto({
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || undefined,
         precio: Number(precio.replace(/\D/g, '')),
@@ -115,7 +115,8 @@ export default function PublicarProductoPage() {
         alcance: alcance as Alcance,
         fotoUrl: '',
       })
-      router.replace('/comerciante/dashboard?publicado=1')
+      // Tras publicar, vamos a editar para que el comerciante agregue fotos.
+      router.replace(`/comerciante/productos/${nuevo.id}/editar?nuevo=1`)
     } catch (err) {
       setErrorGeneral(
         err instanceof Error
@@ -318,7 +319,7 @@ export default function PublicarProductoPage() {
           </p>
           <p className="mt-1.5 text-sm text-[#1A1A1A]/70 leading-relaxed">
             Toma la foto con buena luz, de día, y muestra el producto de cerca.
-            Pronto podrás subir tus fotos desde aquí.
+            Apenas publiques, podrás subir tus fotos.
           </p>
         </div>
 

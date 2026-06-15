@@ -27,13 +27,15 @@ export function LineaCarrito({
   const producto = item.producto
   const precio = producto?.precio ?? 0
   const stock = producto?.stock ?? 99
+  const reservado = producto?.stockReservado ?? 0
+  const disponible = Math.max(0, stock - reservado)
   const subtotal = precio * item.cantidad
   const mostrarPlaceholder = !producto?.fotoUrl || imgError
 
   async function cambiar(delta: number) {
     if (!onActualizar || ocupado) return
     const nueva = item.cantidad + delta
-    if (nueva < 1 || nueva > stock) return
+    if (nueva < 1 || nueva > disponible) return
     setOcupado(true)
     try {
       await onActualizar(item.productoId, nueva)
@@ -90,6 +92,15 @@ export function LineaCarrito({
           {formatearPrecio(precio)}
           {producto?.unidad ? ` · por ${producto.unidad}` : ''}
         </p>
+        {disponible === 0 ? (
+          <p className="text-xs font-medium text-[#C0392B] mt-0.5">Sin stock disponible</p>
+        ) : disponible <= 10 ? (
+          <p className="text-xs font-medium text-[#B7800A] mt-0.5">
+            {disponible === item.cantidad ? 'Máximo disponible' : `Solo quedan ${disponible}`}
+          </p>
+        ) : (
+          <p className="text-xs text-[#1A1A1A]/40 mt-0.5">{disponible} disponibles</p>
+        )}
 
         <div className="mt-auto pt-2 flex items-center justify-between gap-2">
           {editable ? (
@@ -111,7 +122,7 @@ export function LineaCarrito({
               <button
                 type="button"
                 onClick={() => cambiar(1)}
-                disabled={ocupado || item.cantidad >= stock}
+                disabled={ocupado || item.cantidad >= disponible}
                 className="w-9 h-9 rounded-r-lg border border-[#1A1A1A]/15 bg-white flex items-center justify-center text-[#1A1A1A] disabled:opacity-30 hover:bg-[#F8F5F0] transition-colors"
                 aria-label="Aumentar cantidad"
               >

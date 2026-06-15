@@ -1,0 +1,6 @@
+{
+  "watch": ["src"],
+  "ext": "js,json",
+  "ignore": ["config/*", "config/**/*", "prisma/migrations/*"],
+  "delay": 500
+}

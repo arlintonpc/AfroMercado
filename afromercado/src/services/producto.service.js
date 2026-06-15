@@ -96,6 +96,47 @@ const ProductoService = {
 
     return ProductoRepository.desactivar(productoId);
   },
+
+  // ── Imágenes del producto ────────────────────────────────────
+  // Verifica que el producto exista y pertenezca al comerciante.
+  async _verificarPropiedad(usuarioId, productoId) {
+    const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
+    if (!comercio) throw new ErrorNoAutorizado("No tienes un comercio registrado");
+    const producto = await ProductoRepository.buscarPorId(productoId);
+    if (!producto) throw new ErrorNoEncontrado("Producto no encontrado");
+    if (producto.comercioId !== comercio.id)
+      throw new ErrorNoAutorizado("No puedes editar productos de otro comerciante");
+    return producto;
+  },
+
+  // Agrega imágenes (URLs). La primera se vuelve principal si aún no hay.
+  async agregarImagenes(usuarioId, productoId, urls) {
+    const producto = await this._verificarPropiedad(usuarioId, productoId);
+    if (!Array.isArray(urls) || urls.length === 0)
+      throw new ErrorValidacion("No se recibieron imágenes");
+    const imagenes = [...(producto.imagenes || []), ...urls];
+    const fotoUrl = producto.fotoUrl || urls[0];
+    return ProductoRepository.actualizar(productoId, { imagenes, fotoUrl });
+  },
+
+  // Quita una imagen. Si era la principal, asigna otra (o ninguna).
+  async quitarImagen(usuarioId, productoId, url) {
+    const producto = await this._verificarPropiedad(usuarioId, productoId);
+    if (!url) throw new ErrorValidacion("Falta la url de la imagen a quitar");
+    const imagenes = (producto.imagenes || []).filter((u) => u !== url);
+    const fotoUrl =
+      producto.fotoUrl === url ? imagenes[0] || null : producto.fotoUrl;
+    return ProductoRepository.actualizar(productoId, { imagenes, fotoUrl });
+  },
+
+  // Marca una imagen existente como principal (fotoUrl).
+  async establecerPrincipal(usuarioId, productoId, url) {
+    const producto = await this._verificarPropiedad(usuarioId, productoId);
+    const todas = [producto.fotoUrl, ...(producto.imagenes || [])].filter(Boolean);
+    if (!todas.includes(url))
+      throw new ErrorValidacion("Esa imagen no pertenece al producto");
+    return ProductoRepository.actualizar(productoId, { fotoUrl: url });
+  },
 };
 
 module.exports = ProductoService;

@@ -7,7 +7,7 @@ const PedidoController = require("../controllers/pedido.controller");
 
 const router = express.Router();
 
-const soloCompradores = [autenticar, autorizar("COMPRADOR")];
+const soloCompradores = [autenticar, autorizar("COMPRADOR", "COMERCIANTE")];
 
 router.post("/checkout", ...soloCompradores, PedidoController.checkout);
 router.get("/", ...soloCompradores, PedidoController.listar);

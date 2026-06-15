@@ -15,4 +15,15 @@ router.get("/mis/productos", autenticar, autorizar("COMERCIANTE", "ADMIN"), Prod
 router.patch("/:id", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.actualizar);
 router.delete("/:id", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.desactivar);
 
+// Imágenes del producto — solo COMERCIANTE/ADMIN (dueño)
+router.post(
+  "/:id/imagenes",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ProductoController.uploadImagenes,
+  ProductoController.subirImagenes
+);
+router.delete("/:id/imagenes", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.quitarImagen);
+router.patch("/:id/foto-principal", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.fotoPrincipal);
+
 module.exports = router;

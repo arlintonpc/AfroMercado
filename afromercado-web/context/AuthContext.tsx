@@ -23,6 +23,7 @@ interface AuthContextValor {
   login: (email: string, password: string) => Promise<Usuario>
   registro: (datos: DatosRegistro) => Promise<Usuario>
   logout: () => void
+  actualizarUsuario: (usuario: Usuario) => void
 }
 
 const AuthContext = createContext<AuthContextValor | undefined>(undefined)
@@ -89,6 +90,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null)
   }, [])
 
+  const actualizarUsuario = useCallback((nuevoUsuario: Usuario) => {
+    setUsuario(nuevoUsuario)
+    try {
+      window.localStorage.setItem(USUARIO_KEY, JSON.stringify(nuevoUsuario))
+    } catch {
+      // localStorage no disponible
+    }
+  }, [])
+
   const valor: AuthContextValor = {
     usuario,
     token,
@@ -97,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     registro,
     logout,
+    actualizarUsuario,
   }
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>

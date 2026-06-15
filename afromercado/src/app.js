@@ -1,12 +1,15 @@
 // ============================================================
 //  AfroMercado API — Aplicación Express
 // ============================================================
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const rutas = require("./routes");
 const { manejadorErrores, rutaNoEncontrada } = require("./middlewares/errores");
+// WhatsApp se inicia solo cuando el admin hace clic en "Conectar" — no al arrancar el servidor.
+// Esto evita que cada reinicio de nodemon cree un socket nuevo y genere conflictos 440.
 
 const app = express();
 
@@ -29,6 +32,19 @@ app.use(
 app.use(express.json());                    // parsea JSON del body
 app.use(express.urlencoded({ extended: true }));
 
+// Imágenes públicas de productos (subidas por los comerciantes).
+// Cross-Origin-Resource-Policy se sobreescribe a "cross-origin" para que el
+// frontend en un puerto distinto pueda cargar estas imágenes (Helmet pone
+// "same-origin" por defecto, lo que bloquea la carga cross-origin).
+app.use("/uploads/productos", (req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
+app.use(
+  "/uploads/productos",
+  express.static(path.join(__dirname, "..", "uploads", "productos"))
+);
+
 // Rate limiting
 // Límite general para API pública: 60 peticiones por minuto
 const apiLimiter = rateLimit({
@@ -50,6 +66,16 @@ const authLimiter = rateLimit({
 
 app.use("/api", apiLimiter);
 app.use("/api/auth", authLimiter);
+
+// Rate limiter específico para recuperación de contraseña
+const recuperacionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiados intentos. Espera 15 minutos." },
+});
+app.use("/api/auth/recuperar", recuperacionLimiter);
 
 // Rutas de la API
 app.use("/api", rutas);

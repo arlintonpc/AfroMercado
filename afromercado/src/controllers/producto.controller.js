@@ -1,6 +1,34 @@
 // Controlador — Productos
 // Recibe la petición HTTP, llama al servicio, devuelve la respuesta.
+const path = require("path");
+const fs = require("fs");
+const multer = require("multer");
 const ProductoService = require("../services/producto.service");
+const { ErrorValidacion } = require("../utils/errores");
+
+// Carpeta pública donde se guardan las fotos de productos.
+const DIR_PRODUCTOS = path.join(__dirname, "..", "..", "uploads", "productos");
+fs.mkdirSync(DIR_PRODUCTOS, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    fs.mkdirSync(DIR_PRODUCTOS, { recursive: true });
+    cb(null, DIR_PRODUCTOS);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || ".jpg";
+    cb(null, `prod-${req.params.id}-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`);
+  },
+});
+
+function fileFilter(req, file, cb) {
+  if (!file.mimetype.startsWith("image/")) {
+    return cb(new ErrorValidacion("Solo se permiten imágenes"));
+  }
+  cb(null, true);
+}
+
+const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
 
 const ProductoController = {
   async crear(req, res, next) {
@@ -63,6 +91,45 @@ const ProductoController = {
     try {
       await ProductoService.desactivar(req.usuario.id, req.params.id);
       res.json({ ok: true, mensaje: "Producto desactivado correctamente" });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // ── Imágenes ───────────────────────────────────────────────
+  // Middleware multer para varias fotos (campo "imagenes", hasta 6).
+  uploadImagenes: upload.array("imagenes", 6),
+
+  // POST /productos/:id/imagenes  (multipart)
+  async subirImagenes(req, res, next) {
+    try {
+      if (!req.files || req.files.length === 0) {
+        throw new ErrorValidacion("Adjunta al menos una imagen (campo 'imagenes')");
+      }
+      const base = `${req.protocol}://${req.get("host")}`;
+      const urls = req.files.map((f) => `${base}/uploads/productos/${f.filename}`);
+      const producto = await ProductoService.agregarImagenes(req.usuario.id, req.params.id, urls);
+      res.status(201).json({ ok: true, producto });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // DELETE /productos/:id/imagenes  (body: { url })
+  async quitarImagen(req, res, next) {
+    try {
+      const producto = await ProductoService.quitarImagen(req.usuario.id, req.params.id, req.body.url);
+      res.json({ ok: true, producto });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // PATCH /productos/:id/foto-principal  (body: { url })
+  async fotoPrincipal(req, res, next) {
+    try {
+      const producto = await ProductoService.establecerPrincipal(req.usuario.id, req.params.id, req.body.url);
+      res.json({ ok: true, producto });
     } catch (err) {
       next(err);
     }

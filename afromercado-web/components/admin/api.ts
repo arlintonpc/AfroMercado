@@ -134,3 +134,86 @@ export async function obtenerComprobanteObjectUrl(
   const blob = await response.blob()
   return URL.createObjectURL(blob)
 }
+
+// ——— Email ———
+
+export interface SmtpConfig {
+  host: string | null
+  port: number
+  user: string | null
+  secure: boolean
+  tienePassword: boolean
+}
+
+export interface EstadoEmail {
+  configurado: boolean
+  from: string
+  adminEmail: string | null
+  smtp: SmtpConfig
+}
+
+export interface InputSmtp {
+  host: string
+  port: number
+  user: string
+  pass: string
+  secure: boolean
+}
+
+export async function obtenerEstadoEmail(): Promise<EstadoEmail> {
+  const res = await apiFetch<{ ok: boolean; data: EstadoEmail }>('/admin/email/estado')
+  return res.data
+}
+
+export async function guardarConfigSmtp(config: InputSmtp): Promise<void> {
+  await apiFetch<unknown>('/admin/email/smtp', {
+    method: 'PUT',
+    body: config,
+  })
+}
+
+export async function actualizarConfigEmail(adminEmail: string): Promise<void> {
+  await apiFetch<unknown>('/admin/email/config', {
+    method: 'PUT',
+    body: { adminEmail },
+  })
+}
+
+export async function enviarEmailTest(): Promise<string> {
+  const res = await apiFetch<{ ok: boolean; mensaje: string }>('/admin/email/test', {
+    method: 'POST',
+  })
+  return res.mensaje
+}
+
+// ——— WhatsApp ———
+
+export interface EstadoWhatsApp {
+  estado: 'DESCONECTADO' | 'ESCANEANDO_QR' | 'CONECTADO'
+  qrDataUrl?: string
+}
+
+/**
+ * GET /api/admin/whatsapp/estado
+ */
+export async function obtenerEstadoWhatsApp(): Promise<EstadoWhatsApp> {
+  const token = obtenerToken()
+  const res = await fetch(`${API_URL}/admin/whatsapp/estado`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+  if (!res.ok) throw new Error('No se pudo obtener el estado de WhatsApp')
+  const j = await res.json()
+  return j.data
+}
+
+/**
+ * POST /api/admin/whatsapp/conectar
+ */
+export async function conectarWhatsApp(): Promise<void> {
+  const token = obtenerToken()
+  const res = await fetch(`${API_URL}/admin/whatsapp/conectar`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+  if (!res.ok) throw new Error('No se pudo iniciar la conexión')
+}
