@@ -9,9 +9,12 @@ import { useCarrito } from '@/context/CarritoContext'
 
 interface TarjetaProductoProps {
   producto: Producto
+  esDestacado?: boolean
+  etiquetaDestacado?: string
 }
 
-export default function TarjetaProducto({ producto }: TarjetaProductoProps) {
+export default function TarjetaProducto({ producto, esDestacado = false, etiquetaDestacado }: TarjetaProductoProps) {
+  const selloTexto = etiquetaDestacado?.trim() || 'Selección Chocó'
   const { agregar } = useCarrito()
   const [imgCargando, setImgCargando] = useState(true)
   const [imgError, setImgError]       = useState(false)
@@ -44,7 +47,11 @@ export default function TarjetaProducto({ producto }: TarjetaProductoProps) {
 
   return (
     <article
-      className={`group bg-white rounded-3xl overflow-hidden flex flex-col transition-all duration-300 shadow-[0_2px_12px_rgba(0,0,0,0.06)] ${
+      className={`group bg-white rounded-3xl overflow-hidden flex flex-col transition-all duration-300 ${
+        esDestacado
+          ? 'shadow-[0_4px_20px_rgba(45,106,79,0.18)] ring-2 ring-[#2D6A4F]/35'
+          : 'shadow-[0_2px_12px_rgba(0,0,0,0.06)]'
+      } ${
         agotado
           ? 'opacity-70'
           : 'hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(45,106,79,0.15)]'
@@ -52,6 +59,11 @@ export default function TarjetaProducto({ producto }: TarjetaProductoProps) {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
+      {/* Banda superior — solo en tarjetas seleccionadas */}
+      {esDestacado && (
+        <div className="h-[3px] w-full bg-gradient-to-r from-[#2D6A4F] via-[#52B788] to-[#2D6A4F] flex-shrink-0" />
+      )}
+
       {/* Imagen / Placeholder */}
       <Link
         href={href}
@@ -104,59 +116,102 @@ export default function TarjetaProducto({ producto }: TarjetaProductoProps) {
         )}
 
         {/* Badge stock bajo */}
-        {stockBajo && (
+        {stockBajo && !esDestacado && !producto.oferta && (
           <span className="absolute top-3 left-3 bg-[#B7800A] text-white text-[10px] font-bold px-2.5 py-1 rounded-full leading-none">
             Últimas {disponible}
+          </span>
+        )}
+
+        {/* Badge oferta — % descuento */}
+        {producto.oferta && !agotado && !esDestacado && (
+          <span className="absolute top-3 left-3 bg-[#C0392B] text-white text-[10px] font-bold px-2.5 py-1 rounded-full leading-none">
+            {producto.oferta.tipo === 'PORCENTAJE'
+              ? `-${Math.round(producto.oferta.valor)}%`
+              : 'TEMPORADA'}
+          </span>
+        )}
+        {/* Badge oferta secundario cuando hay destacado */}
+        {producto.oferta && !agotado && esDestacado && (
+          <span className="absolute bottom-3 left-3 bg-[#C0392B] text-white text-[9px] font-bold px-2 py-0.5 rounded-full leading-none">
+            {producto.oferta.tipo === 'PORCENTAJE' ? `-${Math.round(producto.oferta.valor)}%` : 'TEMPORADA'}
+          </span>
+        )}
+
+        {/* Sello personalizado */}
+        {esDestacado && (
+          <span className="absolute top-3 left-3 flex items-center gap-1 bg-[#2D6A4F] text-white text-[10px] font-bold px-2.5 py-1 rounded-full leading-none shadow-sm">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M17 8C8 10 5.9 16.17 3.82 19.52 3.23 20.5 4.5 21.5 5.3 20.67 7 18.9 8.91 17.5 11 17c-1 3-4 4-4 4s6 0 9-8c1.5 2 2 3.5 2 5.5 0 0 2-10-1-10.5z"/>
+            </svg>
+            {selloTexto}
           </span>
         )}
       </Link>
 
       {/* Contenido */}
-      <div className="flex flex-col flex-1 p-4">
+      <div className="px-3 py-2">
 
-        {/* Fila superior: comercio + verificado */}
-        <div className="flex items-center justify-between mb-1">
+        {/* Comercio */}
+        <p className="truncate text-[#52B788] font-semibold uppercase" style={{ fontSize: 10, lineHeight: '12px', letterSpacing: '0.07em', marginBottom: 2 }}>
           {producto.comercioId
-            ? <Link href={`/comercio/${producto.comercioId}`} onClick={e => e.stopPropagation()}
-                className="text-[#52B788] text-[10px] font-semibold tracking-widest uppercase truncate mr-2 hover:underline">
+            ? <Link href={`/comercio/${producto.comercioId}`} onClick={e => e.stopPropagation()} className="hover:underline">
                 {producto.comercio.nombre}
+                {producto.comercio.verificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}
               </Link>
-            : <p className="text-[#52B788] text-[10px] font-semibold tracking-widest uppercase truncate mr-2">
-                {producto.comercio.nombre}
-              </p>
+            : <>{producto.comercio.nombre}{producto.comercio.verificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}</>
           }
-          {producto.comercio.verificado && (
-            <span
-              className="flex-shrink-0 w-4 h-4 rounded-full bg-[#52B788] flex items-center justify-center text-white text-[9px] font-bold leading-none"
-              title="Comercio verificado"
-            >
-              ✓
-            </span>
-          )}
-        </div>
-
-        {/* Nombre */}
-        <Link href={href}>
-          <h3
-            className="text-[#1A1A1A] leading-snug line-clamp-2 mb-1 group-hover:text-[#2D6A4F] transition-colors"
-            style={{ fontFamily: 'var(--font-dm-serif)', fontSize: '17px' }}
-          >
-            {producto.nombre}
-          </h3>
-        </Link>
-
-        {/* Municipio · alistamiento */}
-        <p className="text-[#1A1A1A]/40 text-xs">
-          📍 {producto.comercio.municipio} · Listo en {producto.diasAlistamientoMin}–{producto.diasAlistamientoMax} días
         </p>
 
-        <div className="flex-1 min-h-[8px]" />
+        {/* Nombre */}
+        <Link
+          href={href}
+          className="block truncate font-semibold text-[#1A1A1A]"
+          style={{ fontSize: 15, lineHeight: '17px', marginBottom: 2, minHeight: 0 }}
+        >
+          {producto.nombre}
+        </Link>
+
+        <p className="flex items-center gap-1 truncate text-[#1A1A1A]/55" style={{ fontSize: 11, lineHeight: '13px', marginBottom: 5 }}>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-3 w-3 flex-shrink-0 text-[#52B788]"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z" />
+            <circle cx="12" cy="10" r="3" />
+          </svg>
+          <span className="truncate">{producto.comercio.municipio}</span>
+        </p>
+
+        {/* Etiqueta de la oferta */}
+        {producto.oferta?.etiqueta && (
+          <p className="text-[10px] text-[#C0392B] font-semibold truncate mb-1" style={{ lineHeight: '12px' }}>
+            {producto.oferta.etiqueta}
+          </p>
+        )}
 
         {/* Precio + botón */}
-        <div className="flex items-center justify-between mt-3">
-          <div>
-            <span className="text-xl font-bold text-[#1A1A1A]">{formatearPrecio(producto.precio)}</span>
-            <span className="text-xs text-[#1A1A1A]/50 ml-1">/ {producto.unidad.toLowerCase()}</span>
+        <div className="flex items-center justify-between gap-2">
+          <div style={{ lineHeight: 1 }}>
+            {producto.oferta ? (
+              <>
+                <span className="text-xs text-[#1A1A1A]/40 line-through block" style={{ lineHeight: '14px' }}>
+                  {formatearPrecio(producto.precio)}
+                </span>
+                <span className="text-xl font-bold text-[#C0392B]">{formatearPrecio(producto.oferta.precioFinal)}</span>
+                <span className="text-xs text-[#1A1A1A]/50 ml-1">/ {producto.unidad.toLowerCase()}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-xl font-bold text-[#1A1A1A]">{formatearPrecio(producto.precio)}</span>
+                <span className="text-xs text-[#1A1A1A]/50 ml-1">/ {producto.unidad.toLowerCase()}</span>
+              </>
+            )}
           </div>
 
           <button
@@ -165,7 +220,8 @@ export default function TarjetaProducto({ producto }: TarjetaProductoProps) {
             disabled={agregando || agotado}
             aria-label={agotado ? `${producto.nombre} agotado` : `Agregar ${producto.nombre} al pedido`}
             title={agotado ? 'Sin stock disponible' : undefined}
-            className={`w-10 h-10 rounded-full transition-colors duration-200 flex items-center justify-center text-white shadow-sm flex-shrink-0 ${
+            style={{ width: 36, height: 36, minWidth: 36, minHeight: 36 }}
+            className={`rounded-full transition-colors duration-200 flex items-center justify-center text-white shadow-sm flex-shrink-0 ${
               agotado
                 ? 'bg-[#1A1A1A]/20 cursor-not-allowed'
                 : agregado

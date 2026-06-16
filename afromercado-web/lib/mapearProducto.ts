@@ -26,6 +26,16 @@ interface ComercioCrudo {
   totalReviews?: number
 }
 
+interface OfertaCruda {
+  id?:          number | string
+  tipo:        string
+  valor:       number | string
+  etiqueta?:   string | null
+  fin?:        string
+  stockLimite?: number | null
+  stockUsado?: number
+}
+
 export interface ProductoCrudo {
   id?: number | string
   comercioId?: number | string
@@ -44,6 +54,7 @@ export interface ProductoCrudo {
   imagenes?: string[] | null
   activo?: boolean
   comercio?: ComercioCrudo | null
+  ofertas?: OfertaCruda[] | null
 }
 
 /** Convierte un valor numérico o string a number, con fallback. */
@@ -94,6 +105,29 @@ export function mapearProducto(crudo: ProductoCrudo): Producto {
     },
     categoriaId: aId(crudo.categoriaId) || undefined,
     comercioId: aId(crudo.comercioId) || undefined,
+    oferta: (() => {
+      const o = crudo.ofertas?.[0]
+      if (!o) return undefined
+      const stockLimite = o.stockLimite ?? null
+      const stockUsado = aNumero(o.stockUsado)
+      if (stockLimite !== null && stockUsado >= stockLimite) return undefined
+      const precio = aNumero(crudo.precio)
+      const valor  = aNumero(o.valor)
+      const tipo   = o.tipo as 'PORCENTAJE' | 'VALOR_FIJO'
+      const precioFinal = tipo === 'PORCENTAJE'
+        ? Math.round(precio * (1 - valor / 100))
+        : Math.max(0, Math.round(precio - valor))
+      return {
+        id:          o.id !== undefined && o.id !== null ? Number(o.id) : undefined,
+        tipo,
+        valor,
+        etiqueta:    o.etiqueta ?? undefined,
+        precioFinal,
+        fin:         o.fin ?? '',
+        stockLimite,
+        stockUsado,
+      }
+    })(),
   }
 }
 

@@ -82,6 +82,7 @@ const ProductoService = {
       if (!ALCANCES_VALIDOS.includes(datos.alcance)) throw new ErrorValidacion("Alcance inválido");
       campos.alcance = datos.alcance;
     }
+    if (datos.activo !== undefined) campos.activo = Boolean(datos.activo);
 
     return ProductoRepository.actualizar(productoId, campos);
   },

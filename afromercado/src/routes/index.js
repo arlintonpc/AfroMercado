@@ -26,6 +26,10 @@ router.use("/reviews", reviewRoutes);
 router.use("/categorias", require("./categorias.routes"));
 router.use("/pagos", require("./pago.routes"));
 router.use("/admin", require("./admin.routes"));
+router.use("/config", require("./config.routes"));
+router.use("/campanas", require("./campana.routes"));
+router.use("/ofertas",  require("./oferta.routes"));
+router.use("/upload",  require("./upload.routes"));
 // Aquí se irán sumando: /entregas
 
 module.exports = router;

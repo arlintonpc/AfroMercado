@@ -6,10 +6,14 @@ const { autenticar, autorizar } = require("../middlewares/auth");
 const router = express.Router();
 
 const ReviewController = require("../controllers/review.controller");
+const VisibilidadController = require("../controllers/visibilidad.controller");
 
 // Rutas públicas (cualquiera puede ver el catálogo)
+router.get("/destacados", VisibilidadController.listarActivas);
 router.get("/", ProductoController.listar);
 router.get("/:id", ProductoController.obtener);
+// Registra 1 vista orgánica en VistaProducto (con dedup sesionId 4h)
+router.post("/:id/vista", ProductoController.registrarVista);
 router.get("/:id/reviews", ReviewController.listar);
 
 // Rutas protegidas — solo COMERCIANTE o ADMIN

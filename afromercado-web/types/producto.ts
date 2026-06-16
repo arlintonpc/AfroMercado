@@ -28,4 +28,14 @@ export interface Producto {
   // ni los componentes ya construidos.
   categoriaId?: string
   comercioId?: string
+  oferta?: {
+    id?:         number
+    tipo:        'PORCENTAJE' | 'VALOR_FIJO'
+    valor:       number
+    etiqueta?:   string
+    precioFinal: number
+    fin:         string
+    stockLimite?: number | null
+    stockUsado:  number
+  }
 }

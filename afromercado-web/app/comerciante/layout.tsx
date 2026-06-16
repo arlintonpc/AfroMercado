@@ -82,6 +82,7 @@ export default function ComercianteLayout({
 
   const enlaces = [
     { href: '/comerciante/dashboard', etiqueta: 'Inicio' },
+    { href: '/comerciante/analytics', etiqueta: 'Analíticas' },
     { href: '/comerciante/publicar', etiqueta: 'Publicar producto' },
   ]
 

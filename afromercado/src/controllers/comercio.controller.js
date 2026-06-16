@@ -43,6 +43,202 @@ const ComercioController = {
     }
   },
 
+  // GET /comercios/mis-analiticas — analíticas completas del comerciante
+  async misAnaliticas(req, res, next) {
+    try {
+      const comercio = await ComercioService.obtenerMiComercio(req.usuario.id);
+      const comercioId = comercio.id;
+
+      const ahora = new Date();
+      const inicioMesActual = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+      const inicioMesPasado = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1);
+      const hace6Meses = new Date(ahora.getFullYear(), ahora.getMonth() - 5, 1);
+      const hace30Dias = new Date(Date.now() - 30 * 24 * 3600_000);
+      const en48h = new Date(Date.now() + 48 * 3600_000);
+      const CONFIRMADOS = ["CONFIRMADO", "ENTREGADO"];
+
+      const [
+        sumaActual,
+        sumaPasado,
+        ventasMes,
+        pedidosUrgentes,
+        productosComercio,
+        topVendidos,
+        tendenciaRaw,
+        reviewStats,
+        ofertasProximas,
+        reviewsRecientes,
+        topVistasRaw,
+      ] = await Promise.all([
+        prisma.subPedido.aggregate({
+          where: { comercioId, createdAt: { gte: inicioMesActual }, pedido: { estado: { in: CONFIRMADOS } } },
+          _sum: { neto: true },
+        }),
+        prisma.subPedido.aggregate({
+          where: { comercioId, createdAt: { gte: inicioMesPasado, lt: inicioMesActual }, pedido: { estado: { in: CONFIRMADOS } } },
+          _sum: { neto: true },
+        }),
+        prisma.subPedido.count({
+          where: { comercioId, createdAt: { gte: inicioMesActual }, pedido: { estado: { in: CONFIRMADOS } } },
+        }),
+        prisma.subPedido.count({
+          where: { comercioId, estado: { in: ["CONFIRMADO", "EN_PREPARACION"] } },
+        }),
+        prisma.producto.findMany({
+          where: { comercioId, activo: true, deletedAt: null },
+          select: { id: true, nombre: true, fotoUrl: true, precio: true, stock: true, stockReservado: true },
+        }),
+        prisma.pedidoItem.groupBy({
+          by: ["productoId"],
+          where: { subPedido: { comercioId, createdAt: { gte: hace30Dias }, pedido: { estado: { in: CONFIRMADOS } } } },
+          _sum: { cantidad: true, subtotal: true },
+          orderBy: { _sum: { subtotal: "desc" } },
+          take: 8,
+        }),
+        prisma.$queryRaw`
+          SELECT
+            TO_CHAR(s."createdAt" AT TIME ZONE 'America/Bogota', 'YYYY-MM') AS mes,
+            COALESCE(SUM(s.neto), 0)::float AS neto,
+            COUNT(*)::int AS pedidos
+          FROM "SubPedido" s
+          JOIN "Pedido" p ON p.id = s."pedidoId"
+          WHERE s."comercioId" = ${comercioId}
+            AND p.estado IN ('CONFIRMADO', 'ENTREGADO')
+            AND s."createdAt" >= ${hace6Meses}
+          GROUP BY mes
+          ORDER BY mes ASC
+        `,
+        prisma.reviewProducto.aggregate({
+          where: { producto: { comercioId } },
+          _avg: { calificacion: true },
+          _count: { _all: true },
+        }),
+        prisma.oferta.findMany({
+          where: { producto: { comercioId }, activa: true, fin: { lte: en48h, gte: ahora } },
+          include: { producto: { select: { nombre: true } } },
+          orderBy: { fin: "asc" },
+          take: 3,
+        }),
+        prisma.reviewProducto.findMany({
+          where: { producto: { comercioId } },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          include: {
+            comprador: { select: { nombre: true } },
+            producto: { select: { nombre: true } },
+          },
+        }),
+        prisma.$queryRaw`
+          SELECT "productoId"::int, COUNT(*)::int AS vistas
+          FROM "VistaProducto"
+          WHERE "comercioId" = ${comercioId}
+            AND "createdAt" >= ${hace30Dias}
+          GROUP BY "productoId"
+          ORDER BY vistas DESC
+        `,
+      ]);
+
+      const topIds = topVendidos.map((t) => t.productoId);
+      const topInfo = topIds.length
+        ? await prisma.producto.findMany({
+            where: { id: { in: topIds } },
+            select: { id: true, nombre: true, fotoUrl: true, precio: true },
+          })
+        : [];
+
+      const topMasVendidos = topVendidos.map((t) => ({
+        ...topInfo.find((p) => p.id === t.productoId),
+        cantidadVendida: t._sum.cantidad ?? 0,
+        ingresosGenerados: Number(t._sum.subtotal ?? 0),
+      }));
+
+      const stockCritico = productosComercio
+        .filter((p) => p.stock - p.stockReservado <= 3)
+        .slice(0, 5);
+
+      const vendidosSet = new Set(topIds);
+      const sinVentas = productosComercio
+        .filter((p) => !vendidosSet.has(p.id))
+        .slice(0, 5);
+
+      // Procesamiento de vistas
+      const conVistasSet = new Set(topVistasRaw.map((r) => Number(r.productoId)));
+      const topVistasIds = topVistasRaw.slice(0, 8).map((r) => Number(r.productoId));
+      const topVistasInfo = topVistasIds.length
+        ? await prisma.producto.findMany({
+            where: { id: { in: topVistasIds } },
+            select: { id: true, nombre: true, fotoUrl: true, precio: true },
+          })
+        : [];
+      const topMasVistos = topVistasRaw.slice(0, 8).map((r) => ({
+        ...topVistasInfo.find((p) => p.id === Number(r.productoId)),
+        vistas: Number(r.vistas),
+      }));
+      const sinVistas = productosComercio
+        .filter((p) => !conVistasSet.has(p.id))
+        .slice(0, 5);
+
+      const ingresosActual = Number(sumaActual._sum.neto ?? 0);
+      const ingresosPasado = Number(sumaPasado._sum.neto ?? 0);
+      const variacionPorcentaje =
+        ingresosPasado > 0
+          ? ((ingresosActual - ingresosPasado) / ingresosPasado) * 100
+          : null;
+
+      const calProm = Number(reviewStats._avg.calificacion ?? 0);
+      const totalReviews = reviewStats._count._all ?? 0;
+
+      const insights = [];
+      if (pedidosUrgentes > 0) {
+        insights.push({ tipo: "urgente", texto: `Tienes ${pedidosUrgentes} pedido${pedidosUrgentes > 1 ? "s" : ""} esperando tu atención.`, accion: { texto: "Ver pedidos", href: "/comerciante/dashboard" } });
+      }
+      if (stockCritico.length > 0) {
+        insights.push({ tipo: "alerta", texto: `${stockCritico.length} producto${stockCritico.length > 1 ? "s tienen" : " tiene"} stock bajo (≤ 3 unidades).`, accion: { texto: "Actualizar stock", href: "/comerciante/dashboard" } });
+      }
+      if (variacionPorcentaje !== null && variacionPorcentaje >= 20) {
+        insights.push({ tipo: "positivo", texto: `¡Tus ingresos subieron ${variacionPorcentaje.toFixed(0)}% comparado con el mes pasado!`, accion: null });
+      } else if (variacionPorcentaje !== null && variacionPorcentaje <= -20) {
+        insights.push({ tipo: "alerta", texto: `Tus ingresos bajaron ${Math.abs(variacionPorcentaje).toFixed(0)}% este mes. ¿Tienes ofertas activas?`, accion: { texto: "Crear oferta", href: "/comerciante/dashboard" } });
+      }
+      if (ofertasProximas.length > 0) {
+        insights.push({ tipo: "info", texto: `La oferta de "${ofertasProximas[0].producto.nombre}" vence en menos de 48 horas.`, accion: { texto: "Ver ofertas", href: "/comerciante/dashboard" } });
+      }
+      if (sinVentas.length >= 3) {
+        insights.push({ tipo: "info", texto: `${sinVentas.length} productos no tuvieron ventas este mes. Activa una oferta para moverlos.`, accion: { texto: "Ir a ofertas", href: "/comerciante/dashboard" } });
+      }
+      if (sinVistas.length >= 3) {
+        insights.push({ tipo: "info", texto: `${sinVistas.length} productos no recibieron ninguna visita este mes. Mejora sus fotos o actívalos en una oferta.`, accion: { texto: "Ver productos", href: "/comerciante/dashboard" } });
+      }
+      if (topMasVistos.length > 0 && topMasVistos[0].vistas >= 10) {
+        insights.push({ tipo: "positivo", texto: `"${topMasVistos[0].nombre}" es tu producto más visto con ${topMasVistos[0].vistas} visitas este mes.`, accion: null });
+      }
+      if (calProm >= 4.5 && totalReviews >= 5) {
+        insights.push({ tipo: "positivo", texto: `¡Tienda destacada! Tus clientes te dan ${calProm.toFixed(1)} estrellas de 5.`, accion: null });
+      }
+
+      const tendenciaMensual = tendenciaRaw.map((r) => ({
+        mes: String(r.mes),
+        neto: Number(r.neto),
+        pedidos: Number(r.pedidos),
+      }));
+
+      res.json({
+        ok: true,
+        data: {
+          resumen: { ingresosNetos: ingresosActual, ingresosMesPasado: ingresosPasado, variacionPorcentaje, ventasMes, pedidosUrgentes },
+          tendenciaMensual,
+          productos: { topMasVendidos, sinVentas, stockCritico },
+          vistas: { topMasVistos, sinVistas },
+          reputacion: { calificacionPromedio: calProm, totalReviews, reviewsRecientes },
+          ofertasProximas,
+          insights,
+        },
+      });
+    } catch (e) {
+      next(e);
+    }
+  },
+
   // GET /comercios/mis-estadisticas
   async misEstadisticas(req, res, next) {
     try {

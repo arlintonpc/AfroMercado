@@ -14,6 +14,7 @@ import {
   type ProductoCrudo,
 } from '@/lib/mapearProducto'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import { precioVigente } from '@/lib/precioProducto'
 import { useCarrito } from '@/context/CarritoContext'
 import { SeccionResenas } from '@/components/reviews/SeccionResenas'
 import type { Producto } from '@/types/producto'
@@ -158,6 +159,22 @@ export default function PaginaProducto({
     }
 
     cargar()
+
+    // Registra 1 vista orgánica (fire-and-forget, deduplicada por sesionId 4h).
+    const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+    const sesionId = (() => {
+      try {
+        let sid = sessionStorage.getItem('afm_sid')
+        if (!sid) { sid = Math.random().toString(36).slice(2); sessionStorage.setItem('afm_sid', sid) }
+        return sid
+      } catch { return undefined }
+    })()
+    fetch(`${API_URL}/productos/${id}/vista`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sesionId }),
+    }).catch(() => {})
+
     return () => {
       cancelado = true
     }
@@ -221,7 +238,13 @@ export default function PaginaProducto({
     )
   }
 
-  const disponible = Math.max(0, producto.stock - (producto.stockReservado ?? 0))
+  const stockDisponible = Math.max(0, producto.stock - (producto.stockReservado ?? 0))
+  const cupoTemporada =
+    producto.oferta?.stockLimite !== null && producto.oferta?.stockLimite !== undefined
+      ? Math.max(0, producto.oferta.stockLimite - producto.oferta.stockUsado)
+      : stockDisponible
+  const disponible = Math.min(stockDisponible, cupoTemporada)
+  const precioActual = precioVigente(producto)
   const gradiente = GRADIENTES[producto.nombre.length % GRADIENTES.length]
   // Galería: foto principal + imágenes adicionales (sin duplicar la principal).
   const galeria = (producto.fotoUrl ? [producto.fotoUrl] : []).concat(
@@ -319,7 +342,19 @@ export default function PaginaProducto({
 
               {/* 4. Precio */}
               <div>
-                <p className="text-4xl font-bold text-[#1A1A1A]">{formatearPrecio(producto.precio)}</p>
+                {producto.oferta ? (
+                  <>
+                    <span className="inline-flex items-center rounded-full bg-[#C0392B]/10 px-2.5 py-1 text-xs font-bold text-[#C0392B]">
+                      Temporada AfroMercado
+                    </span>
+                    <p className="mt-2 text-sm text-[#1A1A1A]/40 line-through">
+                      {formatearPrecio(producto.precio)}
+                    </p>
+                    <p className="text-4xl font-bold text-[#C0392B]">{formatearPrecio(precioActual)}</p>
+                  </>
+                ) : (
+                  <p className="text-4xl font-bold text-[#1A1A1A]">{formatearPrecio(producto.precio)}</p>
+                )}
                 <p className="text-sm text-[#1A1A1A]/40 mt-0.5">por {producto.unidad}</p>
               </div>
 
@@ -539,7 +574,12 @@ export default function PaginaProducto({
       {/* ——— CTA STICKY MOBILE ——— */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#1A1A1A]/10 px-4 py-3 flex items-center justify-between gap-4">
         <div>
-          <p className="text-lg font-bold text-[#1A1A1A]">{formatearPrecio(producto.precio)}</p>
+          {producto.oferta && (
+            <p className="text-[10px] font-bold uppercase tracking-wide text-[#C0392B]">Temporada</p>
+          )}
+          <p className={`text-lg font-bold ${producto.oferta ? 'text-[#C0392B]' : 'text-[#1A1A1A]'}`}>
+            {formatearPrecio(precioActual)}
+          </p>
           <p className="text-xs text-[#1A1A1A]/40">por {producto.unidad}</p>
         </div>
         <button
@@ -572,7 +612,7 @@ export default function PaginaProducto({
 
       {/* Reseñas */}
       <div className="w-full max-w-2xl mx-auto px-4 md:px-6 pb-10">
-        <SeccionResenas productoId={producto.id} />
+        <SeccionResenas productoId={Number(producto.id)} />
       </div>
 
       <Footer />

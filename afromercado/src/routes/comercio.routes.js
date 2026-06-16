@@ -4,6 +4,7 @@
 const express = require("express");
 const { autenticar, autorizar } = require("../middlewares/auth");
 const ComercioController = require("../controllers/comercio.controller");
+const VisibilidadController = require("../controllers/visibilidad.controller");
 
 const router = express.Router();
 
@@ -29,6 +30,22 @@ router.get(
   autenticar,
   autorizar("COMERCIANTE", "ADMIN"),
   ComercioController.misEstadisticas
+);
+
+// GET /comercios/mis-analiticas — analíticas completas
+router.get(
+  "/mis-analiticas",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.misAnaliticas
+);
+
+// GET /comercios/visibilidad/metricas — métricas de slots activos del propio comercio
+router.get(
+  "/visibilidad/metricas",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  VisibilidadController.metricasComerciante
 );
 
 // GET /comercios/:id — ver cualquier comercio (público)

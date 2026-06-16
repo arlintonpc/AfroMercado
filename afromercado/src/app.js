@@ -1,5 +1,5 @@
 // ============================================================
-//  AfroMercado API — Aplicación Express
+//  AfroMercado API — Aplicación Express  [vista-producto ready]
 // ============================================================
 const path = require("path");
 const express = require("express");
@@ -44,12 +44,24 @@ app.use(
   "/uploads/productos",
   express.static(path.join(__dirname, "..", "uploads", "productos"))
 );
+app.use("/uploads/campanas", (req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
+app.use(
+  "/uploads/campanas",
+  express.static(path.join(__dirname, "..", "uploads", "campanas"))
+);
 
-// Rate limiting
+// Rate limiting — se omite completamente en desarrollo para no interferir con hot-reload
+const esProd = process.env.NODE_ENV === "production";
+const saltarEnDev = () => !esProd;
+
 // Límite general para API pública: 60 peticiones por minuto
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
+  skip: saltarEnDev,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Demasiadas peticiones. Intenta en un minuto." },
@@ -59,6 +71,7 @@ const apiLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  skip: saltarEnDev,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Demasiados intentos. Espera 15 minutos." },
@@ -71,6 +84,7 @@ app.use("/api/auth", authLimiter);
 const recuperacionLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  skip: saltarEnDev,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Demasiados intentos. Espera 15 minutos." },

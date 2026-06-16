@@ -4,6 +4,8 @@ const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
 const ProductoService = require("../services/producto.service");
+const prisma = require("../config/prisma");
+const VisibilidadRepository = require("../repositories/visibilidad.repository");
 const { ErrorValidacion } = require("../utils/errores");
 
 // Carpeta pública donde se guardan las fotos de productos.
@@ -42,7 +44,7 @@ const ProductoController = {
 
   async listar(req, res, next) {
     try {
-      const { q, categoriaId, municipio, comercioId, precioMin, precioMax, alcance, pagina, porPagina } =
+      const { q, categoriaId, municipio, comercioId, precioMin, precioMax, alcance, enOferta, pagina, porPagina } =
         req.query;
       const resultado = await ProductoService.listar({
         q: q || undefined,
@@ -52,6 +54,7 @@ const ProductoController = {
         precioMin: precioMin !== undefined ? Number(precioMin) : undefined,
         precioMax: precioMax !== undefined ? Number(precioMax) : undefined,
         alcance: alcance || undefined,
+        enOferta: enOferta === "true" || enOferta === "1",
         pagina: pagina ? parseInt(pagina) : 1,
         porPagina: porPagina ? parseInt(porPagina) : 12,
       });
@@ -92,6 +95,40 @@ const ProductoController = {
     try {
       await ProductoService.desactivar(req.usuario.id, req.params.id);
       res.json({ ok: true, mensaje: "Producto desactivado correctamente" });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // POST /productos/:id/vista — público, fire-and-forget con deduplicación por sesionId (4h)
+  async registrarVista(req, res, next) {
+    try {
+      const productoId = Number(req.params.id);
+      const { sesionId } = req.body || {};
+
+      const producto = await prisma.producto.findUnique({
+        where: { id: productoId },
+        select: { comercioId: true },
+      });
+      if (!producto) return res.json({ ok: true });
+
+      if (sesionId) {
+        const hace4h = new Date(Date.now() - 4 * 3600_000);
+        const yaVisto = await prisma.vistaProducto.findFirst({
+          where: { productoId, sesionId, createdAt: { gte: hace4h } },
+          select: { id: true },
+        });
+        if (yaVisto) return res.json({ ok: true });
+      }
+
+      await prisma.vistaProducto.create({
+        data: { productoId, comercioId: producto.comercioId, sesionId: sesionId || null },
+      });
+
+      // También actualiza el contador del slot de visibilidad pagada si existe (fire-and-forget).
+      VisibilidadRepository.registrarVistaProducto(req.params.id).catch(() => {});
+
+      res.json({ ok: true });
     } catch (err) {
       next(err);
     }
