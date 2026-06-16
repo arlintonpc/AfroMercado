@@ -220,6 +220,48 @@ export async function subirImagenesProducto(
   return j.producto
 }
 
+// ── Estadísticas del comerciante ──────────────────────────────
+
+export interface ItemPedidoComerciante {
+  id: number
+  cantidad: number
+  producto: { nombre: string; fotoUrl?: string | null }
+}
+
+export interface SubPedidoComerciante {
+  id: number
+  neto: number
+  pedido: {
+    id: number
+    estado: string
+    createdAt: string
+    direccionTexto?: string | null
+    comprador?: { nombre: string; telefono?: string | null }
+  }
+  items: ItemPedidoComerciante[]
+}
+
+export interface TopProducto {
+  id: number
+  nombre: string
+  fotoUrl?: string | null
+  cantidadVendida: number
+}
+
+export interface EstadisticasComerciante {
+  ingresosNetos: number
+  porPreparar: SubPedidoComerciante[]
+  recientes: SubPedidoComerciante[]
+  topProductos: TopProducto[]
+}
+
+export async function obtenerMisEstadisticas(): Promise<EstadisticasComerciante> {
+  const res = await apiFetch<{ ok: boolean; data: EstadisticasComerciante }>(
+    '/comercios/mis-estadisticas'
+  )
+  return res.data
+}
+
 /** Quita una imagen del producto. DELETE /productos/:id/imagenes */
 export async function quitarImagenProducto(
   id: number,

@@ -23,6 +23,14 @@ router.get(
   ComercioController.miComercio
 );
 
+// GET /comercios/mis-estadisticas — dashboard del comerciante
+router.get(
+  "/mis-estadisticas",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.misEstadisticas
+);
+
 // GET /comercios/:id — ver cualquier comercio (público)
 router.get("/:id", ComercioController.obtener);
 
