@@ -104,11 +104,12 @@ model Usuario {
   tokensRecuperacion TokenRecuperacion[]
   sesionesReset      SesionReset[]
 
-  comercio    Comercio?
-  pedidos     Pedido[]
-  direcciones Direccion[]
-  carrito     CarritoItem[]
-  reviews     Review[]
+  comercio        Comercio?
+  pedidos         Pedido[]
+  direcciones     Direccion[]
+  carrito         CarritoItem[]
+  reviews         Review[]
+  reviewsProducto ReviewProducto[]
 }
 
 model Comercio {
@@ -172,6 +173,7 @@ model Producto {
   carrito          CarritoItem[]
   pedidoItems      PedidoItem[]
   historialPrecios PrecioHistorial[]
+  reviews          ReviewProducto[]
 
   @@index([comercioId, activo])
   @@index([categoriaId, activo])
@@ -341,6 +343,21 @@ model SesionReset {
   usuario Usuario @relation(fields: [usuarioId], references: [id])
 
   @@index([usuarioId])
+}
+
+model ReviewProducto {
+  id           Int      @id @default(autoincrement())
+  productoId   Int
+  compradorId  Int
+  calificacion Int
+  comentario   String?
+  createdAt    DateTime @default(now())
+
+  producto  Producto @relation(fields: [productoId], references: [id])
+  comprador Usuario  @relation(fields: [compradorId], references: [id])
+
+  @@unique([compradorId, productoId])
+  @@index([productoId])
 }
 
 model Config {

@@ -7,6 +7,7 @@ const comercioRoutes = require("./comercio.routes");
 const carritoRoutes = require("./carrito.routes");
 const pedidoRoutes = require("./pedido.routes");
 const direccionRoutes = require("./direccion.routes");
+const reviewRoutes = require("./review.routes");
 
 const router = express.Router();
 
@@ -21,6 +22,7 @@ router.use("/comercios", comercioRoutes);
 router.use("/carrito", carritoRoutes);
 router.use("/pedidos", pedidoRoutes);
 router.use("/direcciones", direccionRoutes);
+router.use("/reviews", reviewRoutes);
 router.use("/categorias", require("./categorias.routes"));
 router.use("/pagos", require("./pago.routes"));
 router.use("/admin", require("./admin.routes"));

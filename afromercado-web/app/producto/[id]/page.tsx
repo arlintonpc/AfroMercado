@@ -15,6 +15,7 @@ import {
 } from '@/lib/mapearProducto'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useCarrito } from '@/context/CarritoContext'
+import { SeccionResenas } from '@/components/reviews/SeccionResenas'
 import type { Producto } from '@/types/producto'
 
 // ——— Gradientes (mismo patrón que TarjetaProducto) ———
@@ -561,6 +562,11 @@ export default function PaginaProducto({
             </>
           )}
         </button>
+      </div>
+
+      {/* Reseñas */}
+      <div className="w-full max-w-2xl mx-auto px-4 md:px-6 pb-10">
+        <SeccionResenas productoId={producto.id} />
       </div>
 
       <Footer />

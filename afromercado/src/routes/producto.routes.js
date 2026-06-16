@@ -5,9 +5,12 @@ const { autenticar, autorizar } = require("../middlewares/auth");
 
 const router = express.Router();
 
+const ReviewController = require("../controllers/review.controller");
+
 // Rutas públicas (cualquiera puede ver el catálogo)
 router.get("/", ProductoController.listar);
 router.get("/:id", ProductoController.obtener);
+router.get("/:id/reviews", ReviewController.listar);
 
 // Rutas protegidas — solo COMERCIANTE o ADMIN
 router.post("/", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.crear);

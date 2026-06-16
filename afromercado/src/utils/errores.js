@@ -23,10 +23,15 @@ class ErrorNoEncontrado extends AppError {
   constructor(mensaje = "Recurso no encontrado") { super(mensaje, 404); }
 }
 
+class ErrorConflicto extends AppError {
+  constructor(mensaje = "Recurso ya existe") { super(mensaje, 409); }
+}
+
 module.exports = {
   AppError,
   ErrorValidacion,
   ErrorNoAutorizado,
   ErrorProhibido,
   ErrorNoEncontrado,
+  ErrorConflicto,
 };
