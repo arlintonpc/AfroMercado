@@ -2,6 +2,7 @@
 const app = require("./app");
 const config = require("./config");
 const { cerrarConexion } = require("./utils/whatsapp");
+const { iniciarCron } = require("./utils/cron");
 
 // Evitar que excepciones de Baileys/WhatsApp tumben el proceso
 process.on("uncaughtException", (err) => {
@@ -26,4 +27,5 @@ process.on("SIGINT",  () => shutdown("SIGINT"));
 app.listen(config.puerto, () => {
   console.log(`🌿 AfroMercado API corriendo en http://localhost:${config.puerto}`);
   console.log(`   Entorno: ${config.entorno}`);
+  iniciarCron();
 });

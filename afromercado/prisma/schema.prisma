@@ -37,6 +37,7 @@ enum EstadoPedido {
   PAGO_FALLIDO
   CONFIRMADO
   CANCELADO
+  EXPIRADO
   ENTREGADO
 }
 
