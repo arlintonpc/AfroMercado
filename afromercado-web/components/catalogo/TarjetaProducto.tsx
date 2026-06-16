@@ -116,9 +116,15 @@ export default function TarjetaProducto({ producto }: TarjetaProductoProps) {
 
         {/* Fila superior: comercio + verificado */}
         <div className="flex items-center justify-between mb-1">
-          <p className="text-[#52B788] text-[10px] font-semibold tracking-widest uppercase truncate mr-2">
-            {producto.comercio.nombre}
-          </p>
+          {producto.comercioId
+            ? <Link href={`/comercio/${producto.comercioId}`} onClick={e => e.stopPropagation()}
+                className="text-[#52B788] text-[10px] font-semibold tracking-widest uppercase truncate mr-2 hover:underline">
+                {producto.comercio.nombre}
+              </Link>
+            : <p className="text-[#52B788] text-[10px] font-semibold tracking-widest uppercase truncate mr-2">
+                {producto.comercio.nombre}
+              </p>
+          }
           {producto.comercio.verificado && (
             <span
               className="flex-shrink-0 w-4 h-4 rounded-full bg-[#52B788] flex items-center justify-center text-white text-[9px] font-bold leading-none"

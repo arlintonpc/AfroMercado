@@ -33,6 +33,7 @@ const ProductoRepository = {
     q,
     categoriaId,
     municipio,
+    comercioId,
     precioMin,
     precioMax,
     alcance,
@@ -79,6 +80,11 @@ const ProductoRepository = {
       };
     }
 
+    // Filtro por comercio específico (página pública del vendedor)
+    if (comercioId) {
+      where.comercioId = Number(comercioId);
+    }
+
     // Rango de precio
     if (precioMin !== undefined || precioMax !== undefined) {
       where.precio = {};
@@ -104,6 +110,7 @@ const ProductoRepository = {
         include: {
           comercio: {
             select: {
+              id: true,
               nombre: true,
               municipio: true,
               calificacion: true,

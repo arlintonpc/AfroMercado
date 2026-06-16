@@ -421,7 +421,13 @@ export default function PaginaProducto({
 
             {/* Nombre y municipio */}
             <div>
-              <p className="font-bold text-[#1A1A1A] text-base">{producto.comercio.nombre}</p>
+              {producto.comercioId
+                ? <Link href={`/comercio/${producto.comercioId}`}
+                    className="font-bold text-[#1A1A1A] text-base hover:text-[#2D6A4F] transition-colors">
+                    {producto.comercio.nombre}
+                  </Link>
+                : <p className="font-bold text-[#1A1A1A] text-base">{producto.comercio.nombre}</p>
+              }
               <p className="text-sm text-[#1A1A1A]/50 flex items-center gap-1 mt-0.5">
                 📍 {producto.comercio.municipio}
               </p>
