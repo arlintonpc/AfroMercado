@@ -51,7 +51,7 @@ export default function PaginaTemporada() {
       <main className="flex-1">
         <section className="bg-white border-b border-[#1A1A1A]/5">
           <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-10">
-            <p className="text-[#C0392B] text-xs font-semibold tracking-widest uppercase mb-2">
+            <p className="text-[#2D6A4F] text-xs font-semibold tracking-widest uppercase mb-2">
               Tiempo limitado
             </p>
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">

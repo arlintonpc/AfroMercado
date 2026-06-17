@@ -73,6 +73,15 @@ export default function Header({ itemsCarrito }: HeaderProps) {
           </div>
         </form>
 
+        <nav className="hidden lg:flex items-center gap-1 mr-3">
+          <Link
+            href="/temporada"
+            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#D4A017] hover:bg-[#D4A017]/10 flex items-center"
+          >
+            Temporada
+          </Link>
+        </nav>
+
         {/* Íconos derecha */}
         <div className="flex items-center gap-2">
           {/* Búsqueda móvil */}

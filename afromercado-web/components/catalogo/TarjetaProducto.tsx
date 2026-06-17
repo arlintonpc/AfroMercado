@@ -129,13 +129,13 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
 
         {/* Badge oferta — % descuento */}
         {producto.oferta && !agotado && !esDestacado && (
-          <span className="absolute top-3 left-3 bg-[#C0392B] text-white text-[10px] font-bold px-2.5 py-1 rounded-full leading-none">
+          <span className="absolute top-3 left-3 bg-[#2D6A4F] text-white text-[10px] font-bold px-2.5 py-1 rounded-full leading-none">
             -{descuentoPct}%
           </span>
         )}
         {/* Badge oferta secundario cuando hay destacado */}
         {producto.oferta && !agotado && esDestacado && (
-          <span className="absolute bottom-3 left-3 bg-[#C0392B] text-white text-[9px] font-bold px-2 py-0.5 rounded-full leading-none">
+          <span className="absolute bottom-3 left-3 bg-[#2D6A4F] text-white text-[9px] font-bold px-2 py-0.5 rounded-full leading-none">
             -{descuentoPct}%
           </span>
         )}
@@ -193,7 +193,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
 
         {/* Etiqueta de la oferta */}
         {producto.oferta?.etiqueta && (
-          <p className="text-[10px] text-[#C0392B] font-semibold truncate mb-1" style={{ lineHeight: '12px' }}>
+          <p className="text-[10px] text-[#2D6A4F] font-semibold truncate mb-1" style={{ lineHeight: '12px' }}>
             {producto.oferta.etiqueta}
           </p>
         )}
@@ -206,7 +206,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
                 <span className="text-xs text-[#1A1A1A]/40 line-through block" style={{ lineHeight: '14px' }}>
                   {formatearPrecio(producto.precio)}
                 </span>
-                <span className="text-xl font-bold text-[#C0392B]">{formatearPrecio(producto.oferta.precioFinal)}</span>
+                <span className="text-xl font-bold text-[#2D6A4F]">{formatearPrecio(producto.oferta.precioFinal)}</span>
                 <span className="text-xs text-[#1A1A1A]/50 ml-1">/ {producto.unidad.toLowerCase()}</span>
               </>
             ) : (

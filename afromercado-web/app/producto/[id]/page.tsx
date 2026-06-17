@@ -350,17 +350,17 @@ export default function PaginaProducto({
                 {producto.oferta ? (
                   <>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-flex items-center rounded-full bg-[#C0392B]/10 px-2.5 py-1 text-xs font-bold text-[#C0392B]">
+                      <span className="inline-flex items-center rounded-full bg-[#2D6A4F]/10 px-2.5 py-1 text-xs font-bold text-[#2D6A4F]">
                         Temporada AfroMercado
                       </span>
-                      <span className="inline-flex items-center rounded-full bg-[#C0392B] px-2.5 py-1 text-xs font-bold text-white">
+                      <span className="inline-flex items-center rounded-full bg-[#2D6A4F] px-2.5 py-1 text-xs font-bold text-white">
                         -{descuentoPct}%
                       </span>
                     </div>
                     <p className="mt-2 text-sm text-[#1A1A1A]/40 line-through">
                       {formatearPrecio(producto.precio)}
                     </p>
-                    <p className="text-4xl font-bold text-[#C0392B]">{formatearPrecio(precioActual)}</p>
+                    <p className="text-4xl font-bold text-[#2D6A4F]">{formatearPrecio(precioActual)}</p>
                   </>
                 ) : (
                   <p className="text-4xl font-bold text-[#1A1A1A]">{formatearPrecio(producto.precio)}</p>
@@ -585,9 +585,9 @@ export default function PaginaProducto({
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#1A1A1A]/10 px-4 py-3 flex items-center justify-between gap-4">
         <div>
           {producto.oferta && (
-            <p className="text-[10px] font-bold uppercase tracking-wide text-[#C0392B]">Temporada</p>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-[#2D6A4F]">Temporada</p>
           )}
-          <p className={`text-lg font-bold ${producto.oferta ? 'text-[#C0392B]' : 'text-[#1A1A1A]'}`}>
+          <p className={`text-lg font-bold ${producto.oferta ? 'text-[#2D6A4F]' : 'text-[#1A1A1A]'}`}>
             {formatearPrecio(precioActual)}
           </p>
           <p className="text-xs text-[#1A1A1A]/40">por {producto.unidad}</p>

@@ -514,7 +514,7 @@ function DashboardContenido() {
               type="button"
               onClick={() => { setMostrarFormOferta(v => !v); setErrorOferta(null) }}
               disabled={productos.length === 0}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-[#C0392B] px-3 py-1.5 rounded-xl hover:bg-[#a93226] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-[#2D6A4F] px-3 py-1.5 rounded-xl hover:bg-[#24573f] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span className="text-base leading-none">{mostrarFormOferta ? '×' : '+'}</span>
               {mostrarFormOferta ? 'Cancelar' : 'Nueva oferta'}
@@ -523,7 +523,7 @@ function DashboardContenido() {
 
           {/* Formulario nueva oferta */}
           {mostrarFormOferta && (
-            <div className="rounded-2xl border border-[#C0392B]/25 bg-[#FFF5F5] p-4 mb-4 flex flex-col gap-3">
+            <div className="rounded-2xl border border-[#2D6A4F]/25 bg-[#2D6A4F]/5 p-4 mb-4 flex flex-col gap-3">
               <p className="text-xs text-[#1A1A1A]/50">Los compradores verán el precio original tachado y el precio con descuento en el catálogo.</p>
 
               <div>
@@ -531,7 +531,7 @@ function DashboardContenido() {
                 <select
                   value={formOferta.productoId}
                   onChange={e => setFormOferta(f => ({ ...f, productoId: e.target.value }))}
-                  className="w-full rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C0392B]/30"
+                  className="w-full rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
                 >
                   <option value="">-- Selecciona un producto --</option>
                   {productos.map(p => (
@@ -567,7 +567,7 @@ function DashboardContenido() {
                     value={formOferta.valor}
                     onChange={e => setFormOferta(f => ({ ...f, valor: e.target.value }))}
                     placeholder={formOferta.tipo === 'PORCENTAJE' ? '20' : '5000'}
-                    className="w-full rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C0392B]/30"
+                    className="w-full rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
                   />
                 </div>
               </div>
@@ -580,7 +580,7 @@ function DashboardContenido() {
                   value={formOferta.etiqueta}
                   onChange={e => setFormOferta(f => ({ ...f, etiqueta: e.target.value }))}
                   placeholder="Ej: Oferta de lanzamiento, Temporada de cosecha…"
-                  className="w-full rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C0392B]/30"
+                  className="w-full rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
                 />
               </div>
 
@@ -591,7 +591,7 @@ function DashboardContenido() {
                     type="datetime-local"
                     value={formOferta.inicio}
                     onChange={e => setFormOferta(f => ({ ...f, inicio: e.target.value }))}
-                    className="w-full rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C0392B]/30"
+                    className="w-full rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
                   />
                 </div>
                 <div>
@@ -600,7 +600,7 @@ function DashboardContenido() {
                     type="datetime-local"
                     value={formOferta.fin}
                     onChange={e => setFormOferta(f => ({ ...f, fin: e.target.value }))}
-                    className="w-full rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C0392B]/30"
+                    className="w-full rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
                   />
                 </div>
               </div>
@@ -615,7 +615,7 @@ function DashboardContenido() {
                   value={formOferta.stockLimite}
                   onChange={e => setFormOferta(f => ({ ...f, stockLimite: e.target.value }))}
                   placeholder="Sin límite"
-                  className="w-full rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C0392B]/30"
+                  className="w-full rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
                 />
               </div>
 
@@ -628,7 +628,7 @@ function DashboardContenido() {
                   type="button"
                   onClick={crearOferta}
                   disabled={creandoOferta}
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-[#C0392B] px-5 py-2.5 rounded-xl hover:bg-[#a93226] disabled:opacity-50 transition-colors"
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-[#2D6A4F] px-5 py-2.5 rounded-xl hover:bg-[#24573f] disabled:opacity-50 transition-colors"
                 >
                   {creandoOferta ? 'Publicando…' : 'Publicar oferta'}
                 </button>
@@ -655,8 +655,8 @@ function DashboardContenido() {
                   <li key={o.id} className="flex items-center gap-3 bg-white rounded-xl border border-[#1A1A1A]/5 px-4 py-3">
                     {o.producto.fotoUrl
                       ? <img src={o.producto.fotoUrl} alt={o.producto.nombre} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
-                      : <div className="w-10 h-10 rounded-lg bg-[#C0392B]/8 flex items-center justify-center flex-shrink-0">
-                          <span className="text-[#C0392B] text-base font-bold">%</span>
+                      : <div className="w-10 h-10 rounded-lg bg-[#2D6A4F]/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[#2D6A4F] text-base font-bold">%</span>
                         </div>
                     }
                     <div className="flex-1 min-w-0">

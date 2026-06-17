@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import Image from 'next/image'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
@@ -9,10 +10,22 @@ import FiltrosHorizontales from '@/components/catalogo/FiltrosHorizontales'
 import TarjetaProducto from '@/components/catalogo/TarjetaProducto'
 import { SkeletonCard, EmptyState } from '@/components/ui'
 import { listarProductos, listarCategorias } from '@/lib/api/productos'
-import { mapearProductos } from '@/lib/mapearProducto'
+import { mapearProductos, type ProductoCrudo } from '@/lib/mapearProducto'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import { precioVigente } from '@/lib/precioProducto'
 import type { Producto } from '@/types/producto'
 import type { Categoria } from '@/types/categoria'
+
+/* ─── Utilidad: tiempo restante hasta fin de oferta ─── */
+function tiempoRestante(fin: string): string {
+  const ms = new Date(fin).getTime() - Date.now()
+  if (ms <= 0) return 'Expirada'
+  const h = Math.floor(ms / 3_600_000)
+  const m = Math.floor((ms % 3_600_000) / 60_000)
+  if (h >= 24) return `${Math.floor(h / 24)}d restantes`
+  if (h >= 1)  return `${h}h ${m}m restantes`
+  return `${m} min restantes`
+}
 
 /* ─── Datos estáticos de presentación de categorías (solo visual) ──── */
 const CATEGORIAS = [
@@ -22,6 +35,18 @@ const CATEGORIAS = [
   { emoji: '🏞️', nombre: 'Turismo',     fondo: 'bg-[#EEF3FF]', texto: 'text-[#2A4AB8]', proximamente: true  },
   { emoji: '🎭', nombre: 'Cultural',     fondo: 'bg-[#F5EEF8]', texto: 'text-[#7A2AB8]', proximamente: true  },
 ]
+
+interface VisibilidadActiva {
+  tipo?: 'HOME_DESTACADO' | 'CATALOGO' | string
+  etiqueta?: string | null
+  producto?: ProductoCrudo | null
+}
+
+function visibilidadConProducto(
+  v: VisibilidadActiva,
+): v is VisibilidadActiva & { producto: ProductoCrudo } {
+  return Boolean(v.producto)
+}
 
 /* ─── Componente SeccionCategorias ──────────────────────────────── */
 function SeccionCategorias() {
@@ -63,11 +88,16 @@ function SeccionCategorias() {
 }
 
 /* ─── Componente SeccionDestacados ──────────────────────────────── */
-function SeccionDestacados({ productos }: { productos: Producto[] }) {
-  // Top 3 por ventas. Si no hay nada, la sección no se renderiza.
-  const top3 = [...productos]
+function SeccionDestacados({ productos, destacadosPagados, etiquetasPagadas }: {
+  productos: Producto[]
+  destacadosPagados: Producto[]
+  etiquetasPagadas: Map<string, string>
+}) {
+  const idsDestacados = new Set(destacadosPagados.map(p => p.id))
+  const topVentas = [...productos]
+    .filter(p => !idsDestacados.has(p.id))
     .sort((a, b) => b.comercio.totalVentas - a.comercio.totalVentas)
-    .slice(0, 3)
+  const top3 = [...destacadosPagados.slice(0, 2), ...topVentas].slice(0, 3)
 
   if (top3.length === 0) return null
 
@@ -91,9 +121,14 @@ function SeccionDestacados({ productos }: { productos: Producto[] }) {
         {/* Cards horizontales */}
         <div className="flex flex-col md:flex-row gap-4">
           {top3.map((producto) => (
-            <div
+            <Link
               key={producto.id}
-              className="flex-1 bg-white rounded-2xl p-3 shadow-sm hover:shadow-md transition-shadow duration-200 flex items-center gap-3"
+              href={`/producto/${producto.id}`}
+              className={`flex-1 rounded-2xl p-3 transition-shadow duration-200 flex items-center gap-3 ${
+                idsDestacados.has(producto.id)
+                  ? 'bg-white shadow-[0_2px_12px_rgba(45,106,79,0.18)] ring-2 ring-[#2D6A4F]/35 hover:shadow-[0_4px_20px_rgba(45,106,79,0.25)]'
+                  : 'bg-white shadow-sm hover:shadow-md'
+              }`}
             >
               {/* Imagen / placeholder cuadrado */}
               <div className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 bg-[#F0EBE3] flex items-center justify-center relative">
@@ -125,21 +160,112 @@ function SeccionDestacados({ productos }: { productos: Producto[] }) {
                 </p>
                 <div className="flex items-center gap-2">
                   <span className="text-[#2D6A4F] text-sm font-bold">
-                    {formatearPrecio(producto.precio)}
+                    {formatearPrecio(precioVigente(producto))}
                   </span>
-                  {producto.comercio.totalVentas > 0 && (
+                  {idsDestacados.has(producto.id) ? (
+                    <span className="flex items-center gap-0.5 bg-[#2D6A4F] text-white text-[10px] font-bold px-2 py-0.5 rounded-full leading-none">
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M17 8C8 10 5.9 16.17 3.82 19.52 3.23 20.5 4.5 21.5 5.3 20.67 7 18.9 8.91 17.5 11 17c-1 3-4 4-4 4s6 0 9-8c1.5 2 2 3.5 2 5.5 0 0 2-10-1-10.5z"/>
+                      </svg>
+                      {etiquetasPagadas.get(producto.id) ?? 'Selección Chocó'}
+                    </span>
+                  ) : producto.comercio.totalVentas > 0 ? (
                     <span className="bg-[#D4A017]/15 text-[#B8860B] text-[10px] font-semibold px-2 py-0.5 rounded-full leading-none">
                       {producto.comercio.totalVentas} ventas
                     </span>
-                  )}
+                  ) : null}
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </div>
     </section>
   )
+}
+
+/* ─── Sección: Temporada AfroMercado ────────────────────────────── */
+function SeccionOfertas({ productos }: { productos: Producto[] }) {
+  const conOferta = productos.filter(p => p.oferta)
+  if (conOferta.length === 0) return null
+  return (
+    <section className="bg-white py-10">
+      <div className="max-w-7xl mx-auto px-4 md:px-6">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <p className="text-[#2D6A4F] text-xs font-semibold tracking-widest uppercase mb-1">
+              Tiempo limitado
+            </p>
+            <h2 className="text-2xl md:text-3xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif)' }}>
+              Temporada AfroMercado
+            </h2>
+            <p className="mt-1 text-sm text-[#1A1A1A]/50">
+              Productos con precio especial por tiempo limitado.
+            </p>
+          </div>
+          <Link href="/temporada" className="text-sm text-[#2D6A4F] font-semibold hover:underline hidden md:block">
+            Ver temporada →
+          </Link>
+        </div>
+
+        <div
+          className="flex gap-4 overflow-x-auto pb-2"
+          style={{ scrollbarWidth: 'none' } as React.CSSProperties}
+        >
+          {conOferta.map(p => (
+            <Link
+              key={p.id}
+              href={`/producto/${p.id}`}
+              className="flex-shrink-0 w-48 rounded-2xl border border-[#2D6A4F]/15 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden group"
+            >
+              {/* Imagen */}
+              <div className="relative w-full aspect-square bg-[#F0EBE3] overflow-hidden">
+                {p.fotoUrl ? (
+                  <Image src={p.fotoUrl} alt={p.nombre} fill sizes="192px" className="object-cover group-hover:scale-[1.03] transition-transform duration-300" />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center px-3 text-center">
+                    <span className="text-[#2D6A4F] text-sm font-normal" style={{ fontFamily: 'var(--font-dm-serif)' }}>{p.nombre}</span>
+                  </div>
+                )}
+                <span className="absolute top-2 left-2 bg-[#2D6A4F] text-white text-[10px] font-bold px-2 py-0.5 rounded-full leading-none">
+                  {p.oferta!.tipo === 'PORCENTAJE' ? `-${Math.round(p.oferta!.valor)}%` : 'TEMPORADA'}
+                </span>
+              </div>
+              {/* Info */}
+              <div className="px-3 py-2.5">
+                <p className="text-[10px] text-[#52B788] font-semibold uppercase tracking-wide truncate mb-0.5">{p.comercio.nombre}</p>
+                <p className="text-sm font-semibold text-[#1A1A1A] truncate mb-1">{p.nombre}</p>
+                {p.oferta?.etiqueta && (
+                  <p className="text-[10px] text-[#2D6A4F] font-medium truncate mb-1">{p.oferta.etiqueta}</p>
+                )}
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-base font-bold text-[#2D6A4F]">{formatearPrecio(p.oferta!.precioFinal)}</span>
+                  <span className="text-xs text-[#1A1A1A]/40 line-through">{formatearPrecio(p.precio)}</span>
+                </div>
+                {p.oferta?.fin && (
+                  <p className="text-[9px] text-[#1A1A1A]/35 mt-1 flex items-center gap-0.5">
+                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    {tiempoRestante(p.oferta.fin)}
+                  </p>
+                )}
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* ─── Intercalación: 1 destacado cada 4 orgánicos ───────────────── */
+function intercalarDestacados<T>(pagados: T[], organicos: T[]): T[] {
+  const result: T[] = []
+  let pi = 0, oi = 0
+  while (pi < pagados.length || oi < organicos.length) {
+    if (pi < pagados.length) result.push(pagados[pi++])
+    for (let i = 0; i < 4 && oi < organicos.length; i++) result.push(organicos[oi++])
+  }
+  return result
 }
 
 /* ─── Página principal ───────────────────────────────────────────── */
@@ -149,9 +275,11 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [productos, setProductos] = useState<Producto[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
-  // Destacados: se cargan una vez (todos los productos) y se conservan
-  // aunque el usuario filtre por categoría.
   const [destacados, setDestacados] = useState<Producto[]>([])
+  const [destHome, setDestHome] = useState<Producto[]>([])
+  const [destHomeEtiquetas, setDestHomeEtiquetas] = useState<Map<string, string>>(new Map())
+  // Map: productoId (string) → etiqueta del sello (o "Selección Chocó" si null)
+  const [destCatalogo, setDestCatalogo] = useState<Map<string, string>>(new Map())
 
   /** Carga productos según el filtro de categoría activo. */
   const cargarProductos = useCallback(async (filtro: string) => {
@@ -182,22 +310,68 @@ export default function Home() {
         if (!cancelado) setCategorias([])
       }
 
-      // Destacados: todos los productos ordenados por ventas (top 3).
+      // Todos los productos para la sección de más vendidos
       try {
         const { items } = await listarProductos({ porPagina: 50 })
         if (!cancelado) setDestacados(mapearProductos(items))
       } catch {
         if (!cancelado) setDestacados([])
       }
+
+      // Visibilidades pagadas activas (HOME_DESTACADO y CATALOGO)
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+        const r = await fetch(`${API_URL}/productos/destacados`)
+        if (r.ok) {
+          const j = await r.json()
+          const visibilidades: VisibilidadActiva[] = Array.isArray(j.items) ? j.items : []
+          const homeProds = visibilidades
+            .filter((v): v is VisibilidadActiva & { producto: ProductoCrudo } => (
+              v.tipo === 'HOME_DESTACADO' && visibilidadConProducto(v)
+            ))
+            .map(v => v.producto)
+          const catalogoMap = new Map<string, string>(
+            visibilidades
+              .filter((v): v is VisibilidadActiva & { producto: ProductoCrudo } => (
+                v.tipo === 'CATALOGO' && visibilidadConProducto(v)
+              ))
+              .map(v => [String(v.producto.id), v.etiqueta?.trim() || 'Selección Chocó'] as [string, string])
+          )
+          const homeEtiquetas = new Map<string, string>(
+            visibilidades
+              .filter((v): v is VisibilidadActiva & { producto: ProductoCrudo } => (
+                v.tipo === 'HOME_DESTACADO' && visibilidadConProducto(v)
+              ))
+              .map(v => [String(v.producto.id), v.etiqueta?.trim() || 'Selección Chocó'] as [string, string])
+          )
+          if (!cancelado) {
+            setDestHome(mapearProductos(homeProds.filter(Boolean) as ProductoCrudo[]))
+            setDestHomeEtiquetas(homeEtiquetas)
+            setDestCatalogo(catalogoMap)
+          }
+        }
+      } catch {
+        if (!cancelado) { setDestHome([]); setDestCatalogo(new Map()) }
+      }
     }
 
     cargarInicial()
-    cargarProductos('todos')
+    listarProductos({ porPagina: 24 })
+      .then(({ items }) => {
+        if (!cancelado) setProductos(mapearProductos(items))
+      })
+      .catch((e) => {
+        if (!cancelado) {
+          setError(e instanceof Error ? e.message : 'No se pudieron cargar los productos.')
+          setProductos([])
+        }
+      })
+      .finally(() => { if (!cancelado) setCargando(false) })
 
     return () => {
       cancelado = true
     }
-  }, [cargarProductos])
+  }, [])
 
   function handleFiltroChange(filtro: string) {
     setFiltroActivo(filtro)
@@ -210,13 +384,17 @@ export default function Home() {
       <main className="flex-1">
 
         {/* Hero */}
-        <HeroBanner />
+        <HeroBanner productos={destacados} />
 
         {/* Categorías */}
         <SeccionCategorias />
 
+        {/* Mejores precios */}
+        <SeccionOfertas productos={productos} />
+
         {/* Destacados */}
-        <SeccionDestacados productos={destacados} />
+        <SeccionDestacados productos={destacados} destacadosPagados={destHome} etiquetasPagadas={destHomeEtiquetas} />
+
 
         {/* Catálogo completo */}
         <section id="catalogo" className="max-w-7xl mx-auto w-full px-4 md:px-6 py-10 flex flex-col gap-6">
@@ -273,11 +451,19 @@ export default function Home() {
             />
           )}
 
-          {/* Grid de productos */}
+          {/* Grid — destacados intercalados: 1 pagado cada 4 orgánicos */}
           {!cargando && !error && productos.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {productos.map((producto) => (
-                <TarjetaProducto key={producto.id} producto={producto} />
+              {intercalarDestacados(
+                productos.filter(p => destCatalogo.has(p.id)),
+                productos.filter(p => !destCatalogo.has(p.id)),
+              ).map(producto => (
+                <TarjetaProducto
+                  key={producto.id}
+                  producto={producto}
+                  esDestacado={destCatalogo.has(producto.id)}
+                  etiquetaDestacado={destCatalogo.get(producto.id)}
+                />
               ))}
             </div>
           )}
