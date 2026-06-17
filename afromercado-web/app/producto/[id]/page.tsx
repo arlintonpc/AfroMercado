@@ -245,6 +245,11 @@ export default function PaginaProducto({
       : stockDisponible
   const disponible = Math.min(stockDisponible, cupoTemporada)
   const precioActual = precioVigente(producto)
+  const descuentoPct = producto.oferta
+    ? producto.oferta.tipo === 'PORCENTAJE'
+      ? Math.round(producto.oferta.valor)
+      : Math.round(((producto.precio - producto.oferta.precioFinal) / producto.precio) * 100)
+    : 0
   const gradiente = GRADIENTES[producto.nombre.length % GRADIENTES.length]
   // Galería: foto principal + imágenes adicionales (sin duplicar la principal).
   const galeria = (producto.fotoUrl ? [producto.fotoUrl] : []).concat(
@@ -344,9 +349,14 @@ export default function PaginaProducto({
               <div>
                 {producto.oferta ? (
                   <>
-                    <span className="inline-flex items-center rounded-full bg-[#C0392B]/10 px-2.5 py-1 text-xs font-bold text-[#C0392B]">
-                      Temporada AfroMercado
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center rounded-full bg-[#C0392B]/10 px-2.5 py-1 text-xs font-bold text-[#C0392B]">
+                        Temporada AfroMercado
+                      </span>
+                      <span className="inline-flex items-center rounded-full bg-[#C0392B] px-2.5 py-1 text-xs font-bold text-white">
+                        -{descuentoPct}%
+                      </span>
+                    </div>
                     <p className="mt-2 text-sm text-[#1A1A1A]/40 line-through">
                       {formatearPrecio(producto.precio)}
                     </p>
