@@ -94,6 +94,7 @@ model Usuario {
   nombre       String
   email        String    @unique
   telefono     String?
+  avatarUrl    String?
   passwordHash String
   rol          Rol       @default(COMPRADOR)
   activo       Boolean   @default(true)
@@ -121,6 +122,9 @@ model Usuario {
   favoritos            Favorito[]
   busquedasHistorial   BusquedaHistorial[]
   vistasProducto       VistaProducto[]
+  cuponUsos            CuponUso[]
+  conversaciones       Conversacion[]      @relation("ConversacionComprador")
+  mensajes             Mensaje[]
 }
 
 model Comercio {
@@ -149,6 +153,7 @@ model Comercio {
   reviews       Review[]
   visibilidades VisibilidadPagada[]
   vistasProductos VistaProducto[]
+  conversaciones  Conversacion[]
 }
 
 model Categoria {
@@ -254,10 +259,15 @@ model Pedido {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
+  cuponId        Int?
+  cuponDescuento Decimal? @db.Decimal(12, 2)
+
   comprador  Usuario    @relation(fields: [compradorId], references: [id])
   direccion  Direccion? @relation(fields: [direccionId], references: [id])
   subPedidos SubPedido[]
   pagos      Pago[]
+  cuponUso   CuponUso?
+  cupon      Cupon?     @relation(fields: [cuponId], references: [id], onDelete: SetNull)
 }
 
 model SubPedido {
@@ -489,6 +499,87 @@ model CampanaHero {
 
   @@index([activa, fin])
 }
+
+// ─── FASE 2 ───────────────────────────────────────────────────
+
+model Cupon {
+  id           Int        @id @default(autoincrement())
+  codigo       String     @unique
+  tipo         TipoOferta
+  valor        Decimal    @db.Decimal(10, 2)
+  minimoCompra Decimal?   @db.Decimal(12, 2)
+  usosMaximos  Int?
+  usosActuales Int        @default(0)
+  activo       Boolean    @default(true)
+  inicio       DateTime
+  fin          DateTime
+  soloNuevos   Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+
+  pedidos Pedido[]
+  usos    CuponUso[]
+
+  @@index([codigo, activo])
+  @@index([activo, fin])
+}
+
+model CuponUso {
+  id        Int      @id @default(autoincrement())
+  cuponId   Int
+  usuarioId Int
+  pedidoId  Int      @unique
+  createdAt DateTime @default(now())
+
+  cupon   Cupon   @relation(fields: [cuponId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  pedido  Pedido  @relation(fields: [pedidoId], references: [id])
+
+  @@index([cuponId, usuarioId])
+}
+
+model Conversacion {
+  id           Int       @id @default(autoincrement())
+  compradorId  Int
+  comercioId   Int
+  ultimoMensAt DateTime?
+  createdAt    DateTime  @default(now())
+
+  comprador Usuario  @relation("ConversacionComprador", fields: [compradorId], references: [id])
+  comercio  Comercio @relation(fields: [comercioId], references: [id])
+  mensajes  Mensaje[]
+
+  @@unique([compradorId, comercioId])
+  @@index([compradorId, ultimoMensAt])
+  @@index([comercioId, ultimoMensAt])
+}
+
+model Mensaje {
+  id             Int      @id @default(autoincrement())
+  conversacionId Int
+  autorId        Int
+  contenido      String
+  leido          Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  conversacion Conversacion @relation(fields: [conversacionId], references: [id])
+  autor        Usuario      @relation(fields: [autorId], references: [id])
+
+  @@index([conversacionId, createdAt])
+  @@index([autorId])
+}
+
+model TarifaEnvio {
+  id           Int     @id @default(autoincrement())
+  departamento String
+  pesoMaxKg    Decimal @db.Decimal(6, 2)
+  precio       Decimal @db.Decimal(10, 2)
+  activa       Boolean @default(true)
+
+  @@unique([departamento, pesoMaxKg])
+  @@index([departamento, activa])
+}
+
+// ──────────────────────────────────────────────────────────────
 
 model VisibilidadPagada {
   id         Int      @id @default(autoincrement())

@@ -13,6 +13,12 @@ import type { Producto } from '@/types/producto'
  * Este módulo normaliza esa forma cruda al tipo `Producto` que consumen las
  * tarjetas, la home y la página de detalle, sin tocar el diseño visual.
  */
+interface CategoriaCruda {
+  id?: number | string
+  nombre?: string
+  slug?: string
+}
+
 interface ComercioCrudo {
   id?: number | string
   nombre?: string
@@ -54,6 +60,7 @@ export interface ProductoCrudo {
   imagenes?: string[] | null
   activo?: boolean
   comercio?: ComercioCrudo | null
+  categoria?: CategoriaCruda | null
   ofertas?: OfertaCruda[] | null
 }
 
@@ -105,6 +112,9 @@ export function mapearProducto(crudo: ProductoCrudo): Producto {
     },
     categoriaId: aId(crudo.categoriaId) || undefined,
     comercioId: aId(crudo.comercioId) || undefined,
+    categoria: crudo.categoria
+      ? { id: aId(crudo.categoria.id), nombre: crudo.categoria.nombre ?? '', slug: crudo.categoria.slug }
+      : undefined,
     oferta: (() => {
       const o = crudo.ofertas?.[0]
       if (!o) return undefined

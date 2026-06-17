@@ -10,7 +10,7 @@ const ComercioRepository = {
   },
 
   async buscarPorId(id) {
-    return prisma.comercio.findUnique({ where: { id } });
+    return prisma.comercio.findUnique({ where: { id: Number(id) } });
   },
 
   async crear(data) {
@@ -18,7 +18,7 @@ const ComercioRepository = {
   },
 
   async actualizar(id, data) {
-    return prisma.comercio.update({ where: { id }, data });
+    return prisma.comercio.update({ where: { id: Number(id) }, data });
   },
 
   async listar({ municipio, pagina = 1, porPagina = 20 } = {}) {

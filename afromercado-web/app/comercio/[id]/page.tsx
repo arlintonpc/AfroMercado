@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
@@ -9,6 +10,9 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { mapearProductos } from '@/lib/mapearProducto'
 import type { Producto } from '@/types/producto'
+import { listarReviewsTienda, type ReviewTienda } from '@/lib/api/reviewsTienda'
+import { useAuth } from '@/context/AuthContext'
+import { iniciarConversacion } from '@/lib/api/chat'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
 
@@ -39,7 +43,7 @@ async function fetchProductos(comercioId: number): Promise<Producto[]> {
   })
   if (!r.ok) return []
   const j = await r.json()
-  return mapearProductos(j?.productos ?? [])
+  return mapearProductos(j?.items ?? [])
 }
 
 // ── Estrellas ─────────────────────────────────────────────────
@@ -58,7 +62,7 @@ function Estrellas({ valor }: { valor: number }) {
 
 // ── Cabecera del comercio ─────────────────────────────────────
 
-function CabeceraComercio({ c }: { c: ComercioPublico }) {
+function CabeceraComercio({ c, onChatear }: { c: ComercioPublico; onChatear?: () => void }) {
   const cal = Number(c.calificacion)
   const mensajeWa = `Hola, vi tu tienda "${c.nombre}" en AfroMercado y me gustaría hacer un pedido.`
   const waUrl = c.whatsapp
@@ -138,20 +142,189 @@ function CabeceraComercio({ c }: { c: ComercioPublico }) {
         </details>
       )}
 
-      {waUrl && (
-        <a
-          href={waUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-          </svg>
-          Contactar por WhatsApp
-        </a>
+      {(waUrl || onChatear) && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {waUrl && (
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+              </svg>
+              Contactar por WhatsApp
+            </a>
+          )}
+          {onChatear && (
+            <button
+              onClick={onChatear}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#2D6A4F] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Chatear con el comercio
+            </button>
+          )}
+        </div>
       )}
     </section>
+  )
+}
+
+// ── Estrellas interactivas ────────────────────────────────────
+
+function EstrellasInteractivas({
+  valor,
+  onChange,
+}: {
+  valor: number
+  onChange: (v: number) => void
+}) {
+  const [hover, setHover] = useState(0)
+  return (
+    <span className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onChange(i)}
+          onMouseEnter={() => setHover(i)}
+          onMouseLeave={() => setHover(0)}
+          className="focus:outline-none"
+          aria-label={`${i} estrella${i > 1 ? 's' : ''}`}
+        >
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill={i <= (hover || valor) ? '#D4A017' : 'none'}
+            stroke="#D4A017"
+            strokeWidth="1.5"
+          >
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+          </svg>
+        </button>
+      ))}
+    </span>
+  )
+}
+
+// ── Iniciales del comprador ───────────────────────────────────
+
+function Iniciales({ nombre }: { nombre: string }) {
+  const partes = nombre.trim().split(/\s+/)
+  const letras =
+    partes.length >= 2
+      ? partes[0][0] + partes[1][0]
+      : partes[0].slice(0, 2)
+  return (
+    <div className="w-9 h-9 rounded-full bg-[#52B788]/20 flex items-center justify-center flex-shrink-0">
+      <span className="text-sm font-bold text-[#2D6A4F] uppercase">{letras}</span>
+    </div>
+  )
+}
+
+// ── Fecha relativa ────────────────────────────────────────────
+
+function fechaRelativa(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const dias = Math.floor(diff / 86400000)
+  if (dias === 0) return 'Hoy'
+  if (dias === 1) return 'Ayer'
+  if (dias < 30) return `Hace ${dias} días`
+  const meses = Math.floor(dias / 30)
+  if (meses < 12) return `Hace ${meses} ${meses === 1 ? 'mes' : 'meses'}`
+  const anos = Math.floor(meses / 12)
+  return `Hace ${anos} ${anos === 1 ? 'año' : 'años'}`
+}
+
+// ── Sección de reseñas de tienda ──────────────────────────────
+
+function SeccionResenas({ comercioId }: { comercioId: number }) {
+  const [reviews, setReviews] = useState<ReviewTienda[]>([])
+  const [promedio, setPromedio] = useState<number | null>(null)
+  const [total, setTotal] = useState(0)
+  const [cargando, setCargando] = useState(true)
+
+  useEffect(() => {
+    let activo = true
+    listarReviewsTienda(comercioId)
+      .then((d) => {
+        if (!activo) return
+        setReviews(d.reviews)
+        setPromedio(d.promedio)
+        setTotal(d.total)
+      })
+      .catch(() => {})
+      .finally(() => { if (activo) setCargando(false) })
+    return () => { activo = false }
+  }, [comercioId])
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">Reseñas de clientes</h2>
+
+      {cargando ? (
+        <div className="flex flex-col gap-3">
+          {[1, 2].map((i) => (
+            <div key={i} className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-4 flex gap-3">
+              <Skeleton className="w-9 h-9 rounded-full flex-shrink-0" />
+              <div className="flex-1">
+                <Skeleton className="h-3 w-24 mb-2" />
+                <Skeleton className="h-3 w-40" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : reviews.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 text-center text-sm text-[#1A1A1A]/45">
+          Aún no hay reseñas para este comercio
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {promedio !== null && (
+            <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 px-5 py-4 flex items-center gap-3">
+              <span
+                className="text-3xl font-bold text-[#1A1A1A]"
+                style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
+              >
+                {promedio.toFixed(1)}
+              </span>
+              <div>
+                <Estrellas valor={promedio} />
+                <p className="text-xs text-[#1A1A1A]/45 mt-0.5">
+                  {total} {total === 1 ? 'reseña' : 'reseñas'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {reviews.map((r) => (
+            <div
+              key={r.id}
+              className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-4 flex gap-3"
+            >
+              <Iniciales nombre={r.comprador.nombre} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-[#1A1A1A]">
+                    {r.comprador.nombre}
+                  </span>
+                  <span className="text-xs text-[#1A1A1A]/40">{fechaRelativa(r.createdAt)}</span>
+                </div>
+                <Estrellas valor={r.calificacion} />
+                {r.comentario && (
+                  <p className="text-sm text-[#1A1A1A]/70 mt-1 leading-relaxed">{r.comentario}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -159,10 +332,24 @@ function CabeceraComercio({ c }: { c: ComercioPublico }) {
 
 export default function PaginaComercio({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const router = useRouter()
+  const { usuario, autenticado } = useAuth()
   const [comercio, setComercio] = useState<ComercioPublico | null>(null)
   const [productos, setProductos] = useState<Producto[]>([])
   const [cargando, setCargando] = useState(true)
   const [noEncontrado, setNoEncontrado] = useState(false)
+
+  const esComprador = autenticado && usuario?.rol === 'COMPRADOR'
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null)
+  const [orden, setOrden] = useState<'recientes' | 'precio-asc' | 'precio-desc'>('recientes')
+
+  async function handleChatear() {
+    if (!comercio) return
+    try {
+      const conv = await iniciarConversacion(comercio.id)
+      router.push(`/chat?c=${conv.id}`)
+    } catch { /* silencioso */ }
+  }
 
   useEffect(() => {
     let activo = true
@@ -178,6 +365,33 @@ export default function PaginaComercio({ params }: { params: Promise<{ id: strin
     cargar()
     return () => { activo = false }
   }, [id])
+
+  // Extrae categorías únicas de los productos cargados
+  const categoriasDisponibles = (() => {
+    const mapa = new Map<string, string>()
+    productos.forEach(p => {
+      if (p.categoriaId && p.categoria?.nombre) {
+        mapa.set(p.categoriaId, p.categoria.nombre)
+      }
+    })
+    return Array.from(mapa.entries()).map(([id, nombre]) => ({ id, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre))
+  })()
+
+  const productosVisibles = (() => {
+    let lista = categoriaFiltro
+      ? productos.filter(p => p.categoriaId === categoriaFiltro)
+      : productos
+
+    if (orden === 'precio-asc') {
+      lista = [...lista].sort((a, b) => (a.oferta?.precioFinal ?? a.precio) - (b.oferta?.precioFinal ?? b.precio))
+    } else if (orden === 'precio-desc') {
+      lista = [...lista].sort((a, b) => (b.oferta?.precioFinal ?? b.precio) - (a.oferta?.precioFinal ?? a.precio))
+    }
+    // 'recientes' mantiene el orden original del API
+
+    return lista
+  })()
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F5F0]">
@@ -211,26 +425,80 @@ export default function PaginaComercio({ params }: { params: Promise<{ id: strin
           </EmptyState>
         ) : (
           <div className="flex flex-col gap-6">
-            <CabeceraComercio c={comercio} />
+            <CabeceraComercio c={comercio} onChatear={esComprador ? handleChatear : undefined} />
 
             <div>
-              <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">
-                Productos de {comercio.nombre}
-              </h2>
+              {/* Encabezado con conteo y ordenar */}
+              <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+                <h2 className="text-lg font-semibold text-[#1A1A1A]">
+                  Productos de {comercio.nombre}
+                  <span className="ml-2 text-sm font-normal text-[#1A1A1A]/40">
+                    ({productosVisibles.length})
+                  </span>
+                </h2>
+                {productos.length > 1 && (
+                  <select
+                    value={orden}
+                    onChange={e => setOrden(e.target.value as typeof orden)}
+                    className="text-sm border border-[#1A1A1A]/15 rounded-xl px-3 py-1.5 bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 cursor-pointer"
+                  >
+                    <option value="recientes">Más recientes</option>
+                    <option value="precio-asc">Precio: menor a mayor</option>
+                    <option value="precio-desc">Precio: mayor a menor</option>
+                  </select>
+                )}
+              </div>
 
+              {/* Tabs de categorías */}
+              {categoriasDisponibles.length > 1 && (
+                <div className="flex flex-wrap gap-2 mb-5">
+                  <button
+                    onClick={() => setCategoriaFiltro(null)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                      categoriaFiltro === null
+                        ? 'bg-[#2D6A4F] text-white'
+                        : 'bg-white border border-[#1A1A1A]/12 text-[#1A1A1A]/60 hover:border-[#2D6A4F]/40 hover:text-[#2D6A4F]'
+                    }`}
+                  >
+                    Todas
+                  </button>
+                  {categoriasDisponibles.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setCategoriaFiltro(cat.id)}
+                      className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                        categoriaFiltro === cat.id
+                          ? 'bg-[#2D6A4F] text-white'
+                          : 'bg-white border border-[#1A1A1A]/12 text-[#1A1A1A]/60 hover:border-[#2D6A4F]/40 hover:text-[#2D6A4F]'
+                      }`}
+                    >
+                      {cat.nombre}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Grid de productos */}
               {productos.length === 0 ? (
                 <EmptyState
                   titulo="Sin productos disponibles"
                   descripcion="Este comercio aún no tiene productos publicados o están agotados."
                 />
+              ) : productosVisibles.length === 0 ? (
+                <EmptyState
+                  titulo="Sin productos en esta categoría"
+                  descripcion="Prueba seleccionando otra categoría o mira todos los productos."
+                />
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {productos.map((p) => (
+                  {productosVisibles.map((p) => (
                     <TarjetaProducto key={p.id} producto={p} />
                   ))}
                 </div>
               )}
             </div>
+
+            <SeccionResenas comercioId={comercio.id} />
           </div>
         )}
       </main>

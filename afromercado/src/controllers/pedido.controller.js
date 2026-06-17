@@ -9,7 +9,7 @@ const PedidoController = {
     try {
       // El frontend envía { direccion, telefono, notas }; aceptamos también
       // direccionTexto por compatibilidad. El teléfono se conserva en las notas.
-      const { direccionTexto, direccion, telefono, direccionId, notas } =
+      const { direccionTexto, direccion, telefono, direccionId, notas, codigoCupon } =
         req.body || {};
       const textoDireccion = (direccionTexto || direccion || "").trim();
       const notasFinales = telefono
@@ -19,6 +19,7 @@ const PedidoController = {
         direccionTexto: textoDireccion,
         direccionId: direccionId ? Number(direccionId) : undefined,
         notas: notasFinales,
+        codigoCupon: codigoCupon || undefined,
       });
       res.status(201).json({ ok: true, data: resultado });
     } catch (e) {

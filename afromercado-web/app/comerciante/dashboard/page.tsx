@@ -134,22 +134,7 @@ function FilaSubPedido({ sub, resaltado = false }: { sub: SubPedidoComerciante; 
 
 // ── Productos del comerciante ─────────────────────────────────
 
-function FotoProducto({ producto }: { producto: ProductoComerciante }) {
-  if (producto.fotoUrl) {
-    return <img src={producto.fotoUrl} alt={producto.nombre} className="h-16 w-16 flex-shrink-0 rounded-xl object-cover" />
-  }
-  return (
-    <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl bg-[#52B788]/15" aria-hidden="true">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-        <path d="M4 16l4-4a2 2 0 0 1 3 0l4 4M14 14l1-1a2 2 0 0 1 3 0l2 2M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"
-          stroke="#2D6A4F" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="9" cy="9" r="1.4" fill="#2D6A4F" />
-      </svg>
-    </div>
-  )
-}
-
-function FilaProducto({
+function TarjetaProductoComerciante({
   producto,
   onToggle,
 }: {
@@ -167,44 +152,92 @@ function FilaProducto({
     }
   }
 
+  const stockBajo = producto.stock > 0 && producto.stock <= 5
+  const sinStock = producto.stock === 0
+
   return (
-    <li className="flex items-center gap-4 rounded-2xl border border-[#1A1A1A]/5 bg-white p-4 shadow-sm">
-      <FotoProducto producto={producto} />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="truncate text-lg font-semibold text-[#1A1A1A]">{producto.nombre}</h3>
-          {producto.activo ? <Badge variant="verde">Visible</Badge> : <Badge variant="gris">Oculto</Badge>}
-        </div>
-        <p className="mt-1 text-base text-[#1A1A1A]/70">
-          <span className="font-semibold text-[#2D6A4F]">{formatearPrecio(Number(producto.precio))}</span>{' '}
-          <span className="text-[#1A1A1A]/50">por {etiquetaUnidad(producto.unidad).toLowerCase()}</span>
-        </p>
-        <p className="mt-0.5 text-sm text-[#1A1A1A]/55">
-          {producto.stock > 0 ? `${producto.stock} disponibles` : 'Sin existencias'}
-        </p>
-      </div>
-      <div className="flex flex-shrink-0 items-center gap-2">
-        <button
-          type="button"
-          onClick={handleToggle}
-          disabled={toggling}
-          title={producto.activo ? 'Ocultar del catálogo' : 'Publicar en el catálogo'}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#2D6A4F] focus:ring-offset-2 disabled:opacity-60 ${
-            producto.activo ? 'bg-[#2D6A4F]' : 'bg-[#1A1A1A]/20'
-          }`}
-        >
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-              producto.activo ? 'translate-x-6' : 'translate-x-1'
-            }`}
+    <li className="flex flex-col bg-white rounded-2xl border border-[#1A1A1A]/5 shadow-sm overflow-hidden">
+      {/* Imagen */}
+      <div className="relative w-full aspect-[4/3] bg-[#F0EBE3]">
+        {producto.fotoUrl ? (
+          <img
+            src={producto.fotoUrl}
+            alt={producto.nombre}
+            className="absolute inset-0 w-full h-full object-cover"
           />
-        </button>
-        <Link
-          href={`/comerciante/productos/${producto.id}/editar`}
-          className="rounded-lg border border-[#2D6A4F] px-4 py-2 text-base font-semibold text-[#2D6A4F] transition-colors hover:bg-[#2D6A4F]/5"
-        >
-          Editar
-        </Link>
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 16l4-4a2 2 0 0 1 3 0l4 4M14 14l1-1a2 2 0 0 1 3 0l2 2M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"
+                stroke="#2D6A4F" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="9" cy="9" r="1.4" fill="#2D6A4F" />
+            </svg>
+            <p className="text-sm text-[#2D6A4F]/60 font-medium leading-tight line-clamp-2">{producto.nombre}</p>
+          </div>
+        )}
+        {/* Badge estado flotante */}
+        <span className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+          producto.activo
+            ? 'bg-[#2D6A4F] text-white'
+            : 'bg-[#1A1A1A]/20 text-[#1A1A1A]/60'
+        }`}>
+          {producto.activo ? 'Visible' : 'Oculto'}
+        </span>
+        {/* Badge stock bajo */}
+        {sinStock && (
+          <span className="absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#C0392B] text-white">
+            Agotado
+          </span>
+        )}
+        {stockBajo && !sinStock && (
+          <span className="absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#D4A017] text-white">
+            Últimas {producto.stock}
+          </span>
+        )}
+      </div>
+
+      {/* Contenido */}
+      <div className="flex flex-col flex-1 p-3 gap-3">
+        {/* Nombre y precio */}
+        <div>
+          <h3 className="text-sm font-semibold text-[#1A1A1A] leading-snug line-clamp-2">{producto.nombre}</h3>
+          <p className="mt-0.5 text-base font-bold text-[#2D6A4F] leading-none">
+            {formatearPrecio(Number(producto.precio))}
+            <span className="text-xs font-normal text-[#1A1A1A]/40 ml-1">/ {etiquetaUnidad(producto.unidad).toLowerCase()}</span>
+          </p>
+        </div>
+
+        {/* Stock */}
+        <p className={`text-xs font-medium ${sinStock ? 'text-[#C0392B]' : stockBajo ? 'text-[#9B7300]' : 'text-[#1A1A1A]/45'}`}>
+          {sinStock ? 'Sin existencias' : `${producto.stock} disponibles`}
+        </p>
+
+        {/* Acciones */}
+        <div className="flex items-center gap-2 mt-auto pt-1 border-t border-[#1A1A1A]/5">
+          {/* Toggle visible/oculto */}
+          <button
+            type="button"
+            onClick={handleToggle}
+            disabled={toggling}
+            title={producto.activo ? 'Ocultar del catálogo' : 'Publicar en el catálogo'}
+            className={`relative flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#2D6A4F] focus:ring-offset-1 disabled:opacity-60 flex-shrink-0 ${
+              producto.activo ? 'bg-[#2D6A4F]' : 'bg-[#1A1A1A]/20'
+            }`}
+          >
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+              producto.activo ? 'translate-x-[18px]' : 'translate-x-0.5'
+            }`} />
+          </button>
+          <span className="text-xs text-[#1A1A1A]/40 flex-1">
+            {producto.activo ? 'Visible' : 'Oculto'}
+          </span>
+          <Link
+            href={`/comerciante/productos/${producto.id}/editar`}
+            className="text-xs font-semibold text-[#2D6A4F] border border-[#2D6A4F]/30 rounded-lg px-3 py-1.5 hover:bg-[#2D6A4F]/5 transition-colors"
+          >
+            Editar
+          </Link>
+        </div>
       </div>
     </li>
   )
@@ -695,11 +728,29 @@ function DashboardContenido() {
 
       {/* Mis productos */}
       <section>
-        <h2 className="mb-3 text-xl font-semibold text-[#1A1A1A]">Mis productos</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-semibold text-[#1A1A1A]">Mis productos</h2>
+            {productos.length > 0 && (
+              <p className="text-sm text-[#1A1A1A]/45 mt-0.5">
+                {productos.filter(p => p.activo).length} visibles · {productos.filter(p => !p.activo).length} ocultos
+              </p>
+            )}
+          </div>
+          {productos.length > 0 && (
+            <Link
+              href="/comerciante/publicar"
+              className="text-sm font-semibold text-[#2D6A4F] border border-[#2D6A4F]/30 rounded-xl px-3 py-1.5 hover:bg-[#2D6A4F]/5 transition-colors"
+            >
+              + Nuevo
+            </Link>
+          )}
+        </div>
         {cargando ? (
-          <div className="flex flex-col gap-3">
-            <Skeleton className="h-24 rounded-2xl" />
-            <Skeleton className="h-24 rounded-2xl" />
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-56 rounded-2xl" />
+            ))}
           </div>
         ) : productos.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[#2D6A4F]/30 bg-white px-6 py-10 text-center">
@@ -714,8 +765,8 @@ function DashboardContenido() {
             </div>
           </div>
         ) : (
-          <ul className="flex flex-col gap-3">
-            {productos.map((p) => <FilaProducto key={p.id} producto={p} onToggle={toggleProducto} />)}
+          <ul className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {productos.map((p) => <TarjetaProductoComerciante key={p.id} producto={p} onToggle={toggleProducto} />)}
           </ul>
         )}
       </section>

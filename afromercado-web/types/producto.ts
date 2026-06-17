@@ -23,11 +23,9 @@ export interface Producto {
     totalReviews: number
     historia?: string
   }
-  // Campos opcionales que puede devolver la API y que el frontend
-  // existente no usa todavía. Son opcionales para no romper el mock
-  // ni los componentes ya construidos.
   categoriaId?: string
   comercioId?: string
+  categoria?: { id: string; nombre: string; slug?: string }
   oferta?: {
     id?:         number
     tipo:        'PORCENTAJE' | 'VALOR_FIJO'

@@ -10,6 +10,7 @@ import { formatearPrecio } from '@/lib/formatearPrecio'
 import { precioVigente } from '@/lib/precioProducto'
 import { apiFetch } from '@/lib/api/client'
 import { listarDirecciones, crearDireccion } from '@/lib/api/direccion'
+import { validarCupon, type ResultadoCupon } from '@/lib/api/cupones'
 import { useCarrito } from '@/context/CarritoContext'
 import { useAuth } from '@/context/AuthContext'
 import { agruparPorComercio } from '@/components/carrito/agrupar'
@@ -45,6 +46,11 @@ export default function PaginaCheckout() {
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
+
+  const [codigoCupon, setCodigoCupon] = useState('')
+  const [aplicandoCupon, setAplicandoCupon] = useState(false)
+  const [cuponAplicado, setCuponAplicado] = useState<ResultadoCupon | null>(null)
+  const [errorCupon, setErrorCupon] = useState<string | null>(null)
 
   const grupos = useMemo(() => agruparPorComercio(items), [items])
 
@@ -126,6 +132,21 @@ export default function PaginaCheckout() {
     return partes.join(', ')
   }
 
+  async function aplicarCupon() {
+    if (!codigoCupon.trim()) return
+    setErrorCupon(null)
+    setCuponAplicado(null)
+    setAplicandoCupon(true)
+    try {
+      const resultado = await validarCupon(codigoCupon.trim(), subtotal)
+      setCuponAplicado(resultado)
+    } catch (err) {
+      setErrorCupon(err instanceof Error ? err.message : 'Cupón inválido')
+    } finally {
+      setAplicandoCupon(false)
+    }
+  }
+
   async function confirmar(ev: React.FormEvent) {
     ev.preventDefault()
     setErrorGeneral(null)
@@ -158,6 +179,7 @@ export default function PaginaCheckout() {
           direccionTexto,
           ...(direccionId !== undefined ? { direccionId } : {}),
           ...(notas.trim() ? { notas: notas.trim() } : {}),
+          ...(cuponAplicado ? { codigoCupon: cuponAplicado.cupon.codigo } : {}),
         },
       })
       const data = desenvolver<RespuestaCheckout>(raw)
@@ -435,15 +457,73 @@ export default function PaginaCheckout() {
                 <span>Subtotal ({cantidadTotal})</span>
                 <span>{formatearPrecio(subtotal)}</span>
               </div>
+
+              {cuponAplicado && (
+                <div className="flex justify-between text-sm text-[#2D6A4F] mb-1">
+                  <span>Descuento ({cuponAplicado.cupon.codigo})</span>
+                  <span>-{formatearPrecio(cuponAplicado.descuento)}</span>
+                </div>
+              )}
+
               <p className="text-xs text-[#1A1A1A]/50 mb-3">
                 El envío se coordina con cada productor.
               </p>
 
-              <div className="flex justify-between items-baseline mb-1">
+              <div className="flex justify-between items-baseline mb-4">
                 <span className="font-semibold text-[#1A1A1A]">Total</span>
                 <span className="text-xl font-bold text-[#2D6A4F]">
-                  {formatearPrecio(subtotal)}
+                  {formatearPrecio(cuponAplicado ? cuponAplicado.totalConDescuento : subtotal)}
                 </span>
+              </div>
+
+              {/* Cupón de descuento */}
+              <div className="border border-[#1A1A1A]/10 rounded-xl p-4 mb-4">
+                <p className="text-sm font-semibold text-[#1A1A1A] mb-2">
+                  ¿Tienes un cupón de descuento?
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Código..."
+                    value={codigoCupon}
+                    onChange={(e) => {
+                      setCodigoCupon(e.target.value.toUpperCase())
+                      setCuponAplicado(null)
+                      setErrorCupon(null)
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), aplicarCupon())}
+                    className="flex-1 min-w-0 h-10 px-3 rounded-xl border border-[#1A1A1A]/15 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+                    disabled={aplicandoCupon}
+                  />
+                  <button
+                    type="button"
+                    onClick={aplicarCupon}
+                    disabled={aplicandoCupon || !codigoCupon.trim()}
+                    className="flex-shrink-0 h-10 px-4 rounded-xl bg-[#2D6A4F] text-white text-sm font-semibold disabled:opacity-50 hover:bg-[#2D6A4F]/90 transition-colors"
+                  >
+                    {aplicandoCupon ? '...' : 'Aplicar'}
+                  </button>
+                </div>
+
+                {cuponAplicado && (
+                  <div className="mt-2 flex items-center gap-1.5 text-sm text-[#2D6A4F] bg-[#52B788]/10 rounded-lg px-3 py-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Descuento aplicado: -{formatearPrecio(cuponAplicado.descuento)}
+                  </div>
+                )}
+
+                {errorCupon && (
+                  <div className="mt-2 flex items-center gap-1.5 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <circle cx="12" cy="12" r="9" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    {errorCupon}
+                  </div>
+                )}
               </div>
 
               {errorGeneral && (

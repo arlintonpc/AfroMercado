@@ -21,6 +21,8 @@ const PedidoRepository = {
       notas,
       expiresAt,
       subPedidos,
+      cuponId,
+      cuponDescuento,
     } = datos;
 
     const pedido = await db.pedido.create({
@@ -33,6 +35,7 @@ const PedidoRepository = {
         direccionId: direccionId ?? null,
         notas: notas ?? null,
         expiresAt,
+        ...(cuponId != null ? { cuponId, cuponDescuento: cuponDescuento ?? null } : {}),
         estado: "PENDIENTE_PAGO",
         subPedidos: {
           create: subPedidos.map((sp) => ({

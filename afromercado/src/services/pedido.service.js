@@ -4,6 +4,7 @@
 const prisma = require("../config/prisma");
 const CarritoRepository = require("../repositories/carrito.repository");
 const PedidoRepository = require("../repositories/pedido.repository");
+const CuponRepository = require("../repositories/cupon.repository");
 const { calcularDesglose } = require("../utils/comision");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
 const { ofertaTieneCupo, ofertaVigente, precioVigente } = require("../utils/ofertas");
@@ -13,7 +14,7 @@ const ESTADOS_CANCELABLES = ["PENDIENTE_PAGO", "VERIFICANDO_PAGO"];
 
 const PedidoService = {
   async checkout(usuarioId, datos = {}) {
-    const { direccionTexto, direccionId, notas } = datos;
+    const { direccionTexto, direccionId, notas, codigoCupon } = datos;
     if (!direccionTexto || !direccionTexto.trim()) {
       throw new ErrorValidacion("La dirección de entrega es obligatoria");
     }
@@ -95,7 +96,21 @@ const PedidoService = {
       };
     });
     // El comprador paga el subtotal; la comisión sale de la parte del comerciante
-    const totalGeneral = subtotalGeneral;
+    let totalGeneral = subtotalGeneral;
+    let cuponId = null;
+    let cuponDescuento = null;
+
+    if (codigoCupon) {
+      const resultadoCupon = await CuponRepository.validarParaUsuario(
+        codigoCupon.trim().toUpperCase(),
+        usuarioId,
+        subtotalGeneral
+      );
+      if (resultadoCupon.error) throw new ErrorValidacion(resultadoCupon.error);
+      cuponId = resultadoCupon.cupon.id;
+      cuponDescuento = resultadoCupon.descuento;
+      totalGeneral = resultadoCupon.totalConDescuento;
+    }
 
     // 5. Transacción atómica
     const pedido = await prisma.$transaction(async (tx) => {
@@ -144,6 +159,7 @@ const PedidoService = {
           notas,
           expiresAt,
           subPedidos: subPedidosData,
+          ...(cuponId !== null ? { cuponId, cuponDescuento } : {}),
         },
         tx
       );
@@ -153,6 +169,17 @@ const PedidoService = {
 
       return nuevoPedido;
     });
+
+    if (cuponId !== null) {
+      setImmediate(async () => {
+        try {
+          await CuponRepository.registrarUso({ cuponId, usuarioId, pedidoId: pedido.id });
+          await CuponRepository.incrementarUso(cuponId);
+        } catch (e) {
+          console.error("[CUPON] Error registrando uso:", e.message);
+        }
+      });
+    }
 
     const resultado = {
       pedido,

@@ -535,6 +535,25 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
+      {/* Cupones de descuento */}
+      <section className="mt-6">
+        <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">Cupones de descuento</h2>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/admin/cupones"
+            className="flex items-center justify-between rounded-2xl border border-[#D4A017]/30 bg-[#D4A017]/5 px-5 py-4 hover:bg-[#D4A017]/10 transition-colors"
+          >
+            <div>
+              <p className="font-semibold text-[#9B7300]">🏷️ Gestionar cupones</p>
+              <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Crear y administrar códigos de descuento para que los compradores los usen en el checkout.</p>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#9B7300] flex-shrink-0">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </Link>
+        </div>
+      </section>
+
       {/* Canales de notificación */}
       <section className="mt-6">
         <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">Canales de notificación</h2>
