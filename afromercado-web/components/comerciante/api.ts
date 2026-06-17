@@ -285,3 +285,39 @@ export async function fotoPrincipalProducto(
   )
   return resp.producto
 }
+
+export interface ItemPedido {
+  id: number
+  cantidad: number
+  precioUnitario: number
+  subtotal: number
+  producto: { nombre: string; fotoUrl?: string | null }
+}
+
+export interface MiSubPedido {
+  id: number
+  estado: 'CONFIRMADO' | 'EN_PREPARACION' | 'LISTO' | 'EN_CAMINO' | 'ENTREGADO' | 'CANCELADO'
+  neto: number
+  pedido: {
+    id: number
+    estado: string
+    createdAt: string
+    direccionTexto: string
+    notas?: string | null
+    comprador: { nombre: string; telefono?: string | null; email: string }
+  }
+  items: ItemPedido[]
+}
+
+export async function listarMisPedidos(): Promise<MiSubPedido[]> {
+  const res = await apiFetch<{ ok: boolean; data: MiSubPedido[] }>('/comercios/mis-pedidos')
+  return res.data ?? []
+}
+
+export async function avanzarEstadoPedido(subPedidoId: number): Promise<MiSubPedido> {
+  const res = await apiFetch<{ ok: boolean; subPedido: MiSubPedido }>(
+    `/comercios/mis-pedidos/${subPedidoId}/estado`,
+    { method: 'PATCH', body: {} }
+  )
+  return res.subPedido
+}

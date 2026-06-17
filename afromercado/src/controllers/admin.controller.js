@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const prisma = require("../config/prisma");
 const AdminService = require("../services/admin.service");
 const PagoRepository = require("../repositories/pago.repository");
 const { ErrorNoEncontrado, ErrorValidacion } = require("../utils/errores");
@@ -117,6 +118,48 @@ const AdminController = {
     } catch (e) { next(e); }
   },
 
+  // GET /admin/comercios/buscar?q=texto — para autocomplete en formularios admin
+  // Busca por nombre, municipio o número de WhatsApp
+  async buscarComercios(req, res, next) {
+    try {
+      const q = req.query.q?.trim() ?? '';
+      const where = q
+        ? {
+            OR: [
+              { nombre:    { contains: q, mode: 'insensitive' } },
+              { municipio: { contains: q, mode: 'insensitive' } },
+              { whatsapp:  { contains: q, mode: 'insensitive' } },
+            ],
+          }
+        : {};
+      const items = await prisma.comercio.findMany({
+        where,
+        select: { id: true, nombre: true, municipio: true, whatsapp: true },
+        orderBy: { nombre: 'asc' },
+        take: 20,
+      });
+      res.json({ ok: true, items });
+    } catch (e) { next(e); }
+  },
+
+  // GET /admin/productos/buscar?q=texto&comercioId=X — para autocomplete en formularios admin
+  async buscarProductos(req, res, next) {
+    try {
+      const q = req.query.q?.trim() ?? '';
+      const comercioId = req.query.comercioId ? Number(req.query.comercioId) : undefined;
+      const where = { deletedAt: null };
+      if (q) where.nombre = { contains: q, mode: 'insensitive' };
+      if (comercioId) where.comercioId = comercioId;
+      const items = await prisma.producto.findMany({
+        where,
+        select: { id: true, nombre: true, comercioId: true },
+        orderBy: { nombre: 'asc' },
+        take: 50,
+      });
+      res.json({ ok: true, items });
+    } catch (e) { next(e); }
+  },
+
   // POST /admin/email/test
   async enviarEmailTest(req, res, next) {
     try {
@@ -141,6 +184,24 @@ const AdminController = {
         `,
       });
       res.json({ ok: true, mensaje: `Email de prueba enviado a ${adminEmail}` });
+    } catch (e) { next(e); }
+  },
+
+  // GET /admin/comercios?soloSinVerificar=true
+  async listarComercios(req, res, next) {
+    try {
+      const { soloSinVerificar } = req.query;
+      const comercios = await AdminService.listarComercios({ soloSinVerificar: soloSinVerificar === 'true' });
+      res.json({ ok: true, data: comercios });
+    } catch (e) { next(e); }
+  },
+
+  // PATCH /admin/comercios/:id/verificar
+  async verificarComerciante(req, res, next) {
+    try {
+      const { accion, notas } = req.body;
+      const resultado = await AdminService.verificarComerciante(req.usuario.id, Number(req.params.id), { accion, notas });
+      res.json({ ok: true, data: resultado });
     } catch (e) { next(e); }
   },
 };

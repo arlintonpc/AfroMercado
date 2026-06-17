@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -221,9 +222,32 @@ export default function AdminDashboardPage() {
   }, [])
 
   useEffect(() => {
-    cargarStats()
-    cargarPagos()
-  }, [cargarStats, cargarPagos])
+    let cancelado = false
+
+    obtenerEstadisticas()
+      .then(data => { if (!cancelado) setStats(data) })
+      .catch(err => {
+        if (!cancelado) {
+          setErrorStats(
+            err instanceof Error ? err.message : 'No se pudieron cargar las estadísticas.',
+          )
+        }
+      })
+      .finally(() => { if (!cancelado) setCargandoStats(false) })
+
+    obtenerPagosPendientes()
+      .then(data => { if (!cancelado) setPagos(data) })
+      .catch(err => {
+        if (!cancelado) {
+          setErrorPagos(
+            err instanceof Error ? err.message : 'No se pudieron cargar los pagos.',
+          )
+        }
+      })
+      .finally(() => { if (!cancelado) setCargandoPagos(false) })
+
+    return () => { cancelado = true }
+  }, [])
 
   // Oculta el aviso automáticamente tras unos segundos.
   useEffect(() => {
@@ -448,6 +472,68 @@ export default function AdminDashboardPage() {
           onCerrar={() => setComprobante(null)}
         />
       )}
+
+      {/* Publicidad, comunidad y visibilidad */}
+      <section className="mt-6">
+        <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">Publicidad, comunidad y visibilidad</h2>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/admin/visibilidad"
+            className="flex items-center justify-between rounded-2xl border border-[#D4A017]/30 bg-[#D4A017]/5 px-5 py-4 hover:bg-[#D4A017]/10 transition-colors"
+          >
+            <div>
+              <p className="font-semibold text-[#B8860B]">★ Gestionar slots de visibilidad</p>
+              <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Crear, ver y desactivar productos destacados pagados en el catálogo y el home.</p>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#B8860B] flex-shrink-0">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </Link>
+          <Link
+            href="/admin/hero"
+            className="flex items-center justify-between rounded-2xl border border-[#2D6A4F]/25 bg-[#2D6A4F]/5 px-5 py-4 hover:bg-[#2D6A4F]/10 transition-colors"
+          >
+            <div>
+              <p className="font-semibold text-[#2D6A4F]">🖼️ Configurar hero banner</p>
+              <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Modo de rotación, intervalo, y fuente de contenido (orgánico / campañas / mixto).</p>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#2D6A4F] flex-shrink-0">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </Link>
+          <Link
+            href="/admin/campanas"
+            className="flex items-center justify-between rounded-2xl border border-[#7A2AB8]/20 bg-[#7A2AB8]/5 px-5 py-4 hover:bg-[#7A2AB8]/10 transition-colors"
+          >
+            <div>
+              <p className="font-semibold text-[#7A2AB8]">📢 Campañas del hero</p>
+              <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Crear publicidad premium y campañas sociales con métricas de vistas, clics y CTR.</p>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7A2AB8] flex-shrink-0">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </Link>
+        </div>
+      </section>
+
+      {/* Gestión de comerciantes */}
+      <section className="mt-6">
+        <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">Gestión de comerciantes</h2>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/admin/comerciantes"
+            className="flex items-center justify-between rounded-2xl border border-[#2D6A4F]/25 bg-[#2D6A4F]/5 px-5 py-4 hover:bg-[#2D6A4F]/10 transition-colors"
+          >
+            <div>
+              <p className="font-semibold text-[#2D6A4F]">Verificar comerciantes</p>
+              <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Revisar y aprobar nuevos comercios. Ver documentos de identidad y estado de verificación.</p>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#2D6A4F] flex-shrink-0">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </Link>
+        </div>
+      </section>
 
       {/* Canales de notificación */}
       <section className="mt-6">

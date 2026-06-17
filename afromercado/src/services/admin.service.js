@@ -162,6 +162,13 @@ const AdminService = {
             SET "stockReservado" = GREATEST("stockReservado" - ${item.cantidad}, 0)
             WHERE id = ${item.productoId}
           `;
+          if (item.ofertaId) {
+            await tx.$executeRaw`
+              UPDATE "Oferta"
+              SET "stockUsado" = GREATEST("stockUsado" - ${item.cantidad}, 0)
+              WHERE id = ${item.ofertaId}
+            `;
+          }
         }
       }
 
@@ -239,6 +246,32 @@ const AdminService = {
       totalProductos,
       ventasConfirmadas: Number(ventas._sum.total || 0),
     };
+  },
+
+  async listarComercios({ soloSinVerificar = false } = {}) {
+    return prisma.comercio.findMany({
+      where: soloSinVerificar ? { verificado: false, activo: true } : { activo: true },
+      orderBy: [{ verificado: "asc" }, { createdAt: "desc" }],
+      include: {
+        usuario: { select: { nombre: true, email: true, telefono: true } },
+        _count: { select: { productos: true } },
+      },
+    });
+  },
+
+  async verificarComerciante(adminId, comercioId, { accion, notas }) {
+    if (!["VERIFICAR", "RECHAZAR"].includes(accion)) {
+      throw new ErrorValidacion("Acción inválida. Opciones: VERIFICAR, RECHAZAR");
+    }
+    const comercio = await prisma.comercio.findUnique({ where: { id: comercioId } });
+    if (!comercio) throw new ErrorNoEncontrado("Comercio no encontrado");
+
+    const verificado = accion === "VERIFICAR";
+    return prisma.comercio.update({
+      where: { id: comercioId },
+      data: { verificado },
+      include: { usuario: { select: { nombre: true, email: true } } },
+    });
   },
 };
 

@@ -239,6 +239,64 @@ const ComercioController = {
     }
   },
 
+  async misPedidos(req, res, next) {
+    try {
+      const comercio = await ComercioService.obtenerMiComercio(req.usuario.id);
+      const subPedidos = await prisma.subPedido.findMany({
+        where: { comercioId: comercio.id },
+        orderBy: { pedido: { createdAt: "desc" } },
+        include: {
+          pedido: {
+            select: {
+              id: true,
+              estado: true,
+              createdAt: true,
+              direccionTexto: true,
+              notas: true,
+              comprador: { select: { nombre: true, telefono: true, email: true } },
+            },
+          },
+          items: {
+            include: { producto: { select: { nombre: true, fotoUrl: true } } },
+          },
+        },
+      });
+      res.json({ ok: true, data: subPedidos });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async actualizarEstadoPedido(req, res, next) {
+    try {
+      const { ErrorValidacion, ErrorNoEncontrado, ErrorNoAutorizado } = require("../utils/errores");
+      const comercio = await ComercioService.obtenerMiComercio(req.usuario.id);
+      const subPedidoId = Number(req.params.id);
+
+      const subPedido = await prisma.subPedido.findUnique({ where: { id: subPedidoId } });
+      if (!subPedido) throw new ErrorNoEncontrado("SubPedido no encontrado");
+      if (subPedido.comercioId !== comercio.id) throw new ErrorNoAutorizado("No puedes gestionar este pedido");
+
+      const { estado } = req.body;
+      const TRANSICIONES = { CONFIRMADO: "EN_PREPARACION", EN_PREPARACION: "LISTO" };
+      const estadoActual = subPedido.estado;
+      const estadoSiguiente = TRANSICIONES[estadoActual];
+
+      if (!estadoSiguiente || (estado && estado !== estadoSiguiente)) {
+        throw new ErrorValidacion(`No puedes cambiar de ${estadoActual} a ${estado || "(desconocido)"}. Transición válida: ${estadoActual} → ${estadoSiguiente || "(ninguna)"}`);
+      }
+
+      const actualizado = await prisma.subPedido.update({
+        where: { id: subPedidoId },
+        data: { estado: estadoSiguiente },
+      });
+
+      res.json({ ok: true, subPedido: actualizado });
+    } catch (e) {
+      next(e);
+    }
+  },
+
   // GET /comercios/mis-estadisticas
   async misEstadisticas(req, res, next) {
     try {

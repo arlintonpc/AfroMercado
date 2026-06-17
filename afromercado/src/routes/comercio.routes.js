@@ -48,6 +48,22 @@ router.get(
   VisibilidadController.metricasComerciante
 );
 
+// GET /comercios/mis-pedidos — lista completa de subpedidos del comerciante
+router.get(
+  "/mis-pedidos",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.misPedidos
+);
+
+// PATCH /comercios/mis-pedidos/:id/estado — avanzar estado del subpedido
+router.patch(
+  "/mis-pedidos/:id/estado",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.actualizarEstadoPedido
+);
+
 // GET /comercios/:id — ver cualquier comercio (público)
 router.get("/:id", ComercioController.obtener);
 

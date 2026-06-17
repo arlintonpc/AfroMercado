@@ -217,3 +217,37 @@ export async function conectarWhatsApp(): Promise<void> {
   })
   if (!res.ok) throw new Error('No se pudo iniciar la conexión')
 }
+
+// ——— Comerciantes ———
+
+export interface AdminComercio {
+  id: number
+  nombre: string
+  municipio: string
+  descripcion?: string | null
+  verificado: boolean
+  fotoDocumentoUrl?: string | null
+  totalVentas: number
+  calificacion: number | string
+  createdAt: string
+  usuario: { nombre: string; email: string; telefono?: string | null }
+  _count: { productos: number }
+}
+
+export async function listarComerciosAdmin(soloSinVerificar = false): Promise<AdminComercio[]> {
+  const qs = soloSinVerificar ? '?soloSinVerificar=true' : ''
+  const res = await apiFetch<RespuestaOk<AdminComercio[]>>(`/admin/comercios${qs}`)
+  return res.data
+}
+
+export async function verificarComercianteAdmin(
+  id: number,
+  accion: 'VERIFICAR' | 'RECHAZAR',
+  notas?: string,
+): Promise<AdminComercio> {
+  const res = await apiFetch<RespuestaOk<AdminComercio>>(`/admin/comercios/${id}/verificar`, {
+    method: 'PATCH',
+    body: { accion, notas },
+  })
+  return res.data
+}

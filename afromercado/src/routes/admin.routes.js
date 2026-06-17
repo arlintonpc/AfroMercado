@@ -4,6 +4,7 @@
 const express = require("express");
 const { autenticar, autorizar } = require("../middlewares/auth");
 const AdminController = require("../controllers/admin.controller");
+const VisibilidadController = require("../controllers/visibilidad.controller");
 
 const router = express.Router();
 
@@ -25,10 +26,23 @@ router.get("/estadisticas", ...soloAdmin, AdminController.estadisticas);
 router.get("/whatsapp/estado", ...soloAdmin, AdminController.estadoWhatsApp);
 router.post("/whatsapp/conectar", ...soloAdmin, AdminController.conectarWhatsApp);
 
+// Búsqueda de comercios y productos (para formularios admin)
+router.get("/comercios/buscar", ...soloAdmin, AdminController.buscarComercios);
+router.get("/productos/buscar", ...soloAdmin, AdminController.buscarProductos);
+
+// Visibilidad pagada (publicidad)
+router.post("/visibilidad", ...soloAdmin, VisibilidadController.crear);
+router.get("/visibilidad", ...soloAdmin, VisibilidadController.listarTodas);
+router.patch("/visibilidad/:id/desactivar", ...soloAdmin, VisibilidadController.desactivar);
+
 // Email
 router.get("/email/estado", ...soloAdmin, AdminController.estadoEmail);
 router.put("/email/smtp", ...soloAdmin, AdminController.guardarConfigSmtp);
 router.put("/email/config", ...soloAdmin, AdminController.actualizarConfigEmail);
 router.post("/email/test", ...soloAdmin, AdminController.enviarEmailTest);
+
+// Gestión de comerciantes
+router.get("/comercios", ...soloAdmin, AdminController.listarComercios);
+router.patch("/comercios/:id/verificar", ...soloAdmin, AdminController.verificarComerciante);
 
 module.exports = router;
