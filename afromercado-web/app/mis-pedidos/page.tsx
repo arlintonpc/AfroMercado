@@ -39,18 +39,26 @@ const PASOS = [
   { label: 'Pago' },
   { label: 'Verificación' },
   { label: 'Preparación' },
+  { label: 'Listo' },
   { label: 'Entregado' },
 ]
 
-const PASO_IDX: Record<string, number> = {
-  PENDIENTE_PAGO: 0,
-  VERIFICANDO_PAGO: 1,
-  CONFIRMADO: 2,
-  ENTREGADO: 3,
+function pasoActual(pedido: PedidoDetalle): number {
+  const { estado, subPedidos = [] } = pedido
+  if (estado === 'PENDIENTE_PAGO') return 0
+  if (estado === 'VERIFICANDO_PAGO') return 1
+  if (estado === 'ENTREGADO') return 4
+  if (estado === 'CONFIRMADO') {
+    const todosListo =
+      subPedidos.length > 0 &&
+      subPedidos.every((sp) => sp.estado === 'LISTO' || sp.estado === 'ENTREGADO')
+    return todosListo ? 3 : 2
+  }
+  return -1
 }
 
-function BarraProgreso({ estado }: { estado: string }) {
-  const actual = PASO_IDX[estado] ?? -1
+function BarraProgreso({ pedido }: { pedido: PedidoDetalle }) {
+  const actual = pasoActual(pedido)
   if (actual < 0) return null
   return (
     <div className="flex items-start mt-4">
@@ -119,7 +127,9 @@ function TarjetaPedido({ pedido }: { pedido: PedidoDetalle }) {
       </div>
 
       {/* Barra de progreso */}
-      {ESTADOS_ACTIVOS.has(pedido.estado) && <BarraProgreso estado={pedido.estado} />}
+      {!['CANCELADO', 'EXPIRADO', 'PAGO_FALLIDO'].includes(pedido.estado) && (
+        <BarraProgreso pedido={pedido} />
+      )}
 
       {/* Productos y productor */}
       {(n > 0 || productores) && (
