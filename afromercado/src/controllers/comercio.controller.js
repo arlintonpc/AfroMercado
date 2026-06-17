@@ -278,7 +278,7 @@ const ComercioController = {
       if (subPedido.comercioId !== comercio.id) throw new ErrorNoAutorizado("No puedes gestionar este pedido");
 
       const { estado } = req.body;
-      const TRANSICIONES = { CONFIRMADO: "EN_PREPARACION", EN_PREPARACION: "LISTO" };
+      const TRANSICIONES = { CONFIRMADO: "EN_PREPARACION", EN_PREPARACION: "LISTO", LISTO: "ENTREGADO" };
       const estadoActual = subPedido.estado;
       const estadoSiguiente = TRANSICIONES[estadoActual];
 
@@ -290,6 +290,21 @@ const ComercioController = {
         where: { id: subPedidoId },
         data: { estado: estadoSiguiente },
       });
+
+      // Si este subpedido quedó ENTREGADO, verificar si todos los del pedido lo están.
+      // En ese caso, cerrar el Pedido principal como ENTREGADO.
+      if (estadoSiguiente === "ENTREGADO") {
+        const hermanos = await prisma.subPedido.findMany({
+          where: { pedidoId: subPedido.pedidoId },
+          select: { estado: true },
+        });
+        if (hermanos.every((sp) => sp.estado === "ENTREGADO")) {
+          await prisma.pedido.update({
+            where: { id: subPedido.pedidoId },
+            data: { estado: "ENTREGADO" },
+          });
+        }
+      }
 
       res.json({ ok: true, subPedido: actualizado });
     } catch (e) {

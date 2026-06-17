@@ -71,13 +71,17 @@ function TarjetaPedido({
   avanzando: boolean
   onAvanzar: (sp: MiSubPedido) => void
 }) {
-  const puedeAvanzar = sp.estado === 'CONFIRMADO' || sp.estado === 'EN_PREPARACION'
+  const puedeAvanzar = sp.estado === 'CONFIRMADO' || sp.estado === 'EN_PREPARACION' || sp.estado === 'LISTO'
   const etiquetaBoton =
-    sp.estado === 'CONFIRMADO' ? 'Empezar preparación' : 'Marcar como listo'
+    sp.estado === 'CONFIRMADO' ? 'Empezar preparación'
+    : sp.estado === 'EN_PREPARACION' ? 'Marcar como listo'
+    : 'Marcar como entregado'
   const colorBoton =
     sp.estado === 'CONFIRMADO'
       ? 'bg-[#2D6A4F] hover:bg-[#24573f] text-white'
-      : 'bg-[#D4A017] hover:bg-[#b88a12] text-white'
+      : sp.estado === 'EN_PREPARACION'
+      ? 'bg-[#D4A017] hover:bg-[#b88a12] text-white'
+      : 'bg-[#1A1A1A]/70 hover:bg-[#1A1A1A]/85 text-white'
 
   return (
     <div className="rounded-xl border border-[#1A1A1A]/8 bg-white p-5 shadow-sm">
@@ -175,7 +179,7 @@ export default function PedidosPage() {
 
   const filtrados = pedidos.filter((sp) =>
     pestana === 'HISTORIAL'
-      ? ['ENTREGADO', 'CANCELADO', 'EN_CAMINO'].includes(sp.estado)
+      ? ['ENTREGADO', 'CANCELADO'].includes(sp.estado)
       : sp.estado === pestana
   )
 
@@ -184,7 +188,7 @@ export default function PedidosPage() {
     EN_PREPARACION: pedidos.filter((p) => p.estado === 'EN_PREPARACION').length,
     LISTO: pedidos.filter((p) => p.estado === 'LISTO').length,
     HISTORIAL: pedidos.filter((p) =>
-      ['ENTREGADO', 'CANCELADO', 'EN_CAMINO'].includes(p.estado)
+      ['ENTREGADO', 'CANCELADO'].includes(p.estado)
     ).length,
   }
 

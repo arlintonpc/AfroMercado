@@ -46,8 +46,6 @@ const PASO_IDX: Record<string, number> = {
   PENDIENTE_PAGO: 0,
   VERIFICANDO_PAGO: 1,
   CONFIRMADO: 2,
-  EN_PREPARACION: 2,
-  ENVIADO: 3,
   ENTREGADO: 3,
 }
 
@@ -90,7 +88,7 @@ function BarraProgreso({ estado }: { estado: string }) {
 
 // ── Tarjeta de pedido ─────────────────────────────────────────
 
-const ESTADOS_ACTIVOS = new Set(['PENDIENTE_PAGO', 'VERIFICANDO_PAGO', 'CONFIRMADO', 'EN_PREPARACION', 'ENVIADO'])
+const ESTADOS_ACTIVOS = new Set(['PENDIENTE_PAGO', 'VERIFICANDO_PAGO', 'CONFIRMADO'])
 const ESTADOS_INACTIVOS = new Set(['ENTREGADO', 'CANCELADO', 'EXPIRADO', 'PAGO_FALLIDO'])
 
 function TarjetaPedido({ pedido }: { pedido: PedidoDetalle }) {
