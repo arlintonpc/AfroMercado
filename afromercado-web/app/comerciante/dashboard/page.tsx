@@ -103,7 +103,7 @@ function FilaSubPedido({ sub, resaltado = false }: { sub: SubPedidoComerciante; 
   const totalItems = sub.items.reduce((acc, i) => acc + i.cantidad, 0)
 
   return (
-    <Link href={`/pedido/${sub.pedido.id}`}
+    <Link href="/comerciante/pedidos"
       className={`block rounded-xl border p-4 hover:shadow-sm transition-all ${
         resaltado ? 'border-[#2D6A4F]/30 bg-[#52B788]/5' : 'border-[#1A1A1A]/5 bg-white'
       }`}>
