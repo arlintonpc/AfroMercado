@@ -68,6 +68,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Cierra sesión automáticamente cuando cualquier petición recibe 401.
+  useEffect(() => {
+    function manejarExpiracion() {
+      limpiarSesion()
+      setUsuario(null)
+      setToken(null)
+    }
+    window.addEventListener('afm:session-expired', manejarExpiracion)
+    return () => window.removeEventListener('afm:session-expired', manejarExpiracion)
+  }, [])
+
   const login = useCallback(async (email: string, password: string) => {
     const { usuario: u, token: t } = await apiLogin(email, password)
     guardarSesion(u, t)

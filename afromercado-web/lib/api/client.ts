@@ -90,6 +90,9 @@ export async function apiFetch<T>(
   }
 
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('afm:session-expired'))
+    }
     throw new Error(extraerMensajeError(datos, response.status))
   }
 
