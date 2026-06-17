@@ -23,6 +23,11 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
   const [agregando, setAgregando]     = useState(false)
 
   const disponible = Math.max(0, producto.stock - (producto.stockReservado ?? 0))
+  const descuentoPct = producto.oferta
+    ? producto.oferta.tipo === 'PORCENTAJE'
+      ? Math.round(producto.oferta.valor)
+      : Math.round(((producto.precio - producto.oferta.precioFinal) / producto.precio) * 100)
+    : 0
   const agotado    = disponible === 0
   const stockBajo  = !agotado && disponible <= 5
 
@@ -125,15 +130,13 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         {/* Badge oferta — % descuento */}
         {producto.oferta && !agotado && !esDestacado && (
           <span className="absolute top-3 left-3 bg-[#C0392B] text-white text-[10px] font-bold px-2.5 py-1 rounded-full leading-none">
-            {producto.oferta.tipo === 'PORCENTAJE'
-              ? `-${Math.round(producto.oferta.valor)}%`
-              : 'TEMPORADA'}
+            -{descuentoPct}%
           </span>
         )}
         {/* Badge oferta secundario cuando hay destacado */}
         {producto.oferta && !agotado && esDestacado && (
           <span className="absolute bottom-3 left-3 bg-[#C0392B] text-white text-[9px] font-bold px-2 py-0.5 rounded-full leading-none">
-            {producto.oferta.tipo === 'PORCENTAJE' ? `-${Math.round(producto.oferta.valor)}%` : 'TEMPORADA'}
+            -{descuentoPct}%
           </span>
         )}
 
