@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCarrito } from '@/context/CarritoContext'
 import { useAuth } from '@/context/AuthContext'
+import CampanaNotificaciones from './CampanaNotificaciones'
 
 interface HeaderProps {
   /**
@@ -95,6 +96,9 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             </svg>
           </button>
 
+          {/* Campana de notificaciones — solo usuarios autenticados */}
+          {autenticado && <CampanaNotificaciones />}
+
           {/* Carrito */}
           <Link href="/carrito" className="relative flex items-center justify-center w-11 h-11 rounded-lg hover:bg-[#2D6A4F]/10" aria-label="Carrito">
             <svg className="w-5 h-5 text-[#1A1A1A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -178,6 +182,14 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                     className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10"
                   >
                     Mis pedidos
+                  </Link>
+                  <Link
+                    href="/mis-favoritos"
+                    role="menuitem"
+                    onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10"
+                  >
+                    Mis favoritos
                   </Link>
                   <button
                     role="menuitem"

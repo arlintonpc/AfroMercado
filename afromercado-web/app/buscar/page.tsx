@@ -7,6 +7,7 @@ import Footer from '@/components/layout/Footer'
 import TarjetaProducto from '@/components/catalogo/TarjetaProducto'
 import { SkeletonCard, EmptyState } from '@/components/ui'
 import { listarProductos } from '@/lib/api/productos'
+import { apiFetch } from '@/lib/api/client'
 import { mapearProductos } from '@/lib/mapearProducto'
 import type { Producto } from '@/types/producto'
 
@@ -35,6 +36,9 @@ function Resultados() {
     try {
       const { items } = await listarProductos({ q: texto.trim(), porPagina: 24 })
       setProductos(mapearProductos(items))
+      // Guardar en historial (fire-and-forget)
+      const sesionId = (() => { try { let s = sessionStorage.getItem('afm_sid'); if (!s) { s = Math.random().toString(36).slice(2); sessionStorage.setItem('afm_sid', s) } return s } catch { return undefined } })()
+      apiFetch('/productos/busqueda', { method: 'POST', body: { query: texto.trim(), sesionId } }).catch(() => {})
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo realizar la búsqueda.')
       setProductos([])

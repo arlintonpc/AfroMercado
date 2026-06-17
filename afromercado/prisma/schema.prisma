@@ -117,6 +117,10 @@ model Usuario {
   reviewsProducto      ReviewProducto[]
   visibilidadesAdmin   VisibilidadPagada[] @relation("VisibilidadAdmin")
   campanasAdmin        CampanaHero[]       @relation("CampanaAdmin")
+  notificaciones       Notificacion[]
+  favoritos            Favorito[]
+  busquedasHistorial   BusquedaHistorial[]
+  vistasProducto       VistaProducto[]
 }
 
 model Comercio {
@@ -186,6 +190,7 @@ model Producto {
   visibilidades    VisibilidadPagada[]
   ofertas          Oferta[]
   vistas           VistaProducto[]
+  favoritos        Favorito[]
 
   @@index([comercioId, activo])
   @@index([categoriaId, activo])
@@ -406,14 +411,59 @@ model VistaProducto {
   id         Int      @id @default(autoincrement())
   productoId Int
   comercioId Int
+  usuarioId  Int?
   sesionId   String?
   createdAt  DateTime @default(now())
 
   producto Producto @relation(fields: [productoId], references: [id])
   comercio Comercio @relation(fields: [comercioId], references: [id])
+  usuario  Usuario? @relation(fields: [usuarioId], references: [id])
 
   @@index([productoId, createdAt])
   @@index([comercioId, createdAt])
+  @@index([usuarioId, createdAt])
+}
+
+model Notificacion {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int
+  tipo      String
+  titulo    String
+  mensaje   String
+  leida     Boolean  @default(false)
+  url       String?
+  datos     Json?
+  createdAt DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId, leida, createdAt])
+}
+
+model Favorito {
+  id         Int      @id @default(autoincrement())
+  usuarioId  Int
+  productoId Int
+  createdAt  DateTime @default(now())
+
+  usuario  Usuario  @relation(fields: [usuarioId], references: [id])
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@unique([usuarioId, productoId])
+  @@index([usuarioId, createdAt])
+}
+
+model BusquedaHistorial {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int?
+  sesionId  String?
+  query     String
+  createdAt DateTime @default(now())
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId, createdAt])
+  @@index([sesionId, createdAt])
 }
 
 model CampanaHero {

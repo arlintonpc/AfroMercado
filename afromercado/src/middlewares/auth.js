@@ -8,11 +8,17 @@ const UsuarioRepository = require("../repositories/usuario.repository");
 // Verifica que la petición traiga un token válido
 async function autenticar(req, res, next) {
   try {
+    // Acepta token desde header Authorization o desde query ?token= (solo para SSE/EventSource)
+    let token = null;
     const header = req.headers.authorization;
-    if (!header || !header.startsWith("Bearer ")) {
+    if (header && header.startsWith("Bearer ")) {
+      token = header.split(" ")[1];
+    } else if (req.query.token) {
+      token = req.query.token;
+    }
+    if (!token) {
       return next(new ErrorNoAutorizado("Falta el token de autenticación"));
     }
-    const token = header.split(" ")[1];
     const payload = verificarToken(token); // lanza error si es inválido
 
     // Verificar invalidación de sesión por cambio de contraseña
@@ -45,4 +51,19 @@ function autorizar(...rolesPermitidos) {
   };
 }
 
-module.exports = { autenticar, autorizar };
+// Intenta autenticar pero no falla si no hay token (req.usuario queda null)
+async function autenticarOpcional(req, res, next) {
+  try {
+    const header = req.headers.authorization;
+    if (!header || !header.startsWith("Bearer ")) return next();
+    const token = header.split(" ")[1];
+    const payload = verificarToken(token);
+    const usuario = await UsuarioRepository.buscarPorId(payload.id);
+    if (usuario && usuario.activo) {
+      req.usuario = { id: usuario.id, rol: usuario.rol, nombre: usuario.nombre };
+    }
+  } catch { /* token inválido — continúa sin usuario */ }
+  next();
+}
+
+module.exports = { autenticar, autorizar, autenticarOpcional };

@@ -30,6 +30,7 @@ router.use("/config", require("./config.routes"));
 router.use("/campanas", require("./campana.routes"));
 router.use("/ofertas",  require("./oferta.routes"));
 router.use("/upload",  require("./upload.routes"));
-// Aquí se irán sumando: /entregas
+router.use("/notificaciones", require("./notificacion.routes"));
+router.use("/favoritos", require("./favorito.routes"));
 
 module.exports = router;

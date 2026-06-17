@@ -16,7 +16,12 @@ import {
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { precioVigente } from '@/lib/precioProducto'
 import { useCarrito } from '@/context/CarritoContext'
+import { useFavoritos } from '@/context/FavoritoContext'
+import { useAuth } from '@/context/AuthContext'
+import { apiFetch } from '@/lib/api/client'
 import { SeccionResenas } from '@/components/reviews/SeccionResenas'
+import TarjetaProducto from '@/components/catalogo/TarjetaProducto'
+import { mapearProductos } from '@/lib/mapearProducto'
 import type { Producto } from '@/types/producto'
 
 // ——— Gradientes (mismo patrón que TarjetaProducto) ———
@@ -115,8 +120,11 @@ export default function PaginaProducto({
 }) {
   const { id } = use(params)
   const { agregar } = useCarrito()
+  const { toggle: toggleFav, esFavorito } = useFavoritos()
+  const { autenticado } = useAuth()
 
   const [producto, setProducto] = useState<Producto | null>(null)
+  const [recomendados, setRecomendados] = useState<Producto[]>([])
   const [whatsapp, setWhatsapp] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -160,8 +168,7 @@ export default function PaginaProducto({
 
     cargar()
 
-    // Registra 1 vista orgánica (fire-and-forget, deduplicada por sesionId 4h).
-    const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+    // Registra vista (deduplicada 4h) con JWT para personalización
     const sesionId = (() => {
       try {
         let sid = sessionStorage.getItem('afm_sid')
@@ -169,11 +176,12 @@ export default function PaginaProducto({
         return sid
       } catch { return undefined }
     })()
-    fetch(`${API_URL}/productos/${id}/vista`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sesionId }),
-    }).catch(() => {})
+    apiFetch(`/productos/${id}/vista`, { method: 'POST', body: { sesionId } }).catch(() => {})
+
+    // Cargar recomendaciones basadas en historial
+    apiFetch<{ ok: boolean; data: unknown[] }>('/productos/recomendaciones?limite=4')
+      .then((res) => setRecomendados(mapearProductos(Array.isArray(res?.data) ? res.data : [])))
+      .catch(() => {})
 
     return () => {
       cancelado = true
@@ -325,13 +333,26 @@ export default function PaginaProducto({
                 {producto.comercio.municipio}
               </span>
 
-              {/* 2. Nombre */}
-              <h1
-                className="text-3xl md:text-4xl text-[#1A1A1A] leading-tight"
-                style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
-              >
-                {producto.nombre}
-              </h1>
+              {/* 2. Nombre + favorito */}
+              <div className="flex items-start gap-3">
+                <h1
+                  className="flex-1 text-3xl md:text-4xl text-[#1A1A1A] leading-tight"
+                  style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
+                >
+                  {producto.nombre}
+                </h1>
+                {autenticado && (
+                  <button
+                    onClick={() => toggleFav(producto.id)}
+                    aria-label={esFavorito(producto.id) ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+                    className="mt-1 w-11 h-11 flex items-center justify-center rounded-xl border border-[#1A1A1A]/15 bg-white hover:border-[#2D6A4F] transition-colors shrink-0"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill={esFavorito(producto.id) ? '#2D6A4F' : 'none'} stroke={esFavorito(producto.id) ? '#2D6A4F' : '#1A1A1A'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
 
               {/* 3. Municipio + badge alcance */}
               <div className="flex items-center gap-3 flex-wrap">
@@ -620,10 +641,30 @@ export default function PaginaProducto({
         </button>
       </div>
 
-      {/* Reseñas */}
-      <div className="w-full max-w-2xl mx-auto px-4 md:px-6 pb-10">
+      {/* Reseñas del producto */}
+      <section className="max-w-6xl mx-auto w-full px-4 md:px-6 pb-10">
         <SeccionResenas productoId={Number(producto.id)} />
-      </div>
+      </section>
+
+      {/* También te puede gustar */}
+      {recomendados.length > 0 && (
+        <section className="max-w-6xl mx-auto w-full px-4 md:px-6 pb-10">
+          <h2
+            className="text-xl text-[#1A1A1A] mb-4"
+            style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
+          >
+            También te puede gustar
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {recomendados
+              .filter((p) => p.id !== producto.id)
+              .slice(0, 4)
+              .map((p) => (
+                <TarjetaProducto key={p.id} producto={p} />
+              ))}
+          </div>
+        </section>
+      )}
 
       <Footer />
     </div>

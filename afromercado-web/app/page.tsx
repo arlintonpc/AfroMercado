@@ -10,6 +10,8 @@ import FiltrosHorizontales from '@/components/catalogo/FiltrosHorizontales'
 import TarjetaProducto from '@/components/catalogo/TarjetaProducto'
 import { SkeletonCard, EmptyState } from '@/components/ui'
 import { listarProductos, listarCategorias } from '@/lib/api/productos'
+import { apiFetch } from '@/lib/api/client'
+import { useAuth } from '@/context/AuthContext'
 import { mapearProductos, type ProductoCrudo } from '@/lib/mapearProducto'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { precioVigente } from '@/lib/precioProducto'
@@ -270,7 +272,9 @@ function intercalarDestacados<T>(pagados: T[], organicos: T[]): T[] {
 
 /* ─── Página principal ───────────────────────────────────────────── */
 export default function Home() {
+  const { autenticado } = useAuth()
   const [filtroActivo, setFiltroActivo] = useState<string>('todos')
+  const [recomendados, setRecomendados] = useState<Producto[]>([])
   const [cargando, setCargando] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [productos, setProductos] = useState<Producto[]>([])
@@ -373,6 +377,14 @@ export default function Home() {
     }
   }, [])
 
+  // Recomendaciones personalizadas (solo usuarios autenticados)
+  useEffect(() => {
+    if (!autenticado) return
+    apiFetch<{ ok: boolean; data: unknown[] }>('/productos/recomendaciones?limite=8')
+      .then((res) => setRecomendados(mapearProductos(Array.isArray(res?.data) ? res.data : [])))
+      .catch(() => {})
+  }, [autenticado])
+
   function handleFiltroChange(filtro: string) {
     setFiltroActivo(filtro)
     cargarProductos(filtro)
@@ -395,6 +407,30 @@ export default function Home() {
         {/* Destacados */}
         <SeccionDestacados productos={destacados} destacadosPagados={destHome} etiquetasPagadas={destHomeEtiquetas} />
 
+
+        {/* Para ti — recomendaciones personalizadas */}
+        {autenticado && recomendados.length > 0 && (
+          <section className="bg-white py-10">
+            <div className="max-w-7xl mx-auto px-4 md:px-6">
+              <div className="mb-6">
+                <p className="text-[#52B788] text-xs font-semibold tracking-widest uppercase mb-1">
+                  Basado en tu historial
+                </p>
+                <h2
+                  className="text-2xl md:text-3xl text-[#1A1A1A]"
+                  style={{ fontFamily: 'var(--font-dm-serif)' }}
+                >
+                  Para ti
+                </h2>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {recomendados.map((p) => (
+                  <TarjetaProducto key={p.id} producto={p} />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Catálogo completo */}
         <section id="catalogo" className="max-w-7xl mx-auto w-full px-4 md:px-6 py-10 flex flex-col gap-6">

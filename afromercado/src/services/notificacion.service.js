@@ -3,6 +3,18 @@ const { enviarMensajeWA } = require("../utils/whatsapp");
 const emailPedido = require("../utils/templates/email-pedido");
 const prisma = require("../config/prisma");
 const emailPago = require("../utils/templates/email-pago");
+const sseManager = require("../utils/sse-manager");
+
+async function crearNotificacionDB(usuarioId, { tipo, titulo, mensaje, url, datos }) {
+  try {
+    const notif = await prisma.notificacion.create({
+      data: { usuarioId, tipo, titulo, mensaje, url: url || null, datos: datos || null },
+    });
+    sseManager.enviar(usuarioId, "notificacion", notif);
+  } catch (e) {
+    console.error("[NOTIF-DB]", e.message);
+  }
+}
 
 function formatearPrecio(valor) {
   return `$${Number(valor || 0).toLocaleString("es-CO")} COP`;
@@ -80,6 +92,15 @@ const NotificacionService = {
       .map((it) => `• ${it.cantidad}x ${it.producto?.nombre || "Producto"}`)
       .join("\n");
 
+    // Notificación in-app al comprador
+    await crearNotificacionDB(comprador.id, {
+      tipo: "PEDIDO_CREADO",
+      titulo: "Pedido registrado",
+      mensaje: `Tu pedido #${pedidoId} fue recibido. Tienes tiempo para completar el pago.`,
+      url: `/pedido/${pedidoId}`,
+      datos: { pedidoId },
+    });
+
     // Email al comprador
     await dispararNotificacion(() =>
       enviarEmail({
@@ -112,6 +133,16 @@ const NotificacionService = {
         .map((it) => `• ${it.cantidad}x ${it.producto?.nombre || "Producto"} — ${formatearPrecio(it.subtotal)}`)
         .join("\n");
       const neto = formatearPrecio(sp.neto);
+
+      if (comercio.usuario?.id) {
+        await crearNotificacionDB(comercio.usuario.id, {
+          tipo: "NUEVO_PEDIDO",
+          titulo: "Nuevo pedido recibido 🎉",
+          mensaje: `Tienes un nuevo pedido #${pedidoId}. El pago está en verificación.`,
+          url: `/comerciante/pedidos`,
+          datos: { pedidoId },
+        });
+      }
 
       if (comercio.usuario?.email) {
         await dispararNotificacion(() =>
@@ -163,6 +194,14 @@ const NotificacionService = {
 
   async pagoAprobado({ pedido, comprador, comerciantes }) {
     const pedidoId = pedido.id;
+
+    await crearNotificacionDB(comprador.id, {
+      tipo: "PAGO_CONFIRMADO",
+      titulo: "¡Pago confirmado!",
+      mensaje: `Tu pago del pedido #${pedidoId} fue verificado. Los productores ya empiezan a prepararlo.`,
+      url: `/mis-pedidos`,
+      datos: { pedidoId },
+    });
 
     await dispararNotificacion(() =>
       enviarEmail({
@@ -220,6 +259,14 @@ const NotificacionService = {
   },
 
   async pedidoListo({ pedidoId, comprador }) {
+    await crearNotificacionDB(comprador.id, {
+      tipo: "PEDIDO_LISTO",
+      titulo: "Tu pedido está listo 📦",
+      mensaje: `El pedido #${pedidoId} ya fue preparado y está esperando por ti.`,
+      url: `/mis-pedidos`,
+      datos: { pedidoId },
+    });
+
     await dispararNotificacion(() =>
       enviarEmail({
         to: comprador.email,
@@ -236,6 +283,14 @@ const NotificacionService = {
   },
 
   async pedidoEntregado({ pedidoId, comprador }) {
+    await crearNotificacionDB(comprador.id, {
+      tipo: "PEDIDO_ENTREGADO",
+      titulo: "¡Pedido entregado! ✅",
+      mensaje: `Tu pedido #${pedidoId} fue entregado. ¿Quedaste satisfecho? Deja tu reseña.`,
+      url: `/mis-pedidos`,
+      datos: { pedidoId },
+    });
+
     await dispararNotificacion(() =>
       enviarEmail({
         to: comprador.email,

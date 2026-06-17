@@ -1,7 +1,7 @@
 // Rutas de Productos
 const express = require("express");
 const ProductoController = require("../controllers/producto.controller");
-const { autenticar, autorizar } = require("../middlewares/auth");
+const { autenticar, autorizar, autenticarOpcional } = require("../middlewares/auth");
 
 const router = express.Router();
 
@@ -10,10 +10,12 @@ const VisibilidadController = require("../controllers/visibilidad.controller");
 
 // Rutas públicas (cualquiera puede ver el catálogo)
 router.get("/destacados", VisibilidadController.listarActivas);
+router.get("/recomendaciones", autenticarOpcional, ProductoController.recomendaciones);
+router.get("/busquedas-recientes", autenticarOpcional, ProductoController.busquedasRecientes);
+router.post("/busqueda", autenticarOpcional, ProductoController.registrarBusqueda);
 router.get("/", ProductoController.listar);
 router.get("/:id", ProductoController.obtener);
-// Registra 1 vista orgánica en VistaProducto (con dedup sesionId 4h)
-router.post("/:id/vista", ProductoController.registrarVista);
+router.post("/:id/vista", autenticarOpcional, ProductoController.registrarVista);
 router.get("/:id/reviews", ReviewController.listar);
 
 // Rutas protegidas — solo COMERCIANTE o ADMIN
