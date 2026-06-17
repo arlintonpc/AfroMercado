@@ -1,4 +1,5 @@
 import type { CarritoItem } from '@/types/carrito'
+import { precioVigente } from '@/lib/precioProducto'
 
 export interface GrupoComercio {
   comercio: string
@@ -17,7 +18,7 @@ export function agruparPorComercio(items: CarritoItem[]): GrupoComercio[] {
   for (const it of items) {
     const comercio = it.producto?.comercio?.nombre ?? 'Productor'
     const municipio = it.producto?.comercio?.municipio
-    const precio = it.producto?.precio ?? 0
+    const precio = precioVigente(it.producto)
     const sub = precio * it.cantidad
 
     const grupo = mapa.get(comercio)

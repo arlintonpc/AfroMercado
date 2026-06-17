@@ -1,5 +1,6 @@
 import { apiFetch } from './client'
 import type { Carrito } from '@/types/carrito'
+import { precioVigente } from '@/lib/precioProducto'
 
 /**
  * Normaliza la respuesta del backend a un Carrito.
@@ -32,7 +33,7 @@ function normalizarCarrito(datos: unknown): Carrito {
     typeof fuente.subtotal === 'number'
       ? fuente.subtotal
       : items.reduce(
-          (acc, it) => acc + (it.producto?.precio ?? 0) * (it.cantidad ?? 0),
+          (acc, it) => acc + precioVigente(it.producto) * (it.cantidad ?? 0),
           0,
         )
 

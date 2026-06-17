@@ -9,6 +9,7 @@ export interface FiltrosProductos {
   precioMin?: number
   precioMax?: number
   alcance?: 'LOCAL' | 'NACIONAL' | 'AMBOS'
+  enOferta?: boolean
   pagina?: number
   porPagina?: number
 }

@@ -25,6 +25,11 @@ const ProductoRepository = {
           },
         },
         categoria: true,
+        ofertas: {
+          where: { activa: true, inicio: { lte: new Date() }, fin: { gte: new Date() } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
       },
     });
   },
@@ -37,6 +42,7 @@ const ProductoRepository = {
     precioMin,
     precioMax,
     alcance,
+    enOferta,
     pagina = 1,
     porPagina = 12,
   } = {}) {
@@ -101,6 +107,12 @@ const ProductoRepository = {
       }
     }
 
+    // Filtro: solo productos con oferta activa
+    const ahora = new Date();
+    if (enOferta) {
+      where.ofertas = { some: { activa: true, inicio: { lte: ahora }, fin: { gte: ahora } } };
+    }
+
     const skip = (pagina - 1) * porPagina;
 
     const [total, items] = await Promise.all([
@@ -119,6 +131,11 @@ const ProductoRepository = {
             },
           },
           categoria: true,
+          ofertas: {
+            where: { activa: true, inicio: { lte: ahora }, fin: { gte: ahora } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
         },
         orderBy: [
           { comercio: { calificacion: "desc" } },

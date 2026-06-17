@@ -11,18 +11,41 @@
 const CarritoRepository = require("../repositories/carrito.repository");
 const ProductoRepository = require("../repositories/producto.repository");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
+const { ofertaTieneCupo, ofertaVigente, precioVigente } = require("../utils/ofertas");
+
+function validarCupoOferta(producto, cantidad) {
+  const oferta = ofertaVigente(producto, new Date(), 1);
+  if (!oferta || ofertaTieneCupo(oferta, cantidad)) return;
+  const restantes = Math.max(0, Number(oferta.stockLimite) - Number(oferta.stockUsado));
+  throw new ErrorValidacion(
+    `La oferta de "${producto.nombre}" solo tiene ${restantes} unidad(es) disponibles.`
+  );
+}
 
 /** Normaliza un CarritoItem de Prisma a la forma que consume la UI. */
 function mapearItem(item) {
   const p = item.producto;
   const precio = Number(p.precio);
+  const precioInfo = precioVigente(p);
   const precioAlAgregar = Number(item.precioAlAgregar);
   const c = p.comercio;
+  const oferta = precioInfo.oferta
+    ? {
+        id: precioInfo.oferta.id,
+        tipo: precioInfo.oferta.tipo,
+        valor: Number(precioInfo.oferta.valor),
+        etiqueta: precioInfo.oferta.etiqueta || undefined,
+        precioFinal: precioInfo.precioFinal,
+        fin: precioInfo.oferta.fin,
+        stockLimite: precioInfo.oferta.stockLimite,
+        stockUsado: precioInfo.oferta.stockUsado,
+      }
+    : undefined;
   return {
     productoId: String(p.id),
     cantidad: item.cantidad,
     precioAlAgregar,
-    alertaPrecio: precio !== precioAlAgregar,
+    alertaPrecio: precioInfo.precioFinal !== precioAlAgregar,
     producto: {
       id: String(p.id),
       nombre: p.nombre,
@@ -34,6 +57,7 @@ function mapearItem(item) {
       diasAlistamientoMin: p.diasAlistamientoMin,
       diasAlistamientoMax: p.diasAlistamientoMax,
       alcance: p.alcance,
+      oferta,
       comercio: c
         ? {
             nombre: c.nombre,
@@ -53,7 +77,7 @@ async function construirCarrito(usuarioId) {
   const items = crudos.map(mapearItem);
   const cantidadTotal = items.reduce((acc, i) => acc + i.cantidad, 0);
   const subtotal = items.reduce(
-    (acc, i) => acc + i.producto.precio * i.cantidad,
+    (acc, i) => acc + (i.producto.oferta?.precioFinal ?? i.producto.precio) * i.cantidad,
     0
   );
   return { items, cantidadTotal, subtotal };
@@ -80,7 +104,13 @@ const CarritoService = {
       throw new ErrorValidacion(`Stock insuficiente. Disponible: ${stockDisponible}`);
     }
 
-    await CarritoRepository.agregarItem(usuarioId, pid, cantidad, producto.precio);
+    validarCupoOferta(producto, cantidad);
+    const precioInfo = precioVigente(producto, new Date(), cantidad);
+    if (precioInfo.oferta && precioInfo.precioFinal <= 0) {
+      throw new ErrorValidacion("La oferta vigente no tiene un precio válido.");
+    }
+
+    await CarritoRepository.agregarItem(usuarioId, pid, cantidad, precioInfo.precioFinal);
     return construirCarrito(usuarioId);
   },
 
@@ -99,8 +129,13 @@ const CarritoService = {
     if (stockDisponible < cantidad) {
       throw new ErrorValidacion(`Stock insuficiente. Disponible: ${stockDisponible}`);
     }
+    validarCupoOferta(producto, cantidad);
+    const precioInfo = precioVigente(producto, new Date(), cantidad);
+    if (precioInfo.oferta && precioInfo.precioFinal <= 0) {
+      throw new ErrorValidacion("La oferta vigente no tiene un precio válido.");
+    }
 
-    await CarritoRepository.actualizarCantidad(usuarioId, pid, cantidad);
+    await CarritoRepository.actualizarCantidad(usuarioId, pid, cantidad, precioInfo.precioFinal);
     return construirCarrito(usuarioId);
   },
 

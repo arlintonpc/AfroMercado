@@ -5,6 +5,7 @@ interface EmptyStateProps {
   titulo: string;
   descripcion: string;
   onReintentar?: () => void;
+  children?: React.ReactNode;
 }
 
 // Ícono SVG de caja vacía / hoja — simple y legible a cualquier tamaño
@@ -75,7 +76,7 @@ function EmptyBoxIcon() {
   );
 }
 
-export function EmptyState({ titulo, descripcion, onReintentar }: EmptyStateProps) {
+export function EmptyState({ titulo, descripcion, onReintentar, children }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center gap-5 py-16 px-6 text-center">
       {/* Ícono */}
@@ -100,6 +101,7 @@ export function EmptyState({ titulo, descripcion, onReintentar }: EmptyStateProp
           Reintentar
         </Button>
       )}
+      {children}
     </div>
   );
 }

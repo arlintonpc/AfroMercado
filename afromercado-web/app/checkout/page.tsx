@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import { precioVigente } from '@/lib/precioProducto'
 import { apiFetch } from '@/lib/api/client'
 import { listarDirecciones, crearDireccion } from '@/lib/api/direccion'
 import { useCarrito } from '@/context/CarritoContext'
@@ -60,6 +61,18 @@ export default function PaginaCheckout() {
   }, [cargandoAuth, autenticado, cargandoCarrito, items.length, router])
 
   // Cargar direcciones guardadas
+  const seleccionarDireccion = useCallback((dir: Direccion) => {
+    setSelectedId(dir.id)
+    setDepartamento(dir.departamento)
+    setMunicipio(dir.municipio)
+    setBarrio(dir.barrio ?? '')
+    setLinea1(dir.linea1)
+    setReferencia(dir.referencia ?? '')
+    setTelefono(dir.telefono ?? usuario?.telefono ?? '')
+    setGuardarDir(false)
+    setErrores({})
+  }, [usuario?.telefono])
+
   useEffect(() => {
     if (!autenticado) return
     listarDirecciones()
@@ -73,19 +86,7 @@ export default function PaginaCheckout() {
       })
       .catch(() => {})
       .finally(() => setCargandoDirs(false))
-  }, [autenticado])
-
-  function seleccionarDireccion(dir: Direccion) {
-    setSelectedId(dir.id)
-    setDepartamento(dir.departamento)
-    setMunicipio(dir.municipio)
-    setBarrio(dir.barrio ?? '')
-    setLinea1(dir.linea1)
-    setReferencia(dir.referencia ?? '')
-    setTelefono(dir.telefono ?? usuario?.telefono ?? '')
-    setGuardarDir(false)
-    setErrores({})
-  }
+  }, [autenticado, seleccionarDireccion])
 
   function seleccionarNueva() {
     setSelectedId(null)
@@ -419,7 +420,7 @@ export default function PaginaCheckout() {
                             {it.cantidad}× {it.producto?.nombre ?? 'Producto'}
                           </span>
                           <span className="text-[#1A1A1A] whitespace-nowrap">
-                            {formatearPrecio((it.producto?.precio ?? 0) * it.cantidad)}
+                            {formatearPrecio(precioVigente(it.producto) * it.cantidad)}
                           </span>
                         </li>
                       ))}

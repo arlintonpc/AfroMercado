@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import { precioVigente } from '@/lib/precioProducto'
 import type { CarritoItem } from '@/types/carrito'
 
 /**
@@ -25,10 +26,15 @@ export function LineaCarrito({
   const [ocupado, setOcupado] = useState(false)
 
   const producto = item.producto
-  const precio = producto?.precio ?? 0
+  const precio = precioVigente(producto)
   const stock = producto?.stock ?? 99
   const reservado = producto?.stockReservado ?? 0
-  const disponible = Math.max(0, stock - reservado)
+  const stockDisponible = Math.max(0, stock - reservado)
+  const cupoTemporada =
+    producto?.oferta?.stockLimite !== null && producto?.oferta?.stockLimite !== undefined
+      ? Math.max(0, producto.oferta.stockLimite - producto.oferta.stockUsado)
+      : stockDisponible
+  const disponible = Math.min(stockDisponible, cupoTemporada)
   const subtotal = precio * item.cantidad
   const mostrarPlaceholder = !producto?.fotoUrl || imgError
 
@@ -89,7 +95,21 @@ export function LineaCarrito({
           {producto?.nombre ?? 'Producto'}
         </Link>
         <p className="text-xs text-[#1A1A1A]/50 mt-0.5">
-          {formatearPrecio(precio)}
+          {producto?.oferta ? (
+            <>
+              <span className="line-through text-[#1A1A1A]/35 mr-1">
+                {formatearPrecio(producto.precio)}
+              </span>
+              <span className="font-semibold text-[#C0392B]">
+                {formatearPrecio(precio)}
+              </span>
+              <span className="ml-1 rounded-full bg-[#C0392B]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#C0392B]">
+                Temporada
+              </span>
+            </>
+          ) : (
+            formatearPrecio(precio)
+          )}
           {producto?.unidad ? ` · por ${producto.unidad}` : ''}
         </p>
         {disponible === 0 ? (
@@ -100,6 +120,11 @@ export function LineaCarrito({
           </p>
         ) : (
           <p className="text-xs text-[#1A1A1A]/40 mt-0.5">{disponible} disponibles</p>
+        )}
+        {item.alertaPrecio && (
+          <p className="mt-1 text-xs font-medium text-[#B7800A]">
+            Precio actualizado. Revisa antes de confirmar.
+          </p>
         )}
 
         <div className="mt-auto pt-2 flex items-center justify-between gap-2">

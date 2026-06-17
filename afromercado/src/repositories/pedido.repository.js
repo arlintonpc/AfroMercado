@@ -44,6 +44,7 @@ const PedidoRepository = {
             items: {
               create: sp.items.map((item) => ({
                 productoId: item.productoId,
+                ofertaId: item.ofertaId ?? null,
                 cantidad: item.cantidad,
                 precioUnitario: item.precioUnitario,
                 subtotal: item.subtotal,

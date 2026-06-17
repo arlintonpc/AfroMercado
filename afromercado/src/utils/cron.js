@@ -27,6 +27,13 @@ async function expirarPedidosVencidos() {
               SET "stockReservado" = GREATEST("stockReservado" - ${item.cantidad}, 0)
               WHERE id = ${item.productoId}
             `;
+            if (item.ofertaId) {
+              await tx.$executeRaw`
+                UPDATE "Oferta"
+                SET "stockUsado" = GREATEST("stockUsado" - ${item.cantidad}, 0)
+                WHERE id = ${item.ofertaId}
+              `;
+            }
           }
         }
         await tx.pedido.update({

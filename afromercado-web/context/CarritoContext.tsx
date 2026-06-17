@@ -19,6 +19,7 @@ import {
 } from '@/lib/api/carrito'
 import type { Carrito, CarritoItem } from '@/types/carrito'
 import type { Producto } from '@/types/producto'
+import { precioVigente } from '@/lib/precioProducto'
 
 const CARRITO_KEY = 'afromercado_carrito'
 
@@ -74,7 +75,7 @@ function calcularTotales(items: CarritoItem[]): {
   return items.reduce(
     (acc, it) => {
       acc.cantidadTotal += it.cantidad
-      acc.subtotal += (it.producto?.precio ?? 0) * it.cantidad
+      acc.subtotal += precioVigente(it.producto) * it.cantidad
       return acc
     },
     { cantidadTotal: 0, subtotal: 0 },
@@ -109,7 +110,10 @@ export function CarritoProvider({ children }: { children: ReactNode }) {
 
   // Estabiliza la lista de items local para la sincronización al hacer login.
   const itemsRef = useRef<CarritoItem[]>([])
-  itemsRef.current = items
+
+  useEffect(() => {
+    itemsRef.current = items
+  }, [items])
 
   // Aplica un Carrito devuelto por la API al estado local.
   const aplicarCarritoApi = useCallback((carrito: Carrito) => {

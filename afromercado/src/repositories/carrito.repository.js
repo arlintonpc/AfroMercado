@@ -5,6 +5,7 @@ const prisma = require("../config/prisma");
 
 const CarritoRepository = {
   async obtenerCarrito(usuarioId) {
+    const ahora = new Date();
     return prisma.carritoItem.findMany({
       where: {
         usuarioId,
@@ -12,7 +13,14 @@ const CarritoRepository = {
       },
       include: {
         producto: {
-          include: { comercio: true },
+          include: {
+            comercio: true,
+            ofertas: {
+              where: { activa: true, inicio: { lte: ahora }, fin: { gte: ahora } },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+            },
+          },
         },
       },
     });
@@ -26,10 +34,10 @@ const CarritoRepository = {
     });
   },
 
-  async actualizarCantidad(usuarioId, productoId, cantidad) {
+  async actualizarCantidad(usuarioId, productoId, cantidad, precio) {
     return prisma.carritoItem.update({
       where: { usuarioId_productoId: { usuarioId, productoId } },
-      data: { cantidad },
+      data: precio !== undefined ? { cantidad, precioAlAgregar: precio } : { cantidad },
     });
   },
 

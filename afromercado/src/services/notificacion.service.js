@@ -1,6 +1,7 @@
 const { enviarEmail } = require("../utils/email");
 const { enviarMensajeWA } = require("../utils/whatsapp");
 const emailPedido = require("../utils/templates/email-pedido");
+const prisma = require("../config/prisma");
 const emailPago = require("../utils/templates/email-pago");
 
 function formatearPrecio(valor) {
@@ -215,6 +216,38 @@ const NotificacionService = {
             })
           ), `WA comerciante ${comercio.id} pago aprobado`);
       }
+    }
+  },
+
+  async pedidoListo({ pedidoId, comprador }) {
+    await dispararNotificacion(() =>
+      enviarEmail({
+        to: comprador.email,
+        subject: `Tu pedido #${pedidoId} está listo para entrega — AfroMercado`,
+        html: emailPedido.pedidoListo({ nombreComprador: comprador.nombre, pedidoId }),
+      }), "email comprador pedido listo");
+
+    if (comprador.telefono) {
+      await dispararNotificacion(() =>
+        enviarMensajeWA(comprador.telefono,
+          `¡Tu pedido está listo! 📦\n\nHola ${primerNombre(comprador.nombre)}, el pedido *#${pedidoId}* ya fue preparado y está esperando por ti.\n\nEl productor coordinará contigo el envío. ¡Gracias por apoyar el Chocó! 🌿`
+        ), "WA comprador pedido listo");
+    }
+  },
+
+  async pedidoEntregado({ pedidoId, comprador }) {
+    await dispararNotificacion(() =>
+      enviarEmail({
+        to: comprador.email,
+        subject: `¡Pedido #${pedidoId} entregado! — AfroMercado`,
+        html: emailPedido.pedidoEntregado({ nombreComprador: comprador.nombre, pedidoId }),
+      }), "email comprador pedido entregado");
+
+    if (comprador.telefono) {
+      await dispararNotificacion(() =>
+        enviarMensajeWA(comprador.telefono,
+          `¡Entregado! ✅\n\nHola ${primerNombre(comprador.nombre)}, tu pedido *#${pedidoId}* fue marcado como entregado.\n\n¿Todo llegó bien? Deja tu reseña en AfroMercado y apoya a los productores del Chocó. 🌿`
+        ), "WA comprador pedido entregado");
     }
   },
 

@@ -4,6 +4,7 @@
 //  No tiene lógica de negocio.
 // ============================================================
 const ComercioService = require("../services/comercio.service");
+const NotificacionService = require("../services/notificacion.service");
 const prisma = require("../config/prisma");
 
 const ComercioController = {
@@ -291,19 +292,44 @@ const ComercioController = {
         data: { estado: estadoSiguiente },
       });
 
-      // Si este subpedido quedó ENTREGADO, verificar si todos los del pedido lo están.
-      // En ese caso, cerrar el Pedido principal como ENTREGADO.
-      if (estadoSiguiente === "ENTREGADO") {
-        const hermanos = await prisma.subPedido.findMany({
-          where: { pedidoId: subPedido.pedidoId },
-          select: { estado: true },
+      // Notificaciones y cierre del pedido principal (fire-and-forget).
+      if (estadoSiguiente === "LISTO" || estadoSiguiente === "ENTREGADO") {
+        const pedidoId = subPedido.pedidoId;
+        setImmediate(async () => {
+          try {
+            const pedidoCompleto = await prisma.pedido.findUnique({
+              where: { id: pedidoId },
+              include: { comprador: { select: { nombre: true, email: true, telefono: true } } },
+            });
+            if (!pedidoCompleto) return;
+
+            if (estadoSiguiente === "LISTO") {
+              await NotificacionService.pedidoListo({
+                pedidoId,
+                comprador: pedidoCompleto.comprador,
+              });
+            }
+
+            if (estadoSiguiente === "ENTREGADO") {
+              const hermanos = await prisma.subPedido.findMany({
+                where: { pedidoId },
+                select: { estado: true },
+              });
+              if (hermanos.every((sp) => sp.estado === "ENTREGADO")) {
+                await prisma.pedido.update({
+                  where: { id: pedidoId },
+                  data: { estado: "ENTREGADO" },
+                });
+                await NotificacionService.pedidoEntregado({
+                  pedidoId,
+                  comprador: pedidoCompleto.comprador,
+                });
+              }
+            }
+          } catch (e) {
+            console.error("[NOTIF] Error en estado pedido:", e.message);
+          }
         });
-        if (hermanos.every((sp) => sp.estado === "ENTREGADO")) {
-          await prisma.pedido.update({
-            where: { id: subPedido.pedidoId },
-            data: { estado: "ENTREGADO" },
-          });
-        }
       }
 
       res.json({ ok: true, subPedido: actualizado });

@@ -39,6 +39,8 @@ export default function PaginaPedido({
   const [pedido, setPedido] = useState<PedidoDetalle | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [cancelando, setCancelando] = useState(false)
+  const [cancelado, setCancelado] = useState(false)
 
   useEffect(() => {
     if (!cargandoAuth && !autenticado) {
@@ -103,6 +105,20 @@ export default function PaginaPedido({
     )
   }
 
+  async function handleCancelar() {
+    if (!window.confirm('¿Seguro que quieres cancelar este pedido? Esta acción no se puede deshacer.')) return
+    setCancelando(true)
+    try {
+      await apiFetch(`/pedidos/${id}/cancelar`, { method: 'POST' })
+      setCancelado(true)
+      setPedido((p) => p ? { ...p, estado: 'CANCELADO' as typeof p.estado } : p)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo cancelar el pedido.')
+    } finally {
+      setCancelando(false)
+    }
+  }
+
   const info = infoEstado(pedido.estado)
   const grupos = lineasDePedido(pedido)
   const total = pedido.total ?? pedido.subtotal ?? 0
@@ -162,9 +178,18 @@ export default function PaginaPedido({
           </div>
 
           {esPendiente && (
-            <Link href={`/pedido/${pedido.id}/pago`} className="inline-block mt-5">
-              <Button>Realizar el pago</Button>
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mt-5">
+              <Link href={`/pedido/${pedido.id}/pago`} className="inline-block">
+                <Button>Realizar el pago</Button>
+              </Link>
+              <button
+                onClick={handleCancelar}
+                disabled={cancelando || cancelado}
+                className="px-5 py-2 rounded-xl text-sm font-medium border border-[#1A1A1A]/20 text-[#1A1A1A]/60 hover:border-red-400 hover:text-red-600 disabled:opacity-40 transition-colors"
+              >
+                {cancelando ? 'Cancelando…' : cancelado ? 'Pedido cancelado' : 'Cancelar pedido'}
+              </button>
+            </div>
           )}
         </div>
 
