@@ -14,7 +14,7 @@ const config = {
   puerto: parseInt(process.env.PORT || "3000", 10),
 
   jwt: {
-    secret: requerido("JWT_SECRET", "cambia-esto-en-produccion"),
+    secret: requerido("JWT_SECRET"),
     expiraEn: process.env.JWT_EXPIRES_IN || "24h",
   },
 

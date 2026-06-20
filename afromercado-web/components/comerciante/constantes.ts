@@ -3,18 +3,38 @@
  * unidades de venta y alcances, con etiquetas amigables en español sencillo.
  */
 
-/** Municipios del Chocó para el select de registro de comercio. */
+/** Municipios del Chocó (30 oficiales DIVIPOLA — DANE). */
 export const MUNICIPIOS_CHOCO: string[] = [
   'Quibdó',
-  'Istmina',
-  'Tadó',
-  'Condoto',
-  'Bagadó',
-  'Pie de Pató',
-  'Bahía Solano',
-  'Nuquí',
   'Acandí',
-  'Otro',
+  'Alto Baudó',
+  'Atrato',
+  'Bagadó',
+  'Bahía Solano',
+  'Bajo Baudó',
+  'Bojayá',
+  'El Cantón del San Pablo',
+  'Carmen del Darién',
+  'Cértegui',
+  'Condoto',
+  'El Carmen de Atrato',
+  'El Litoral del San Juan',
+  'Istmina',
+  'Juradó',
+  'Lloró',
+  'Medio Atrato',
+  'Medio Baudó',
+  'Medio San Juan',
+  'Nóvita',
+  'Nuquí',
+  'Río Iró',
+  'Río Quito',
+  'Riosucio',
+  'San José del Palmar',
+  'Sipí',
+  'Tadó',
+  'Unión Panamericana',
+  'Ungía',
 ]
 
 /** Unidad de venta válida en el backend. */

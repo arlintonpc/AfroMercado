@@ -108,8 +108,8 @@ function BuscadorComercio({
       } else {
         setOpciones(j.items ?? [])
       }
-    } catch (err: any) {
-      setErrorBusqueda(err.message ?? 'Sin conexión')
+    } catch (err: unknown) {
+      setErrorBusqueda(err instanceof Error ? err.message : 'Sin conexión')
       setOpciones([])
     } finally {
       setCargando(false)
@@ -289,8 +289,8 @@ function FormNueva({ onCreada }: { onCreada: () => void }) {
         notas: '', montoCOP: '15000', etiqueta: '',
       }))
       onCreada()
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al crear')
     } finally {
       setGuardando(false)
     }
@@ -371,7 +371,7 @@ function FormNueva({ onCreada }: { onCreada: () => void }) {
             {form.etiqueta.trim() || 'Selección Chocó'}
           </span>
         </div>
-        <p className="text-[10px] text-[#1A1A1A]/40">Si lo dejas vacío usa "Selección Chocó". Máx. 28 caracteres.</p>
+        <p className="text-[10px] text-[#1A1A1A]/40">Si lo dejas vacío usa Selección Chocó. Máx. 28 caracteres.</p>
       </div>
 
       {/* Notas */}

@@ -26,6 +26,7 @@ export default function EditarProductoPage() {
   const [precio, setPrecio] = useState('')
   const [stock, setStock] = useState('')
   const [alcance, setAlcance] = useState<Alcance>('LOCAL')
+  const [pesoKg, setPesoKg] = useState('')
 
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
@@ -54,6 +55,7 @@ export default function EditarProductoPage() {
         setPrecio(String(Number(p.precio)))
         setStock(String(p.stock))
         setAlcance(p.alcance)
+        setPesoKg(p.pesoKg !== undefined && p.pesoKg !== null ? String(Number(p.pesoKg)) : '')
       } catch (err) {
         if (activo)
           setErrorGeneral(
@@ -87,11 +89,13 @@ export default function EditarProductoPage() {
 
     setGuardando(true)
     try {
+      const pesoKgNum = pesoKg.trim() ? Number(pesoKg) : null
       await actualizarProducto(producto.id, {
         descripcion: descripcion.trim(),
         precio: Number(precio.replace(/\D/g, '')),
         stock: Number(stock.replace(/\D/g, '')),
         alcance,
+        pesoKg: pesoKgNum !== null && pesoKgNum > 0 ? pesoKgNum : null,
       })
       router.replace('/comerciante/dashboard')
     } catch (err) {
@@ -207,6 +211,16 @@ export default function EditarProductoPage() {
           value={stock}
           onChange={(v) => setStock(v.replace(/\D/g, ''))}
           error={errores.stock}
+        />
+
+        <CampoTexto
+          label="Peso aproximado (kg)"
+          name="pesoKg"
+          inputMode="decimal"
+          placeholder="Ej: 0.5"
+          value={pesoKg}
+          onChange={(v) => setPesoKg(v.replace(/[^0-9.]/g, ''))}
+          hint="Opcional. Se usa para calcular el costo de envío."
         />
 
         <fieldset>

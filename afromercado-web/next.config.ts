@@ -23,6 +23,12 @@ const nextConfig: NextConfig = {
         hostname: "localhost",
         pathname: "/**",
       },
+      {
+        // Backend desplegado en Render (producción)
+        protocol: "https",
+        hostname: "*.onrender.com",
+        pathname: "/**",
+      },
     ],
   },
 };

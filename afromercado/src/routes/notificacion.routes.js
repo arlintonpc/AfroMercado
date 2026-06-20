@@ -8,6 +8,7 @@ const router = express.Router();
 router.get("/stream", autenticar, NotificacionController.stream);
 
 router.get("/", autenticar, NotificacionController.listar);
+router.get("/no-leidas/count", autenticar, NotificacionController.contarNoLeidas);
 router.patch("/leer-todas", autenticar, NotificacionController.marcarTodasLeidas);
 router.patch("/:id/leer", autenticar, NotificacionController.marcarLeida);
 

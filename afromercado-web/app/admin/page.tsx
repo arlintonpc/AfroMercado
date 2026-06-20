@@ -516,10 +516,34 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
-      {/* Gestión de comerciantes */}
+      {/* Gestión de usuarios y comerciantes */}
       <section className="mt-6">
-        <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">Gestión de comerciantes</h2>
+        <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">Gestión de usuarios</h2>
         <div className="flex flex-col gap-3">
+          <Link
+            href="/admin/categorias"
+            className="flex items-center justify-between rounded-2xl border border-[#2D6A4F]/25 bg-[#2D6A4F]/5 px-5 py-4 hover:bg-[#2D6A4F]/10 transition-colors"
+          >
+            <div>
+              <p className="font-semibold text-[#2D6A4F]">🏷️ Categorías</p>
+              <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Crear, editar y activar/desactivar categorías de productos del marketplace.</p>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#2D6A4F] flex-shrink-0">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </Link>
+          <Link
+            href="/admin/usuarios"
+            className="flex items-center justify-between rounded-2xl border border-[#2D6A4F]/25 bg-[#2D6A4F]/5 px-5 py-4 hover:bg-[#2D6A4F]/10 transition-colors"
+          >
+            <div>
+              <p className="font-semibold text-[#2D6A4F]">👥 Usuarios registrados</p>
+              <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Ver todos los usuarios, filtrar por rol, bloquear o activar cuentas.</p>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#2D6A4F] flex-shrink-0">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </Link>
           <Link
             href="/admin/comerciantes"
             className="flex items-center justify-between rounded-2xl border border-[#2D6A4F]/25 bg-[#2D6A4F]/5 px-5 py-4 hover:bg-[#2D6A4F]/10 transition-colors"
@@ -527,6 +551,25 @@ export default function AdminDashboardPage() {
             <div>
               <p className="font-semibold text-[#2D6A4F]">Verificar comerciantes</p>
               <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Revisar y aprobar nuevos comercios. Ver documentos de identidad y estado de verificación.</p>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#2D6A4F] flex-shrink-0">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </Link>
+        </div>
+      </section>
+
+      {/* Reportería estratégica */}
+      <section className="mt-6">
+        <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">Reportería y análisis</h2>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/admin/reportes"
+            className="flex items-center justify-between rounded-2xl border border-[#2D6A4F]/30 bg-[#52B788]/5 px-5 py-4 hover:bg-[#52B788]/10 transition-colors"
+          >
+            <div>
+              <p className="font-semibold text-[#2D6A4F]">📊 Reportería estratégica</p>
+              <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Dashboard de ingresos, GMV, comercios en riesgo, ROI de campañas y exportación Excel.</p>
             </div>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#2D6A4F] flex-shrink-0">
               <path d="M9 18l6-6-6-6" />
@@ -548,6 +591,49 @@ export default function AdminDashboardPage() {
               <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Crear y administrar códigos de descuento para que los compradores los usen en el checkout.</p>
             </div>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#9B7300] flex-shrink-0">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </Link>
+        </div>
+      </section>
+
+      {/* Gestión de entregas */}
+      <section className="mt-6">
+        <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">Logística y entregas</h2>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/admin/entregas"
+            className="flex items-center justify-between rounded-2xl border border-[#2D6A4F]/25 bg-[#2D6A4F]/5 px-5 py-4 hover:bg-[#2D6A4F]/10 transition-colors"
+          >
+            <div>
+              <p className="font-semibold text-[#2D6A4F]">🚴 Gestión de entregas</p>
+              <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Ver todas las entregas, asignar repartidores y supervisar el estado de cada despacho.</p>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#2D6A4F] flex-shrink-0">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </Link>
+          <Link
+            href="/admin/solicitudes-repartidor"
+            className="flex items-center justify-between rounded-2xl border border-[#D4A017]/25 bg-[#D4A017]/5 px-5 py-4 hover:bg-[#D4A017]/10 transition-colors"
+          >
+            <div>
+              <p className="font-semibold text-[#9B7300]">📋 Solicitudes de repartidor</p>
+              <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Revisa las solicitudes de usuarios que quieren ser repartidores. Verifica vehículo y licencia antes de aprobar.</p>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#9B7300] flex-shrink-0">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </Link>
+          <Link
+            href="/admin/liquidaciones"
+            className="flex items-center justify-between rounded-2xl border border-[#2D6A4F]/25 bg-[#2D6A4F]/5 px-5 py-4 hover:bg-[#2D6A4F]/10 transition-colors"
+          >
+            <div>
+              <p className="font-semibold text-[#2D6A4F]">💰 Liquidaciones</p>
+              <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Gestiona los pagos pendientes a comerciantes y repartidores. Crea y marca como pagadas.</p>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#2D6A4F] flex-shrink-0">
               <path d="M9 18l6-6-6-6" />
             </svg>
           </Link>

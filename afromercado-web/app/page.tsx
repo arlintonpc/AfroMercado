@@ -381,7 +381,10 @@ export default function Home() {
   useEffect(() => {
     if (!autenticado) return
     apiFetch<{ ok: boolean; data: unknown[] }>('/productos/recomendaciones?limite=8')
-      .then((res) => setRecomendados(mapearProductos(Array.isArray(res?.data) ? res.data : [])))
+      .then((res) => {
+        const data = Array.isArray(res?.data) ? (res.data as ProductoCrudo[]) : []
+        setRecomendados(mapearProductos(data))
+      })
       .catch(() => {})
   }, [autenticado])
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { CampoTexto, CampoArea, CampoSelect } from '@/components/comerciante/Campos'
@@ -10,6 +11,7 @@ import {
   obtenerMiComercio,
   type CategoriaComerciante,
 } from '@/components/comerciante/api'
+import SubidorImagenes from '@/components/comerciante/SubidorImagenes'
 import { UNIDADES, ALCANCES, type Alcance } from '@/components/comerciante/constantes'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
@@ -17,8 +19,10 @@ export default function PublicarProductoPage() {
   const router = useRouter()
 
   const [verificando, setVerificando] = useState(true)
-
   const [categorias, setCategorias] = useState<CategoriaComerciante[]>([])
+
+  // Paso 2: ID del producto recién creado
+  const [nuevoId, setNuevoId] = useState<number | null>(null)
 
   // Campos del formulario
   const [nombre, setNombre] = useState('')
@@ -30,12 +34,12 @@ export default function PublicarProductoPage() {
   const [diasMin, setDiasMin] = useState('')
   const [diasMax, setDiasMax] = useState('')
   const [alcance, setAlcance] = useState<Alcance | ''>('')
+  const [pesoKg, setPesoKg] = useState('')
 
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
 
-  // Verificar que tiene comercio; si no, redirigir a registro-comercio.
   useEffect(() => {
     let activo = true
     obtenerMiComercio()
@@ -44,27 +48,16 @@ export default function PublicarProductoPage() {
         if (!c) router.replace('/comerciante/registro-comercio')
         else setVerificando(false)
       })
-      .catch(() => {
-        if (activo) setVerificando(false)
-      })
-    return () => {
-      activo = false
-    }
+      .catch(() => { if (activo) setVerificando(false) })
+    return () => { activo = false }
   }, [router])
 
-  // Cargar categorías (solo informativo; "Del Campo" es la activa).
   useEffect(() => {
     let activo = true
     listarCategorias()
-      .then((cats) => {
-        if (activo) setCategorias(cats.filter((c) => c.activa))
-      })
-      .catch(() => {
-        /* silencioso */
-      })
-    return () => {
-      activo = false
-    }
+      .then((cats) => { if (activo) setCategorias(cats.filter((c) => c.activa)) })
+      .catch(() => { /* silencioso */ })
+    return () => { activo = false }
   }, [])
 
   function validar(): boolean {
@@ -74,8 +67,7 @@ export default function PublicarProductoPage() {
 
     const precioNum = Number(precio.replace(/\D/g, ''))
     if (!precio.trim()) e.precio = '¿Cuánto cuesta? Escribe el precio.'
-    else if (!precioNum || precioNum <= 0)
-      e.precio = 'El precio debe ser mayor que cero.'
+    else if (!precioNum || precioNum <= 0) e.precio = 'El precio debe ser mayor que cero.'
 
     if (!unidad) e.unidad = '¿Cómo lo vendes? Elige una opción.'
 
@@ -87,8 +79,7 @@ export default function PublicarProductoPage() {
     const maxNum = Number(diasMax.replace(/\D/g, ''))
     if (!diasMin.trim()) e.diasMin = 'Escribe los días mínimos.'
     if (!diasMax.trim()) e.diasMax = 'Escribe los días máximos.'
-    else if (diasMin.trim() && maxNum < minNum)
-      e.diasMax = 'El máximo no puede ser menor que el mínimo.'
+    else if (diasMin.trim() && maxNum < minNum) e.diasMax = 'El máximo no puede ser menor que el mínimo.'
 
     if (!alcance) e.alcance = '¿Hasta dónde quieres vender? Elige una opción.'
 
@@ -104,6 +95,7 @@ export default function PublicarProductoPage() {
 
     setEnviando(true)
     try {
+      const pesoKgNum = pesoKg.trim() ? Number(pesoKg) : undefined
       const nuevo = await crearProducto({
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || undefined,
@@ -114,14 +106,14 @@ export default function PublicarProductoPage() {
         diasAlistamientoMax: Number(diasMax.replace(/\D/g, '')),
         alcance: alcance as Alcance,
         fotoUrl: '',
+        categoriaId: categoriaId ? Number(categoriaId) : undefined,
+        ...(pesoKgNum !== undefined && pesoKgNum > 0 ? { pesoKg: pesoKgNum } : {}),
       })
-      // Tras publicar, vamos a editar para que el comerciante agregue fotos.
-      router.replace(`/comerciante/productos/${nuevo.id}/editar?nuevo=1`)
+      setNuevoId(nuevo.id)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
       setErrorGeneral(
-        err instanceof Error
-          ? err.message
-          : 'No pudimos publicar tu producto. Intenta de nuevo.',
+        err instanceof Error ? err.message : 'No pudimos publicar tu producto. Intenta de nuevo.',
       )
       setEnviando(false)
     }
@@ -135,6 +127,55 @@ export default function PublicarProductoPage() {
     )
   }
 
+  // ── Paso 2: Producto creado → subir fotos ─────────────────────────────────
+  if (nuevoId !== null) {
+    return (
+      <div className="mx-auto w-full max-w-xl">
+        {/* Confirmación */}
+        <div className="mb-6 flex flex-col items-center text-center gap-2">
+          <div className="w-14 h-14 rounded-full bg-[#52B788]/15 flex items-center justify-center mb-1">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </div>
+          <h1
+            className="text-3xl text-[#2D6A4F]"
+            style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
+          >
+            ¡Producto publicado!
+          </h1>
+          <p className="text-base text-[#1A1A1A]/60">
+            Ahora añade las fotos para que los compradores lo vean.
+          </p>
+        </div>
+
+        {/* Subidor de imágenes */}
+        <div className="rounded-2xl border border-[#1A1A1A]/8 bg-white p-5 shadow-sm mb-4">
+          <SubidorImagenes
+            productoId={nuevoId}
+            fotoUrlInicial={null}
+            imagenesIniciales={[]}
+          />
+        </div>
+
+        {/* Acciones */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link href="/comerciante/dashboard" className="flex-1">
+            <Button variant="secondary" size="lg" className="w-full">
+              Ir al panel
+            </Button>
+          </Link>
+          <Link href={`/producto/${nuevoId}`} className="flex-1">
+            <Button size="lg" className="w-full">
+              Ver mi producto
+            </Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Paso 1: Formulario ────────────────────────────────────────────────────
   const precioVista = Number(precio.replace(/\D/g, ''))
 
   return (
@@ -227,6 +268,16 @@ export default function PublicarProductoPage() {
           error={errores.stock}
         />
 
+        <CampoTexto
+          label="Peso aproximado (kg)"
+          name="pesoKg"
+          inputMode="decimal"
+          placeholder="Ej: 0.5"
+          value={pesoKg}
+          onChange={(v) => setPesoKg(v.replace(/[^0-9.]/g, ''))}
+          hint="Opcional. Se usa para calcular el costo de envío."
+        />
+
         <div>
           <p className="mb-1.5 text-base font-semibold text-[#1A1A1A]">
             ¿En cuántos días lo tienes listo?
@@ -256,7 +307,6 @@ export default function PublicarProductoPage() {
           </div>
         </div>
 
-        {/* Alcance: botones grandes */}
         <fieldset>
           <legend className="mb-2 text-base font-semibold text-[#1A1A1A]">
             ¿Hasta dónde quieres vender?
@@ -271,9 +321,7 @@ export default function PublicarProductoPage() {
                   onClick={() => setAlcance(op.valor)}
                   aria-pressed={activo}
                   className={`flex items-start gap-3 rounded-xl border-2 px-4 py-3 text-left transition-colors ${
-                    activo
-                      ? 'border-[#2D6A4F] bg-[#2D6A4F]/5'
-                      : 'border-[#1A1A1A]/15 bg-white'
+                    activo ? 'border-[#2D6A4F] bg-[#2D6A4F]/5' : 'border-[#1A1A1A]/15 bg-white'
                   }`}
                 >
                   <span
@@ -285,43 +333,17 @@ export default function PublicarProductoPage() {
                     {activo && <span className="h-2.5 w-2.5 rounded-full bg-[#2D6A4F]" />}
                   </span>
                   <span>
-                    <span className="block text-base font-semibold text-[#1A1A1A]">
-                      {op.etiqueta}
-                    </span>
-                    <span className="block text-sm text-[#1A1A1A]/60">
-                      {op.descripcion}
-                    </span>
+                    <span className="block text-base font-semibold text-[#1A1A1A]">{op.etiqueta}</span>
+                    <span className="block text-sm text-[#1A1A1A]/60">{op.descripcion}</span>
                   </span>
                 </button>
               )
             })}
           </div>
           {errores.alcance && (
-            <p role="alert" className="mt-1.5 text-sm text-[#C0392B]">
-              {errores.alcance}
-            </p>
+            <p role="alert" className="mt-1.5 text-sm text-[#C0392B]">{errores.alcance}</p>
           )}
         </fieldset>
-
-        {/* Ayuda para la foto */}
-        <div className="rounded-xl border border-[#D4A017]/30 bg-[#D4A017]/10 px-4 py-3">
-          <p className="flex items-center gap-2 text-base font-semibold text-[#1A1A1A]">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M4 7h3l2-2h6l2 2h3v12H4V7z"
-                stroke="#D4A017"
-                strokeWidth="1.8"
-                strokeLinejoin="round"
-              />
-              <circle cx="12" cy="13" r="3.2" stroke="#D4A017" strokeWidth="1.8" />
-            </svg>
-            Consejo para una buena foto
-          </p>
-          <p className="mt-1.5 text-sm text-[#1A1A1A]/70 leading-relaxed">
-            Toma la foto con buena luz, de día, y muestra el producto de cerca.
-            Apenas publiques, podrás subir tus fotos.
-          </p>
-        </div>
 
         {errorGeneral && (
           <div

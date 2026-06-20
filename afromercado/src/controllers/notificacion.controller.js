@@ -21,6 +21,16 @@ const NotificacionController = {
     } catch (e) { next(e); }
   },
 
+  // GET /api/notificaciones/no-leidas/count
+  async contarNoLeidas(req, res, next) {
+    try {
+      const count = await prisma.notificacion.count({
+        where: { usuarioId: req.usuario.id, leida: false },
+      });
+      res.json({ ok: true, data: { count } });
+    } catch (e) { next(e); }
+  },
+
   // PATCH /api/notificaciones/:id/leer
   async marcarLeida(req, res, next) {
     try {

@@ -3,18 +3,86 @@
 // ============================================================
 const prisma = require("../config/prisma");
 const CarritoRepository = require("../repositories/carrito.repository");
+const DireccionRepository = require("../repositories/direccion.repository");
 const PedidoRepository = require("../repositories/pedido.repository");
 const CuponRepository = require("../repositories/cupon.repository");
 const { calcularDesglose } = require("../utils/comision");
+const config = require("../config");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
 const { ofertaTieneCupo, ofertaVigente, precioVigente } = require("../utils/ofertas");
 const NotificacionService = require("./notificacion.service");
 
 const ESTADOS_CANCELABLES = ["PENDIENTE_PAGO", "VERIFICANDO_PAGO"];
 
+function extraerDepartamentoDesdeDireccionTexto(direccionTexto) {
+  if (!direccionTexto) return null;
+  const partes = String(direccionTexto)
+    .split(",")
+    .map((parte) => parte.trim())
+    .filter(Boolean);
+
+  for (let i = partes.length - 1; i >= 0; i -= 1) {
+    const parte = partes[i];
+    if (/^tel:/i.test(parte)) continue;
+    if (/^indicaciones:/i.test(parte)) continue;
+    return parte;
+  }
+  return null;
+}
+
+async function calcularCostoEnvioServidor({ usuarioId, direccionId, departamento, itemsConPrecio }) {
+  const pesoTotalKg = itemsConPrecio.reduce((acum, item) => {
+    const pesoUnitario = item.producto.pesoKg != null ? Number(item.producto.pesoKg) : 1;
+    const pesoSeguro = Number.isFinite(pesoUnitario) ? pesoUnitario : 1;
+    return acum + (pesoSeguro * item.cantidad);
+  }, 0);
+
+  let departamentoEnvio = departamento?.trim() || null;
+  if (direccionId != null) {
+    const direccionIdNum = Number(direccionId);
+    if (!Number.isInteger(direccionIdNum) || direccionIdNum <= 0) {
+      throw new ErrorValidacion("direccionId inválido");
+    }
+
+    const direccion = await DireccionRepository.buscarPorId(direccionIdNum, usuarioId);
+    if (!direccion) {
+      throw new ErrorNoEncontrado("Dirección no encontrada");
+    }
+    departamentoEnvio = direccion.departamento;
+  }
+
+  if (!departamentoEnvio) {
+    throw new ErrorValidacion("No pudimos determinar el departamento de entrega");
+  }
+
+  const tarifaLocal = await prisma.tarifaEnvio.findFirst({
+    where: {
+      departamento: { equals: departamentoEnvio, mode: "insensitive" },
+      pesoMaxKg: { gte: pesoTotalKg },
+      activa: true,
+    },
+    orderBy: { pesoMaxKg: "asc" },
+  });
+
+  const tarifa = tarifaLocal || await prisma.tarifaEnvio.findFirst({
+    where: {
+      departamento: "Nacional",
+      pesoMaxKg: { gte: pesoTotalKg },
+      activa: true,
+    },
+    orderBy: { pesoMaxKg: "asc" },
+  });
+
+  if (!tarifa) {
+    throw new ErrorNoEncontrado("No hay tarifa de envío disponible para esta dirección");
+  }
+
+  return Number(tarifa.precio);
+}
+
 const PedidoService = {
   async checkout(usuarioId, datos = {}) {
-    const { direccionTexto, direccionId, notas, codigoCupon } = datos;
+    const { direccionTexto, direccionId, departamento, notas, codigoCupon } = datos;
     if (!direccionTexto || !direccionTexto.trim()) {
       throw new ErrorValidacion("La dirección de entrega es obligatoria");
     }
@@ -69,22 +137,46 @@ const PedidoService = {
       }
     }
 
-    // 4. Calcular montos
+    // 4. Calcular montos — tasa en cascada: override por comercio > Config global > env
+    const comercioIds = Object.keys(porComercio).map(Number);
+    const ahora2 = new Date();
+    const [overridesComision, configGlobal] = await Promise.all([
+      prisma.comisionComercio.findMany({
+        where: {
+          comercioId: { in: comercioIds },
+          desde: { lte: ahora2 },
+          OR: [{ hasta: null }, { hasta: { gt: ahora2 } }],
+        },
+        orderBy: { desde: "desc" },
+      }),
+      prisma.config.findUnique({ where: { clave: "comision_global" } }),
+    ]);
+    const tasaGlobal = configGlobal
+      ? parseFloat(configGlobal.valor)
+      : config.comisionPorcentaje;
+    const tasaPorComercio = new Map(
+      overridesComision.map((o) => [o.comercioId, Number(o.tasa)])
+    );
+
     let subtotalGeneral = 0;
     let comisionGeneral = 0;
+    const subtotalesPorComercio = new Map();
     const subPedidosData = Object.values(porComercio).map(({ comercio, items: itms }) => {
       const subtotalComercio = itms.reduce(
         (acc, i) => acc + Number(i.precioUnitario) * i.cantidad,
         0
       );
-      const desglose = calcularDesglose(subtotalComercio, 0.1);
+      const tasa = tasaPorComercio.get(comercio.id) ?? tasaGlobal;
+      const desglose = calcularDesglose(subtotalComercio, tasa);
       subtotalGeneral += desglose.subtotal;
       comisionGeneral += desglose.comision;
+      subtotalesPorComercio.set(comercio.id, desglose.subtotal);
 
       return {
         comercioId: comercio.id,
         subtotal: desglose.subtotal,
         comision: desglose.comision,
+        tasaComisionAplicada: tasa,
         neto: desglose.montoComerciante,
         items: itms.map((i) => ({
           productoId: i.productoId,
@@ -95,22 +187,24 @@ const PedidoService = {
         })),
       };
     });
-    // El comprador paga el subtotal; la comisión sale de la parte del comerciante
-    let totalGeneral = subtotalGeneral;
+    // El comprador paga el subtotal + costoEnvio; la comisión sale de la parte del comerciante
+    const departamentoEnvio = departamento?.trim() || extraerDepartamentoDesdeDireccionTexto(direccionTexto);
+    if (!departamentoEnvio) {
+      throw new ErrorValidacion("No pudimos determinar el departamento de entrega");
+    }
+
+    const costoEnvioCalculado = await calcularCostoEnvioServidor({
+      usuarioId,
+      direccionId,
+      itemsConPrecio,
+      departamento: departamentoEnvio,
+    });
+    const costoEnvioNum = costoEnvioCalculado ?? 0;
+    let totalGeneral = subtotalGeneral + costoEnvioNum;
     let cuponId = null;
     let cuponDescuento = null;
 
-    if (codigoCupon) {
-      const resultadoCupon = await CuponRepository.validarParaUsuario(
-        codigoCupon.trim().toUpperCase(),
-        usuarioId,
-        subtotalGeneral
-      );
-      if (resultadoCupon.error) throw new ErrorValidacion(resultadoCupon.error);
-      cuponId = resultadoCupon.cupon.id;
-      cuponDescuento = resultadoCupon.descuento;
-      totalGeneral = resultadoCupon.totalConDescuento;
-    }
+    // La validación del cupón se hace dentro de la transacción, con bloqueo.
 
     // 5. Transacción atómica
     const pedido = await prisma.$transaction(async (tx) => {
@@ -146,6 +240,19 @@ const PedidoService = {
         }
       }
 
+      if (codigoCupon) {
+        const resultadoCupon = await CuponRepository.validarParaCheckout(tx, {
+          codigo: codigoCupon.trim().toUpperCase(),
+          usuarioId,
+          subtotal: subtotalGeneral,
+          subtotalesPorComercio,
+        });
+        if (resultadoCupon.error) throw new ErrorValidacion(resultadoCupon.error);
+        cuponId = resultadoCupon.cupon.id;
+        cuponDescuento = resultadoCupon.descuento;
+        totalGeneral = resultadoCupon.totalConDescuento + costoEnvioNum;
+      }
+
       // 5b. Crear pedido con expiresAt = now + 30 min
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
       const nuevoPedido = await PedidoRepository.crear(
@@ -154,6 +261,7 @@ const PedidoService = {
           subtotal: subtotalGeneral,
           comisionTotal: comisionGeneral,
           total: totalGeneral,
+          costoEnvio: costoEnvioNum,
           direccionTexto: direccionTexto.trim(),
           direccionId,
           notas,
@@ -164,22 +272,16 @@ const PedidoService = {
         tx
       );
 
+      if (cuponId !== null) {
+        await CuponRepository.registrarUso({ cuponId, usuarioId, pedidoId: nuevoPedido.id }, tx);
+        await CuponRepository.incrementarUso(cuponId, tx);
+      }
+
       // 5e. Vaciar carrito
       await tx.carritoItem.deleteMany({ where: { usuarioId } });
 
       return nuevoPedido;
     });
-
-    if (cuponId !== null) {
-      setImmediate(async () => {
-        try {
-          await CuponRepository.registrarUso({ cuponId, usuarioId, pedidoId: pedido.id });
-          await CuponRepository.incrementarUso(cuponId);
-        } catch (e) {
-          console.error("[CUPON] Error registrando uso:", e.message);
-        }
-      });
-    }
 
     const resultado = {
       pedido,
@@ -202,6 +304,16 @@ const PedidoService = {
           comprador: compradorCompleto,
           comerciantes: resultado.pedido.subPedidos?.map(sp => sp.comercio) || [],
         });
+
+        // Notificar a cada comerciante involucrado (PEDIDO_NUEVO in-app)
+        for (const sp of (resultado.pedido.subPedidos || [])) {
+          await NotificacionService.pedidoNuevoComercio(
+            sp.comercioId,
+            resultado.pedido.id,
+            compradorCompleto?.nombre || "Un comprador",
+            sp.subtotal
+          );
+        }
       } catch (e) {
         console.error("[NOTIF] Error en checkoutCompletado:", e.message);
       }

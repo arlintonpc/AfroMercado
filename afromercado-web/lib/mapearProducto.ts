@@ -26,6 +26,7 @@ interface ComercioCrudo {
   descripcion?: string
   historia?: string
   whatsapp?: string | null
+  whatsappVisible?: boolean
   calificacion?: number | string
   verificado?: boolean
   totalVentas?: number
@@ -109,6 +110,7 @@ export function mapearProducto(crudo: ProductoCrudo): Producto {
       calificacion: aNumero(comercio.calificacion),
       totalReviews: aNumero(comercio.totalReviews),
       historia: comercio.historia,
+      whatsappVisible: crudo.comercio?.whatsappVisible ?? false,
     },
     categoriaId: aId(crudo.categoriaId) || undefined,
     comercioId: aId(crudo.comercioId) || undefined,

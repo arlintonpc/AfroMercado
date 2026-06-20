@@ -312,6 +312,46 @@ const ProductoController = {
       next(err);
     }
   },
+
+  // GET /productos/historial-vistas — productos vistos recientemente por el usuario
+  async historialVistas(req, res, next) {
+    try {
+      const usuarioId = req.usuario?.id ?? null;
+      if (!usuarioId) return res.json({ ok: true, data: [] });
+
+      const limite = Math.min(Number(req.query.limite) || 12, 24);
+
+      const vistas = await prisma.vistaProducto.findMany({
+        where: { usuarioId },
+        orderBy: { createdAt: "desc" },
+        take: limite * 2,
+        distinct: ["productoId"],
+        include: {
+          producto: {
+            where: { activo: true },
+            include: {
+              comercio: { select: { nombre: true, municipio: true } },
+              categoria: { select: { nombre: true, slug: true } },
+              ofertas: {
+                where: { activa: true, fin: { gte: new Date() } },
+                orderBy: { createdAt: "desc" },
+                take: 1,
+              },
+            },
+          },
+        },
+      });
+
+      const productos = vistas
+        .filter((v) => v.producto)
+        .map((v) => v.producto)
+        .slice(0, limite);
+
+      res.json({ ok: true, data: productos });
+    } catch (err) {
+      next(err);
+    }
+  },
 };
 
 module.exports = ProductoController;

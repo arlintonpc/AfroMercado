@@ -12,15 +12,18 @@ const VisibilidadController = require("../controllers/visibilidad.controller");
 router.get("/destacados", VisibilidadController.listarActivas);
 router.get("/recomendaciones", autenticarOpcional, ProductoController.recomendaciones);
 router.get("/busquedas-recientes", autenticarOpcional, ProductoController.busquedasRecientes);
+router.get("/historial-vistas", autenticarOpcional, ProductoController.historialVistas);
 router.post("/busqueda", autenticarOpcional, ProductoController.registrarBusqueda);
 router.get("/", ProductoController.listar);
+
+// Rutas protegidas estáticas — deben ir ANTES de /:id para evitar conflicto
+router.post("/", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.crear);
+router.get("/mis/productos", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.misProductos);
+
+// Rutas dinámicas con :id
 router.get("/:id", ProductoController.obtener);
 router.post("/:id/vista", autenticarOpcional, ProductoController.registrarVista);
 router.get("/:id/reviews", ReviewController.listar);
-
-// Rutas protegidas — solo COMERCIANTE o ADMIN
-router.post("/", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.crear);
-router.get("/mis/productos", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.misProductos);
 router.patch("/:id", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.actualizar);
 router.delete("/:id", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.desactivar);
 

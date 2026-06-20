@@ -35,6 +35,9 @@ router.use("/favoritos", require("./favorito.routes"));
 router.use("/cupones", require("./cupon.routes"));
 router.use("/chat", require("./chat.routes"));
 router.use("/repartidor", require("./repartidor.routes"));
-router.use("/envios", require("./envio.routes"));
+router.use("/envios",        require("./envio.routes"));
+router.use("/reportes",      require("./reporte.routes"));
+router.use("/push",          require("./push.routes"));
+router.use("/liquidaciones", require("./liquidacion.routes"));
 
 module.exports = router;

@@ -220,34 +220,201 @@ export async function conectarWhatsApp(): Promise<void> {
 
 // ——— Comerciantes ———
 
+export type EstadoComerciante = 'PENDIENTE_REVISION' | 'APROBADO' | 'RECHAZADO' | 'SUSPENDIDO'
+
 export interface AdminComercio {
   id: number
   nombre: string
   municipio: string
+  whatsapp?: string | null
   descripcion?: string | null
   verificado: boolean
+  estadoRegistro: EstadoComerciante
+  motivoRechazo?: string | null
+  revisadoAt?: string | null
+  whatsappVisible: boolean
   fotoDocumentoUrl?: string | null
   totalVentas: number
   calificacion: number | string
   createdAt: string
-  usuario: { nombre: string; email: string; telefono?: string | null }
+  usuario: {
+    id: number
+    nombre: string
+    email: string
+    telefono?: string | null
+    tipoDocumento?: string | null
+    numeroDocumento?: string | null
+    createdAt: string
+  }
   _count: { productos: number }
+  comisiones: Array<{ tasa: number | string; motivo?: string | null; desde: string; hasta?: string | null }>
 }
 
-export async function listarComerciosAdmin(soloSinVerificar = false): Promise<AdminComercio[]> {
-  const qs = soloSinVerificar ? '?soloSinVerificar=true' : ''
+export async function listarComerciosAdmin(
+  soloSinVerificar = false,
+  estado?: EstadoComerciante,
+): Promise<AdminComercio[]> {
+  const params = new URLSearchParams()
+  if (soloSinVerificar) params.set('soloSinVerificar', 'true')
+  if (estado) params.set('estado', estado)
+  const qs = params.toString() ? `?${params}` : ''
   const res = await apiFetch<RespuestaOk<AdminComercio[]>>(`/admin/comercios${qs}`)
   return res.data
 }
 
 export async function verificarComercianteAdmin(
   id: number,
-  accion: 'VERIFICAR' | 'RECHAZAR',
-  notas?: string,
+  accion: 'APROBAR' | 'RECHAZAR' | 'SUSPENDER' | 'REHABILITAR',
+  motivo?: string,
 ): Promise<AdminComercio> {
   const res = await apiFetch<RespuestaOk<AdminComercio>>(`/admin/comercios/${id}/verificar`, {
     method: 'PATCH',
-    body: { accion, notas },
+    body: { accion, motivo },
   })
+  return res.data
+}
+
+export async function toggleWhatsappAdmin(id: number): Promise<AdminComercio> {
+  const res = await apiFetch<RespuestaOk<AdminComercio>>(`/admin/comercios/${id}/whatsapp-visible`, {
+    method: 'PATCH',
+  })
+  return res.data
+}
+
+export async function setComisionComercioAdmin(
+  id: number,
+  tasa: number,
+  motivo?: string,
+  hasta?: string,
+): Promise<{ id: number; tasa: number; motivo?: string | null }> {
+  const res = await apiFetch<RespuestaOk<{ id: number; tasa: number; motivo?: string | null }>>(
+    `/admin/comercios/${id}/comision`,
+    { method: 'POST', body: { tasa, motivo, hasta } },
+  )
+  return res.data
+}
+
+export async function actualizarConfigAdmin(clave: string, valor: string): Promise<void> {
+  await apiFetch(`/admin/config/${clave}`, { method: 'PUT', body: { valor } })
+}
+
+// ——— Pedidos (admin) ———
+
+export type EstadoPedido =
+  | 'PENDIENTE_PAGO'
+  | 'VERIFICANDO_PAGO'
+  | 'PAGO_FALLIDO'
+  | 'CONFIRMADO'
+  | 'CANCELADO'
+  | 'EXPIRADO'
+  | 'ENTREGADO'
+
+export interface AdminPedidoResumen {
+  id: number
+  codigo: string | null
+  estado: EstadoPedido
+  total: number
+  costoEnvio: number
+  subtotal: number
+  comisionTotal: number
+  cuponDescuento: number | null
+  direccionTexto: string
+  createdAt: string
+  expiresAt: string
+  comprador: {
+    id: number
+    nombre: string
+    email: string
+    telefono?: string | null
+  }
+  subPedidos: Array<{
+    id: number
+    estado: string
+    comercio: { id: number; nombre: string }
+  }>
+  pagos: Array<{
+    id: number
+    monto: number
+    metodo: string
+    estado: string
+    createdAt: string
+  }>
+}
+
+export interface AdminPedidoItem {
+  id: number
+  cantidad: number
+  precioUnitario: number
+  subtotal: number
+  producto: { id: number; nombre: string; fotoUrl?: string | null }
+}
+
+export interface AdminSubPedido {
+  id: number
+  estado: string
+  subtotal: number
+  comision: number
+  neto: number
+  tasaComisionAplicada: number | null
+  notas?: string | null
+  comercio: { id: number; nombre: string; municipio: string }
+  items: AdminPedidoItem[]
+  entrega?: {
+    id: number
+    estado: string
+    direccion: string
+    notas?: string | null
+  } | null
+}
+
+export interface AdminPedidoDetalle extends AdminPedidoResumen {
+  notas?: string | null
+  subPedidos: AdminSubPedido[]
+  pagos: Array<{
+    id: number
+    monto: number
+    metodo: string
+    estado: string
+    referencia?: string | null
+    comprobanteUrl?: string | null
+    notas?: string | null
+    createdAt: string
+    verificadoAt?: string | null
+  }>
+  cupon?: {
+    id: number
+    codigo: string
+    tipo: string
+    valor: number
+  } | null
+}
+
+export interface ListaPedidosAdmin {
+  items: AdminPedidoResumen[]
+  total: number
+  pagina: number
+  paginas: number
+}
+
+export async function listarPedidosAdmin(params?: {
+  estado?: EstadoPedido
+  page?: number
+  limit?: number
+  comercioId?: number
+  compradorId?: number
+}): Promise<ListaPedidosAdmin> {
+  const qs = new URLSearchParams()
+  if (params?.estado)      qs.set('estado',      params.estado)
+  if (params?.page)        qs.set('page',         String(params.page))
+  if (params?.limit)       qs.set('limit',        String(params.limit))
+  if (params?.comercioId)  qs.set('comercioId',   String(params.comercioId))
+  if (params?.compradorId) qs.set('compradorId',  String(params.compradorId))
+  const q = qs.toString() ? `?${qs}` : ''
+  const res = await apiFetch<RespuestaOk<ListaPedidosAdmin>>(`/admin/pedidos${q}`)
+  return res.data
+}
+
+export async function obtenerPedidoAdmin(id: number): Promise<AdminPedidoDetalle> {
+  const res = await apiFetch<RespuestaOk<AdminPedidoDetalle>>(`/admin/pedidos/${id}`)
   return res.data
 }

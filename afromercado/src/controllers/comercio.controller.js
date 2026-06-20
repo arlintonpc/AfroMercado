@@ -3,9 +3,27 @@
 //  Recibe la petición HTTP, llama al servicio y responde.
 //  No tiene lógica de negocio.
 // ============================================================
+const path = require("path");
+const fs = require("fs");
+const multer = require("multer");
 const ComercioService = require("../services/comercio.service");
 const NotificacionService = require("../services/notificacion.service");
 const prisma = require("../config/prisma");
+
+const DIR_DOCS = path.join(__dirname, "..", "..", "uploads", "documentos");
+fs.mkdirSync(DIR_DOCS, { recursive: true });
+
+const _uploadDoc = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, DIR_DOCS),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+      cb(null, `doc_${req.usuario.id}_${Date.now()}${ext}`);
+    },
+  }),
+  fileFilter: (req, file, cb) => cb(null, file.mimetype.startsWith("image/")),
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).single("documento");
 
 const ComercioController = {
   async registrar(req, res, next) {
@@ -262,7 +280,19 @@ const ComercioController = {
           },
         },
       });
-      res.json({ ok: true, data: subPedidos });
+      const datos = subPedidos.map(sp => ({
+        ...sp,
+        subtotal:             Number(sp.subtotal),
+        comision:             Number(sp.comision),
+        neto:                 Number(sp.neto),
+        tasaComisionAplicada: sp.tasaComisionAplicada != null ? Number(sp.tasaComisionAplicada) : null,
+        items: (sp.items || []).map(item => ({
+          ...item,
+          precioUnitario: Number(item.precioUnitario),
+          subtotal:       Number(item.subtotal),
+        })),
+      }));
+      res.json({ ok: true, data: datos });
     } catch (e) {
       next(e);
     }
@@ -274,12 +304,17 @@ const ComercioController = {
       const comercio = await ComercioService.obtenerMiComercio(req.usuario.id);
       const subPedidoId = Number(req.params.id);
 
-      const subPedido = await prisma.subPedido.findUnique({ where: { id: subPedidoId } });
+      const subPedido = await prisma.subPedido.findUnique({
+        where: { id: subPedidoId },
+        include: { pedido: { select: { id: true, direccionTexto: true } } },
+      });
       if (!subPedido) throw new ErrorNoEncontrado("SubPedido no encontrado");
       if (subPedido.comercioId !== comercio.id) throw new ErrorNoAutorizado("No puedes gestionar este pedido");
 
       const { estado } = req.body;
-      const TRANSICIONES = { CONFIRMADO: "EN_PREPARACION", EN_PREPARACION: "LISTO", LISTO: "ENTREGADO" };
+      // LISTO es el estado terminal desde el lado del comerciante.
+      // La Entrega (repartidor) se encarga de avanzar a ENTREGADO.
+      const TRANSICIONES = { CONFIRMADO: "EN_PREPARACION", EN_PREPARACION: "LISTO" };
       const estadoActual = subPedido.estado;
       const estadoSiguiente = TRANSICIONES[estadoActual];
 
@@ -292,14 +327,26 @@ const ComercioController = {
         data: { estado: estadoSiguiente },
       });
 
+      // Cuando el comerciante marca LISTO, crear Entrega para que un repartidor la tome.
+      if (estadoSiguiente === "LISTO") {
+        await prisma.entrega.create({
+          data: {
+            subPedidoId,
+            repartidorId: null,
+            estado: "ASIGNADA",
+            direccion: subPedido.pedido.direccionTexto,
+          },
+        });
+      }
+
       // Notificaciones y cierre del pedido principal (fire-and-forget).
-      if (estadoSiguiente === "LISTO" || estadoSiguiente === "ENTREGADO") {
+      if (estadoSiguiente === "LISTO") {
         const pedidoId = subPedido.pedidoId;
         setImmediate(async () => {
           try {
             const pedidoCompleto = await prisma.pedido.findUnique({
               where: { id: pedidoId },
-              include: { comprador: { select: { nombre: true, email: true, telefono: true } } },
+              include: { comprador: { select: { id: true, nombre: true, email: true, telefono: true } } },
             });
             if (!pedidoCompleto) return;
 
@@ -308,23 +355,6 @@ const ComercioController = {
                 pedidoId,
                 comprador: pedidoCompleto.comprador,
               });
-            }
-
-            if (estadoSiguiente === "ENTREGADO") {
-              const hermanos = await prisma.subPedido.findMany({
-                where: { pedidoId },
-                select: { estado: true },
-              });
-              if (hermanos.every((sp) => sp.estado === "ENTREGADO")) {
-                await prisma.pedido.update({
-                  where: { id: pedidoId },
-                  data: { estado: "ENTREGADO" },
-                });
-                await NotificacionService.pedidoEntregado({
-                  pedidoId,
-                  comprador: pedidoCompleto.comprador,
-                });
-              }
             }
           } catch (e) {
             console.error("[NOTIF] Error en estado pedido:", e.message);
@@ -407,6 +437,53 @@ const ComercioController = {
     } catch (e) {
       next(e);
     }
+  },
+  async misLiquidaciones(req, res, next) {
+    try {
+      const comercio = await ComercioService.obtenerMiComercio(req.usuario.id);
+      const liquidaciones = await prisma.liquidacion.findMany({
+        where: { beneficiarioId: comercio.usuarioId, tipo: "COMERCIANTE" },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          tipo: true,
+          monto: true,
+          estado: true,
+          periodoDesde: true,
+          periodoHasta: true,
+          cuentaDestino: true,
+          comprobante: true,
+          notas: true,
+          createdAt: true,
+          pagadoAt: true,
+        },
+      });
+      const datos = liquidaciones.map((l) => ({
+        ...l,
+        monto: Number(l.monto),
+      }));
+      res.json({ ok: true, data: datos });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  subirDocumento(req, res, next) {
+    _uploadDoc(req, res, async (err) => {
+      if (err) return next(err);
+      if (!req.file) return res.status(400).json({ ok: false, error: "No se recibió imagen." });
+      try {
+        const base = `${req.protocol}://${req.get("host")}`;
+        const url = `${base}/uploads/documentos/${req.file.filename}`;
+        const comercio = await prisma.comercio.update({
+          where: { usuarioId: req.usuario.id },
+          data: { fotoDocumentoUrl: url },
+        });
+        res.json({ ok: true, url, comercio });
+      } catch (e) {
+        next(e);
+      }
+    });
   },
 };
 

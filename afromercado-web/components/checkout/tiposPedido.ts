@@ -31,6 +31,7 @@ export interface ItemSubPedido {
   precioUnitario?: number
   subtotal?: number
   producto?: {
+    id?: string | number
     nombre?: string
     fotoUrl?: string | null
     unidad?: string
@@ -53,6 +54,7 @@ export interface SubPedido {
 
 export interface PedidoDetalle {
   id: string | number
+  codigo?: string | null
   estado: EstadoPedidoPago
   total?: number
   subtotal?: number

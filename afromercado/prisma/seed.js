@@ -60,6 +60,26 @@ async function upsertProducto(comercioId, categoriaId, datos) {
 async function main() {
   console.log("🌱 Sembrando datos de AfroMercado...\n");
 
+  // ── 0. Categorías ───────────────────────────────────────────
+  const CATEGORIAS_SEED = [
+    { nombre: "Del campo",            slug: "del-campo",           icono: "🌿" },
+    { nombre: "Frutas tropicales",    slug: "frutas-tropicales",   icono: "🍊" },
+    { nombre: "Cacao y chocolate",    slug: "cacao-chocolate",     icono: "🍫" },
+    { nombre: "Artesanías",           slug: "artesanias",          icono: "🎨" },
+    { nombre: "Plantas medicinales",  slug: "plantas-medicinales", icono: "🌱" },
+    { nombre: "Madera y muebles",     slug: "madera-muebles",      icono: "🪵" },
+    { nombre: "Tejidos y textiles",   slug: "tejidos-textiles",    icono: "🧶" },
+    { nombre: "Productos del mar",    slug: "productos-del-mar",   icono: "🐟" },
+  ];
+  for (const cat of CATEGORIAS_SEED) {
+    await prisma.categoria.upsert({
+      where:  { slug: cat.slug },
+      update: { nombre: cat.nombre, icono: cat.icono },
+      create: { ...cat, activa: true },
+    });
+  }
+  console.log(`✔ Categorías: ${CATEGORIAS_SEED.length} registradas`);
+
   // ── 1. Admin ────────────────────────────────────────────────
   const admin = await upsertUsuario({
     nombre: "Admin AfroMercado",

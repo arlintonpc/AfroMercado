@@ -52,6 +52,9 @@ export default function PaginaCheckout() {
   const [cuponAplicado, setCuponAplicado] = useState<ResultadoCupon | null>(null)
   const [errorCupon, setErrorCupon] = useState<string | null>(null)
 
+  const [costoEnvio, setCostoEnvio] = useState<number | null>(null)
+  const [cargandoEnvio, setCargandoEnvio] = useState(false)
+
   const grupos = useMemo(() => agruparPorComercio(items), [items])
 
   useEffect(() => {
@@ -93,6 +96,43 @@ export default function PaginaCheckout() {
       .catch(() => {})
       .finally(() => setCargandoDirs(false))
   }, [autenticado, seleccionarDireccion])
+
+  // Peso total del carrito (suma pesoKg * cantidad; fallback 1 kg si algún producto no tiene peso)
+  const pesoTotalKg = useMemo(() => {
+    if (items.length === 0) return 1
+    let total = 0
+    let todosTienenPeso = true
+    for (const it of items) {
+      const peso = it.producto?.pesoKg
+      if (peso === undefined || peso === null) {
+        todosTienenPeso = false
+        break
+      }
+      total += Number(peso) * it.cantidad
+    }
+    return todosTienenPeso && total > 0 ? total : 1
+  }, [items])
+
+  // Calcular costo de envío cuando el departamento tiene texto (debounce 900ms)
+  useEffect(() => {
+    const dep = departamento.trim()
+    if (!dep) { setCostoEnvio(null); return }
+    setCargandoEnvio(true)
+    const t = setTimeout(async () => {
+      try {
+        const res = await apiFetch<{ ok: boolean; data: { precio: number } }>(
+          `/envios/calcular?departamento=${encodeURIComponent(dep)}&pesoKg=${pesoTotalKg}`,
+          { auth: false }
+        )
+        setCostoEnvio(res.data.precio)
+      } catch {
+        setCostoEnvio(null)
+      } finally {
+        setCargandoEnvio(false)
+      }
+    }, 900)
+    return () => clearTimeout(t)
+  }, [departamento, pesoTotalKg])
 
   function seleccionarNueva() {
     setSelectedId(null)
@@ -177,9 +217,11 @@ export default function PaginaCheckout() {
         method: 'POST',
         body: {
           direccionTexto,
+          departamento: departamento.trim(),
           ...(direccionId !== undefined ? { direccionId } : {}),
           ...(notas.trim() ? { notas: notas.trim() } : {}),
           ...(cuponAplicado ? { codigoCupon: cuponAplicado.cupon.codigo } : {}),
+          costoEnvio: costoEnvio ?? 0,
         },
       })
       const data = desenvolver<RespuestaCheckout>(raw)
@@ -222,6 +264,32 @@ export default function PaginaCheckout() {
         >
           Confirmar pedido
         </h1>
+
+        {/* Banner multi-comercio */}
+        {grupos.length > 1 && (
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-[#D4A017]/30 bg-[#D4A017]/10 px-4 py-3">
+            <svg
+              className="mt-0.5 flex-shrink-0 text-[#A07810]"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <p className="text-sm text-[#A07810]">
+              Tu pedido incluye productos de{' '}
+              <span className="font-semibold">{grupos.length} tiendas diferentes</span>. Se
+              procesará como un pedido único pero cada tienda coordinará su preparación por
+              separado.
+            </p>
+          </div>
+        )}
 
         <form
           onSubmit={confirmar}
@@ -465,14 +533,26 @@ export default function PaginaCheckout() {
                 </div>
               )}
 
-              <p className="text-xs text-[#1A1A1A]/50 mb-3">
-                El envío se coordina con cada productor.
-              </p>
+              <div className="flex justify-between text-sm text-[#1A1A1A]/70 mb-3">
+                <span>Envío estimado</span>
+                <span>
+                  {cargandoEnvio
+                    ? '…'
+                    : costoEnvio !== null
+                    ? formatearPrecio(costoEnvio)
+                    : departamento.trim()
+                    ? 'Sin tarifa'
+                    : 'Ingresa departamento'}
+                </span>
+              </div>
 
               <div className="flex justify-between items-baseline mb-4">
                 <span className="font-semibold text-[#1A1A1A]">Total</span>
                 <span className="text-xl font-bold text-[#2D6A4F]">
-                  {formatearPrecio(cuponAplicado ? cuponAplicado.totalConDescuento : subtotal)}
+                  {formatearPrecio(
+                    (cuponAplicado ? cuponAplicado.totalConDescuento : subtotal) +
+                    (costoEnvio ?? 0)
+                  )}
                 </span>
               </div>
 

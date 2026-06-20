@@ -17,6 +17,7 @@ export default function Footer() {
 
           {/* Links */}
           <div className="flex flex-col md:flex-row gap-4 items-center md:items-end text-sm text-white/70">
+            <Link href="/ser-repartidor" className="hover:text-[#D4A017] transition-colors min-h-[44px] flex items-center font-semibold text-[#D4A017]/80">Sé repartidor</Link>
             <Link href="/terminos" className="hover:text-white transition-colors min-h-[44px] flex items-center">Términos</Link>
             <Link href="/privacidad" className="hover:text-white transition-colors min-h-[44px] flex items-center">Privacidad</Link>
             <Link href="/contacto" className="hover:text-white transition-colors min-h-[44px] flex items-center">Contacto</Link>

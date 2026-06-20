@@ -1,5 +1,6 @@
 const { enviarEmail } = require("../utils/email");
 const { enviarMensajeWA } = require("../utils/whatsapp");
+const { enviarPushAUsuario } = require("../utils/push");
 const emailPedido = require("../utils/templates/email-pedido");
 const prisma = require("../config/prisma");
 const emailPago = require("../utils/templates/email-pago");
@@ -80,6 +81,20 @@ async function dispararNotificacion(fn, descripcion) {
     await fn();
   } catch (err) {
     console.error(`[NOTIF] Error en ${descripcion}:`, err.message);
+  }
+}
+
+async function notificarAdmins({ tipo, titulo, mensaje, url, datos }) {
+  try {
+    const admins = await prisma.usuario.findMany({
+      where: { rol: "ADMIN" },
+      select: { id: true },
+    });
+    for (const admin of admins) {
+      await crearNotificacionDB(admin.id, { tipo, titulo, mensaje, url, datos });
+    }
+  } catch (e) {
+    console.error("[NOTIF-ADMINS]", e.message);
   }
 }
 
@@ -177,19 +192,42 @@ const NotificacionService = {
   },
 
   async comprobanteSubido({ pedido, comprador }) {
-    const adminEmail = process.env.ADMIN_EMAIL;
-    if (!adminEmail) return;
+    const pedidoId = pedido.id;
     const monto = formatearPrecio(pedido.pagos?.[0]?.monto || pedido.total);
-    await dispararNotificacion(() =>
-      enviarEmail({
-        to: adminEmail,
-        subject: `[VERIFICAR] Comprobante pedido #${pedido.id} — AfroMercado`,
-        html: emailPago.comprobanteSubido({
-          pedidoId: pedido.id,
-          nombreComprador: comprador?.nombre || "Comprador",
-          monto,
-        }),
-      }), "email admin comprobante");
+
+    // N-C-04: in-app al comprador
+    if (comprador?.id) {
+      await crearNotificacionDB(comprador.id, {
+        tipo: "COMPROBANTE_ENVIADO",
+        titulo: "Comprobante recibido ✅",
+        mensaje: `Recibimos tu comprobante del pedido #${pedidoId}. Lo verificaremos en los próximos 30 minutos en días hábiles.`,
+        url: `/mis-pedidos`,
+        datos: { pedidoId },
+      });
+    }
+
+    // N-A-01: in-app a todos los admins
+    await notificarAdmins({
+      tipo: "COMPROBANTE_A_VERIFICAR",
+      titulo: "Comprobante pendiente de verificación",
+      mensaje: `Pedido #${pedidoId} — ${monto} — ${comprador?.nombre || "Comprador"}. Verifica el pago.`,
+      url: `/admin/pagos`,
+      datos: { pedidoId },
+    });
+
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (adminEmail) {
+      await dispararNotificacion(() =>
+        enviarEmail({
+          to: adminEmail,
+          subject: `[VERIFICAR] Comprobante pedido #${pedidoId} — AfroMercado`,
+          html: emailPago.comprobanteSubido({
+            pedidoId,
+            nombreComprador: comprador?.nombre || "Comprador",
+            monto,
+          }),
+        }), "email admin comprobante");
+    }
   },
 
   async pagoAprobado({ pedido, comprador, comerciantes }) {
@@ -309,6 +347,19 @@ const NotificacionService = {
   async pagoRechazado({ pedido, comprador, motivo }) {
     const pedidoId = pedido.id;
 
+    // N-C-06: in-app al comprador
+    if (comprador?.id) {
+      await crearNotificacionDB(comprador.id, {
+        tipo: "PAGO_RECHAZADO",
+        titulo: "Problema con tu pago",
+        mensaje: motivo
+          ? `No pudimos verificar tu pago del pedido #${pedidoId}. Motivo: ${motivo}`
+          : `No pudimos verificar tu pago del pedido #${pedidoId}. Sube un nuevo comprobante o contáctanos.`,
+        url: `/mis-pedidos`,
+        datos: { pedidoId },
+      });
+    }
+
     await dispararNotificacion(() =>
       enviarEmail({
         to: comprador.email,
@@ -321,6 +372,233 @@ const NotificacionService = {
         enviarMensajeWA(comprador.telefono,
           `Hola ${comprador.nombre}, hubo un problema con el pago del pedido *#${pedidoId}*.\n\n${motivo || "El comprobante no pudo ser verificado."}\n\nPor favor sube un nuevo comprobante en la app o contáctanos. 🌿`
         ), "WA comprador pago rechazado");
+    }
+  },
+
+  // N-C-09 comprador + N-V-07 comerciante
+  async entregaRecogida({ pedidoId, comprador, comerciante }) {
+    await crearNotificacionDB(comprador.id, {
+      tipo: "ENTREGA_RECOGIDA",
+      titulo: "El repartidor ya recogió tu pedido",
+      mensaje: `El repartidor recogió los productos del pedido #${pedidoId} y viene en camino.`,
+      url: `/mis-pedidos`,
+      datos: { pedidoId },
+    });
+    if (comerciante?.usuarioId) {
+      await crearNotificacionDB(comerciante.usuarioId, {
+        tipo: "ENTREGA_RECOGIDA",
+        titulo: "Repartidor recogió el pedido",
+        mensaje: `El repartidor ya recogió el pedido #${pedidoId} de tu local.`,
+        url: `/comerciante/pedidos`,
+        datos: { pedidoId },
+      });
+    }
+  },
+
+  // N-C-10 comprador CRÍTICO (WA + Push)
+  async entregaEnCamino({ pedidoId, comprador, repartidorNombre, direccion }) {
+    await crearNotificacionDB(comprador.id, {
+      tipo: "ENTREGA_EN_CAMINO",
+      titulo: "🚴 ¡Tu pedido va en camino!",
+      mensaje: `${repartidorNombre} está en camino con tu pedido #${pedidoId}. Prepárate para recibirlo.`,
+      url: `/mis-pedidos`,
+      datos: { pedidoId },
+    });
+    await enviarPushAUsuario(prisma, comprador.id, {
+      titulo: "🚴 ¡Tu pedido va en camino!",
+      cuerpo: `${repartidorNombre} está en camino. Prepárate para recibirlo.`,
+      url: `/mis-pedidos`,
+    });
+    if (comprador.telefono) {
+      await dispararNotificacion(() =>
+        enviarMensajeWA(comprador.telefono,
+          `🚴 *¡Tu pedido va en camino!*\n\nHola ${primerNombre(comprador.nombre)}, el repartidor *${repartidorNombre}* está en camino con tu pedido *#${pedidoId}*.\n\nPrepárate para recibirlo en:\n📍 ${direccion || "tu dirección registrada"}\n\n¡Gracias por apoyar el Chocó! 🌿`
+        ), "WA comprador entrega en camino");
+    }
+  },
+
+  // N-C-12 comprador + N-A-06 admin
+  async entregaFallida({ pedidoId, comprador }) {
+    await crearNotificacionDB(comprador.id, {
+      tipo: "ENTREGA_FALLIDA",
+      titulo: "Problema con tu entrega",
+      mensaje: `Tuvimos un inconveniente entregando el pedido #${pedidoId}. Nuestro equipo te contactará pronto.`,
+      url: `/mis-pedidos`,
+      datos: { pedidoId },
+    });
+    if (comprador.telefono) {
+      await dispararNotificacion(() =>
+        enviarMensajeWA(comprador.telefono,
+          `Hola ${primerNombre(comprador.nombre)}, tuvimos un problema entregando tu pedido *#${pedidoId}*.\n\nNuestro equipo te contactará pronto para resolverlo. Disculpa los inconvenientes. 🌿`
+        ), "WA comprador entrega fallida");
+    }
+    await notificarAdmins({
+      tipo: "ENTREGA_FALLIDA_ADMIN",
+      titulo: "Entrega fallida — requiere acción",
+      mensaje: `Pedido #${pedidoId} marcado como FALLIDO. Coordina reentrega o reembolso.`,
+      url: `/admin/entregas`,
+      datos: { pedidoId },
+    });
+  },
+
+  // N-V-08 comerciante — entrega completada
+  async entregaCompletadaComerciante({ pedidoId, comerciante }) {
+    if (!comerciante?.usuarioId) return;
+    await crearNotificacionDB(comerciante.usuarioId, {
+      tipo: "ENTREGA_COMPLETADA",
+      titulo: "Entrega completada ✅",
+      mensaje: `El pedido #${pedidoId} fue entregado al cliente. Los fondos serán liquidados según el acuerdo.`,
+      url: `/comerciante/pedidos`,
+      datos: { pedidoId },
+    });
+  },
+
+  // N-R-04 repartidor — entrega asignada CRÍTICO (Push + WA)
+  async entregaAsignada({ entregaId, pedidoId, repartidor, comercioNombre, comercioMunicipio, direccion }) {
+    await enviarPushAUsuario(prisma, repartidor.id, {
+      titulo: "🚴 Nueva entrega asignada",
+      cuerpo: `Recoge en ${comercioNombre}. Pedido #${pedidoId}.`,
+      url: `/repartidor`,
+    });
+    await crearNotificacionDB(repartidor.id, {
+      tipo: "ENTREGA_ASIGNADA",
+      titulo: "Nueva entrega asignada 🚴",
+      mensaje: `Recoge en ${comercioNombre}${comercioMunicipio ? ` — ${comercioMunicipio}` : ""}. Pedido #${pedidoId}.`,
+      url: `/repartidor`,
+      datos: { entregaId, pedidoId },
+    });
+    if (repartidor.telefono) {
+      await dispararNotificacion(() =>
+        enviarMensajeWA(repartidor.telefono,
+          `🚴 *Nueva entrega asignada — AfroMercado*\n\n📦 Pedido #${pedidoId}\n🏪 Recoge en: *${comercioNombre}*${comercioMunicipio ? ` — ${comercioMunicipio}` : ""}\n📍 Entrega en: ${direccion || "ver en la app"}\n\nEntra a la app para ver los detalles.`
+        ), "WA repartidor entrega asignada");
+    }
+  },
+
+  // N-R-01 usuario + N-A-04 admin — solicitud enviada
+  async solicitudRepartidorCreada({ usuarioId, usuarioNombre }) {
+    await crearNotificacionDB(usuarioId, {
+      tipo: "SOLICITUD_REPARTIDOR_CREADA",
+      titulo: "Solicitud recibida",
+      mensaje: "Recibimos tu solicitud para ser repartidor. La revisaremos en 2–3 días hábiles.",
+      url: `/ser-repartidor`,
+      datos: {},
+    });
+    await notificarAdmins({
+      tipo: "NUEVA_SOLICITUD_REPARTIDOR",
+      titulo: "Nueva solicitud de repartidor",
+      mensaje: `${usuarioNombre} quiere ser repartidor. Revisa el vehículo y la licencia.`,
+      url: `/admin/solicitudes-repartidor`,
+      datos: { usuarioId },
+    });
+  },
+
+  // N-R-02 — solicitud aprobada CRÍTICO (Push + WA)
+  async solicitudRepartidorAprobada({ usuario }) {
+    await enviarPushAUsuario(prisma, usuario.id, {
+      titulo: "¡Solicitud aprobada! 🎉",
+      cuerpo: "Ya eres repartidor oficial de AfroMercado. ¡Bienvenido al equipo!",
+      url: `/repartidor`,
+    });
+    await crearNotificacionDB(usuario.id, {
+      tipo: "SOLICITUD_REPARTIDOR_APROBADA",
+      titulo: "¡Solicitud aprobada! 🎉",
+      mensaje: "Tu solicitud fue aprobada. Ya eres repartidor oficial de AfroMercado. ¡Bienvenido al equipo!",
+      url: `/repartidor`,
+      datos: {},
+    });
+    if (usuario.telefono) {
+      await dispararNotificacion(() =>
+        enviarMensajeWA(usuario.telefono,
+          `¡Felicitaciones, ${primerNombre(usuario.nombre)}! 🎉🚴\n\nTu solicitud para ser repartidor de *AfroMercado* fue *aprobada*.\n\nYa puedes ingresar al panel de repartidor en la app y empezar a recibir entregas. ¡Bienvenido al equipo! 🌿`
+        ), "WA solicitud repartidor aprobada");
+    }
+  },
+
+  // N-R-03 — solicitud rechazada
+  async solicitudRepartidorRechazada({ usuario, notasAdmin }) {
+    await crearNotificacionDB(usuario.id, {
+      tipo: "SOLICITUD_REPARTIDOR_RECHAZADA",
+      titulo: "Solicitud no aprobada",
+      mensaje: notasAdmin
+        ? `Tu solicitud no fue aprobada. Motivo: ${notasAdmin}. Puedes corregir los datos y volver a aplicar.`
+        : "Tu solicitud no fue aprobada. Puedes corregir los datos y volver a aplicar.",
+      url: `/ser-repartidor`,
+      datos: {},
+    });
+    if (usuario.telefono) {
+      await dispararNotificacion(() =>
+        enviarMensajeWA(usuario.telefono,
+          `Hola ${primerNombre(usuario.nombre)}, lamentablemente tu solicitud de repartidor *no fue aprobada*.\n\n${notasAdmin ? `Motivo: ${notasAdmin}\n\n` : ""}Puedes corregir los datos y volver a aplicar en la app. 🌿`
+        ), "WA solicitud repartidor rechazada");
+    }
+  },
+
+  // Método genérico: crea notificación en BD y la envía por SSE.
+  // Acepta tanto un objeto { usuarioId, tipo, titulo, mensaje, pedidoId, comercioId }
+  // como parámetros posicionales (usuarioId, tipo, titulo, mensaje, { pedidoId, comercioId }).
+  async crearYEnviar(usuarioIdOrObj, tipo, titulo, mensaje, { pedidoId, comercioId } = {}) {
+    try {
+      let uid, t, tit, msg, pid, cid;
+      if (typeof usuarioIdOrObj === "object" && usuarioIdOrObj !== null) {
+        ({ usuarioId: uid, tipo: t, titulo: tit, mensaje: msg, pedidoId: pid, comercioId: cid } = usuarioIdOrObj);
+      } else {
+        uid = usuarioIdOrObj; t = tipo; tit = titulo; msg = mensaje; pid = pedidoId; cid = comercioId;
+      }
+      const datos = {};
+      if (pid !== undefined) datos.pedidoId = pid;
+      if (cid !== undefined) datos.comercioId = cid;
+      const notif = await prisma.notificacion.create({
+        data: {
+          usuarioId: uid,
+          tipo: t,
+          titulo: tit,
+          mensaje: msg,
+          datos: Object.keys(datos).length ? datos : null,
+        },
+      });
+      sseManager.enviar(uid, "notificacion", notif);
+      return notif;
+    } catch (e) {
+      console.error("[NOTIF] crearYEnviar:", e.message);
+    }
+  },
+
+  // Notificación in-app al comerciante cuando recibe un pedido nuevo
+  async pedidoNuevoComercio(comercioId, pedidoId, compradorNombre, subtotal) {
+    try {
+      const comercio = await prisma.comercio.findUnique({
+        where: { id: Number(comercioId) },
+        select: { usuarioId: true },
+      });
+      if (!comercio?.usuarioId) return;
+      const montoFormateado = formatearPrecio(subtotal);
+      await crearNotificacionDB(comercio.usuarioId, {
+        tipo: "PEDIDO_NUEVO",
+        titulo: "Nuevo pedido recibido",
+        mensaje: `${compradorNombre} acaba de realizar un pedido por ${montoFormateado}`,
+        url: `/comerciante/pedidos`,
+        datos: { pedidoId, comercioId },
+      });
+    } catch (e) {
+      console.error("[NOTIF] pedidoNuevoComercio:", e.message);
+    }
+  },
+
+  // N-V-02 — comercio verificado CRÍTICO
+  async comercioVerificado({ comercio, usuario }) {
+    await crearNotificacionDB(usuario.id, {
+      tipo: "COMERCIO_VERIFICADO",
+      titulo: "¡Tu comercio fue verificado! 🌿",
+      mensaje: `${comercio.nombre} está verificado en AfroMercado. Ya puedes publicar productos y comenzar a vender.`,
+      url: `/comerciante`,
+      datos: { comercioId: comercio.id },
+    });
+    if (usuario.telefono) {
+      await dispararNotificacion(() =>
+        enviarMensajeWA(usuario.telefono,
+          `¡Felicitaciones, ${primerNombre(usuario.nombre)}! 🎉🌿\n\nTu comercio *${comercio.nombre}* fue *verificado* en AfroMercado.\n\nYa puedes publicar tus productos y comenzar a recibir pedidos. ¡Mucho éxito!`
+        ), "WA comercio verificado");
     }
   },
 };

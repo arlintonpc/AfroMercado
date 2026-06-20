@@ -2,7 +2,9 @@
 //  Servicio de Usuario — lógica de negocio del perfil
 // ============================================================
 const UsuarioRepository = require("../repositories/usuario.repository");
-const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
+const { ErrorValidacion, ErrorNoEncontrado, ErrorNoAutorizado } = require("../utils/errores");
+const bcrypt = require("bcryptjs");
+const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || "10", 10);
 
 const UsuarioService = {
   async obtenerPerfil(id) {
@@ -13,7 +15,7 @@ const UsuarioService = {
   },
 
   async actualizarPerfil(id, datos) {
-    const permitidos = ["nombre", "telefono", "tipoDocumento", "numeroDocumento"];
+    const permitidos = ["nombre", "telefono", "tipoDocumento", "numeroDocumento", "municipio"];
     const actualizacion = {};
 
     for (const campo of permitidos) {
@@ -44,6 +46,22 @@ const UsuarioService = {
     const actualizado = await UsuarioRepository.actualizar(id, actualizacion);
     const { passwordHash, deletedAt, ...publico } = actualizado;
     return publico;
+  },
+
+  async cambiarPassword(id, { passwordActual, passwordNueva }) {
+    if (!passwordActual || !passwordNueva)
+      throw new ErrorValidacion("Se requieren la contraseña actual y la nueva.");
+    if (passwordNueva.length < 6)
+      throw new ErrorValidacion("La nueva contraseña debe tener al menos 6 caracteres.");
+
+    const usuario = await UsuarioRepository.buscarPorId(id);
+    if (!usuario || !usuario.activo) throw new ErrorNoEncontrado("Usuario no encontrado");
+
+    const coincide = await bcrypt.compare(passwordActual, usuario.passwordHash);
+    if (!coincide) throw new ErrorNoAutorizado("La contraseña actual no es correcta.");
+
+    const nuevoHash = await bcrypt.hash(passwordNueva, BCRYPT_ROUNDS);
+    await UsuarioRepository.actualizar(id, { passwordHash: nuevoHash });
   },
 };
 

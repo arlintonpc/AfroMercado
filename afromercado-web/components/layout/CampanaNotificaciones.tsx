@@ -81,7 +81,7 @@ export default function CampanaNotificaciones() {
           </div>
 
           {/* Lista */}
-          <ul className="max-h-96 overflow-y-auto divide-y divide-[#1A1A1A]/5">
+          <ul className="max-h-80 overflow-y-auto divide-y divide-[#1A1A1A]/5">
             {notificaciones.length === 0 && (
               <li className="px-4 py-8 text-center text-sm text-[#1A1A1A]/40">
                 Sin notificaciones aún
@@ -114,6 +114,17 @@ export default function CampanaNotificaciones() {
               )
             })}
           </ul>
+
+          {/* Pie: ver todas */}
+          <div className="border-t border-[#1A1A1A]/8">
+            <Link
+              href="/notificaciones"
+              onClick={() => setAbierto(false)}
+              className="block w-full px-4 py-3 text-center text-xs font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/5 transition-colors"
+            >
+              Ver todas las notificaciones
+            </Link>
+          </div>
         </div>
       )}
     </div>

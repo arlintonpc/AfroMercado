@@ -8,13 +8,15 @@ import Footer from '@/components/layout/Footer'
 import TarjetaProducto from '@/components/catalogo/TarjetaProducto'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useAuth } from '@/context/AuthContext'
-import { listarFavoritos, type FavoritoItem } from '@/lib/api/favoritos'
+import { listarFavoritos, type FavoritoItemApi } from '@/lib/api/favoritos'
+import { mapearProducto, type ProductoCrudo } from '@/lib/mapearProducto'
+import type { Producto } from '@/types/producto'
 
 export default function PaginaMisFavoritos() {
   const { autenticado, cargando: cargandoAuth } = useAuth()
   const router = useRouter()
 
-  const [favoritos, setFavoritos] = useState<FavoritoItem[]>([])
+  const [favoritos, setFavoritos] = useState<FavoritoItemApi[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,14 +28,34 @@ export default function PaginaMisFavoritos() {
 
   useEffect(() => {
     if (cargandoAuth || !autenticado) return
-    setCargando(true)
-    listarFavoritos()
-      .then(setFavoritos)
-      .catch((e) => setError(e instanceof Error ? e.message : 'No se pudieron cargar los favoritos.'))
-      .finally(() => setCargando(false))
+    let cancelado = false
+
+    async function cargarFavoritos() {
+      setCargando(true)
+      setError(null)
+      try {
+        const items = await listarFavoritos()
+        if (!cancelado) setFavoritos(items)
+      } catch (e) {
+        if (!cancelado) setError(e instanceof Error ? e.message : 'No se pudieron cargar los favoritos.')
+      } finally {
+        if (!cancelado) setCargando(false)
+      }
+    }
+
+    void cargarFavoritos()
+    return () => {
+      cancelado = true
+    }
   }, [autenticado, cargandoAuth])
 
   const titulo = 'Mis favoritos'
+  const favoritosNormalizados: Array<FavoritoItemApi & { producto: Producto }> = favoritos
+    .filter((fav): fav is FavoritoItemApi & { producto: ProductoCrudo | Producto } => Boolean(fav.producto))
+    .map((fav) => ({
+      ...fav,
+      producto: mapearProducto(fav.producto),
+    }))
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F5F0]">
@@ -50,7 +72,7 @@ export default function PaginaMisFavoritos() {
           </h1>
           {!cargando && !error && (
             <p className="text-sm text-[#1A1A1A]/40 mt-1">
-              {favoritos.length} {favoritos.length === 1 ? 'producto guardado' : 'productos guardados'}
+              {favoritosNormalizados.length} {favoritosNormalizados.length === 1 ? 'producto guardado' : 'productos guardados'}
             </p>
           )}
         </div>
@@ -67,7 +89,7 @@ export default function PaginaMisFavoritos() {
           <EmptyState titulo="No pudimos cargar tus favoritos" descripcion={error} />
         )}
 
-        {!cargando && !error && favoritos.length === 0 && (
+        {!cargando && !error && favoritosNormalizados.length === 0 && (
           <div className="flex flex-col items-center py-20 text-center gap-4">
             <div className="w-16 h-16 rounded-full bg-[#2D6A4F]/10 flex items-center justify-center">
               <svg viewBox="0 0 24 24" className="w-8 h-8 text-[#2D6A4F]" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -92,9 +114,9 @@ export default function PaginaMisFavoritos() {
           </div>
         )}
 
-        {!cargando && !error && favoritos.length > 0 && (
+        {!cargando && !error && favoritosNormalizados.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {favoritos.map((fav) => (
+            {favoritosNormalizados.map((fav) => (
               <TarjetaProducto key={fav.productoId} producto={fav.producto} />
             ))}
           </div>

@@ -22,10 +22,12 @@ export interface Producto {
     calificacion: number
     totalReviews: number
     historia?: string
+    whatsappVisible?: boolean
   }
   categoriaId?: string
   comercioId?: string
   categoria?: { id: string; nombre: string; slug?: string }
+  pesoKg?: number | null
   oferta?: {
     id?:         number
     tipo:        'PORCENTAJE' | 'VALOR_FIJO'

@@ -25,7 +25,9 @@ const AuthService = {
     const rolFinal = rol && ROLES_VALIDOS.includes(rol) ? rol : "COMPRADOR";
 
     // No permitir correos ni teléfonos duplicados
-    if (await UsuarioRepository.buscarPorEmail(email)) {
+    const emailNormalizado = String(email).toLowerCase().trim();
+
+    if (await UsuarioRepository.buscarPorEmail(emailNormalizado)) {
       throw new ErrorValidacion("Ya existe una cuenta con ese correo");
     }
     if (await UsuarioRepository.buscarPorTelefono(telefono)) {
@@ -35,7 +37,7 @@ const AuthService = {
     const passwordHash = await hashearPassword(password);
     const usuario = await UsuarioRepository.crear({
       nombre: nombre.trim(),
-      email: email.toLowerCase().trim(),
+      email: emailNormalizado,
       telefono: telefono?.trim(),
       passwordHash,
       rol: rolFinal,
@@ -55,6 +57,9 @@ const AuthService = {
     const usuario = await UsuarioRepository.buscarPorEmail(email);
     if (!usuario) {
       throw new ErrorNoAutorizado("Correo o contraseña incorrectos");
+    }
+    if (!usuario.activo) {
+      throw new ErrorNoAutorizado("Tu cuenta está inactiva. Contacta al administrador.");
     }
     const passwordOk = await compararPassword(password, usuario.passwordHash);
     if (!passwordOk) {

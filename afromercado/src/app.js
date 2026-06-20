@@ -52,6 +52,22 @@ app.use(
   "/uploads/campanas",
   express.static(path.join(__dirname, "..", "uploads", "campanas"))
 );
+app.use("/uploads/documentos", (req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
+app.use(
+  "/uploads/documentos",
+  express.static(path.join(__dirname, "..", "uploads", "documentos"))
+);
+app.use("/uploads/avatares", (req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
+app.use(
+  "/uploads/avatares",
+  express.static(path.join(__dirname, "..", "uploads", "avatares"))
+);
 
 // Rate limiting — se omite completamente en desarrollo para no interferir con hot-reload
 const esProd = process.env.NODE_ENV === "production";

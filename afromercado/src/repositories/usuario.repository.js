@@ -10,7 +10,15 @@ const UsuarioRepository = {
   },
 
   async buscarPorEmail(email) {
-    return prisma.usuario.findUnique({ where: { email } });
+    const emailNormalizado = String(email || "").trim().toLowerCase();
+    return prisma.usuario.findFirst({
+      where: {
+        email: {
+          equals: emailNormalizado,
+          mode: "insensitive",
+        },
+      },
+    });
   },
 
   async buscarPorTelefono(telefono) {

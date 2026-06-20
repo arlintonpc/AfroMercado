@@ -2,8 +2,27 @@
 
 import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
+
+const NAV_LINKS = [
+  { href: '/admin',                      label: 'Resumen'        },
+  { href: '/admin/categorias',           label: 'Categorías'     },
+  { href: '/admin/usuarios',             label: 'Usuarios'       },
+  { href: '/admin/comerciantes',         label: 'Comerciantes'   },
+  { href: '/admin/solicitudes-repartidor', label: 'Repartidores' },
+  { href: '/admin/liquidaciones',        label: 'Liquidaciones'  },
+  { href: '/admin/entregas',             label: 'Entregas'       },
+  { href: '/admin/envios',              label: 'Envíos'         },
+  { href: '/admin/pedidos',              label: 'Pedidos'        },
+  { href: '/admin/cupones',              label: 'Cupones'        },
+  { href: '/admin/visibilidad',          label: 'Visibilidad'    },
+  { href: '/admin/campanas',             label: 'Campañas'       },
+  { href: '/admin/hero',                 label: 'Hero'           },
+  { href: '/admin/reportes',             label: 'Reportes'       },
+  { href: '/admin/config',               label: 'Config'         },
+]
 
 /** Loader a pantalla completa mientras se valida la sesión. */
 function PantallaCargando() {
@@ -111,6 +130,33 @@ export default function AdminLayout({
           </div>
         </div>
       </header>
+
+      {/* Nav secundaria */}
+      <nav className="border-b border-[#1A1A1A]/10 bg-white">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <ul className="flex overflow-x-auto gap-1 py-1 scrollbar-none">
+            {NAV_LINKS.map(({ href, label }) => {
+              const activo = href === '/admin'
+                ? pathname === '/admin'
+                : pathname === href || pathname.startsWith(href + '/')
+              return (
+                <li key={href} className="shrink-0">
+                  <Link
+                    href={href}
+                    className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                      activo
+                        ? 'bg-[#2D6A4F]/10 text-[#2D6A4F] font-semibold'
+                        : 'text-[#1A1A1A]/60 hover:text-[#1A1A1A] hover:bg-[#1A1A1A]/5'
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      </nav>
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
         {children}

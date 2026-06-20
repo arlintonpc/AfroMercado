@@ -1,16 +1,13 @@
 'use client'
 import Link from 'next/link'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCarrito } from '@/context/CarritoContext'
 import { useAuth } from '@/context/AuthContext'
+import { apiFetch } from '@/lib/api/client'
 import CampanaNotificaciones from './CampanaNotificaciones'
 
 interface HeaderProps {
-  /**
-   * Cantidad de items en el carrito. Si no se pasa, se usa la cantidad real
-   * del carrito global (useCarrito). Se mantiene opcional por compatibilidad.
-   */
   itemsCarrito?: number
 }
 
@@ -23,15 +20,32 @@ export default function Header({ itemsCarrito }: HeaderProps) {
 
   const [menuAbierto, setMenuAbierto] = useState(false)
   const [busqueda, setBusqueda] = useState('')
+  const [busquedasRecientes, setBusquedasRecientes] = useState<string[]>([])
+  const [mostrarSugerencias, setMostrarSugerencias] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const busquedaRef = useRef<HTMLDivElement>(null)
 
   function buscar(e: React.FormEvent) {
     e.preventDefault()
     const q = busqueda.trim()
+    setMostrarSugerencias(false)
     router.push(q ? `/buscar?q=${encodeURIComponent(q)}` : '/buscar')
   }
 
-  // Cierra el menú de usuario al hacer click fuera.
+  function seleccionarSugerencia(q: string) {
+    setBusqueda(q)
+    setMostrarSugerencias(false)
+    router.push(`/buscar?q=${encodeURIComponent(q)}`)
+  }
+
+  const cargarBusquedasRecientes = useCallback(async () => {
+    if (!autenticado) return
+    try {
+      const res = await apiFetch<{ ok: boolean; data: { query: string }[] }>('/productos/busquedas-recientes')
+      setBusquedasRecientes((res?.data ?? []).map((b) => b.query))
+    } catch { /* silencioso */ }
+  }, [autenticado])
+
   useEffect(() => {
     if (!menuAbierto) return
     function onClick(e: MouseEvent) {
@@ -42,6 +56,17 @@ export default function Header({ itemsCarrito }: HeaderProps) {
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
   }, [menuAbierto])
+
+  useEffect(() => {
+    if (!mostrarSugerencias) return
+    function onClick(e: MouseEvent) {
+      if (busquedaRef.current && !busquedaRef.current.contains(e.target as Node)) {
+        setMostrarSugerencias(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [mostrarSugerencias])
 
   return (
     <header className="sticky top-0 z-50 bg-[#F8F5F0] shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
@@ -57,11 +82,15 @@ export default function Header({ itemsCarrito }: HeaderProps) {
 
         {/* Barra de búsqueda — solo desktop */}
         <form onSubmit={buscar} className="hidden md:flex flex-1 max-w-md mx-8" role="search">
-          <div className="relative w-full">
+          <div className="relative w-full" ref={busquedaRef}>
             <input
               type="search"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
+              onFocus={() => {
+                cargarBusquedasRecientes()
+                setMostrarSugerencias(true)
+              }}
               placeholder="Buscar productos del Chocó..."
               aria-label="Buscar productos"
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-[#1A1A1A]/20 bg-white focus:outline-none focus:border-[#D4A017] text-sm"
@@ -71,6 +100,28 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
+
+            {/* Dropdown búsquedas recientes */}
+            {mostrarSugerencias && busquedasRecientes.length > 0 && !busqueda && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.10)] border border-[#1A1A1A]/8 py-1 z-50">
+                <p className="px-3 py-1.5 text-xs font-semibold text-[#1A1A1A]/40 uppercase tracking-wide">
+                  Búsquedas recientes
+                </p>
+                {busquedasRecientes.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => seleccionarSugerencia(q)}
+                    className="w-full text-left px-3 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/5 flex items-center gap-2"
+                  >
+                    <svg className="w-3.5 h-3.5 text-[#1A1A1A]/30 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="truncate">{q}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </form>
 
@@ -148,55 +199,64 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                     <p className="text-xs text-[#1A1A1A]/50 truncate">{usuario?.email}</p>
                   </div>
                   {usuario?.rol === 'ADMIN' && (
-                    <Link
-                      href="/admin"
-                      role="menuitem"
-                      onClick={() => setMenuAbierto(false)}
-                      className="block px-4 py-2 text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10"
-                    >
+                    <Link href="/admin" role="menuitem" onClick={() => setMenuAbierto(false)}
+                      className="block px-4 py-2 text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10">
                       Panel de administración
                     </Link>
                   )}
                   {usuario?.rol === 'COMERCIANTE' && (
-                    <Link
-                      href="/comerciante"
-                      role="menuitem"
-                      onClick={() => setMenuAbierto(false)}
-                      className="block px-4 py-2 text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10"
-                    >
-                      Mi tienda
+                    <>
+                      <Link href="/comerciante" role="menuitem" onClick={() => setMenuAbierto(false)}
+                        className="block px-4 py-2 text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10">
+                        Mi tienda
+                      </Link>
+                      <Link href="/mis-liquidaciones" role="menuitem" onClick={() => setMenuAbierto(false)}
+                        className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                        Mis liquidaciones
+                      </Link>
+                    </>
+                  )}
+                  {usuario?.rol === 'REPARTIDOR' && (
+                    <>
+                      <Link href="/repartidor" role="menuitem" onClick={() => setMenuAbierto(false)}
+                        className="block px-4 py-2 text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10">
+                        Panel repartidor
+                      </Link>
+                      <Link href="/mis-liquidaciones" role="menuitem" onClick={() => setMenuAbierto(false)}
+                        className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                        Mis liquidaciones
+                      </Link>
+                    </>
+                  )}
+                  {usuario?.rol === 'COMPRADOR' && (
+                    <Link href="/ser-repartidor" role="menuitem" onClick={() => setMenuAbierto(false)}
+                      className="block px-4 py-2 text-sm font-semibold text-[#D4A017] hover:bg-[#D4A017]/10">
+                      🚴 Sé repartidor
                     </Link>
                   )}
-                  <Link
-                    href="/perfil"
-                    role="menuitem"
-                    onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10"
-                  >
+                  <Link href="/perfil" role="menuitem" onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
                     Mi perfil
                   </Link>
-                  <Link
-                    href="/mis-pedidos"
-                    role="menuitem"
-                    onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10"
-                  >
+                  <Link href="/mis-pedidos" role="menuitem" onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
                     Mis pedidos
                   </Link>
-                  <Link
-                    href="/mis-favoritos"
-                    role="menuitem"
-                    onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10"
-                  >
+                  <Link href="/mis-direcciones" role="menuitem" onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    Mis direcciones
+                  </Link>
+                  <Link href="/mis-favoritos" role="menuitem" onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
                     Mis favoritos
+                  </Link>
+                  <Link href="/chat" role="menuitem" onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    Mensajes
                   </Link>
                   <button
                     role="menuitem"
-                    onClick={() => {
-                      setMenuAbierto(false)
-                      logout()
-                    }}
+                    onClick={() => { setMenuAbierto(false); logout() }}
                     className="block w-full text-left px-4 py-2 text-sm text-[#B85A1A] hover:bg-[#2D6A4F]/10"
                   >
                     Cerrar sesión

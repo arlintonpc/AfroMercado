@@ -5,7 +5,16 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { CampoTexto, CampoArea, CampoSelect } from '@/components/comerciante/Campos'
 import { MUNICIPIOS_CHOCO } from '@/components/comerciante/constantes'
-import { crearComercio, obtenerMiComercio } from '@/components/comerciante/api'
+import { crearComercio, obtenerMiComercio, type TipoDocumento } from '@/components/comerciante/api'
+
+const TIPOS_DOCUMENTO: { valor: TipoDocumento; etiqueta: string }[] = [
+  { valor: 'CC', etiqueta: 'Cédula de Ciudadanía (CC)' },
+  { valor: 'TI', etiqueta: 'Tarjeta de Identidad (TI)' },
+  { valor: 'CE', etiqueta: 'Cédula de Extranjería (CE)' },
+  { valor: 'PEP', etiqueta: 'Permiso Especial de Permanencia (PEP)' },
+  { valor: 'PASAPORTE', etiqueta: 'Pasaporte' },
+  { valor: 'NIT', etiqueta: 'NIT (empresa)' },
+]
 
 export default function RegistroComercioPage() {
   const router = useRouter()
@@ -14,6 +23,8 @@ export default function RegistroComercioPage() {
 
   const [nombre, setNombre] = useState('')
   const [municipio, setMunicipio] = useState('')
+  const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento | ''>('')
+  const [numeroDocumento, setNumeroDocumento] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [historia, setHistoria] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
@@ -22,7 +33,6 @@ export default function RegistroComercioPage() {
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
 
-  // Si ya tiene comercio, no debe quedarse aquí: lo enviamos al panel.
   useEffect(() => {
     let activo = true
     obtenerMiComercio()
@@ -43,6 +53,10 @@ export default function RegistroComercioPage() {
     const e: Record<string, string> = {}
     if (!nombre.trim()) e.nombre = 'Escribe el nombre de tu negocio.'
     if (!municipio) e.municipio = 'Elige tu municipio.'
+    if (!tipoDocumento) e.tipoDocumento = 'Elige el tipo de documento.'
+    if (!numeroDocumento.trim()) e.numeroDocumento = 'Escribe tu número de documento.'
+    else if (!/^[A-Z0-9\-]{4,20}$/i.test(numeroDocumento.trim()))
+      e.numeroDocumento = 'El número de documento debe tener entre 4 y 20 caracteres.'
     if (whatsapp) {
       const tel = whatsapp.replace(/\D/g, '')
       if (tel.length !== 10) e.whatsapp = 'El WhatsApp debe tener 10 números.'
@@ -62,6 +76,8 @@ export default function RegistroComercioPage() {
       await crearComercio({
         nombre: nombre.trim(),
         municipio,
+        tipoDocumento: tipoDocumento as TipoDocumento,
+        numeroDocumento: numeroDocumento.trim(),
         descripcion: descripcion.trim() || undefined,
         historia: historia.trim() || undefined,
         whatsapp: whatsapp.replace(/\D/g, '') || undefined,
@@ -122,6 +138,35 @@ export default function RegistroComercioPage() {
           opciones={MUNICIPIOS_CHOCO.map((m) => ({ valor: m, etiqueta: m }))}
           error={errores.municipio}
         />
+
+        {/* Separador de identidad */}
+        <div className="border-t border-[#1A1A1A]/8 pt-1">
+          <p className="text-sm font-semibold text-[#1A1A1A]/70 mb-4">
+            Verificación de identidad
+          </p>
+
+          <div className="flex flex-col gap-5">
+            <CampoSelect
+              label="Tipo de documento"
+              name="tipoDocumento"
+              placeholder="Elige el tipo"
+              value={tipoDocumento}
+              onChange={(v) => setTipoDocumento(v as TipoDocumento | '')}
+              opciones={TIPOS_DOCUMENTO}
+              error={errores.tipoDocumento}
+            />
+
+            <CampoTexto
+              label="Número de documento"
+              name="numeroDocumento"
+              placeholder="Ej: 1234567890"
+              value={numeroDocumento}
+              onChange={setNumeroDocumento}
+              error={errores.numeroDocumento}
+              hint="Tal como aparece en tu documento de identidad."
+            />
+          </div>
+        </div>
 
         <CampoTexto
           label="Una frase sobre tu negocio"

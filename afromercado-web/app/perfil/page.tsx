@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { obtenerPerfil, actualizarPerfil } from '@/lib/api/usuario'
+import { obtenerPerfil, actualizarPerfil, subirAvatar } from '@/lib/api/usuario'
+import { apiFetch } from '@/lib/api/client'
 import type { Usuario, TipoDocumento } from '@/types/usuario'
 
 const ETIQUETA_ROL: Record<string, string> = {
@@ -44,8 +45,23 @@ export default function PerfilPage() {
   // Campos del formulario
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [municipio, setMunicipio] = useState('')
   const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento | ''>('')
   const [numeroDocumento, setNumeroDocumento] = useState('')
+
+  // Avatar
+  const inputAvatarRef = useRef<HTMLInputElement>(null)
+  const [subiendoAvatar, setSubiendoAvatar] = useState(false)
+  const [errorAvatar, setErrorAvatar] = useState<string | null>(null)
+
+  // Cambio de contraseña
+  const [cambiandoPassword, setCambiandoPassword] = useState(false)
+  const [pwActual, setPwActual] = useState('')
+  const [pwNueva, setPwNueva] = useState('')
+  const [pwConfirm, setPwConfirm] = useState('')
+  const [guardandoPw, setGuardandoPw] = useState(false)
+  const [exitoPw, setExitoPw] = useState(false)
+  const [errorPw, setErrorPw] = useState<string | null>(null)
 
   useEffect(() => {
     if (!cargandoAuth && !autenticado) {
@@ -59,6 +75,7 @@ export default function PerfilPage() {
         setPerfil(p)
         setNombre(p.nombre)
         setTelefono(p.telefono ?? '')
+        setMunicipio(p.municipio ?? '')
         setTipoDocumento((p.tipoDocumento as TipoDocumento) ?? '')
         setNumeroDocumento(p.numeroDocumento ?? '')
       })
@@ -68,6 +85,7 @@ export default function PerfilPage() {
           setPerfil(usuarioCtx as Usuario)
           setNombre(usuarioCtx.nombre)
           setTelefono(usuarioCtx.telefono ?? '')
+          setMunicipio(usuarioCtx.municipio ?? '')
         }
       })
       .finally(() => setCargando(false))
@@ -84,6 +102,7 @@ export default function PerfilPage() {
       const actualizado = await actualizarPerfil({
         nombre: nombre.trim(),
         telefono: telefono.replace(/\D/g, '') || undefined,
+        municipio: municipio.trim() || undefined,
         tipoDocumento: tipoDocumento || undefined,
         numeroDocumento: numeroDocumento.trim() || undefined,
       })
@@ -103,10 +122,29 @@ export default function PerfilPage() {
     if (!perfil) return
     setNombre(perfil.nombre)
     setTelefono(perfil.telefono ?? '')
+    setMunicipio(perfil.municipio ?? '')
     setTipoDocumento((perfil.tipoDocumento as TipoDocumento) ?? '')
     setNumeroDocumento(perfil.numeroDocumento ?? '')
     setError(null)
     setEditando(false)
+  }
+
+  async function handleCambioAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0]
+    if (!archivo) return
+    setErrorAvatar(null)
+    setSubiendoAvatar(true)
+    try {
+      const actualizado = await subirAvatar(archivo)
+      setPerfil(actualizado)
+      actualizarUsuario(actualizado)
+    } catch (err) {
+      setErrorAvatar(err instanceof Error ? err.message : 'No se pudo subir la foto.')
+    } finally {
+      setSubiendoAvatar(false)
+      // Limpia el input para permitir re-subir el mismo archivo
+      if (inputAvatarRef.current) inputAvatarRef.current.value = ''
+    }
   }
 
   if (cargandoAuth || cargando) {
@@ -139,9 +177,56 @@ export default function PerfilPage() {
 
         {/* Tarjeta de identidad */}
         <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 flex items-center gap-5">
-          <div className="w-16 h-16 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center text-2xl font-bold flex-shrink-0">
-            {inicial}
+          {/* Avatar con click para cambiar */}
+          <div className="relative flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => inputAvatarRef.current?.click()}
+              disabled={subiendoAvatar}
+              className="relative group w-16 h-16 rounded-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/50 focus:ring-offset-2"
+              aria-label="Cambiar foto de perfil"
+              title="Cambiar foto de perfil"
+            >
+              {perfil.avatarUrl ? (
+                <img
+                  src={perfil.avatarUrl}
+                  alt={perfil.nombre}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="w-full h-full flex items-center justify-center bg-[#2D6A4F] text-white text-2xl font-bold">
+                  {subiendoAvatar ? (
+                    <svg className="animate-spin" width="20" height="20" viewBox="0 0 18 18" fill="none">
+                      <circle cx="9" cy="9" r="7" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+                      <path d="M9 2a7 7 0 0 1 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  ) : inicial}
+                </span>
+              )}
+              {/* Overlay al hover */}
+              <span className="absolute inset-0 flex items-center justify-center bg-[#1A1A1A]/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                {subiendoAvatar ? (
+                  <svg className="animate-spin text-white" width="20" height="20" viewBox="0 0 18 18" fill="none">
+                    <circle cx="9" cy="9" r="7" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+                    <path d="M9 2a7 7 0 0 1 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" aria-hidden="true">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                )}
+              </span>
+            </button>
+            <input
+              ref={inputAvatarRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handleCambioAvatar}
+            />
           </div>
+
           <div className="flex-1 min-w-0">
             <p className="text-lg font-bold text-[#1A1A1A] truncate">{perfil.nombre}</p>
             <p className="text-sm text-[#1A1A1A]/55 truncate">{perfil.email}</p>
@@ -155,7 +240,11 @@ export default function PerfilPage() {
                 </span>
               )}
             </div>
+            {errorAvatar && (
+              <p className="mt-1 text-xs text-red-600">{errorAvatar}</p>
+            )}
           </div>
+
           {perfil.rol === 'COMERCIANTE' && (
             <Link
               href="/comerciante"
@@ -235,6 +324,19 @@ export default function PerfilPage() {
                 </div>
               </div>
 
+              {/* Municipio */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-[#1A1A1A]">Municipio</label>
+                <input
+                  type="text"
+                  value={municipio}
+                  onChange={(e) => setMunicipio(e.target.value)}
+                  placeholder="Ej: Quibdó, Bogotá, Medellín…"
+                  maxLength={80}
+                  className="w-full h-11 px-4 rounded-xl border border-[#1A1A1A]/15 bg-white text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] transition-colors"
+                />
+              </div>
+
               {/* Tipo de documento */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-[#1A1A1A]">Tipo de documento</label>
@@ -304,6 +406,14 @@ export default function PerfilPage() {
                 </dd>
               </div>
               <div>
+                <dt className="text-xs text-[#1A1A1A]/45 uppercase tracking-wide font-medium mb-0.5">Municipio</dt>
+                <dd className="text-sm font-medium text-[#1A1A1A]">
+                  {perfil.municipio
+                    ? perfil.municipio
+                    : <span className="text-[#1A1A1A]/30 italic">No registrado</span>}
+                </dd>
+              </div>
+              <div>
                 <dt className="text-xs text-[#1A1A1A]/45 uppercase tracking-wide font-medium mb-0.5">Documento</dt>
                 <dd className="text-sm font-medium text-[#1A1A1A]">
                   {perfil.tipoDocumento && perfil.numeroDocumento
@@ -318,17 +428,82 @@ export default function PerfilPage() {
         {/* Seguridad */}
         <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6">
           <h2 className="font-bold text-[#1A1A1A] mb-4">Seguridad</h2>
-          <div className="flex items-center justify-between py-3 border-b border-[#1A1A1A]/8">
-            <div>
-              <p className="text-sm font-medium text-[#1A1A1A]">Contrasena</p>
-              <p className="text-xs text-[#1A1A1A]/45 mt-0.5">Ultima actualizacion desconocida</p>
+          <div className="py-3 border-b border-[#1A1A1A]/8">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-[#1A1A1A]">Contraseña</p>
+                <p className="text-xs text-[#1A1A1A]/45 mt-0.5">
+                  {exitoPw ? '✓ Actualizada recientemente' : 'Cambia tu contraseña de acceso'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setCambiandoPassword((v) => !v); setErrorPw(null); setExitoPw(false) }}
+                className="text-sm font-semibold text-[#2D6A4F] hover:underline"
+              >
+                {cambiandoPassword ? 'Cancelar' : 'Cambiar'}
+              </button>
             </div>
-            <Link
-              href="/recuperar-password"
-              className="text-sm font-semibold text-[#2D6A4F] hover:underline"
-            >
-              Cambiar
-            </Link>
+            {cambiandoPassword && (
+              <form
+                className="mt-4 flex flex-col gap-3"
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  if (pwNueva !== pwConfirm) { setErrorPw('Las contraseñas nuevas no coinciden.'); return }
+                  setErrorPw(null)
+                  setGuardandoPw(true)
+                  try {
+                    await apiFetch('/usuario/yo/cambiar-password', {
+                      method: 'PATCH',
+                      body: { passwordActual: pwActual, passwordNueva: pwNueva },
+                    })
+                    setExitoPw(true)
+                    setCambiandoPassword(false)
+                    setPwActual(''); setPwNueva(''); setPwConfirm('')
+                  } catch (err) {
+                    setErrorPw(err instanceof Error ? err.message : 'No se pudo actualizar.')
+                  } finally {
+                    setGuardandoPw(false)
+                  }
+                }}
+              >
+                {errorPw && (
+                  <p className="text-xs text-[#C0392B] bg-red-50 border border-red-200 rounded-lg px-3 py-2">{errorPw}</p>
+                )}
+                <input
+                  type="password"
+                  placeholder="Contraseña actual"
+                  value={pwActual}
+                  onChange={(e) => setPwActual(e.target.value)}
+                  required
+                  className="h-10 px-3 rounded-xl border border-[#1A1A1A]/15 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+                />
+                <input
+                  type="password"
+                  placeholder="Nueva contraseña (mínimo 6 caracteres)"
+                  value={pwNueva}
+                  onChange={(e) => setPwNueva(e.target.value)}
+                  required
+                  minLength={6}
+                  className="h-10 px-3 rounded-xl border border-[#1A1A1A]/15 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+                />
+                <input
+                  type="password"
+                  placeholder="Confirmar nueva contraseña"
+                  value={pwConfirm}
+                  onChange={(e) => setPwConfirm(e.target.value)}
+                  required
+                  className="h-10 px-3 rounded-xl border border-[#1A1A1A]/15 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+                />
+                <button
+                  type="submit"
+                  disabled={guardandoPw || !pwActual || !pwNueva || !pwConfirm}
+                  className="h-10 rounded-xl bg-[#2D6A4F] text-white text-sm font-semibold hover:bg-[#245a42] transition-colors disabled:opacity-50"
+                >
+                  {guardandoPw ? 'Guardando…' : 'Guardar nueva contraseña'}
+                </button>
+              </form>
+            )}
           </div>
           <div className="flex items-center justify-between py-3">
             <div>
@@ -362,6 +537,20 @@ export default function PerfilPage() {
             className="text-sm font-semibold text-[#2D6A4F] hover:underline"
           >
             Ver pedidos &rarr;
+          </Link>
+        </div>
+
+        {/* Mis direcciones */}
+        <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-[#1A1A1A]">Mis direcciones</p>
+            <p className="text-xs text-[#1A1A1A]/45 mt-0.5">Libreta de direcciones de entrega</p>
+          </div>
+          <Link
+            href="/mis-direcciones"
+            className="text-sm font-semibold text-[#2D6A4F] hover:underline"
+          >
+            Ver direcciones &rarr;
           </Link>
         </div>
 

@@ -64,6 +64,22 @@ router.patch(
   ComercioController.actualizarEstadoPedido
 );
 
+// GET /comercios/liquidaciones — liquidaciones del comerciante autenticado
+router.get(
+  "/liquidaciones",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.misLiquidaciones
+);
+
+// POST /comercios/subir-documento — foto del documento de identidad
+router.post(
+  "/subir-documento",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.subirDocumento
+);
+
 // GET /comercios/:id — ver cualquier comercio (público)
 router.get("/:id", ComercioController.obtener);
 

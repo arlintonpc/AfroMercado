@@ -297,7 +297,7 @@ export default function EmailPanel() {
                     <span className="text-[#1A1A1A]">{estado.smtp.secure ? 'SSL/TLS' : 'STARTTLS'}</span>
                   </div>
                 ) : (
-                  <p className="text-sm text-[#1A1A1A]/40 italic py-1">No configurado. Haz clic en "Configurar" para agregar los datos SMTP.</p>
+                  <p className="text-sm text-[#1A1A1A]/40 italic py-1">No configurado. Haz clic en Configurar para agregar los datos SMTP.</p>
                 )}
               </div>
             )}

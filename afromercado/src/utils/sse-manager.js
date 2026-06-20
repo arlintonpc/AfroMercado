@@ -3,11 +3,19 @@
 
 const conexiones = new Map(); // usuarioId (number) → Set<Response>
 
-const HEARTBEAT_MS = 25_000; // ping cada 25 s para evitar timeouts de proxy
+const HEARTBEAT_MS = 25_000;       // ping cada 25 s para evitar timeouts de proxy
+const MAX_CONEXIONES_POR_USUARIO = 5; // previene memory leak si pestañas no cierran limpio
 
 function agregar(usuarioId, res) {
   if (!conexiones.has(usuarioId)) conexiones.set(usuarioId, new Set());
-  conexiones.get(usuarioId).add(res);
+  const set = conexiones.get(usuarioId);
+  // Si se supera el límite, cerrar la conexión más antigua
+  if (set.size >= MAX_CONEXIONES_POR_USUARIO) {
+    const [primera] = set;
+    try { primera.end(); } catch { /* ya cerrada */ }
+    set.delete(primera);
+  }
+  set.add(res);
 }
 
 function quitar(usuarioId, res) {

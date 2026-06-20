@@ -374,6 +374,122 @@ function DashboardContenido() {
     }
   }
 
+  // ── Banners de estado del comercio ──────────────────────────
+  function renderBannerEstadoComercio() {
+    if (!comercio) return null
+    const estado = comercio.estadoRegistro
+
+    if (estado === 'PENDIENTE_REVISION') {
+      return (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-2xl border border-[#D4A017]/40 bg-[#D4A017]/10 px-4 py-4"
+        >
+          <svg
+            className="mt-0.5 flex-shrink-0 text-[#9B7300]"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+            <path d="M12 8v5M12 16.5h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-[#9B7300]">Tu tienda está en revisión</p>
+            <p className="mt-0.5 text-sm text-[#9B7300]/80 leading-relaxed">
+              El equipo de AfroMercado verificará tus documentos en 24–48 horas.
+              Te notificaremos cuando sea aprobada. Mientras tanto puedes configurar
+              tu catálogo y tus productos.
+            </p>
+          </div>
+        </div>
+      )
+    }
+
+    if (estado === 'RECHAZADO') {
+      return (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-2xl border border-[#C0392B]/30 bg-[#C0392B]/8 px-4 py-4"
+        >
+          <svg
+            className="mt-0.5 flex-shrink-0 text-[#C0392B]"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+            <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-[#C0392B]">Tu solicitud fue rechazada</p>
+            {comercio.motivoRechazo && (
+              <p className="mt-0.5 text-sm text-[#C0392B]/80 leading-relaxed">
+                Motivo: {comercio.motivoRechazo}
+              </p>
+            )}
+            <p className="mt-1 text-sm text-[#C0392B]/70">
+              Actualiza tu información y documentos para volver a solicitar la aprobación.
+            </p>
+            <Link
+              href="/comerciante/perfil"
+              className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#C0392B] underline underline-offset-2 hover:text-[#a93226] transition-colors"
+            >
+              Ir a mi perfil para actualizar
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+      )
+    }
+
+    if (estado === 'SUSPENDIDO') {
+      return (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-2xl border border-[#7B241C]/30 bg-[#7B241C]/10 px-4 py-4"
+        >
+          <svg
+            className="mt-0.5 flex-shrink-0 text-[#7B241C]"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M10.3 4.5 2.8 17.5A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.5L13.7 4.5a2 2 0 0 0-3.4 0Z"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path d="M12 9v4M12 17h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-[#7B241C]">Tu tienda ha sido suspendida</p>
+            {comercio.motivoRechazo && (
+              <p className="mt-0.5 text-sm text-[#7B241C]/80 leading-relaxed">
+                Motivo: {comercio.motivoRechazo}
+              </p>
+            )}
+            <p className="mt-1 text-sm text-[#7B241C]/70">
+              Por favor contacta al equipo de AfroMercado para resolver la situación.
+            </p>
+          </div>
+        </div>
+      )
+    }
+
+    return null
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Aviso publicación exitosa */}
@@ -402,6 +518,9 @@ function DashboardContenido() {
         </div>
       )}
 
+      {/* Banner de estado del comercio (pendiente / rechazado / suspendido) */}
+      {renderBannerEstadoComercio()}
+
       {/* Métricas */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {cargando ? (
@@ -423,13 +542,21 @@ function DashboardContenido() {
         )}
       </div>
 
-      {/* Botón publicar */}
-      <Link href="/comerciante/publicar" className="block">
-        <div className="flex items-center justify-center gap-2 rounded-2xl bg-[#2D6A4F] px-5 py-4 text-lg font-semibold text-white shadow-sm transition-colors hover:bg-[#245a42]">
-          <span className="text-2xl leading-none">+</span>
-          Publicar producto
-        </div>
-      </Link>
+      {/* Acciones rápidas */}
+      <div className="grid grid-cols-2 gap-3">
+        <Link href="/comerciante/publicar" className="block">
+          <div className="flex items-center justify-center gap-2 rounded-2xl bg-[#2D6A4F] px-5 py-4 text-base font-semibold text-white shadow-sm transition-colors hover:bg-[#245a42]">
+            <span className="text-xl leading-none">+</span>
+            Publicar producto
+          </div>
+        </Link>
+        <Link href="/comerciante/reportes/ventas" className="block">
+          <div className="flex items-center justify-center gap-2 rounded-2xl border border-[#2D6A4F]/30 bg-[#52B788]/8 px-5 py-4 text-base font-semibold text-[#2D6A4F] shadow-sm transition-colors hover:bg-[#52B788]/15">
+            <span className="text-xl leading-none">📊</span>
+            Ver reportes
+          </div>
+        </Link>
+      </div>
 
       {/* Por preparar */}
       {!cargando && stats && stats.porPreparar.length > 0 && (

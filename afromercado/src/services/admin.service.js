@@ -259,18 +259,78 @@ const AdminService = {
     });
   },
 
-  async verificarComerciante(adminId, comercioId, { accion, notas }) {
-    if (!["VERIFICAR", "RECHAZAR"].includes(accion)) {
-      throw new ErrorValidacion("Acción inválida. Opciones: VERIFICAR, RECHAZAR");
+  async verificarComerciante(adminId, comercioId, { accion, motivo }) {
+    const ACCIONES = ["APROBAR", "RECHAZAR", "SUSPENDER", "REHABILITAR"];
+    if (!ACCIONES.includes(accion)) {
+      throw new ErrorValidacion(`Acción inválida. Opciones: ${ACCIONES.join(", ")}`);
     }
     const comercio = await prisma.comercio.findUnique({ where: { id: comercioId } });
     if (!comercio) throw new ErrorNoEncontrado("Comercio no encontrado");
 
-    const verificado = accion === "VERIFICAR";
-    return prisma.comercio.update({
+    const ESTADO_MAP = {
+      APROBAR:     "APROBADO",
+      RECHAZAR:    "RECHAZADO",
+      SUSPENDER:   "SUSPENDIDO",
+      REHABILITAR: "APROBADO",
+    };
+    const nuevoEstado = ESTADO_MAP[accion];
+    const estaActivo  = nuevoEstado === "APROBADO";
+
+    const actualizado = await prisma.comercio.update({
       where: { id: comercioId },
-      data: { verificado },
-      include: { usuario: { select: { nombre: true, email: true } } },
+      data: {
+        estadoRegistro: nuevoEstado,
+        verificado:     estaActivo,
+        activo:         estaActivo,
+        motivoRechazo:  accion === "RECHAZAR" || accion === "SUSPENDER" ? (motivo?.trim() || null) : null,
+        revisadoPor:    adminId,
+        revisadoAt:     new Date(),
+      },
+      include: { usuario: { select: { id: true, nombre: true, email: true, telefono: true } } },
+    });
+
+    // Log de moderación
+    await prisma.accionModeracion.create({
+      data: { adminId, targetId: comercioId, targetTipo: "COMERCIO", accion, motivo: motivo?.trim() || null },
+    });
+
+    // Notificar al comerciante
+    setImmediate(async () => {
+      try {
+        if (accion === "APROBAR" && actualizado.usuario?.id) {
+          await NotificacionService.comercioVerificado({ comercio: actualizado, usuario: actualizado.usuario });
+        }
+        if ((accion === "RECHAZAR" || accion === "SUSPENDER") && actualizado.usuario?.id) {
+          await NotificacionService.crearYEnviar({
+            usuarioId: actualizado.usuario.id,
+            tipo: accion === "RECHAZAR" ? "COMERCIO_RECHAZADO" : "COMERCIO_SUSPENDIDO",
+            titulo: accion === "RECHAZAR" ? "Solicitud de comercio rechazada" : "Comercio suspendido",
+            mensaje: motivo?.trim() || "El administrador revisó tu solicitud.",
+          });
+        }
+      } catch (e) {
+        console.error("[NOTIF] verificarComerciante:", e.message);
+      }
+    });
+
+    return actualizado;
+  },
+
+  async listarComerciosAdmin({ soloSinVerificar = false, estado = null } = {}) {
+    const where = {};
+    if (estado) {
+      where.estadoRegistro = estado;
+    } else if (soloSinVerificar) {
+      where.estadoRegistro = "PENDIENTE_REVISION";
+    }
+    return prisma.comercio.findMany({
+      where,
+      orderBy: [{ estadoRegistro: "asc" }, { createdAt: "desc" }],
+      include: {
+        usuario: { select: { id: true, nombre: true, email: true, telefono: true, tipoDocumento: true, numeroDocumento: true, createdAt: true } },
+        _count: { select: { productos: true } },
+        comisiones: { where: { OR: [{ hasta: null }, { hasta: { gt: new Date() } }] }, orderBy: { desde: "desc" }, take: 1 },
+      },
     });
   },
 };

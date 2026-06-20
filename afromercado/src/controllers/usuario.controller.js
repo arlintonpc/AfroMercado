@@ -22,6 +22,15 @@ const UsuarioController = {
       next(err);
     }
   },
+
+  async cambiarPassword(req, res, next) {
+    try {
+      await UsuarioService.cambiarPassword(req.usuario.id, req.body);
+      res.json({ ok: true, mensaje: "Contraseña actualizada correctamente." });
+    } catch (err) {
+      next(err);
+    }
+  },
 };
 
 module.exports = UsuarioController;

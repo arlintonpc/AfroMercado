@@ -87,6 +87,12 @@ const PagoService = {
     if (!pago.pedido || pago.pedido.compradorId !== usuarioId) {
       throw new ErrorProhibido("Este pago no te pertenece");
     }
+    if (!["PENDIENTE", "VERIFICANDO"].includes(pago.estado)) {
+      throw new ErrorValidacion("Este pago ya fue procesado y no admite un nuevo comprobante");
+    }
+    if (!["PENDIENTE_PAGO", "VERIFICANDO_PAGO"].includes(pago.pedido.estado)) {
+      throw new ErrorValidacion("Este pedido ya fue procesado y no admite nuevos comprobantes");
+    }
 
     const pagoActualizado = await PagoRepository.actualizar(pago.id, {
       comprobanteUrl,

@@ -3,6 +3,41 @@
 // ============================================================
 const prisma = require("../config/prisma");
 
+function generarCodigoPedido() {
+  const d = new Date();
+  const yr = String(d.getFullYear()).slice(2);
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let sfx = '';
+  for (let i = 0; i < 4; i++) sfx += chars[Math.floor(Math.random() * chars.length)];
+  return `AFM-${yr}${mo}-${sfx}`;
+}
+
+function mapearPedido(p) {
+  if (!p) return p;
+  return {
+    ...p,
+    subtotal:      Number(p.subtotal),
+    comisionTotal: Number(p.comisionTotal),
+    total:         Number(p.total),
+    costoEnvio:    Number(p.costoEnvio ?? 0),
+    cuponDescuento: p.cuponDescuento != null ? Number(p.cuponDescuento) : null,
+    subPedidos: (p.subPedidos || []).map(sp => ({
+      ...sp,
+      subtotal:             Number(sp.subtotal),
+      comision:             Number(sp.comision),
+      neto:                 Number(sp.neto),
+      tasaComisionAplicada: sp.tasaComisionAplicada != null ? Number(sp.tasaComisionAplicada) : null,
+      items: (sp.items || []).map(item => ({
+        ...item,
+        precioUnitario: Number(item.precioUnitario),
+        subtotal:       Number(item.subtotal),
+        producto: item.producto ? { ...item.producto, precio: Number(item.producto.precio) } : item.producto,
+      })),
+    })),
+  };
+}
+
 const PedidoRepository = {
   /**
    * Crea un Pedido con sus SubPedidos y PedidoItems dentro de una transacción.
@@ -16,6 +51,7 @@ const PedidoRepository = {
       subtotal,
       comisionTotal,
       total,
+      costoEnvio,
       direccionTexto,
       direccionId,
       notas,
@@ -31,10 +67,12 @@ const PedidoRepository = {
         subtotal,
         comisionTotal,
         total,
+        costoEnvio: costoEnvio ?? 0,
         direccionTexto,
         direccionId: direccionId ?? null,
         notas: notas ?? null,
         expiresAt,
+        codigo: generarCodigoPedido(),
         ...(cuponId != null ? { cuponId, cuponDescuento: cuponDescuento ?? null } : {}),
         estado: "PENDIENTE_PAGO",
         subPedidos: {
@@ -42,6 +80,7 @@ const PedidoRepository = {
             comercioId: sp.comercioId,
             subtotal: sp.subtotal,
             comision: sp.comision,
+            tasaComisionAplicada: sp.tasaComisionAplicada ?? null,
             neto: sp.neto,
             estado: "CONFIRMADO",
             items: {
@@ -70,7 +109,7 @@ const PedidoRepository = {
   },
 
   async buscarPorId(id) {
-    return prisma.pedido.findUnique({
+    const p = await prisma.pedido.findUnique({
       where: { id },
       include: {
         subPedidos: {
@@ -81,10 +120,11 @@ const PedidoRepository = {
         },
       },
     });
+    return mapearPedido(p);
   },
 
   async listarPorComprador(compradorId) {
-    return prisma.pedido.findMany({
+    const pedidos = await prisma.pedido.findMany({
       where: { compradorId },
       orderBy: { createdAt: "desc" },
       include: {
@@ -96,6 +136,7 @@ const PedidoRepository = {
         },
       },
     });
+    return pedidos.map(mapearPedido);
   },
 
   async actualizarEstado(id, estado, tx) {

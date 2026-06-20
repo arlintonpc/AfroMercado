@@ -32,6 +32,11 @@ export interface Comercio {
   totalVentas: number
   verificado: boolean
   activo: boolean
+  estadoRegistro?: 'PENDIENTE_REVISION' | 'APROBADO' | 'RECHAZADO' | 'SUSPENDIDO'
+  motivoRechazo?: string | null
+  fotoDocumentoUrl?: string | null
+  whatsappVisible?: boolean
+  vereda?: string | null
 }
 
 /** Producto propio del comerciante (forma de /productos/mis/productos). */
@@ -52,6 +57,7 @@ export interface ProductoComerciante {
   diasAlistamientoMin: number
   diasAlistamientoMax: number
   alcance: 'LOCAL' | 'NACIONAL' | 'AMBOS'
+  pesoKg?: string | number | null
 }
 
 export interface CategoriaComerciante {
@@ -62,12 +68,19 @@ export interface CategoriaComerciante {
   activa: boolean
 }
 
+export type TipoDocumento = 'CC' | 'TI' | 'CE' | 'PEP' | 'PASAPORTE' | 'NIT'
+
 export interface DatosComercio {
   nombre: string
   municipio: string
+  tipoDocumento: TipoDocumento
+  numeroDocumento: string
   descripcion?: string
   historia?: string
   whatsapp?: string
+  vereda?: string
+  logoUrl?: string
+  fotoDocumentoUrl?: string
 }
 
 export interface DatosProducto {
@@ -80,6 +93,8 @@ export interface DatosProducto {
   diasAlistamientoMax: number
   alcance: 'LOCAL' | 'NACIONAL' | 'AMBOS'
   fotoUrl?: string
+  categoriaId?: number
+  pesoKg?: number
 }
 
 /**
@@ -147,6 +162,7 @@ export interface DatosActualizarProducto {
   stock?: number
   alcance?: 'LOCAL' | 'NACIONAL' | 'AMBOS'
   fotoUrl?: string
+  pesoKg?: number | null
 }
 
 /**
@@ -311,6 +327,95 @@ export interface MiSubPedido {
 
 export async function listarMisPedidos(): Promise<MiSubPedido[]> {
   const res = await apiFetch<{ ok: boolean; data: MiSubPedido[] }>('/comercios/mis-pedidos')
+  return res.data ?? []
+}
+
+export async function actualizarComercio(datos: Partial<DatosComercio>): Promise<Comercio> {
+  const resp = await apiFetch<{ ok: boolean; comercio: Comercio }>('/comercios', {
+    method: 'PATCH',
+    body: datos,
+  })
+  return resp.comercio
+}
+
+export async function subirDocumentoComercio(file: File): Promise<{ url: string }> {
+  const token = obtenerToken()
+  const fd = new FormData()
+  fd.append('documento', file)
+  const res = await fetch(`${API_URL}/comercios/subir-documento`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: fd,
+  })
+  if (!res.ok) {
+    let msg = 'No se pudo subir el documento.'
+    try { const j = await res.json(); if (j?.error) msg = j.error } catch { /* sin cuerpo */ }
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+// ── Ofertas ───────────────────────────────────────────────────
+
+export interface Oferta {
+  id: number
+  productoId: number
+  tipo: 'PORCENTAJE' | 'VALOR_FIJO'
+  valor: number | string
+  etiqueta: string | null
+  inicio: string
+  fin: string
+  stockLimite: number | null
+  activa: boolean
+  createdAt: string
+  producto: { id: number; nombre: string; precio: number | string; fotoUrl: string | null }
+}
+
+export interface DatosOferta {
+  productoId: number
+  tipo: 'PORCENTAJE' | 'VALOR_FIJO'
+  valor: number
+  inicio: string
+  fin: string
+  etiqueta?: string
+  stockLimite?: number
+}
+
+export async function listarMisOfertas(): Promise<Oferta[]> {
+  const res = await apiFetch<{ ok: boolean; items: Oferta[] }>('/ofertas/mis-ofertas')
+  return res.items ?? []
+}
+
+export async function crearOferta(datos: DatosOferta): Promise<Oferta> {
+  const res = await apiFetch<{ ok: boolean; oferta: Oferta }>('/ofertas', {
+    method: 'POST',
+    body: datos,
+  })
+  return res.oferta
+}
+
+export async function desactivarOferta(id: number): Promise<void> {
+  await apiFetch(`/ofertas/${id}/desactivar`, { method: 'PATCH' })
+}
+
+// ── Liquidaciones ─────────────────────────────────────────────
+
+export interface Liquidacion {
+  id: number
+  tipo: 'COMERCIANTE' | 'REPARTIDOR'
+  monto: number
+  estado: 'PENDIENTE' | 'PAGADA'
+  periodoDesde: string
+  periodoHasta: string
+  cuentaDestino: string | null
+  comprobante: string | null
+  notas: string | null
+  createdAt: string
+  pagadoAt: string | null
+}
+
+export async function listarMisLiquidaciones(): Promise<Liquidacion[]> {
+  const res = await apiFetch<{ ok: boolean; data: Liquidacion[] }>('/comercios/liquidaciones')
   return res.data ?? []
 }
 

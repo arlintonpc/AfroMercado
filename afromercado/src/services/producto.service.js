@@ -11,7 +11,7 @@ const ProductoService = {
     const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
     if (!comercio) throw new ErrorValidacion("Debes tener un comercio registrado para publicar productos");
 
-    const { nombre, descripcion, precio, unidad, stock, diasAlistamientoMin, diasAlistamientoMax, alcance, fotoUrl } = datos;
+    const { nombre, descripcion, precio, unidad, stock, diasAlistamientoMin, diasAlistamientoMax, alcance, fotoUrl, categoriaId, pesoKg } = datos;
 
     if (!nombre || !precio || !unidad) {
       throw new ErrorValidacion("Nombre, precio y unidad son obligatorios");
@@ -30,6 +30,9 @@ const ProductoService = {
     if (min < 0 || max < min) {
       throw new ErrorValidacion("Los días de alistamiento deben ser positivos y el máximo >= al mínimo");
     }
+    if (pesoKg !== undefined && pesoKg !== null && parseFloat(pesoKg) <= 0) {
+      throw new ErrorValidacion("El peso debe ser mayor a cero");
+    }
 
     return ProductoRepository.crear({
       comercioId: comercio.id,
@@ -42,6 +45,8 @@ const ProductoService = {
       diasAlistamientoMax: max,
       alcance: alcance ?? "LOCAL",
       fotoUrl,
+      ...(categoriaId ? { categoriaId: parseInt(categoriaId) } : {}),
+      ...(pesoKg !== undefined && pesoKg !== null ? { pesoKg: parseFloat(pesoKg) } : {}),
     });
   },
 
@@ -83,6 +88,9 @@ const ProductoService = {
       campos.alcance = datos.alcance;
     }
     if (datos.activo !== undefined) campos.activo = Boolean(datos.activo);
+    if (datos.pesoKg !== undefined) {
+      campos.pesoKg = datos.pesoKg !== null && datos.pesoKg !== '' ? parseFloat(datos.pesoKg) : null;
+    }
 
     return ProductoRepository.actualizar(productoId, campos);
   },

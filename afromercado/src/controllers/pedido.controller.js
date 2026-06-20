@@ -11,6 +11,7 @@ const PedidoController = {
       // direccionTexto por compatibilidad. El teléfono se conserva en las notas.
       const { direccionTexto, direccion, telefono, direccionId, notas, codigoCupon } =
         req.body || {};
+      const departamento = (req.body?.departamento || "").trim();
       const textoDireccion = (direccionTexto || direccion || "").trim();
       const notasFinales = telefono
         ? `${notas ? notas + " · " : ""}Tel: ${telefono}`
@@ -18,6 +19,7 @@ const PedidoController = {
       const resultado = await PedidoService.checkout(req.usuario.id, {
         direccionTexto: textoDireccion,
         direccionId: direccionId ? Number(direccionId) : undefined,
+        departamento: departamento || undefined,
         notas: notasFinales,
         codigoCupon: codigoCupon || undefined,
       });

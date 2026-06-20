@@ -148,11 +148,11 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         {autenticado && (
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); toggleFav(producto.id) }}
-            aria-label={esFavorito(producto.id) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+            onClick={(e) => { e.preventDefault(); toggleFav(Number(producto.id)) }}
+            aria-label={esFavorito(Number(producto.id)) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
             className="absolute top-2.5 right-2.5 w-8 h-8 flex items-center justify-center rounded-full bg-white/80 backdrop-blur shadow-sm hover:bg-white transition-colors z-10"
           >
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill={esFavorito(producto.id) ? '#2D6A4F' : 'none'} stroke={esFavorito(producto.id) ? '#2D6A4F' : '#1A1A1A'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill={esFavorito(Number(producto.id)) ? '#2D6A4F' : 'none'} stroke={esFavorito(Number(producto.id)) ? '#2D6A4F' : '#1A1A1A'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
           </button>

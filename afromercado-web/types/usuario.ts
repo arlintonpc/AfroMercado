@@ -7,6 +7,8 @@ export interface Usuario {
   nombre: string
   email: string
   telefono?: string | null
+  avatarUrl?: string | null
+  municipio?: string | null
   rol: RolUsuario
   activo: boolean
   tipoDocumento?: TipoDocumento | null

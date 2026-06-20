@@ -71,11 +71,9 @@ function TarjetaPedido({
   avanzando: boolean
   onAvanzar: (sp: MiSubPedido) => void
 }) {
-  const puedeAvanzar = sp.estado === 'CONFIRMADO' || sp.estado === 'EN_PREPARACION' || sp.estado === 'LISTO'
+  const puedeAvanzar = sp.estado === 'CONFIRMADO' || sp.estado === 'EN_PREPARACION'
   const etiquetaBoton =
-    sp.estado === 'CONFIRMADO' ? 'Empezar preparación'
-    : sp.estado === 'EN_PREPARACION' ? 'Marcar como listo'
-    : 'Marcar como entregado'
+    sp.estado === 'CONFIRMADO' ? 'Empezar preparación' : 'Marcar como listo'
   const colorBoton =
     sp.estado === 'CONFIRMADO'
       ? 'bg-[#2D6A4F] hover:bg-[#24573f] text-white'
@@ -116,10 +114,17 @@ function TarjetaPedido({
         <p className="text-[#1A1A1A]/70">
           <span className="font-medium text-[#1A1A1A]">Comprador: </span>
           {sp.pedido.comprador.nombre}
-          {sp.pedido.comprador.telefono && (
-            <span className="ml-1 text-[#1A1A1A]/50">· {sp.pedido.comprador.telefono}</span>
-          )}
         </p>
+        {sp.pedido.comprador.telefono && (
+          <a
+            href={`https://wa.me/57${sp.pedido.comprador.telefono.replace(/\D/g, '')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#2D6A4F] underline text-sm"
+          >
+            WhatsApp {sp.pedido.comprador.telefono}
+          </a>
+        )}
         <p className="text-[#1A1A1A]/70">
           <span className="font-medium text-[#1A1A1A]">Dirección: </span>
           {sp.pedido.direccionTexto}
@@ -131,6 +136,12 @@ function TarjetaPedido({
           </p>
         )}
       </div>
+
+      {sp.estado === 'LISTO' && (
+        <p className="text-xs text-[#2D6A4F]/70 border border-[#52B788]/30 bg-[#52B788]/8 rounded-lg px-3 py-2">
+          ✓ Listo — esperando que un repartidor lo recoja
+        </p>
+      )}
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-base font-bold text-[#2D6A4F]">{cop(sp.neto)}</p>
