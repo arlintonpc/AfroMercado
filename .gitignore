@@ -24,3 +24,12 @@ afromercado/uploads/
 .DS_Store
 Thumbs.db
 .idea/
+
+# Temporales (capturas, perfiles de prueba, locks de Office)
+.tmp_*
+**/.tmp-chrome-profile/
+~$*
+Documentacion/~$*
+
+# Herramientas locales
+.claude/worktrees/

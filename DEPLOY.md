@@ -66,6 +66,7 @@ git push -u origin main
    | `COMISION_PORCENTAJE` | `0.10` |
    | `BCRYPT_ROUNDS` | `10` |
    | `CORS_ORIGIN` | *(lo llenas en el Paso 4)* |
+   | `CLOUDINARY_URL` | *(del dashboard de Cloudinary — para fotos permanentes)* |
 
    Genera el `JWT_SECRET` con:
    ```bash

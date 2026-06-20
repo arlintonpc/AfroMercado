@@ -7,6 +7,7 @@ const ProductoService = require("../services/producto.service");
 const prisma = require("../config/prisma");
 const VisibilidadRepository = require("../repositories/visibilidad.repository");
 const { ErrorValidacion } = require("../utils/errores");
+const { subirACloudinary } = require("../utils/cloudinary");
 
 // Carpeta pública donde se guardan las fotos de productos.
 const DIR_PRODUCTOS = path.join(__dirname, "..", "..", "uploads", "productos");
@@ -285,7 +286,18 @@ const ProductoController = {
         throw new ErrorValidacion("Adjunta al menos una imagen (campo 'imagenes')");
       }
       const base = `${req.protocol}://${req.get("host")}`;
-      const urls = req.files.map((f) => `${base}/uploads/productos/${f.filename}`);
+      // Si Cloudinary está configurado, subimos cada foto a la nube (permanente
+      // y optimizada) y borramos la copia local. Si no, usamos el disco local.
+      const urls = [];
+      for (const f of req.files) {
+        const cloudUrl = await subirACloudinary(f.path, "afromercado/productos");
+        if (cloudUrl) {
+          urls.push(cloudUrl);
+          fs.unlink(f.path, () => {});
+        } else {
+          urls.push(`${base}/uploads/productos/${f.filename}`);
+        }
+      }
       const producto = await ProductoService.agregarImagenes(req.usuario.id, req.params.id, urls);
       res.status(201).json({ ok: true, producto });
     } catch (err) {

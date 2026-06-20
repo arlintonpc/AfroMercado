@@ -28,60 +28,106 @@ export default function PaginaTerminos() {
             Términos y condiciones
           </h1>
           <p className="mt-3 max-w-2xl text-sm md:text-base text-[#1A1A1A]/60 leading-relaxed">
-            Estas condiciones resumen cómo funciona AfroMercado, qué puedes esperar del sitio y qué responsabilidades
-            compartimos entre compradores, comercios y la plataforma.
+            Estas condiciones regulan el uso de AfroMercado y la relación entre compradores, comercios y la
+            plataforma. Al crear una cuenta o realizar un pedido aceptas estos términos.
           </p>
+          <p className="mt-2 text-xs text-[#1A1A1A]/45">Última actualización: [COMPLETAR fecha] · Aplica legislación de la República de Colombia.</p>
         </div>
 
         <div className="grid gap-4">
-          <Bloque titulo="1. Uso de la plataforma">
+          <Bloque titulo="1. Quiénes somos">
             <p>
-              AfroMercado conecta personas que compran con productores y comercios del Chocó. El sitio puede usarse
-              solo para fines lícitos y respetando las normas de la comunidad.
+              AfroMercado es operado por <strong>[COMPLETAR: razón social]</strong>, identificada con
+              NIT <strong>[COMPLETAR: NIT]</strong>, con domicilio en <strong>[COMPLETAR: dirección, ciudad]</strong>,
+              correo <strong>[COMPLETAR: correo]</strong> y teléfono <strong>[COMPLETAR: teléfono/WhatsApp]</strong>.
             </p>
             <p>
-              No está permitido publicar contenido engañoso, intentar afectar la seguridad del sitio o usar la
-              plataforma para actividades que incumplan la ley.
-            </p>
-          </Bloque>
-
-          <Bloque titulo="2. Cuentas, pedidos y pagos">
-            <p>
-              Para comprar, guardar favoritos o escribir en el chat, necesitas una cuenta válida. Debes mantener tus
-              datos actualizados para que podamos gestionar pedidos, entregas y soporte.
-            </p>
-            <p>
-              Los precios, la disponibilidad y los tiempos de despacho pueden cambiar según el inventario y el comercio
-              que publica el producto. Antes de confirmar un pedido, revisa bien la información mostrada en pantalla.
+              AfroMercado es un <strong>marketplace</strong>: una plataforma que conecta a compradores con productores
+              y comercios del Chocó. Actuamos como intermediarios tecnológicos; la venta se celebra entre el comprador
+              y el comercio que publica cada producto.
             </p>
           </Bloque>
 
-          <Bloque titulo="3. Productos y contenido">
+          <Bloque titulo="2. Uso de la plataforma">
             <p>
-              Los comercios son responsables de la información que publican sobre sus productos, incluyendo fotos,
-              descripciones, stock y condiciones especiales.
+              Puedes usar el sitio solo para fines lícitos. No está permitido publicar contenido engañoso, suplantar a
+              terceros, afectar la seguridad del sitio ni usar la plataforma para actividades que incumplan la ley.
             </p>
             <p>
-              AfroMercado puede ajustar o retirar contenido que incumpla estas condiciones, que sea fraudulento o que
-              genere riesgo para los usuarios.
-            </p>
-          </Bloque>
-
-          <Bloque titulo="4. Limitación de responsabilidad">
-            <p>
-              Hacemos lo posible por mantener la plataforma disponible y actualizada, pero no garantizamos que siempre
-              esté libre de interrupciones, errores o cambios de terceros fuera de nuestro control.
-            </p>
-            <p>
-              Cada compra se gestiona con el comercio correspondiente. Si surge un problema con un pedido, te
-              ayudaremos a canalizarlo, pero la resolución final depende del caso concreto.
+              Para comprar, guardar favoritos o usar el chat necesitas una cuenta válida. Eres responsable de la
+              confidencialidad de tu contraseña y de mantener tus datos actualizados.
             </p>
           </Bloque>
 
-          <Bloque titulo="5. Contacto">
+          <Bloque titulo="3. Precios, pedidos y pagos">
             <p>
-              Si tienes preguntas sobre estos términos, entra a nuestra página de contacto o escríbenos desde tu
-              cuenta para revisar el caso con más detalle.
+              Los precios se muestran en pesos colombianos (COP). La disponibilidad y los tiempos de alistamiento
+              dependen del comercio que publica el producto. Revisa la información en pantalla antes de confirmar.
+            </p>
+            <p>
+              AfroMercado cobra una comisión sobre cada venta a los comercios (actualmente 10%). El pago se realiza por
+              los medios habilitados (Nequi, Daviplata, transferencia o efectivo) y es verificado por AfroMercado antes
+              de que el comercio prepare el pedido. Si el pago no se completa dentro del tiempo indicado, el pedido se
+              cancela y el inventario se libera.
+            </p>
+          </Bloque>
+
+          <Bloque titulo="4. Envíos y entregas">
+            <p>
+              El envío se coordina con cada comercio según su alcance (local o nacional) y el peso del producto. Los
+              tiempos son estimados y pueden variar por causas externas (clima, transporte, disponibilidad).
+            </p>
+          </Bloque>
+
+          <Bloque titulo="5. Derecho de retracto y devoluciones">
+            <p>
+              De acuerdo con el Estatuto del Consumidor (Ley 1480 de 2011), en las compras a distancia tienes derecho
+              de retracto dentro de los <strong>cinco (5) días hábiles</strong> siguientes a la entrega, salvo las
+              excepciones legales (por ejemplo, productos perecederos o de consumo que se deterioran rápido, como
+              alimentos frescos).
+            </p>
+            <p>
+              Si un producto llega defectuoso o no corresponde a lo ofrecido, escríbenos por los canales de soporte y
+              te ayudaremos a gestionar la solución con el comercio (cambio, reembolso o reenvío según el caso).
+            </p>
+          </Bloque>
+
+          <Bloque titulo="6. Responsabilidad de los comercios">
+            <p>
+              Los comercios son responsables de la veracidad de la información que publican (fotos, descripciones,
+              precio, stock, condiciones) y de cumplir con la entrega de los pedidos confirmados.
+            </p>
+            <p>
+              AfroMercado puede ajustar, ocultar o retirar contenido o cuentas que incumplan estos términos, que sean
+              fraudulentos o que generen riesgo para los usuarios.
+            </p>
+          </Bloque>
+
+          <Bloque titulo="7. Limitación de responsabilidad">
+            <p>
+              Hacemos lo posible por mantener la plataforma disponible, pero no garantizamos que esté libre de
+              interrupciones o errores. AfroMercado no es responsable por el incumplimiento atribuible exclusivamente a
+              un comercio o a un tercero (pagos, transporte), sin perjuicio de la ayuda que brindamos para canalizar
+              cada caso.
+            </p>
+          </Bloque>
+
+          <Bloque titulo="8. Ley aplicable y disputas">
+            <p>
+              Estos términos se rigen por las leyes de la República de Colombia. Cualquier diferencia se intentará
+              resolver de buena fe; en lo relativo a protección al consumidor, podrás acudir a la Superintendencia de
+              Industria y Comercio (SIC).
+            </p>
+          </Bloque>
+
+          <Bloque titulo="9. Cambios y contacto">
+            <p>
+              Podemos actualizar estos términos; publicaremos la versión vigente en esta página. Si tienes preguntas,
+              entra a la página de contacto o escríbenos a <strong>[COMPLETAR: correo de soporte]</strong>.
+            </p>
+            <p className="text-xs text-[#1A1A1A]/45">
+              Nota: este documento es una base general. Antes de publicar, recomendamos que un abogado en Colombia lo
+              revise y complete los campos marcados.
             </p>
           </Bloque>
         </div>
