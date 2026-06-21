@@ -10,7 +10,14 @@
 export const TOKEN_KEY = 'afromercado_token'
 export const USUARIO_KEY = 'afromercado_usuario'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+// URL del backend. Si NEXT_PUBLIC_API_URL está definida, manda. Si no, el
+// valor por defecto depende del entorno de compilación: en producción apunta
+// al backend en Render; en desarrollo, al backend local.
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === 'production'
+    ? 'https://afromercado-api.onrender.com/api'
+    : 'http://localhost:3001/api')
 
 /**
  * Lee el token guardado en localStorage. Devuelve null en SSR o si no existe.
