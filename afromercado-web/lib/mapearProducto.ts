@@ -54,6 +54,7 @@ export interface ProductoCrudo {
   unidad?: string
   stock?: number
   stockReservado?: number
+  pesoKg?: number | string | null
   diasAlistamientoMin?: number
   diasAlistamientoMax?: number
   alcance?: Producto['alcance']
@@ -96,6 +97,7 @@ export function mapearProducto(crudo: ProductoCrudo): Producto {
     unidad: crudo.unidad ?? '',
     stock: aNumero(crudo.stock),
     stockReservado: aNumero(crudo.stockReservado),
+    pesoKg: crudo.pesoKg != null ? aNumero(crudo.pesoKg) : null,
     diasAlistamientoMin: aNumero(crudo.diasAlistamientoMin),
     diasAlistamientoMax: aNumero(crudo.diasAlistamientoMax),
     alcance: crudo.alcance ?? 'LOCAL',

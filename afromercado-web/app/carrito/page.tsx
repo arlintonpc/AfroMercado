@@ -122,9 +122,14 @@ export default function PaginaCarrito() {
                   </span>
                 </div>
 
-                <p className="text-xs text-[#1A1A1A]/50 mb-4 flex items-start gap-1.5">
+                <div className="flex justify-between text-sm text-[#1A1A1A]/70 mb-2">
+                  <span>Envío</span>
+                  <span className="text-[#1A1A1A]/50">Se calcula en el siguiente paso</span>
+                </div>
+
+                <p className="text-xs text-[#1A1A1A]/45 mb-4 flex items-start gap-1.5">
                   <span aria-hidden>🚚</span>
-                  El envío se coordina con cada productor.
+                  Verás el costo exacto según tu ciudad antes de pagar.
                 </p>
 
                 <div className="h-px bg-[#1A1A1A]/10 my-3" />

@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import ProductoGaleria from '@/components/catalogo/ProductoGaleria'
+import EstimadorEnvio from '@/components/catalogo/EstimadorEnvio'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -485,6 +486,9 @@ export default function PaginaProducto({
                 <span>⏱</span>
                 Listo en {producto.diasAlistamientoMin}–{producto.diasAlistamientoMax} días · El productor prepara tu pedido con dedicación
               </p>
+
+              {/* 9. Estimador de envío */}
+              <EstimadorEnvio pesoKg={producto.pesoKg} />
             </div>
           </div>
         </div>
