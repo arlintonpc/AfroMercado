@@ -9,6 +9,7 @@ const { obtenerEstadoWA, iniciarWhatsApp } = require("../utils/whatsapp");
 const { estaConfigurado, obtenerFrom, enviarEmail, obtenerConfigSmtp } = require("../utils/email");
 const { hashearPassword } = require("../utils/auth");
 const ConfigRepository = require("../repositories/config.repository");
+const Reglas = require("../config/reglas");
 const NotificacionService = require("../services/notificacion.service");
 
 const RAIZ_PROYECTO = path.join(__dirname, "..", "..");
@@ -266,24 +267,45 @@ const AdminController = {
     } catch (e) { next(e); }
   },
 
+  // GET /admin/reglas — reglas de negocio agrupadas con su valor actual
+  async listarReglas(req, res, next) {
+    try {
+      const grupos = await Reglas.todasConMeta();
+      res.json({ ok: true, data: grupos });
+    } catch (e) { next(e); }
+  },
+
   // PUT /admin/config/:clave
   async actualizarConfig(req, res, next) {
     try {
       const { clave } = req.params;
-      const { valor } = req.body;
-      if (!valor?.toString().trim()) throw new ErrorValidacion("El valor es obligatorio");
+      let { valor } = req.body;
+      if (valor === undefined || valor === null || valor.toString().trim() === "")
+        throw new ErrorValidacion("El valor es obligatorio");
+      valor = valor.toString().trim();
 
-      // Validación especial para la comisión global
-      if (clave === 'comision_global') {
-        const num = parseFloat(valor);
-        if (isNaN(num) || num < 0 || num > 1)
-          throw new ErrorValidacion("La comisión global debe ser un número entre 0 y 1 (ej: 0.10 para 10%)");
+      // Validación según el tipo definido en el Centro de Reglas.
+      const def = Reglas.DEFAULTS[clave];
+      if (def) {
+        if (def.tipo === "bool" && !["true", "false"].includes(valor))
+          throw new ErrorValidacion("Debe ser verdadero o falso");
+        if (def.tipo === "numero") {
+          const n = Number(valor);
+          if (!Number.isFinite(n) || n < 0) throw new ErrorValidacion("Debe ser un número válido (mayor o igual a 0)");
+        }
+        if (def.tipo === "porcentaje_decimal") {
+          const n = parseFloat(valor);
+          if (isNaN(n) || n < 0 || n > 1)
+            throw new ErrorValidacion("Debe ser un decimal entre 0 y 1 (ej: 0.10 = 10%)");
+        }
+        if (def.tipo === "select" && def.opciones && !def.opciones.includes(valor))
+          throw new ErrorValidacion(`Valor inválido. Opciones: ${def.opciones.join(", ")}`);
       }
 
       const data = await prisma.config.upsert({
         where:  { clave },
-        update: { valor: valor.toString().trim() },
-        create: { clave, valor: valor.toString().trim() },
+        update: { valor },
+        create: { clave, valor },
       });
       res.json({ ok: true, data });
     } catch (e) { next(e); }

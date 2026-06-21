@@ -50,6 +50,7 @@ router.post("/comercios/:id/comision",          ...soloAdmin, AdminController.se
 
 // Config global
 router.get("/config",        ...soloAdmin, AdminController.listarConfig);
+router.get("/reglas",        ...soloAdmin, AdminController.listarReglas);
 router.put("/config/:clave", ...soloAdmin, AdminController.actualizarConfig);
 
 // Gestión de repartidores

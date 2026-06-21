@@ -640,6 +640,25 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
+      {/* Configuración del marketplace */}
+      <section className="mt-6">
+        <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">Configuración del marketplace</h2>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/admin/reglas"
+            className="flex items-center justify-between rounded-2xl border border-[#2D6A4F]/25 bg-[#2D6A4F]/5 px-5 py-4 hover:bg-[#2D6A4F]/10 transition-colors"
+          >
+            <div>
+              <p className="font-semibold text-[#2D6A4F]">⚙️ Reglas del marketplace</p>
+              <p className="text-sm text-[#1A1A1A]/55 mt-0.5">Comisión, cupones, envíos y pagos. Cambia las reglas de negocio sin tocar código; efecto inmediato.</p>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#2D6A4F] flex-shrink-0">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </Link>
+        </div>
+      </section>
+
       {/* Canales de notificación */}
       <section className="mt-6">
         <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">Canales de notificación</h2>
