@@ -426,3 +426,59 @@ export async function avanzarEstadoPedido(subPedidoId: number): Promise<MiSubPed
   )
   return res.subPedido
 }
+
+// ── Cupones del vendedor ──────────────────────────────────────
+
+export interface CuponVendedor {
+  id: number
+  codigo: string
+  tipo: 'PORCENTAJE' | 'VALOR_FIJO'
+  valor: number | string
+  minimoCompra: number | string | null
+  usosMaximos: number | null
+  usosMaximosPorUsuario: number | null
+  usosActuales: number
+  activo: boolean
+  inicio: string
+  fin: string
+  soloNuevos: boolean
+  createdAt: string
+  _count?: { usos: number }
+}
+
+/** Reglas vigentes que gobiernan los cupones del vendedor (vienen del Centro de Reglas). */
+export interface ReglasCupon {
+  permitido: boolean
+  maxPct: number
+}
+
+export interface DatosCuponVendedor {
+  codigo: string
+  tipo: 'PORCENTAJE' | 'VALOR_FIJO'
+  valor: number
+  inicio: string
+  fin: string
+  minimoCompra?: number
+  usosMaximos?: number
+  usosMaximosPorUsuario?: number
+  soloNuevos?: boolean
+}
+
+export async function listarMisCupones(): Promise<{ items: CuponVendedor[]; reglas: ReglasCupon }> {
+  const res = await apiFetch<{ ok: boolean; data: { items: CuponVendedor[]; reglas: ReglasCupon } }>(
+    '/cupones/mis-cupones'
+  )
+  return res.data ?? { items: [], reglas: { permitido: true, maxPct: 50 } }
+}
+
+export async function crearCuponVendedor(datos: DatosCuponVendedor): Promise<CuponVendedor> {
+  const res = await apiFetch<{ ok: boolean; data: CuponVendedor }>('/cupones/mis-cupones', {
+    method: 'POST',
+    body: datos,
+  })
+  return res.data
+}
+
+export async function desactivarCuponVendedor(id: number): Promise<void> {
+  await apiFetch(`/cupones/mis-cupones/${id}/desactivar`, { method: 'PATCH' })
+}

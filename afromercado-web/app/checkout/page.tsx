@@ -57,6 +57,18 @@ export default function PaginaCheckout() {
 
   const grupos = useMemo(() => agruparPorComercio(items), [items])
 
+  // Subtotal por comercio (id → $). Permite que los cupones restringidos a una
+  // tienda se validen y estimen igual que en el checkout real.
+  const subtotalesPorComercio = useMemo(() => {
+    const m: Record<number, number> = {}
+    for (const it of items) {
+      const cid = Number(it.producto?.comercioId)
+      if (!cid) continue
+      m[cid] = (m[cid] ?? 0) + precioVigente(it.producto) * it.cantidad
+    }
+    return m
+  }, [items])
+
   useEffect(() => {
     if (!cargandoAuth && !autenticado) {
       router.replace('/ingresar?redirect=/checkout')
@@ -178,7 +190,10 @@ export default function PaginaCheckout() {
     setCuponAplicado(null)
     setAplicandoCupon(true)
     try {
-      const resultado = await validarCupon(codigoCupon.trim(), subtotal)
+      const resultado = await validarCupon(codigoCupon.trim(), subtotal, {
+        comercioIds: Object.keys(subtotalesPorComercio).map(Number),
+        subtotalesPorComercio,
+      })
       setCuponAplicado(resultado)
     } catch (err) {
       setErrorCupon(err instanceof Error ? err.message : 'Cupón inválido')

@@ -176,6 +176,7 @@ export default function ComercianteLayout({
     { href: '/comerciante/mis-productos',  etiqueta: 'Mis productos' },
     { href: '/comerciante/publicar',       etiqueta: 'Publicar' },
     { href: '/comerciante/ofertas',        etiqueta: 'Ofertas' },
+    { href: '/comerciante/cupones',        etiqueta: 'Cupones' },
     { href: '/comerciante/analytics',      etiqueta: 'Analíticas' },
     { href: '/comerciante/liquidaciones',  etiqueta: 'Liquidaciones' },
     { href: '/comerciante/perfil',         etiqueta: 'Mi tienda' },

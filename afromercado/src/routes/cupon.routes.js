@@ -4,9 +4,15 @@ const CuponController = require("../controllers/cupon.controller");
 
 const router = express.Router();
 const soloAdmin = [autenticar, autorizar("ADMIN")];
+const soloComerciante = [autenticar, autorizar("COMERCIANTE", "ADMIN")];
 
 // Uso público (compradores)
 router.post("/validar", autenticar, CuponController.validar);
+
+// Cupones del vendedor (gestión propia, restringidos a su tienda)
+router.get("/mis-cupones",                  ...soloComerciante, CuponController.misCupones);
+router.post("/mis-cupones",                 ...soloComerciante, CuponController.crearComerciante);
+router.patch("/mis-cupones/:id/desactivar", ...soloComerciante, CuponController.desactivarComerciante);
 
 // Selector de comercios para el formulario de creación
 router.get("/comercios", ...soloAdmin, CuponController.listarComerciosSelector);
