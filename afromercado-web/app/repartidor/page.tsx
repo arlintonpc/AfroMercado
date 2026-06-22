@@ -211,6 +211,8 @@ export default function PanelRepartidorPage() {
   const [misEntregasList, setMisEntregasList] = useState<EntregaDetalle[]>([])
   const [disponiblesList, setDisponiblesList] = useState<EntregaDetalle[]>([])
   const [historialList, setHistorialList] = useState<EntregaDetalle[]>([])
+  const [municipioBase, setMunicipioBase] = useState<string | null>(null)
+  const [verTodasZonas, setVerTodasZonas] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cargandoAccion, setCargandoAccion] = useState<number | null>(null)
@@ -231,19 +233,20 @@ export default function PanelRepartidorPage() {
     try {
       const [mis, disp, hist] = await Promise.all([
         misEntregas(),
-        entregasDisponibles(),
+        entregasDisponibles(verTodasZonas),
         historialEntregas(),
       ])
       // misEntregas devuelve todas; filtramos activas vs historial
       setMisEntregasList(mis.filter((e) => estaActiva(e.estado)))
-      setDisponiblesList(disp)
+      setDisponiblesList(disp.items)
+      setMunicipioBase(disp.municipioBase)
       setHistorialList(hist)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar las entregas.')
     } finally {
       setCargando(false)
     }
-  }, [])
+  }, [verTodasZonas])
 
   useEffect(() => {
     if (!usuario || usuario.rol !== 'REPARTIDOR') return
@@ -423,6 +426,27 @@ export default function PanelRepartidorPage() {
             Historial
           </button>
         </div>
+
+        {/* Barra de zona (solo en Disponibles) */}
+        {tab === 'disponibles' && (
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-[#1A1A1A]/8 bg-white px-4 py-2.5 text-sm">
+            <span className="text-[#1A1A1A]/60">
+              {verTodasZonas
+                ? '📍 Mostrando todas las zonas'
+                : municipioBase
+                ? <>📍 Tu zona: <span className="font-semibold text-[#2D6A4F]">{municipioBase}</span></>
+                : '📍 Todas las zonas'}
+            </span>
+            {municipioBase && (
+              <button
+                onClick={() => setVerTodasZonas((v) => !v)}
+                className="shrink-0 font-semibold text-[#2D6A4F] hover:underline"
+              >
+                {verTodasZonas ? 'Ver solo mi zona' : 'Ver todas las zonas'}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Contenido */}
         {cargando ? (

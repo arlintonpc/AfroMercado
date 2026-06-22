@@ -29,9 +29,18 @@ export async function historialEntregas(): Promise<EntregaDetalle[]> {
   return res.data.filter((e) => e.estado === 'ENTREGADA' || e.estado === 'FALLIDA')
 }
 
-export async function entregasDisponibles(): Promise<EntregaDetalle[]> {
-  const res = await apiFetch<{ ok: boolean; data: EntregaDetalle[] }>('/repartidor/entregas/disponibles')
-  return res.data
+export interface EntregasDisponibles {
+  items: EntregaDetalle[]
+  /** Municipio base del repartidor por el que se filtró (null = todas las zonas). */
+  municipioBase: string | null
+}
+
+export async function entregasDisponibles(todos = false): Promise<EntregasDisponibles> {
+  const qs = todos ? '?todos=1' : ''
+  const res = await apiFetch<{ ok: boolean; data: EntregaDetalle[]; municipioBase: string | null }>(
+    `/repartidor/entregas/disponibles${qs}`,
+  )
+  return { items: res.data, municipioBase: res.municipioBase ?? null }
 }
 
 export async function tomarEntrega(id: number): Promise<EntregaDetalle> {

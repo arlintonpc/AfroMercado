@@ -52,12 +52,32 @@ const RepartidorController = {
 
   async disponibles(req, res, next) {
     try {
+      // Geo-filtro: por defecto el repartidor solo ve entregas cuyo comercio
+      // está en su municipio base (de su solicitud aprobada). Con ?todos=1 ve
+      // todas las zonas. Si no tiene municipio base, ve todas.
+      const verTodos = req.query.todos === "1" || req.query.todos === "true";
+      let municipioBase = null;
+      if (!verTodos) {
+        const sol = await prisma.solicitudRepartidor.findUnique({
+          where: { usuarioId: req.usuario.id },
+          select: { municipioBase: true, estado: true },
+        });
+        if (sol?.estado === "APROBADA" && sol.municipioBase?.trim()) {
+          municipioBase = sol.municipioBase.trim();
+        }
+      }
+
       const entregas = await prisma.entrega.findMany({
-        where: { repartidorId: null },
+        where: {
+          repartidorId: null,
+          ...(municipioBase
+            ? { subPedido: { comercio: { municipio: { equals: municipioBase, mode: "insensitive" } } } }
+            : {}),
+        },
         include: INCLUDE_ENTREGA,
         orderBy: { createdAt: "desc" },
       });
-      res.json({ ok: true, data: entregas });
+      res.json({ ok: true, data: entregas, municipioBase });
     } catch (err) {
       next(err);
     }
