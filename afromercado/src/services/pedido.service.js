@@ -31,7 +31,7 @@ function extraerDepartamentoDesdeDireccionTexto(direccionTexto) {
   return null;
 }
 
-async function calcularCostoEnvioServidor({ usuarioId, direccionId, departamento, itemsConPrecio }) {
+async function calcularCostoEnvioServidor({ usuarioId, direccionId, departamento, itemsConPrecio, subtotalGeneral = 0, subtotalesPorComercio = null }) {
   const pesoTotalKg = itemsConPrecio.reduce((acum, item) => {
     const pesoUnitario = item.producto.pesoKg != null ? Number(item.producto.pesoKg) : 1;
     const pesoSeguro = Number.isFinite(pesoUnitario) ? pesoUnitario : 1;
@@ -85,6 +85,29 @@ async function calcularCostoEnvioServidor({ usuarioId, direccionId, departamento
     throw new ErrorValidacion(
       "No hay envío disponible a este destino por ahora. Escríbenos al soporte para coordinarlo."
     );
+  }
+
+  // ── Envío gratis (híbrido, configurable) ───────────────────────
+  // Ya confirmamos que SÍ se puede entregar; ahora decidimos si es gratis.
+
+  // 1) Plataforma: campaña global de envío gratis sobre cierto monto (0 = off).
+  const umbralPlataforma = await Reglas.numero("envio_gratis_umbral_plataforma");
+  if (umbralPlataforma > 0 && subtotalGeneral >= umbralPlataforma) {
+    return 0;
+  }
+
+  // 2) Vendedor: cada tienda puede regalar el envío sobre su propio monto.
+  //    Aplica solo a pedidos de una sola tienda (el envío es consolidado).
+  const vendedorPermitido = await Reglas.bool("envio_gratis_vendedor_permitido");
+  if (vendedorPermitido && subtotalesPorComercio && subtotalesPorComercio.size === 1) {
+    const [[comercioId, subtotalComercio]] = subtotalesPorComercio;
+    const cfg = await prisma.config.findUnique({
+      where: { clave: `envio_gratis_comercio:${comercioId}` },
+    });
+    const umbralVendedor = cfg && cfg.valor ? Number(cfg.valor) : null;
+    if (umbralVendedor !== null && umbralVendedor > 0 && subtotalComercio >= umbralVendedor) {
+      return 0;
+    }
   }
 
   return Number(tarifa.precio);
@@ -208,6 +231,8 @@ const PedidoService = {
       direccionId,
       itemsConPrecio,
       departamento: departamentoEnvio,
+      subtotalGeneral,
+      subtotalesPorComercio,
     });
     const costoEnvioNum = costoEnvioCalculado ?? 0;
     let totalGeneral = subtotalGeneral + costoEnvioNum;

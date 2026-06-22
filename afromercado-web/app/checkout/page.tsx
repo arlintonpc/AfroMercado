@@ -11,6 +11,7 @@ import { precioVigente } from '@/lib/precioProducto'
 import { apiFetch } from '@/lib/api/client'
 import { listarDirecciones, crearDireccion } from '@/lib/api/direccion'
 import { validarCupon, type ResultadoCupon } from '@/lib/api/cupones'
+import { obtenerReglasPublicas } from '@/lib/api/config'
 import { useCarrito } from '@/context/CarritoContext'
 import { useAuth } from '@/context/AuthContext'
 import { agruparPorComercio } from '@/components/carrito/agrupar'
@@ -54,6 +55,7 @@ export default function PaginaCheckout() {
 
   const [costoEnvio, setCostoEnvio] = useState<number | null>(null)
   const [cargandoEnvio, setCargandoEnvio] = useState(false)
+  const [umbralEnvioGratis, setUmbralEnvioGratis] = useState(0)
 
   const grupos = useMemo(() => agruparPorComercio(items), [items])
 
@@ -132,8 +134,16 @@ export default function PaginaCheckout() {
     setCargandoEnvio(true)
     const t = setTimeout(async () => {
       try {
+        const ids = Object.keys(subtotalesPorComercio)
+        const qs = new URLSearchParams({
+          departamento: dep,
+          pesoKg: String(pesoTotalKg),
+          subtotal: String(subtotal),
+        })
+        // Solo un comercio → habilita evaluar envío gratis del vendedor.
+        if (ids.length === 1) qs.set('comercioId', ids[0])
         const res = await apiFetch<{ ok: boolean; data: { precio: number } }>(
-          `/envios/calcular?departamento=${encodeURIComponent(dep)}&pesoKg=${pesoTotalKg}`,
+          `/envios/calcular?${qs.toString()}`,
           { auth: false }
         )
         setCostoEnvio(res.data.precio)
@@ -144,7 +154,14 @@ export default function PaginaCheckout() {
       }
     }, 900)
     return () => clearTimeout(t)
-  }, [departamento, pesoTotalKg])
+  }, [departamento, pesoTotalKg, subtotal, subtotalesPorComercio])
+
+  // Umbral de envío gratis de plataforma (para el aviso "te faltan $X")
+  useEffect(() => {
+    obtenerReglasPublicas()
+      .then((r) => setUmbralEnvioGratis(r.envioGratisUmbralPlataforma))
+      .catch(() => {})
+  }, [])
 
   function seleccionarNueva() {
     setSelectedId(null)
@@ -548,18 +565,32 @@ export default function PaginaCheckout() {
                 </div>
               )}
 
-              <div className="flex justify-between text-sm text-[#1A1A1A]/70 mb-3">
+              <div className="flex justify-between text-sm text-[#1A1A1A]/70 mb-1">
                 <span>Envío estimado</span>
                 <span>
                   {cargandoEnvio
                     ? '…'
                     : costoEnvio !== null
-                    ? formatearPrecio(costoEnvio)
+                    ? (costoEnvio === 0
+                        ? <span className="font-bold text-[#2D6A4F]">¡Gratis! 🎉</span>
+                        : formatearPrecio(costoEnvio))
                     : departamento.trim()
                     ? 'Sin tarifa'
                     : 'Ingresa departamento'}
                 </span>
               </div>
+
+              {/* Aviso de envío gratis de plataforma */}
+              {umbralEnvioGratis > 0 && costoEnvio !== 0 && subtotal < umbralEnvioGratis && (
+                <p className="text-xs text-[#9B7300] mb-3">
+                  Te faltan {formatearPrecio(umbralEnvioGratis - subtotal)} para envío gratis.
+                </p>
+              )}
+              {umbralEnvioGratis > 0 && costoEnvio !== 0 && subtotal >= umbralEnvioGratis && (
+                <p className="text-xs text-[#2D6A4F] mb-3">
+                  ¡Tu compra califica para envío gratis!
+                </p>
+              )}
 
               <div className="flex justify-between items-baseline mb-4">
                 <span className="font-semibold text-[#1A1A1A]">Total</span>

@@ -11,6 +11,15 @@ const CAMPOS_EDITABLES = ["nombre", "descripcion", "municipio", "historia", "wha
 
 const TIPOS_DOCUMENTO_VALIDOS = ["CC", "TI", "CE", "PEP", "PASAPORTE", "NIT"];
 
+// Envío gratis del vendedor: se guarda en la tabla Config por comercio
+// (clave `envio_gratis_comercio:<id>`), evitando una migración de esquema.
+const claveEnvioGratis = (comercioId) => `envio_gratis_comercio:${comercioId}`;
+
+async function leerEnvioGratis(comercioId) {
+  const row = await prisma.config.findUnique({ where: { clave: claveEnvioGratis(comercioId) } });
+  return row && row.valor ? Number(row.valor) : null;
+}
+
 const ComercioService = {
   async registrar(usuarioId, datos) {
     const { nombre, municipio } = datos;
@@ -78,7 +87,8 @@ const ComercioService = {
     if (!comercio) {
       throw new ErrorNoEncontrado("No tienes un comercio registrado");
     }
-    return comercio;
+    const envioGratisDesde = await leerEnvioGratis(comercio.id);
+    return { ...comercio, envioGratisDesde };
   },
 
   async obtenerPorId(id) {
@@ -100,11 +110,39 @@ const ComercioService = {
       if (datos[campo] !== undefined) cambios[campo] = datos[campo];
     }
 
+    // Envío gratis del vendedor: monto mínimo (0 / vacío / null = desactivado).
+    // Se guarda en Config por comercio (sin migración). Si la plataforma tiene
+    // la regla desactivada, el valor se guarda pero no surte efecto hasta que el
+    // admin la habilite (lo respeta el cálculo de envío).
+    let tocoEnvioGratis = false;
+    if (datos.envioGratisDesde !== undefined) {
+      const v = datos.envioGratisDesde;
+      const n = v === null || v === "" ? null : Number(v);
+      if (n !== null && (!Number.isFinite(n) || n < 0)) {
+        throw new ErrorValidacion("El monto de envío gratis no es válido.");
+      }
+      const clave = claveEnvioGratis(comercio.id);
+      if (n === null || n === 0) {
+        await prisma.config.deleteMany({ where: { clave } });
+      } else {
+        await prisma.config.upsert({
+          where: { clave },
+          create: { clave, valor: String(n) },
+          update: { valor: String(n) },
+        });
+      }
+      tocoEnvioGratis = true;
+    }
+
     if (Object.keys(cambios).length === 0) {
+      if (tocoEnvioGratis) {
+        return { ...comercio, envioGratisDesde: await leerEnvioGratis(comercio.id) };
+      }
       throw new ErrorValidacion("No se enviaron campos válidos para actualizar");
     }
 
-    return ComercioRepository.actualizar(comercio.id, cambios);
+    const actualizado = await ComercioRepository.actualizar(comercio.id, cambios);
+    return { ...actualizado, envioGratisDesde: await leerEnvioGratis(comercio.id) };
   },
 };
 

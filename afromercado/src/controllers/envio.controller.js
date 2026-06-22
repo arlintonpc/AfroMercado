@@ -1,4 +1,5 @@
 const prisma = require("../config/prisma");
+const Reglas = require("../config/reglas");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 
 const EnvioController = {
@@ -39,10 +40,42 @@ const EnvioController = {
         );
       }
 
+      // ── Envío gratis (híbrido, configurable) ─────────────────
+      // Si el front envía el subtotal (y el comercio, en pedidos de una sola
+      // tienda), aplicamos las mismas reglas que el checkout para que lo que se
+      // muestra coincida con lo que se cobra. El estimador del producto no envía
+      // subtotal, así que ahí siempre se ve la tarifa base.
+      let precio = Number(tarifa.precio);
+      let gratis = false;
+      let motivo = null;
+      const subtotal = req.query.subtotal != null ? Number(req.query.subtotal) : null;
+      const comercioId = req.query.comercioId != null ? Number(req.query.comercioId) : null;
+
+      if (subtotal != null && Number.isFinite(subtotal) && subtotal > 0) {
+        const umbralPlataforma = await Reglas.numero("envio_gratis_umbral_plataforma");
+        if (umbralPlataforma > 0 && subtotal >= umbralPlataforma) {
+          precio = 0; gratis = true; motivo = "plataforma";
+        }
+        if (!gratis && comercioId) {
+          const vendedorPermitido = await Reglas.bool("envio_gratis_vendedor_permitido");
+          if (vendedorPermitido) {
+            const cfg = await prisma.config.findUnique({
+              where: { clave: `envio_gratis_comercio:${comercioId}` },
+            });
+            const umbral = cfg && cfg.valor ? Number(cfg.valor) : null;
+            if (umbral !== null && umbral > 0 && subtotal >= umbral) {
+              precio = 0; gratis = true; motivo = "vendedor";
+            }
+          }
+        }
+      }
+
       res.json({
         ok: true,
         data: {
-          precio: Number(tarifa.precio),
+          precio,
+          gratis,
+          motivo,
           departamento: tarifa.departamento,
           pesoKg: peso,
           tarifa: {

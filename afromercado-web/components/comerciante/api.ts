@@ -37,6 +37,8 @@ export interface Comercio {
   fotoDocumentoUrl?: string | null
   whatsappVisible?: boolean
   vereda?: string | null
+  /** Monto mínimo para envío gratis de esta tienda (null = desactivado). */
+  envioGratisDesde?: string | number | null
 }
 
 /** Producto propio del comerciante (forma de /productos/mis/productos). */
@@ -81,6 +83,8 @@ export interface DatosComercio {
   vereda?: string
   logoUrl?: string
   fotoDocumentoUrl?: string
+  /** Monto mínimo para envío gratis de la tienda (null/0 = desactivado). */
+  envioGratisDesde?: number | null
 }
 
 export interface DatosProducto {

@@ -12,6 +12,7 @@ import {
   type Comercio,
   type TipoDocumento,
 } from '@/components/comerciante/api'
+import { obtenerReglasPublicas } from '@/lib/api/config'
 
 const TIPOS_DOCUMENTO: { valor: TipoDocumento; etiqueta: string }[] = [
   { valor: 'CC',        etiqueta: 'Cédula de Ciudadanía (CC)' },
@@ -33,6 +34,8 @@ export default function PerfilComerciantePage() {
   const [whatsapp, setWhatsapp] = useState('')
   const [vereda, setVereda] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
+  const [envioGratisDesde, setEnvioGratisDesde] = useState('')
+  const [envioGratisPermitido, setEnvioGratisPermitido] = useState(false)
 
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [guardando, setGuardando] = useState(false)
@@ -57,9 +60,16 @@ export default function PerfilComerciantePage() {
         setLogoUrl(c.logoUrl ?? '')
         setFotoDocumentoUrl(c.fotoDocumentoUrl ?? null)
         setVereda(c.vereda ?? '')
+        setEnvioGratisDesde(c.envioGratisDesde != null ? String(Number(c.envioGratisDesde)) : '')
       })
       .catch(() => {})
       .finally(() => setCargando(false))
+  }, [])
+
+  useEffect(() => {
+    obtenerReglasPublicas()
+      .then((r) => setEnvioGratisPermitido(r.envioGratisVendedorPermitido))
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -93,6 +103,9 @@ export default function PerfilComerciantePage() {
         whatsapp: whatsapp.replace(/\D/g, '') || undefined,
         vereda: vereda.trim() || undefined,
         logoUrl: logoUrl.trim() || undefined,
+        ...(envioGratisPermitido
+          ? { envioGratisDesde: envioGratisDesde.trim() ? Number(envioGratisDesde) : null }
+          : {}),
       })
       setComercio(actualizado)
       setAviso({ tipo: 'exito', texto: 'Datos guardados correctamente.' })
@@ -236,6 +249,19 @@ export default function PerfilComerciantePage() {
           onChange={setLogoUrl}
           hint="Opcional. Enlace directo a la imagen de tu logo."
         />
+
+        {envioGratisPermitido && (
+          <CampoTexto
+            label="Envío gratis desde ($)"
+            name="envioGratisDesde"
+            type="tel"
+            inputMode="numeric"
+            placeholder="Ej: 80000"
+            value={envioGratisDesde}
+            onChange={(v) => setEnvioGratisDesde(v.replace(/\D/g, ''))}
+            hint="Opcional. Si el pedido de tu tienda supera este monto, el envío sale gratis. Déjalo vacío para desactivarlo."
+          />
+        )}
 
         <Button type="submit" loading={guardando} className="w-full">
           Guardar cambios
