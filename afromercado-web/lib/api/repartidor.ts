@@ -68,21 +68,31 @@ export async function actualizarEstadoEntrega(
   return res.data
 }
 
-/** Sube la foto de prueba de entrega (multipart, campo "foto"). Devuelve la URL. */
-export async function subirFotoEntrega(id: number, file: File): Promise<string> {
+/** Sube una imagen al backend (multipart, campo "foto") y devuelve su URL. */
+async function subirImagen(endpoint: string, file: File): Promise<string> {
   const fd = new FormData()
   fd.append('foto', file)
   const token = obtenerToken()
-  const res = await fetch(`${API_URL}/repartidor/entregas/${id}/foto`, {
+  const res = await fetch(`${API_URL}${endpoint}`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: fd,
   })
   if (!res.ok) {
-    let msg = 'No se pudo subir la foto.'
+    let msg = 'No se pudo subir la imagen.'
     try { const j = await res.json(); if (j?.error) msg = j.error; else if (j?.mensaje) msg = j.mensaje } catch { /* sin cuerpo */ }
     throw new Error(msg)
   }
   const j = await res.json()
   return j.url
+}
+
+/** Sube la foto de prueba de entrega. Devuelve la URL. */
+export function subirFotoEntrega(id: number, file: File): Promise<string> {
+  return subirImagen(`/repartidor/entregas/${id}/foto`, file)
+}
+
+/** Sube un documento de la solicitud de repartidor (cédula, matrícula, etc.). */
+export function subirDocumentoSolicitud(file: File): Promise<string> {
+  return subirImagen('/repartidor/solicitud/foto', file)
 }

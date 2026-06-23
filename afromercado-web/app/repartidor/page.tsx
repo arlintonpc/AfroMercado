@@ -682,15 +682,31 @@ export default function PanelRepartidorPage() {
               />
             </svg>
             <p className="text-base font-semibold text-[#1A1A1A]/40">
-              No hay entregas disponibles
+              {!verTodasZonas && municipioBase
+                ? `No hay entregas en ${municipioBase}`
+                : 'No hay entregas disponibles'}
             </p>
-            <p className="mt-1 text-sm text-[#1A1A1A]/30">Vuelve a revisar más tarde.</p>
-            <button
-              onClick={cargarDatos}
-              className="mt-4 rounded-xl border border-[#1A1A1A]/15 bg-white text-[#1A1A1A]/70 font-semibold px-5 py-2.5 text-sm hover:border-[#2D6A4F]/30 transition-colors"
-            >
-              Actualizar
-            </button>
+            <p className="mt-1 text-sm text-[#1A1A1A]/30">
+              {!verTodasZonas && municipioBase
+                ? 'Quizá haya entregas en otras zonas.'
+                : 'Vuelve a revisar más tarde.'}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {!verTodasZonas && municipioBase && (
+                <button
+                  onClick={() => setVerTodasZonas(true)}
+                  className="rounded-xl bg-[#2D6A4F] hover:bg-[#245a42] text-white font-semibold px-5 py-2.5 text-sm transition-colors"
+                >
+                  Ver todas las zonas
+                </button>
+              )}
+              <button
+                onClick={cargarDatos}
+                className="rounded-xl border border-[#1A1A1A]/15 bg-white text-[#1A1A1A]/70 font-semibold px-5 py-2.5 text-sm hover:border-[#2D6A4F]/30 transition-colors"
+              >
+                Actualizar
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col gap-4">

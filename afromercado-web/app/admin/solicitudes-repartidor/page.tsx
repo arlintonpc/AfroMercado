@@ -19,6 +19,7 @@ interface SolicitudAdmin {
   municipioBase?: string
   fotoVehiculoUrl: string | null
   fotoLicenciaUrl: string | null
+  documentos?: Record<string, string> | null
   notasAdmin: string | null
   revisadoAt: string | null
   createdAt: string
@@ -33,6 +34,16 @@ function fmtFecha(iso: string) {
 
 const TIPO_EMOJI: Record<string, string> = {
   MOTO: '🏍️', BICICLETA: '🚲', CARRO: '🚗', CAMIONETA: '🚙', TRICIMOTO: '🛺',
+}
+
+const DOC_LABELS: Record<string, string> = {
+  cedulaFrente: 'Cédula (frente)',
+  cedulaReverso: 'Cédula (reverso)',
+  selfie: 'Selfie',
+  licenciaFoto: 'Licencia',
+  matriculaFrente: 'Matrícula (frente)',
+  matriculaReverso: 'Matrícula (reverso)',
+  soat: 'SOAT',
 }
 
 const ESTADO_BADGE: Record<string, string> = {
@@ -152,6 +163,29 @@ function ModalRevisar({
               <div className="rounded-xl bg-[#F8F5F0] px-4 py-3 text-sm">
                 <p className="font-semibold text-[#1A1A1A]">{solicitud.municipioBase}</p>
               </div>
+            </section>
+          )}
+
+          {/* Documentos */}
+          {solicitud.documentos && Object.values(solicitud.documentos).some(Boolean) && (
+            <section>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#1A1A1A]/40 mb-2">Documentos</p>
+              <div className="grid grid-cols-3 gap-2">
+                {Object.entries(solicitud.documentos).map(([k, url]) =>
+                  url ? (
+                    <a key={k} href={url} target="_blank" rel="noopener noreferrer" className="block">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt={DOC_LABELS[k] ?? k}
+                        className="h-24 w-full rounded-lg border border-[#1A1A1A]/10 object-cover"
+                      />
+                      <p className="mt-1 text-center text-[11px] text-[#1A1A1A]/55">{DOC_LABELS[k] ?? k}</p>
+                    </a>
+                  ) : null,
+                )}
+              </div>
+              <p className="mt-1 text-xs text-[#1A1A1A]/35">Toca una imagen para verla en grande.</p>
             </section>
           )}
 

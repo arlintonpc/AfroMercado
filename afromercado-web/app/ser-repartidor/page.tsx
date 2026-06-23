@@ -7,6 +7,7 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { Button } from '@/components/ui/Button'
 import { apiFetch } from '@/lib/api/client'
+import { subirDocumentoSolicitud } from '@/lib/api/repartidor'
 import { useAuth } from '@/context/AuthContext'
 import { MUNICIPIOS_CHOCO } from '@/components/comerciante/constantes'
 
@@ -22,6 +23,59 @@ interface Solicitud {
   vehiculoAnio: number
   notasAdmin: string | null
   createdAt: string
+  documentos?: Record<string, string> | null
+}
+
+// Tipos de vehículo motorizados (requieren licencia, matrícula y SOAT).
+const esMotorizado = (t: string) => t !== '' && t !== 'BICICLETA'
+
+// Campo reutilizable para subir un documento (con foto/cámara).
+function SubidorDoc({
+  etiqueta, hint, valor, subiendo, requerido, error, onArchivo,
+}: {
+  etiqueta: string
+  hint?: string
+  valor?: string
+  subiendo: boolean
+  requerido?: boolean
+  error?: string
+  onArchivo: (file: File) => void
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-[#1A1A1A]">
+        {etiqueta}{requerido && <span className="text-red-500"> *</span>}
+      </label>
+      <label
+        className={`flex cursor-pointer items-center gap-3 rounded-xl border border-dashed p-3 transition-colors hover:border-[#2D6A4F]/50 ${
+          error ? 'border-red-400' : 'border-[#1A1A1A]/20'
+        }`}
+      >
+        {valor ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={valor} alt={etiqueta} className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+        ) : (
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-[#F0EBE3] text-2xl">📷</span>
+        )}
+        <span className="text-sm font-medium text-[#2D6A4F]">
+          {subiendo ? 'Subiendo…' : valor ? 'Cambiar imagen' : 'Subir imagen'}
+        </span>
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          disabled={subiendo}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) onArchivo(f) }}
+        />
+      </label>
+      {error ? (
+        <p className="mt-1 text-xs text-red-600">{error}</p>
+      ) : hint ? (
+        <p className="mt-1 text-xs text-[#1A1A1A]/40">{hint}</p>
+      ) : null}
+    </div>
+  )
 }
 
 const TIPOS_VEHICULO = [
@@ -115,6 +169,8 @@ export default function SerRepartidorPage() {
   const [anio, setAnio]               = useState('')
   const [licencia, setLicencia]       = useState('')
   const [municipioBase, setMunicipioBase] = useState('')
+  const [docs, setDocs]               = useState<Record<string, string>>({})
+  const [subiendoDoc, setSubiendoDoc] = useState<string | null>(null)
 
   const [errores, setErrores]         = useState<Record<string, string>>({})
   const [errorGen, setErrorGen]       = useState<string | null>(null)
@@ -130,10 +186,27 @@ export default function SerRepartidorPage() {
   useEffect(() => {
     if (cargandoAuth || !autenticado) return
     apiFetch<{ ok: boolean; data: Solicitud | null }>('/repartidor/mi-solicitud')
-      .then((res) => setSolicitudExistente(res.data))
+      .then((res) => {
+        setSolicitudExistente(res.data)
+        if (res.data?.documentos) setDocs(res.data.documentos)
+      })
       .catch(() => setSolicitudExistente(null))
       .finally(() => setCargando(false))
   }, [cargandoAuth, autenticado])
+
+  async function handleDoc(clave: string, file: File) {
+    setSubiendoDoc(clave)
+    setErrorGen(null)
+    try {
+      const url = await subirDocumentoSolicitud(file)
+      setDocs((d) => ({ ...d, [clave]: url }))
+      setErrores((e) => { const n = { ...e }; delete n[clave]; return n })
+    } catch (err) {
+      setErrorGen(err instanceof Error ? err.message : 'No se pudo subir la imagen.')
+    } finally {
+      setSubiendoDoc(null)
+    }
+  }
 
   function validar(): boolean {
     const e: Record<string, string> = {}
@@ -147,6 +220,14 @@ export default function SerRepartidorPage() {
       e.anio = 'Año inválido.'
     if (!licencia.trim()) e.licencia = 'Escribe el número de licencia.'
     if (!municipioBase) e.municipioBase = 'Indica tu municipio de operación principal.'
+    // Documentos
+    if (!docs.cedulaFrente)  e.cedulaFrente  = 'Sube la foto de tu cédula (frente).'
+    if (!docs.cedulaReverso) e.cedulaReverso = 'Sube la foto de tu cédula (reverso).'
+    if (esMotorizado(tipo)) {
+      if (!docs.licenciaFoto)     e.licenciaFoto     = 'Sube la foto de tu licencia.'
+      if (!docs.matriculaFrente)  e.matriculaFrente  = 'Sube la matrícula (frente).'
+      if (!docs.matriculaReverso) e.matriculaReverso = 'Sube la matrícula (reverso).'
+    }
     setErrores(e)
     return Object.keys(e).length === 0
   }
@@ -163,6 +244,7 @@ export default function SerRepartidorPage() {
           vehiculoTipo: tipo, vehiculoMarca: marca, vehiculoModelo: modelo,
           vehiculoColor: color, vehiculoPlaca: placa, vehiculoAnio: parseInt(anio),
           licenciaNumero: licencia, municipioBase,
+          documentos: docs,
         },
       })
       setSolicitudExistente(res.data)
@@ -336,6 +418,61 @@ export default function SerRepartidorPage() {
                     ))}
                   </select>
                   {errores.municipioBase && <p className="mt-1 text-xs text-red-600">{errores.municipioBase}</p>}
+                </div>
+              </div>
+
+              {/* Documentos */}
+              <div className="border-t border-[#1A1A1A]/8 pt-4">
+                <h2 className="text-lg font-bold text-[#1A1A1A] mb-1">Documentos</h2>
+                <p className="text-xs text-[#1A1A1A]/50 mb-4">
+                  Sube fotos claras y legibles. Las usamos solo para verificar tu identidad y tu vehículo.
+                </p>
+                <div className="flex flex-col gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <SubidorDoc
+                      etiqueta="Cédula (frente)" requerido valor={docs.cedulaFrente}
+                      subiendo={subiendoDoc === 'cedulaFrente'} error={errores.cedulaFrente}
+                      onArchivo={(f) => handleDoc('cedulaFrente', f)}
+                    />
+                    <SubidorDoc
+                      etiqueta="Cédula (reverso)" requerido valor={docs.cedulaReverso}
+                      subiendo={subiendoDoc === 'cedulaReverso'} error={errores.cedulaReverso}
+                      onArchivo={(f) => handleDoc('cedulaReverso', f)}
+                    />
+                  </div>
+
+                  <SubidorDoc
+                    etiqueta="Foto tuya (selfie)" hint="Opcional. Ayuda a confirmar tu identidad."
+                    valor={docs.selfie} subiendo={subiendoDoc === 'selfie'}
+                    onArchivo={(f) => handleDoc('selfie', f)}
+                  />
+
+                  {esMotorizado(tipo) && (
+                    <>
+                      <SubidorDoc
+                        etiqueta="Licencia de conducción (foto)" requerido valor={docs.licenciaFoto}
+                        subiendo={subiendoDoc === 'licenciaFoto'} error={errores.licenciaFoto}
+                        onArchivo={(f) => handleDoc('licenciaFoto', f)}
+                      />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <SubidorDoc
+                          etiqueta="Tarjeta de propiedad / matrícula (frente)" requerido valor={docs.matriculaFrente}
+                          subiendo={subiendoDoc === 'matriculaFrente'} error={errores.matriculaFrente}
+                          onArchivo={(f) => handleDoc('matriculaFrente', f)}
+                        />
+                        <SubidorDoc
+                          etiqueta="Tarjeta de propiedad / matrícula (reverso)" requerido valor={docs.matriculaReverso}
+                          subiendo={subiendoDoc === 'matriculaReverso'} error={errores.matriculaReverso}
+                          onArchivo={(f) => handleDoc('matriculaReverso', f)}
+                        />
+                      </div>
+                      <SubidorDoc
+                        etiqueta="SOAT vigente" hint="Recomendado. Seguro obligatorio del vehículo."
+                        valor={docs.soat} subiendo={subiendoDoc === 'soat'}
+                        onArchivo={(f) => handleDoc('soat', f)}
+                      />
+                    </>
+                  )}
                 </div>
               </div>
 

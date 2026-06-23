@@ -24,6 +24,25 @@ const _uploadFoto = multer({
 
 const claveFoto = (id) => `entrega:${id}:foto`;
 
+// Documentos de la solicitud de repartidor (cédula, matrícula, etc.) se guardan
+// como JSON en Config por usuario, evitando una migración de esquema.
+const claveDocs = (usuarioId) => `repartidor_docs:${usuarioId}`;
+
+const DIR_REP = path.join(__dirname, "..", "..", "uploads", "repartidores");
+fs.mkdirSync(DIR_REP, { recursive: true });
+
+const _uploadDoc = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, DIR_REP),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+      cb(null, `rep_${req.usuario.id}_${Date.now()}_${Math.round(Math.random() * 1e4)}${ext}`);
+    },
+  }),
+  fileFilter: (req, file, cb) => cb(null, file.mimetype.startsWith("image/")),
+  limits: { fileSize: 6 * 1024 * 1024 },
+}).single("foto");
+
 /** Pago al repartidor por una entrega, según el Centro de Reglas. */
 function calcularPagoEntrega(entrega, modo, valor) {
   if (modo === "porcentaje_envio") {
@@ -327,7 +346,7 @@ const RepartidorController = {
       const {
         vehiculoTipo, vehiculoMarca, vehiculoModelo, vehiculoColor,
         vehiculoPlaca, vehiculoAnio, licenciaNumero,
-        fotoVehiculoUrl, fotoLicenciaUrl, municipioBase,
+        fotoVehiculoUrl, fotoLicenciaUrl, municipioBase, documentos,
       } = req.body;
 
       const TIPOS_VALIDOS = ["MOTO", "BICICLETA", "CARRO", "CAMIONETA", "TRICIMOTO"];
@@ -341,6 +360,15 @@ const RepartidorController = {
       if (!anio || anio < 1990 || anio > new Date().getFullYear() + 1)
         throw new ErrorValidacion("Año del vehículo inválido");
       if (!licenciaNumero?.trim()) throw new ErrorValidacion("El número de licencia es requerido");
+
+      // Documentos (cédula, matrícula, licencia, SOAT, etc.) → Config por usuario.
+      if (documentos && typeof documentos === "object") {
+        await prisma.config.upsert({
+          where: { clave: claveDocs(usuarioId) },
+          create: { clave: claveDocs(usuarioId), valor: JSON.stringify(documentos) },
+          update: { valor: JSON.stringify(documentos) },
+        });
+      }
 
       const existente = await prisma.solicitudRepartidor.findUnique({ where: { usuarioId } });
       if (existente) {
@@ -410,7 +438,25 @@ const RepartidorController = {
       const solicitud = await prisma.solicitudRepartidor.findUnique({
         where: { usuarioId: req.usuario.id },
       });
-      res.json({ ok: true, data: solicitud ?? null });
+      let documentos = null;
+      const docsRow = await prisma.config.findUnique({ where: { clave: claveDocs(req.usuario.id) } });
+      if (docsRow?.valor) { try { documentos = JSON.parse(docsRow.valor); } catch { /* noop */ } }
+      res.json({ ok: true, data: solicitud ? { ...solicitud, documentos } : null });
+    } catch (err) { next(err); }
+  },
+
+  // Middleware multer (campo "foto") para subir un documento de la solicitud.
+  uploadDocSolicitud: _uploadDoc,
+
+  // POST /repartidor/solicitud/foto — sube un documento (cédula, matrícula, etc.)
+  async subirDocSolicitud(req, res, next) {
+    try {
+      if (!req.file) throw new ErrorValidacion("Adjunta la imagen (campo 'foto')");
+      const cloud = await subirACloudinary(req.file.path, "afromercado/repartidores");
+      const url = cloud
+        ? (() => { try { fs.unlinkSync(req.file.path); } catch { /* noop */ } return cloud; })()
+        : `${req.protocol}://${req.get("host")}/uploads/repartidores/${req.file.filename}`;
+      res.json({ ok: true, url });
     } catch (err) { next(err); }
   },
 

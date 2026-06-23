@@ -464,7 +464,20 @@ const AdminController = {
         },
         orderBy: { createdAt: "desc" },
       });
-      res.json({ ok: true, data });
+      // Adjuntar los documentos (cédula, matrícula, etc.) guardados en Config.
+      const claves = data.map((s) => `repartidor_docs:${s.usuarioId}`);
+      const rows = claves.length
+        ? await prisma.config.findMany({ where: { clave: { in: claves } } })
+        : [];
+      const mapaDocs = {};
+      for (const r of rows) {
+        try { mapaDocs[r.clave] = JSON.parse(r.valor); } catch { mapaDocs[r.clave] = null; }
+      }
+      const conDocs = data.map((s) => ({
+        ...s,
+        documentos: mapaDocs[`repartidor_docs:${s.usuarioId}`] ?? null,
+      }));
+      res.json({ ok: true, data: conDocs });
     } catch (e) { next(e); }
   },
 

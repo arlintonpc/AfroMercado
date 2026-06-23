@@ -16,5 +16,6 @@ router.patch("/admin/entregas/:id/asignar", autenticar, autorizar("ADMIN"), Repa
 // Solicitud para ser repartidor (cualquier usuario autenticado)
 router.post("/solicitar",   autenticar, RepartidorController.enviarSolicitud);
 router.get("/mi-solicitud", autenticar, RepartidorController.miSolicitud);
+router.post("/solicitud/foto", autenticar, RepartidorController.uploadDocSolicitud, RepartidorController.subirDocSolicitud);
 
 module.exports = router;
