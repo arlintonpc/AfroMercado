@@ -9,8 +9,10 @@ import {
   historialEntregas,
   tomarEntrega,
   actualizarEstadoEntrega,
+  subirFotoEntrega,
   type EntregaDetalle,
 } from '@/lib/api/repartidor'
+import { formatearPrecio } from '@/lib/formatearPrecio'
 
 // ── Utilidades ────────────────────────────────────────────────
 
@@ -78,12 +80,16 @@ function TarjetaEntrega({
   onAvanzar,
   onFallida,
   onTomar,
+  onSubirFoto,
+  subiendoFotoId,
   cargandoAccion,
 }: {
   entrega: EntregaDetalle
   onAvanzar?: (id: number, estado: string) => Promise<void>
   onFallida?: (id: number) => Promise<void>
   onTomar?: (id: number) => Promise<void>
+  onSubirFoto?: (id: number, file: File) => void
+  subiendoFotoId?: number | null
   cargandoAccion: number | null
 }) {
   const { subPedido } = entrega
@@ -166,6 +172,42 @@ function TarjetaEntrega({
         <p className="text-sm text-[#1A1A1A]/55 italic">Nota: {entrega.notas}</p>
       )}
 
+      {/* Pago al repartidor */}
+      {typeof entrega.pagoRepartidor === 'number' && entrega.pagoRepartidor > 0 && (
+        <p className="text-sm font-semibold text-[#2D6A4F]">
+          💵 Pago por esta entrega: {formatearPrecio(entrega.pagoRepartidor)}
+        </p>
+      )}
+
+      {/* Foto de prueba de entrega (en el paso "En camino") */}
+      {onSubirFoto && entrega.estado === 'EN_CAMINO' && (
+        <div className="rounded-xl border border-dashed border-[#1A1A1A]/15 p-3">
+          {entrega.fotoEntrega ? (
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={entrega.fotoEntrega} alt="Prueba de entrega" className="h-16 w-16 rounded-lg object-cover" />
+              <span className="text-sm font-medium text-[#2D6A4F]">✓ Foto adjunta</span>
+            </div>
+          ) : (
+            <label className="flex cursor-pointer flex-col gap-1">
+              <span className="text-sm font-semibold text-[#1A1A1A]">📷 Foto de entrega (recomendado)</span>
+              <span className="text-xs text-[#1A1A1A]/50">Tómale una foto al pedido entregado antes de marcarlo.</span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                disabled={subiendoFotoId === entrega.id}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) onSubirFoto(entrega.id, f) }}
+              />
+              <span className="mt-1 inline-flex w-fit rounded-lg border border-[#2D6A4F]/30 bg-[#52B788]/8 px-3 py-1.5 text-sm font-semibold text-[#2D6A4F]">
+                {subiendoFotoId === entrega.id ? 'Subiendo…' : 'Adjuntar foto'}
+              </span>
+            </label>
+          )}
+        </div>
+      )}
+
       {/* Acciones */}
       {onTomar && (
         <button
@@ -216,6 +258,7 @@ export default function PanelRepartidorPage() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cargandoAccion, setCargandoAccion] = useState<number | null>(null)
+  const [subiendoFotoId, setSubiendoFotoId] = useState<number | null>(null)
   const [mensajeExito, setMensajeExito] = useState<string | null>(null)
 
   // Auth guard — la protección de rol la hace el layout; aquí solo redirigimos
@@ -263,9 +306,15 @@ export default function PanelRepartidorPage() {
     try {
       const actualizada = await actualizarEstadoEntrega(id, estado)
       if (!estaActiva(actualizada.estado)) {
-        // Pasó a estado terminal: sacar de activas y agregar al historial
+        // Pasó a estado terminal: conservar pago/foto y mover al historial
+        const previo = misEntregasList.find((e) => e.id === id)
+        const conExtras = {
+          ...actualizada,
+          pagoRepartidor: previo?.pagoRepartidor,
+          fotoEntrega: previo?.fotoEntrega,
+        }
         setMisEntregasList((prev) => prev.filter((e) => e.id !== id))
-        setHistorialList((prev) => [actualizada, ...prev])
+        setHistorialList((prev) => [conExtras, ...prev])
       } else {
         setMisEntregasList((prev) =>
           prev.map((e) => (e.id === id ? actualizada : e))
@@ -305,6 +354,19 @@ export default function PanelRepartidorPage() {
       setError(err instanceof Error ? err.message : 'No se pudo tomar la entrega.')
     } finally {
       setCargandoAccion(null)
+    }
+  }
+
+  async function handleSubirFoto(id: number, file: File) {
+    setSubiendoFotoId(id)
+    try {
+      const url = await subirFotoEntrega(id, file)
+      setMisEntregasList((prev) => prev.map((e) => (e.id === id ? { ...e, fotoEntrega: url } : e)))
+      mostrarExito('Foto de entrega adjunta')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo subir la foto.')
+    } finally {
+      setSubiendoFotoId(null)
     }
   }
 
@@ -462,6 +524,9 @@ export default function PanelRepartidorPage() {
           (() => {
             const totalEntregadas = historialList.filter((e) => e.estado === 'ENTREGADA').length
             const totalFallidas = historialList.filter((e) => e.estado === 'FALLIDA').length
+            const totalGanado = historialList
+              .filter((e) => e.estado === 'ENTREGADA')
+              .reduce((s, e) => s + (e.pagoRepartidor ?? 0), 0)
             return historialList.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-[#1A1A1A]/8 bg-white py-14 text-center">
                 <svg
@@ -488,17 +553,23 @@ export default function PanelRepartidorPage() {
             ) : (
               <div className="flex flex-col gap-4">
                 {/* Resumen */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-[#52B788]/25 bg-[#52B788]/8 px-4 py-4 text-center">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-2xl border border-[#52B788]/25 bg-[#52B788]/8 px-3 py-4 text-center">
                     <p className="text-2xl font-bold text-[#2D6A4F]">{totalEntregadas}</p>
                     <p className="mt-0.5 text-xs font-semibold text-[#2D6A4F]/70 uppercase tracking-wide">
                       Entregadas
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-center">
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-4 text-center">
                     <p className="text-2xl font-bold text-red-600">{totalFallidas}</p>
                     <p className="mt-0.5 text-xs font-semibold text-red-400 uppercase tracking-wide">
                       Fallidas
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-[#D4A017]/30 bg-[#D4A017]/8 px-3 py-4 text-center">
+                    <p className="text-lg font-bold text-[#9B7300] leading-tight">{formatearPrecio(totalGanado)}</p>
+                    <p className="mt-0.5 text-xs font-semibold text-[#9B7300]/70 uppercase tracking-wide">
+                      Ganado
                     </p>
                   </div>
                 </div>
@@ -513,6 +584,14 @@ export default function PanelRepartidorPage() {
                   <ul className="divide-y divide-[#1A1A1A]/5">
                     {historialList.map((e) => (
                       <li key={e.id} className="flex items-start gap-3 px-4 py-3">
+                        {e.fotoEntrega && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={e.fotoEntrega}
+                            alt="Prueba de entrega"
+                            className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                          />
+                        )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <p className="text-xs text-[#1A1A1A]/40 font-medium">
@@ -526,7 +605,12 @@ export default function PanelRepartidorPage() {
                             {e.subPedido.pedido.direccionTexto}
                           </p>
                         </div>
-                        <BadgeEstado estado={e.estado} />
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <BadgeEstado estado={e.estado} />
+                          {e.estado === 'ENTREGADA' && typeof e.pagoRepartidor === 'number' && e.pagoRepartidor > 0 && (
+                            <span className="text-xs font-semibold text-[#2D6A4F]">{formatearPrecio(e.pagoRepartidor)}</span>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -572,6 +656,8 @@ export default function PanelRepartidorPage() {
                   entrega={e}
                   onAvanzar={handleAvanzar}
                   onFallida={handleFallida}
+                  onSubirFoto={handleSubirFoto}
+                  subiendoFotoId={subiendoFotoId}
                   cargandoAccion={cargandoAccion}
                 />
               ))}

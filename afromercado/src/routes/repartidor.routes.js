@@ -8,6 +8,7 @@ router.get("/entregas", autenticar, autorizar("REPARTIDOR"), RepartidorControlle
 router.get("/entregas/disponibles", autenticar, autorizar("REPARTIDOR"), RepartidorController.disponibles);
 router.patch("/entregas/:id/tomar", autenticar, autorizar("REPARTIDOR"), RepartidorController.tomar);
 router.patch("/entregas/:id/estado", autenticar, autorizar("REPARTIDOR"), RepartidorController.actualizarEstado);
+router.post("/entregas/:id/foto", autenticar, autorizar("REPARTIDOR"), RepartidorController.uploadFotoEntrega, RepartidorController.subirFotoEntrega);
 
 router.get("/admin/entregas", autenticar, autorizar("ADMIN"), RepartidorController.listarAdmin);
 router.patch("/admin/entregas/:id/asignar", autenticar, autorizar("ADMIN"), RepartidorController.asignarAdmin);

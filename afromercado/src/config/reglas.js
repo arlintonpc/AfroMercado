@@ -94,6 +94,23 @@ const DEFAULTS = {
     desc: "Tiempo que tiene el comprador para pagar antes de que el pedido expire y libere el stock.",
   },
 
+  // ── Repartidor ────────────────────────────────────────────
+  repartidor_pago_modo: {
+    valor: "fijo",
+    tipo: "select",
+    opciones: ["fijo", "porcentaje_envio"],
+    grupo: "Repartidor",
+    etiqueta: "Cómo se le paga al repartidor",
+    desc: "Monto fijo por entrega, o un porcentaje del costo de envío del pedido.",
+  },
+  repartidor_pago_valor: {
+    valor: "5000",
+    tipo: "numero",
+    grupo: "Repartidor",
+    etiqueta: "Valor del pago al repartidor",
+    desc: "Si es 'fijo': monto en $ por cada entrega. Si es 'porcentaje del envío': el % a pagar (ej. 70).",
+  },
+
   // ── General ───────────────────────────────────────────────
   whatsapp_boton_activo: {
     valor: "false",

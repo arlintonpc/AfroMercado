@@ -1,6 +1,56 @@
+const path = require("path");
+const fs = require("fs");
+const multer = require("multer");
 const prisma = require("../config/prisma");
+const Reglas = require("../config/reglas");
+const { subirACloudinary } = require("../utils/cloudinary");
 const { ErrorNoEncontrado, ErrorProhibido, ErrorValidacion } = require("../utils/errores");
 const NotificacionService = require("../services/notificacion.service");
+
+const DIR_ENTREGAS = path.join(__dirname, "..", "..", "uploads", "entregas");
+fs.mkdirSync(DIR_ENTREGAS, { recursive: true });
+
+const _uploadFoto = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, DIR_ENTREGAS),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+      cb(null, `entrega_${req.params.id}_${Date.now()}${ext}`);
+    },
+  }),
+  fileFilter: (req, file, cb) => cb(null, file.mimetype.startsWith("image/")),
+  limits: { fileSize: 6 * 1024 * 1024 },
+}).single("foto");
+
+const claveFoto = (id) => `entrega:${id}:foto`;
+
+/** Pago al repartidor por una entrega, según el Centro de Reglas. */
+function calcularPagoEntrega(entrega, modo, valor) {
+  if (modo === "porcentaje_envio") {
+    const envio = Number(entrega.subPedido?.pedido?.costoEnvio ?? 0);
+    return Math.round(envio * (valor / 100));
+  }
+  return Math.round(valor); // fijo
+}
+
+/** Agrega pago calculado (y opcionalmente la foto de entrega) a una lista. */
+async function decorarEntregas(entregas, { conFoto = false } = {}) {
+  const [modo, valor] = await Promise.all([
+    Reglas.obtener("repartidor_pago_modo"),
+    Reglas.numero("repartidor_pago_valor"),
+  ]);
+  let fotos = {};
+  if (conFoto && entregas.length) {
+    const claves = entregas.map((e) => claveFoto(e.id));
+    const rows = await prisma.config.findMany({ where: { clave: { in: claves } } });
+    fotos = Object.fromEntries(rows.map((r) => [r.clave, r.valor]));
+  }
+  return entregas.map((e) => ({
+    ...e,
+    pagoRepartidor: calcularPagoEntrega(e, modo, valor),
+    ...(conFoto ? { fotoEntrega: fotos[claveFoto(e.id)] ?? null } : {}),
+  }));
+}
 
 const INCLUDE_ENTREGA = {
   subPedido: {
@@ -9,6 +59,7 @@ const INCLUDE_ENTREGA = {
         select: {
           id: true,
           direccionTexto: true,
+          costoEnvio: true,
           comprador: { select: { id: true, nombre: true, telefono: true, email: true } },
         },
       },
@@ -44,7 +95,8 @@ const RepartidorController = {
         include: INCLUDE_ENTREGA,
         orderBy: { createdAt: "desc" },
       });
-      res.json({ ok: true, data: entregas });
+      const data = await decorarEntregas(entregas, { conFoto: true });
+      res.json({ ok: true, data });
     } catch (err) {
       next(err);
     }
@@ -77,7 +129,8 @@ const RepartidorController = {
         include: INCLUDE_ENTREGA,
         orderBy: { createdAt: "desc" },
       });
-      res.json({ ok: true, data: entregas, municipioBase });
+      const data = await decorarEntregas(entregas);
+      res.json({ ok: true, data, municipioBase });
     } catch (err) {
       next(err);
     }
@@ -358,6 +411,38 @@ const RepartidorController = {
         where: { usuarioId: req.usuario.id },
       });
       res.json({ ok: true, data: solicitud ?? null });
+    } catch (err) { next(err); }
+  },
+
+  // Middleware multer (campo "foto") para la subida de prueba de entrega.
+  uploadFotoEntrega: _uploadFoto,
+
+  // POST /repartidor/entregas/:id/foto — prueba de entrega (foto)
+  async subirFotoEntrega(req, res, next) {
+    try {
+      const id = Number(req.params.id);
+      if (!req.file) throw new ErrorValidacion("Adjunta la foto (campo 'foto')");
+
+      const entrega = await prisma.entrega.findUnique({
+        where: { id },
+        select: { id: true, repartidorId: true },
+      });
+      if (!entrega) throw new ErrorNoEncontrado("Entrega no encontrada");
+      if (entrega.repartidorId !== req.usuario.id)
+        throw new ErrorProhibido("No eres el repartidor asignado a esta entrega");
+
+      const cloud = await subirACloudinary(req.file.path, "afromercado/entregas");
+      const url = cloud
+        ? (() => { try { fs.unlinkSync(req.file.path); } catch { /* noop */ } return cloud; })()
+        : `${req.protocol}://${req.get("host")}/uploads/entregas/${req.file.filename}`;
+
+      await prisma.config.upsert({
+        where: { clave: claveFoto(id) },
+        create: { clave: claveFoto(id), valor: url },
+        update: { valor: url },
+      });
+
+      res.json({ ok: true, url });
     } catch (err) { next(err); }
   },
 };
