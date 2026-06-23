@@ -178,8 +178,8 @@ const CuponRepository = {
    * @param {number} subtotal - subtotal total del carrito
    * @param {number[]} comercioIds - IDs de los comercios que tiene el carrito
    */
-  async validarParaUsuario(codigo, usuarioId, subtotal, comercioIds = [], subtotalesPorComercio = null) {
-    return validarCuponBase(prisma, { codigo, usuarioId, subtotal, comercioIds, subtotalesPorComercio });
+  async validarParaUsuario(codigo, usuarioId, subtotal, comercioIds = [], subtotalesPorComercio = null, subtotalesElegibles = null) {
+    return validarCuponBase(prisma, { codigo, usuarioId, subtotal, comercioIds, subtotalesPorComercio, subtotalesElegibles });
   },
 
   /**

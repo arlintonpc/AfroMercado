@@ -12,6 +12,9 @@ export interface OpcionesCupon {
   /** Subtotal por comercio { comercioId: subtotal } — hace que el descuento
    *  estimado coincida exactamente con el del checkout para cupones de tienda. */
   subtotalesPorComercio?: Record<number, number>
+  /** Subtotal SIN ofertas por comercio. Cuando el cupón no es combinable con
+   *  ofertas, el descuento se calcula sobre esta base menor. */
+  subtotalesElegibles?: Record<number, number>
 }
 
 export async function validarCupon(
@@ -26,6 +29,7 @@ export async function validarCupon(
       subtotal,
       ...(opciones.comercioIds?.length ? { comercioIds: opciones.comercioIds } : {}),
       ...(opciones.subtotalesPorComercio ? { subtotalesPorComercio: opciones.subtotalesPorComercio } : {}),
+      ...(opciones.subtotalesElegibles ? { subtotalesElegibles: opciones.subtotalesElegibles } : {}),
     },
   })
   return res.data

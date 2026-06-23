@@ -32,69 +32,71 @@ function extraerDepartamentoDesdeDireccionTexto(direccionTexto) {
   return null;
 }
 
-async function calcularCostoEnvioServidor({ usuarioId, direccionId, departamento, itemsConPrecio, subtotalGeneral = 0, subtotalesPorComercio = null }) {
-  const pesoTotalKg = itemsConPrecio.reduce((acum, item) => {
-    const pesoUnitario = item.producto.pesoKg != null ? Number(item.producto.pesoKg) : 1;
-    const pesoSeguro = Number.isFinite(pesoUnitario) ? pesoUnitario : 1;
-    return acum + (pesoSeguro * item.cantidad);
+function pesoDeItems(items) {
+  return items.reduce((acum, item) => {
+    const pu = item.producto.pesoKg != null ? Number(item.producto.pesoKg) : 1;
+    return acum + (Number.isFinite(pu) ? pu : 1) * item.cantidad;
   }, 0);
+}
 
+async function comercioRegalaEnvio(comercioId, subtotalComercio) {
+  const cfg = await prisma.config.findUnique({
+    where: { clave: `envio_gratis_comercio:${comercioId}` },
+  });
+  const umbral = cfg && cfg.valor ? Number(cfg.valor) : null;
+  return umbral !== null && umbral > 0 && subtotalComercio >= umbral;
+}
+
+async function calcularCostoEnvioServidor({ usuarioId, direccionId, departamento, itemsConPrecio, subtotalGeneral = 0, subtotalesPorComercio = null, porComercio = null }) {
+  // Departamento de entrega
   let departamentoEnvio = departamento?.trim() || null;
   if (direccionId != null) {
     const direccionIdNum = Number(direccionId);
     if (!Number.isInteger(direccionIdNum) || direccionIdNum <= 0) {
       throw new ErrorValidacion("direccionId inválido");
     }
-
     const direccion = await DireccionRepository.buscarPorId(direccionIdNum, usuarioId);
     if (!direccion) {
       throw new ErrorNoEncontrado("Dirección no encontrada");
     }
     departamentoEnvio = direccion.departamento;
   }
-
   if (!departamentoEnvio) {
     throw new ErrorValidacion("No pudimos determinar el departamento de entrega");
   }
 
-  // Cotización base por departamento + peso (con extrapolación y respaldo
-  // Nacional). 'envio_sin_tarifa_accion' define qué hacer si no hay tarifa.
   const accionSinTarifa = await Reglas.obtener("envio_sin_tarifa_accion");
-  const precioBase = await cotizarEnvio({
-    departamento: departamentoEnvio,
-    pesoKg: pesoTotalKg,
-    accionSinTarifa,
-  });
+  const SIN_ENVIO = "No hay envío disponible a este destino por ahora. Escríbenos al soporte para coordinarlo.";
 
-  if (precioBase === null) {
-    throw new ErrorValidacion(
-      "No hay envío disponible a este destino por ahora. Escríbenos al soporte para coordinarlo."
-    );
-  }
-
-  // ── Envío gratis (híbrido, configurable) ───────────────────────
-  // Ya confirmamos que SÍ se puede entregar; ahora decidimos si es gratis.
-
-  // 1) Plataforma: campaña global de envío gratis sobre cierto monto (0 = off).
+  // 1) Envío gratis de plataforma (campaña global por monto) — aplica a todo el pedido.
   const umbralPlataforma = await Reglas.numero("envio_gratis_umbral_plataforma");
-  if (umbralPlataforma > 0 && subtotalGeneral >= umbralPlataforma) {
-    return 0;
-  }
+  if (umbralPlataforma > 0 && subtotalGeneral >= umbralPlataforma) return 0;
 
-  // 2) Vendedor: cada tienda puede regalar el envío sobre su propio monto.
-  //    Aplica solo a pedidos de una sola tienda (el envío es consolidado).
   const vendedorPermitido = await Reglas.bool("envio_gratis_vendedor_permitido");
-  if (vendedorPermitido && subtotalesPorComercio && subtotalesPorComercio.size === 1) {
-    const [[comercioId, subtotalComercio]] = subtotalesPorComercio;
-    const cfg = await prisma.config.findUnique({
-      where: { clave: `envio_gratis_comercio:${comercioId}` },
-    });
-    const umbralVendedor = cfg && cfg.valor ? Number(cfg.valor) : null;
-    if (umbralVendedor !== null && umbralVendedor > 0 && subtotalComercio >= umbralVendedor) {
-      return 0;
+  const politica = await Reglas.obtener("envio_politica_multicomercio");
+  const grupos = porComercio ? Object.values(porComercio) : null;
+
+  // 2) Política "por comercio": un envío por cada tienda (cada productor despacha).
+  if (politica === "por_comercio" && grupos && grupos.length > 1) {
+    let total = 0;
+    for (const g of grupos) {
+      const cid = g.comercio.id;
+      const subC = subtotalesPorComercio?.get(cid) ?? 0;
+      if (vendedorPermitido && (await comercioRegalaEnvio(cid, subC))) continue;
+      const base = await cotizarEnvio({ departamento: departamentoEnvio, pesoKg: pesoDeItems(g.items), accionSinTarifa });
+      if (base === null) throw new ErrorValidacion(SIN_ENVIO);
+      total += base;
     }
+    return total;
   }
 
+  // 3) Consolidado: un solo envío para todo el pedido.
+  const precioBase = await cotizarEnvio({ departamento: departamentoEnvio, pesoKg: pesoDeItems(itemsConPrecio), accionSinTarifa });
+  if (precioBase === null) throw new ErrorValidacion(SIN_ENVIO);
+  if (vendedorPermitido && subtotalesPorComercio && subtotalesPorComercio.size === 1) {
+    const [[cid, subC]] = subtotalesPorComercio;
+    if (await comercioRegalaEnvio(cid, subC)) return 0;
+  }
   return precioBase;
 }
 
@@ -188,9 +190,14 @@ const PedidoService = {
     let subtotalGeneral = 0;
     let comisionGeneral = 0;
     const subtotalesPorComercio = new Map();
+    const subtotalesElegibles = new Map(); // subtotal de items SIN oferta, por comercio (para cupón no combinable)
     const subPedidosData = Object.values(porComercio).map(({ comercio, items: itms }) => {
       const subtotalComercio = itms.reduce(
         (acc, i) => acc + Number(i.precioUnitario) * i.cantidad,
+        0
+      );
+      const subtotalSinOferta = itms.reduce(
+        (acc, i) => acc + (i.ofertaId ? 0 : Number(i.precioUnitario) * i.cantidad),
         0
       );
       const tasa = tasaPorComercio.get(comercio.id) ?? tasaGlobal;
@@ -198,6 +205,7 @@ const PedidoService = {
       subtotalGeneral += desglose.subtotal;
       comisionGeneral += desglose.comision;
       subtotalesPorComercio.set(comercio.id, desglose.subtotal);
+      subtotalesElegibles.set(comercio.id, redondear(subtotalSinOferta));
 
       return {
         comercioId: comercio.id,
@@ -227,6 +235,7 @@ const PedidoService = {
       departamento: departamentoEnvio,
       subtotalGeneral,
       subtotalesPorComercio,
+      porComercio,
     });
     const costoEnvioNum = costoEnvioCalculado ?? 0;
     let totalGeneral = subtotalGeneral + costoEnvioNum;
@@ -270,11 +279,15 @@ const PedidoService = {
       }
 
       if (codigoCupon) {
+        // cupon_combinable_con_oferta: si es false, el descuento no aplica a
+        // productos que ya están en oferta (base "elegible" = sin ofertas).
+        const combinable = await Reglas.bool("cupon_combinable_con_oferta");
         const resultadoCupon = await CuponRepository.validarParaCheckout(tx, {
           codigo: codigoCupon.trim().toUpperCase(),
           usuarioId,
           subtotal: subtotalGeneral,
           subtotalesPorComercio,
+          ...(combinable ? {} : { subtotalesElegibles }),
         });
         if (resultadoCupon.error) throw new ErrorValidacion(resultadoCupon.error);
         cuponId = resultadoCupon.cupon.id;

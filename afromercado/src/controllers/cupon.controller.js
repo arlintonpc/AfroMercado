@@ -7,7 +7,7 @@ const CuponController = {
   // POST /cupones/validar
   async validar(req, res, next) {
     try {
-      const { codigo, subtotal, comercioIds = [], subtotalesPorComercio = null } = req.body;
+      const { codigo, subtotal, comercioIds = [], subtotalesPorComercio = null, subtotalesElegibles = null } = req.body;
       if (!codigo || typeof codigo !== "string" || !codigo.trim()) {
         throw new ErrorValidacion("El código de cupón es obligatorio");
       }
@@ -19,7 +19,8 @@ const CuponController = {
         req.usuario.id,
         Number(subtotal),
         Array.isArray(comercioIds) ? comercioIds.map(Number) : [],
-        subtotalesPorComercio
+        subtotalesPorComercio,
+        subtotalesElegibles
       );
       if (resultado.error) throw new ErrorValidacion(resultado.error);
       res.json({ ok: true, data: resultado });

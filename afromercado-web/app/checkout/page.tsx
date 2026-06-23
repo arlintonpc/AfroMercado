@@ -7,7 +7,8 @@ import Footer from '@/components/layout/Footer'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { formatearPrecio } from '@/lib/formatearPrecio'
-import { precioVigente } from '@/lib/precioProducto'
+import { precioVigente, tieneOfertaVigente } from '@/lib/precioProducto'
+import { calcularEnvio } from '@/lib/api/envios'
 import { apiFetch } from '@/lib/api/client'
 import { listarDirecciones, crearDireccion } from '@/lib/api/direccion'
 import { validarCupon, type ResultadoCupon } from '@/lib/api/cupones'
@@ -58,6 +59,8 @@ export default function PaginaCheckout() {
   const [costoEnvio, setCostoEnvio] = useState<number | null>(null)
   const [cargandoEnvio, setCargandoEnvio] = useState(false)
   const [umbralEnvioGratis, setUmbralEnvioGratis] = useState(0)
+  const [politicaEnvio, setPoliticaEnvio] = useState<'por_comercio' | 'consolidado'>('consolidado')
+  const [cuponCombinable, setCuponCombinable] = useState(true)
 
   const grupos = useMemo(() => agruparPorComercio(items), [items])
 
@@ -69,6 +72,24 @@ export default function PaginaCheckout() {
       const cid = Number(it.producto?.comercioId)
       if (!cid) continue
       m[cid] = (m[cid] ?? 0) + precioVigente(it.producto) * it.cantidad
+    }
+    return m
+  }, [items])
+
+  // Por comercio: subtotal, peso y subtotal SIN ofertas (para envío por comercio
+  // y para cupón no combinable con ofertas).
+  const datosPorComercio = useMemo(() => {
+    const m: Record<number, { subtotal: number; peso: number; sinOferta: number }> = {}
+    for (const it of items) {
+      const cid = Number(it.producto?.comercioId)
+      if (!cid) continue
+      const linea = precioVigente(it.producto) * it.cantidad
+      const p = it.producto?.pesoKg
+      const peso = (p != null && Number(p) > 0 ? Number(p) : 1) * it.cantidad
+      if (!m[cid]) m[cid] = { subtotal: 0, peso: 0, sinOferta: 0 }
+      m[cid].subtotal += linea
+      m[cid].peso += peso
+      if (!tieneOfertaVigente(it.producto)) m[cid].sinOferta += linea
     }
     return m
   }, [items])
@@ -134,19 +155,28 @@ export default function PaginaCheckout() {
     setCargandoEnvio(true)
     const t = setTimeout(async () => {
       try {
-        const ids = Object.keys(subtotalesPorComercio)
-        const qs = new URLSearchParams({
-          departamento: dep,
-          pesoKg: String(pesoTotalKg),
-          subtotal: String(subtotal),
-        })
-        // Solo un comercio → habilita evaluar envío gratis del vendedor.
-        if (ids.length === 1) qs.set('comercioId', ids[0])
-        const res = await apiFetch<{ ok: boolean; data: { precio: number } }>(
-          `/envios/calcular?${qs.toString()}`,
-          { auth: false }
-        )
-        setCostoEnvio(res.data.precio)
+        const ids = Object.keys(datosPorComercio).map(Number)
+        let precio: number
+        if (umbralEnvioGratis > 0 && subtotal >= umbralEnvioGratis) {
+          // Envío gratis de plataforma (a nivel de todo el pedido).
+          precio = 0
+        } else if (politicaEnvio === 'por_comercio' && ids.length > 1) {
+          // Un envío por cada tienda (cada productor despacha por separado).
+          const partes = await Promise.all(
+            ids.map((cid) => {
+              const d = datosPorComercio[cid]
+              return calcularEnvio(dep, d.peso, { subtotal: d.subtotal, comercioId: cid })
+            }),
+          )
+          precio = partes.reduce((a, r) => a + r.precio, 0)
+        } else {
+          const r = await calcularEnvio(dep, pesoTotalKg, {
+            subtotal,
+            ...(ids.length === 1 ? { comercioId: ids[0] } : {}),
+          })
+          precio = r.precio
+        }
+        setCostoEnvio(precio)
       } catch {
         setCostoEnvio(null)
       } finally {
@@ -154,12 +184,16 @@ export default function PaginaCheckout() {
       }
     }, 900)
     return () => clearTimeout(t)
-  }, [departamento, pesoTotalKg, subtotal, subtotalesPorComercio])
+  }, [departamento, pesoTotalKg, subtotal, datosPorComercio, politicaEnvio, umbralEnvioGratis])
 
-  // Umbral de envío gratis de plataforma (para el aviso "te faltan $X")
+  // Reglas públicas: umbral de envío gratis, política de envío y combinabilidad de cupón.
   useEffect(() => {
     obtenerReglasPublicas()
-      .then((r) => setUmbralEnvioGratis(r.envioGratisUmbralPlataforma))
+      .then((r) => {
+        setUmbralEnvioGratis(r.envioGratisUmbralPlataforma)
+        setPoliticaEnvio(r.envioPoliticaMulticomercio)
+        setCuponCombinable(r.cuponCombinableConOferta)
+      })
       .catch(() => {})
   }, [])
 
@@ -208,9 +242,14 @@ export default function PaginaCheckout() {
     setCuponAplicado(null)
     setAplicandoCupon(true)
     try {
+      const subtotalesElegibles: Record<number, number> = {}
+      for (const [cid, d] of Object.entries(datosPorComercio)) {
+        subtotalesElegibles[Number(cid)] = d.sinOferta
+      }
       const resultado = await validarCupon(codigoCupon.trim(), subtotal, {
         comercioIds: Object.keys(subtotalesPorComercio).map(Number),
         subtotalesPorComercio,
+        ...(cuponCombinable ? {} : { subtotalesElegibles }),
       })
       setCuponAplicado(resultado)
     } catch (err) {

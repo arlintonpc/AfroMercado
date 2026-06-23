@@ -8,6 +8,8 @@ const FUENTES_VALIDAS = ["ORGANICO", "CAMPANAS", "MIXTO"];
 const REGLAS_PUBLICAS = [
   "envio_gratis_umbral_plataforma",
   "envio_gratis_vendedor_permitido",
+  "envio_politica_multicomercio",
+  "cupon_combinable_con_oferta",
   "whatsapp_boton_activo",
 ];
 

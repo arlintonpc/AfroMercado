@@ -10,6 +10,10 @@ export interface ReglasPublicas {
   envioGratisUmbralPlataforma: number
   /** Si los vendedores pueden ofrecer envío gratis por monto mínimo de su tienda. */
   envioGratisVendedorPermitido: boolean
+  /** 'por_comercio' = un envío por cada tienda; 'consolidado' = un solo envío. */
+  envioPoliticaMulticomercio: 'por_comercio' | 'consolidado'
+  /** Si un cupón puede sumarse al descuento de un producto en oferta. */
+  cuponCombinableConOferta: boolean
   /** Si el botón de WhatsApp está visible en la tienda. */
   whatsappBotonActivo: boolean
 }
@@ -23,6 +27,8 @@ export async function obtenerReglasPublicas(): Promise<ReglasPublicas> {
   return {
     envioGratisUmbralPlataforma: Number(d['envio_gratis_umbral_plataforma'] ?? 0) || 0,
     envioGratisVendedorPermitido: d['envio_gratis_vendedor_permitido'] === 'true',
+    envioPoliticaMulticomercio: d['envio_politica_multicomercio'] === 'consolidado' ? 'consolidado' : 'por_comercio',
+    cuponCombinableConOferta: d['cupon_combinable_con_oferta'] === 'true',
     whatsappBotonActivo: d['whatsapp_boton_activo'] === 'true',
   }
 }
