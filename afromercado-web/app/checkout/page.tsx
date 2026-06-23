@@ -12,6 +12,7 @@ import { apiFetch } from '@/lib/api/client'
 import { listarDirecciones, crearDireccion } from '@/lib/api/direccion'
 import { validarCupon, type ResultadoCupon } from '@/lib/api/cupones'
 import { obtenerReglasPublicas } from '@/lib/api/config'
+import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 import { useCarrito } from '@/context/CarritoContext'
 import { useAuth } from '@/context/AuthContext'
 import { agruparPorComercio } from '@/components/carrito/agrupar'
@@ -34,6 +35,7 @@ export default function PaginaCheckout() {
   // Campos del formulario
   const [departamento, setDepartamento] = useState('')
   const [municipio, setMunicipio] = useState('')
+  const [municipioOtro, setMunicipioOtro] = useState(false)
   const [barrio, setBarrio] = useState('')
   const [linea1, setLinea1] = useState('')
   const [referencia, setReferencia] = useState('')
@@ -111,20 +113,18 @@ export default function PaginaCheckout() {
       .finally(() => setCargandoDirs(false))
   }, [autenticado, seleccionarDireccion])
 
-  // Peso total del carrito (suma pesoKg * cantidad; fallback 1 kg si algún producto no tiene peso)
+  // Peso total del carrito = suma de (peso por unidad × cantidad).
+  // Si un producto no tiene peso configurado, se asume 1 kg por unidad
+  // (mismo criterio que el backend), para que la cantidad siempre cuente.
   const pesoTotalKg = useMemo(() => {
     if (items.length === 0) return 1
     let total = 0
-    let todosTienenPeso = true
     for (const it of items) {
       const peso = it.producto?.pesoKg
-      if (peso === undefined || peso === null) {
-        todosTienenPeso = false
-        break
-      }
-      total += Number(peso) * it.cantidad
+      const unidad = peso != null && Number(peso) > 0 ? Number(peso) : 1
+      total += unidad * it.cantidad
     }
-    return todosTienenPeso && total > 0 ? total : 1
+    return total > 0 ? total : 1
   }, [items])
 
   // Calcular costo de envío cuando el departamento tiene texto (debounce 900ms)
@@ -167,6 +167,7 @@ export default function PaginaCheckout() {
     setSelectedId(null)
     setDepartamento('')
     setMunicipio('')
+    setMunicipioOtro(false)
     setBarrio('')
     setLinea1('')
     setReferencia('')
@@ -414,24 +415,101 @@ export default function PaginaCheckout() {
               )}
 
               {/* Formulario de dirección */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="Departamento"
-                  name="departamento"
-                  placeholder="Chocó"
-                  value={departamento}
-                  onChange={(e) => setDepartamento(e.target.value)}
-                  error={errores.departamento}
-                />
-                <Input
-                  label="Municipio / Ciudad"
-                  name="municipio"
-                  placeholder="Quibdó"
-                  value={municipio}
-                  onChange={(e) => setMunicipio(e.target.value)}
-                  error={errores.municipio}
-                />
-              </div>
+              {(() => {
+                const muniOpciones = municipiosDe(departamento)
+                const usarTextoMunicipio =
+                  !!departamento &&
+                  (muniOpciones.length === 0 ||
+                    municipioOtro ||
+                    (municipio !== '' && !muniOpciones.includes(municipio)))
+                const selBase =
+                  'w-full bg-transparent min-h-[44px] py-2 text-base border-b outline-none transition-colors duration-150 font-[var(--font-inter)]'
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Departamento */}
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor="departamento" className="font-semibold text-sm text-[#1A1A1A] leading-tight">
+                        Departamento
+                      </label>
+                      <div className="relative flex items-center min-h-[44px]">
+                        <select
+                          id="departamento"
+                          name="departamento"
+                          value={departamento}
+                          onChange={(e) => { setDepartamento(e.target.value); setMunicipio(''); setMunicipioOtro(false) }}
+                          className={[
+                            selBase,
+                            departamento ? 'text-[#1A1A1A]' : 'text-[#1A1A1A]/40',
+                            errores.departamento ? 'border-[#C0392B]' : 'border-[#1A1A1A]/30 focus:border-[#D4A017]',
+                          ].join(' ')}
+                        >
+                          <option value="">Elige tu departamento…</option>
+                          {DEPARTAMENTOS.map((d) => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </div>
+                      {errores.departamento && <p className="text-sm text-[#C0392B] mt-0.5">{errores.departamento}</p>}
+                    </div>
+
+                    {/* Municipio */}
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor="municipio" className="font-semibold text-sm text-[#1A1A1A] leading-tight">
+                        Municipio / Ciudad
+                      </label>
+                      {usarTextoMunicipio ? (
+                        <>
+                          <div className="relative flex items-center min-h-[44px]">
+                            <input
+                              id="municipio"
+                              name="municipio"
+                              placeholder="Escribe tu municipio"
+                              value={municipio}
+                              onChange={(e) => setMunicipio(e.target.value)}
+                              className={[
+                                selBase,
+                                'text-[#1A1A1A] placeholder:text-[#1A1A1A]/40',
+                                errores.municipio ? 'border-[#C0392B]' : 'border-[#1A1A1A]/30 focus:border-[#D4A017]',
+                              ].join(' ')}
+                            />
+                          </div>
+                          {muniOpciones.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => { setMunicipioOtro(false); setMunicipio('') }}
+                              className="self-start text-xs text-[#2D6A4F] hover:underline mt-0.5"
+                            >
+                              Elegir de la lista
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <div className="relative flex items-center min-h-[44px]">
+                          <select
+                            id="municipio"
+                            name="municipio"
+                            value={municipio}
+                            disabled={!departamento}
+                            onChange={(e) => {
+                              if (e.target.value === '__OTRO__') { setMunicipioOtro(true); setMunicipio('') }
+                              else setMunicipio(e.target.value)
+                            }}
+                            className={[
+                              selBase,
+                              municipio ? 'text-[#1A1A1A]' : 'text-[#1A1A1A]/40',
+                              errores.municipio ? 'border-[#C0392B]' : 'border-[#1A1A1A]/30 focus:border-[#D4A017]',
+                              !departamento ? 'opacity-50 cursor-not-allowed' : '',
+                            ].join(' ')}
+                          >
+                            <option value="">{departamento ? 'Elige tu municipio…' : 'Primero elige departamento'}</option>
+                            {muniOpciones.map((m) => <option key={m} value={m}>{m}</option>)}
+                            {departamento && <option value="__OTRO__">Otro (escribir)…</option>}
+                          </select>
+                        </div>
+                      )}
+                      {errores.municipio && <p className="text-sm text-[#C0392B] mt-0.5">{errores.municipio}</p>}
+                    </div>
+                  </div>
+                )
+              })()}
 
               <div className="mt-4">
                 <Input

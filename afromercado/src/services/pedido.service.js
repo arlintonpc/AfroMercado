@@ -12,6 +12,7 @@ const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils
 const { ofertaTieneCupo, ofertaVigente, precioVigente } = require("../utils/ofertas");
 const NotificacionService = require("./notificacion.service");
 const Reglas = require("../config/reglas");
+const { cotizarEnvio } = require("../utils/envio");
 
 const ESTADOS_CANCELABLES = ["PENDIENTE_PAGO", "VERIFICANDO_PAGO"];
 
@@ -56,32 +57,16 @@ async function calcularCostoEnvioServidor({ usuarioId, direccionId, departamento
     throw new ErrorValidacion("No pudimos determinar el departamento de entrega");
   }
 
-  const tarifaLocal = await prisma.tarifaEnvio.findFirst({
-    where: {
-      departamento: { equals: departamentoEnvio, mode: "insensitive" },
-      pesoMaxKg: { gte: pesoTotalKg },
-      activa: true,
-    },
-    orderBy: { pesoMaxKg: "asc" },
+  // Cotización base por departamento + peso (con extrapolación y respaldo
+  // Nacional). 'envio_sin_tarifa_accion' define qué hacer si no hay tarifa.
+  const accionSinTarifa = await Reglas.obtener("envio_sin_tarifa_accion");
+  const precioBase = await cotizarEnvio({
+    departamento: departamentoEnvio,
+    pesoKg: pesoTotalKg,
+    accionSinTarifa,
   });
 
-  // Qué hacer si no hay tarifa específica para el destino lo define el
-  // Centro de Reglas: 'nacional' (default) usa la tarifa Nacional como
-  // respaldo; 'bloquear' obliga a tener una tarifa para ese departamento.
-  const accionSinTarifa = await Reglas.obtener("envio_sin_tarifa_accion");
-  let tarifa = tarifaLocal;
-  if (!tarifa && accionSinTarifa !== "bloquear") {
-    tarifa = await prisma.tarifaEnvio.findFirst({
-      where: {
-        departamento: "Nacional",
-        pesoMaxKg: { gte: pesoTotalKg },
-        activa: true,
-      },
-      orderBy: { pesoMaxKg: "asc" },
-    });
-  }
-
-  if (!tarifa) {
+  if (precioBase === null) {
     throw new ErrorValidacion(
       "No hay envío disponible a este destino por ahora. Escríbenos al soporte para coordinarlo."
     );
@@ -110,7 +95,7 @@ async function calcularCostoEnvioServidor({ usuarioId, direccionId, departamento
     }
   }
 
-  return Number(tarifa.precio);
+  return precioBase;
 }
 
 const PedidoService = {

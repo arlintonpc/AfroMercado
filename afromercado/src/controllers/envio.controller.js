@@ -1,5 +1,6 @@
 const prisma = require("../config/prisma");
 const Reglas = require("../config/reglas");
+const { cotizarEnvio } = require("../utils/envio");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 
 const EnvioController = {
@@ -14,27 +15,10 @@ const EnvioController = {
         throw new ErrorValidacion("pesoKg debe ser un número positivo");
       }
 
-      let tarifa = await prisma.tarifaEnvio.findFirst({
-        where: {
-          departamento: { equals: departamento, mode: "insensitive" },
-          pesoMaxKg: { gte: peso },
-          activa: true,
-        },
-        orderBy: { pesoMaxKg: "asc" },
-      });
+      const accionSinTarifa = await Reglas.obtener("envio_sin_tarifa_accion");
+      let precio = await cotizarEnvio({ departamento, pesoKg: peso, accionSinTarifa });
 
-      if (!tarifa) {
-        tarifa = await prisma.tarifaEnvio.findFirst({
-          where: {
-            departamento: "Nacional",
-            pesoMaxKg: { gte: peso },
-            activa: true,
-          },
-          orderBy: { pesoMaxKg: "asc" },
-        });
-      }
-
-      if (!tarifa) {
+      if (precio === null) {
         throw new ErrorNoEncontrado(
           "No hay tarifa de envío disponible para este peso y destino"
         );
@@ -45,7 +29,6 @@ const EnvioController = {
       // tienda), aplicamos las mismas reglas que el checkout para que lo que se
       // muestra coincida con lo que se cobra. El estimador del producto no envía
       // subtotal, así que ahí siempre se ve la tarifa base.
-      let precio = Number(tarifa.precio);
       let gratis = false;
       let motivo = null;
       const subtotal = req.query.subtotal != null ? Number(req.query.subtotal) : null;
@@ -72,17 +55,7 @@ const EnvioController = {
 
       res.json({
         ok: true,
-        data: {
-          precio,
-          gratis,
-          motivo,
-          departamento: tarifa.departamento,
-          pesoKg: peso,
-          tarifa: {
-            id: tarifa.id,
-            pesoMaxKg: Number(tarifa.pesoMaxKg),
-          },
-        },
+        data: { precio, gratis, motivo, departamento, pesoKg: peso },
       });
     } catch (err) {
       next(err);
