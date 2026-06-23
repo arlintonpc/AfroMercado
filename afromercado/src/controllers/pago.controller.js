@@ -5,6 +5,7 @@ const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
 const PagoService = require("../services/pago.service");
+const { subirACloudinary } = require("../utils/cloudinary");
 const { ErrorValidacion } = require("../utils/errores");
 
 // Carpeta donde se guardan los comprobantes de pago.
@@ -71,15 +72,23 @@ const PagoController = {
       if (!req.file) {
         throw new ErrorValidacion("Debes adjuntar el comprobante (campo 'comprobante')");
       }
-      // Guardamos la ruta relativa al proyecto (no la absoluta del sistema).
-      const rutaRelativa = path
-        .join("uploads", "comprobantes", req.file.filename)
-        .replace(/\\/g, "/");
+      // Cloudinary (persistente en producción); si no está configurado, se
+      // guarda la ruta local relativa como respaldo (desarrollo).
+      const cloud = await subirACloudinary(req.file.path, "afromercado/comprobantes");
+      let ruta;
+      if (cloud) {
+        ruta = cloud;
+        try { fs.unlinkSync(req.file.path); } catch { /* noop */ }
+      } else {
+        ruta = path
+          .join("uploads", "comprobantes", req.file.filename)
+          .replace(/\\/g, "/");
+      }
 
       const pago = await PagoService.adjuntarComprobante(
         req.usuario.id,
         req.params.id,
-        rutaRelativa
+        ruta
       );
       res.json({ ok: true, data: pago });
     } catch (e) {

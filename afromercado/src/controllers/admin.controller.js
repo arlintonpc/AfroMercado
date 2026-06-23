@@ -55,6 +55,11 @@ const AdminController = {
       const pago = await PagoRepository.buscarPorId(Number(req.params.id));
       if (!pago) throw new ErrorNoEncontrado("Pago no encontrado");
       if (!pago.comprobanteUrl) throw new ErrorNoEncontrado("Este pago no tiene comprobante adjunto");
+      // Comprobantes en Cloudinary (persistentes): el endpoint sigue protegido
+      // por admin; redirige a la URL del archivo.
+      if (/^https?:\/\//i.test(pago.comprobanteUrl)) {
+        return res.redirect(pago.comprobanteUrl);
+      }
       const rutaAbsoluta = path.resolve(RAIZ_PROYECTO, pago.comprobanteUrl);
       const dirUploads = path.resolve(RAIZ_PROYECTO, "uploads");
       if (!rutaAbsoluta.startsWith(dirUploads)) throw new ErrorNoEncontrado("Comprobante no disponible");
