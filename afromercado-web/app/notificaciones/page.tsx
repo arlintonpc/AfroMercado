@@ -144,8 +144,15 @@ export default function NotificacionesPage() {
     if (!autenticado) return
     setCargando(true)
     try {
-      const res = await apiFetch<{ ok: boolean; data: Notificacion[] }>('/notificaciones')
-      setItems(res.data ?? [])
+      // El backend responde { ok, data: { notificaciones, noLeidas } }.
+      // Aceptamos también un arreglo directo por compatibilidad.
+      const res = await apiFetch<{
+        ok: boolean
+        data: Notificacion[] | { notificaciones?: Notificacion[]; noLeidas?: number }
+      }>('/notificaciones')
+      const data = res.data
+      const lista = Array.isArray(data) ? data : (data?.notificaciones ?? [])
+      setItems(lista)
     } catch { /**/ } finally {
       setCargando(false)
     }
