@@ -7,7 +7,7 @@ const PagoController = require("../controllers/pago.controller");
 
 const router = express.Router();
 
-const soloCompradores = [autenticar, autorizar("COMPRADOR")];
+const soloCompradores = [autenticar, autorizar("COMPRADOR", "COMERCIANTE", "REPARTIDOR")];
 
 // Crear un pago para un pedido
 router.post("/", ...soloCompradores, PagoController.crear);

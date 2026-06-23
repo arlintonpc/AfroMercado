@@ -157,6 +157,15 @@ const PedidoService = {
 
     // 4. Calcular montos — tasa en cascada: override por comercio > Config global > env
     const comercioIds = Object.keys(porComercio).map(Number);
+
+    // Candado: nadie puede comprar sus propios productos (conflicto de interés).
+    const comercioPropio = await prisma.comercio.findFirst({
+      where: { id: { in: comercioIds }, usuarioId },
+      select: { id: true },
+    });
+    if (comercioPropio) {
+      throw new ErrorValidacion("No puedes comprar productos de tu propia tienda.");
+    }
     const ahora2 = new Date();
     const [overridesComision, configGlobal] = await Promise.all([
       prisma.comisionComercio.findMany({

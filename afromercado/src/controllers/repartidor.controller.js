@@ -138,12 +138,18 @@ const RepartidorController = {
         }
       }
 
+      // Candado: el repartidor no ve (ni puede tomar) entregas de su propio pedido.
+      const subPedidoFiltro = {
+        pedido: { compradorId: { not: req.usuario.id } },
+        ...(municipioBase
+          ? { comercio: { municipio: { equals: municipioBase, mode: "insensitive" } } }
+          : {}),
+      };
+
       const entregas = await prisma.entrega.findMany({
         where: {
           repartidorId: null,
-          ...(municipioBase
-            ? { subPedido: { comercio: { municipio: { equals: municipioBase, mode: "insensitive" } } } }
-            : {}),
+          subPedido: subPedidoFiltro,
         },
         include: INCLUDE_ENTREGA,
         orderBy: { createdAt: "desc" },
@@ -158,10 +164,15 @@ const RepartidorController = {
   async tomar(req, res, next) {
     try {
       const id = Number(req.params.id);
-      const entrega = await prisma.entrega.findUnique({ where: { id } });
+      const entrega = await prisma.entrega.findUnique({
+        where: { id },
+        include: { subPedido: { select: { pedido: { select: { compradorId: true } } } } },
+      });
       if (!entrega) throw new ErrorNoEncontrado("Entrega no encontrada");
       if (entrega.repartidorId !== null)
         throw new ErrorProhibido("Esta entrega ya tiene repartidor asignado");
+      if (entrega.subPedido?.pedido?.compradorId === req.usuario.id)
+        throw new ErrorProhibido("No puedes tomar la entrega de tu propio pedido");
 
       const actualizada = await prisma.entrega.update({
         where: { id },
@@ -295,7 +306,10 @@ const RepartidorController = {
       const { repartidorId } = req.body || {};
       if (!repartidorId) throw new ErrorValidacion("El campo repartidorId es requerido");
 
-      const entrega = await prisma.entrega.findUnique({ where: { id } });
+      const entrega = await prisma.entrega.findUnique({
+        where: { id },
+        include: { subPedido: { select: { pedido: { select: { compradorId: true } } } } },
+      });
       if (!entrega) throw new ErrorNoEncontrado("Entrega no encontrada");
 
       const repartidor = await prisma.usuario.findUnique({
@@ -304,6 +318,9 @@ const RepartidorController = {
       });
       if (!repartidor || repartidor.rol !== "REPARTIDOR")
         throw new ErrorValidacion("El usuario no es un repartidor válido");
+      // Candado: no asignar a un repartidor la entrega de su propio pedido.
+      if (entrega.subPedido?.pedido?.compradorId === repartidor.id)
+        throw new ErrorValidacion("No puedes asignar a un repartidor su propio pedido");
 
       const actualizada = await prisma.entrega.update({
         where: { id },

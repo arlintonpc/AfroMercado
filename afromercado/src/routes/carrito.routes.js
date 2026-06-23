@@ -7,7 +7,7 @@ const CarritoController = require("../controllers/carrito.controller");
 
 const router = express.Router();
 
-const soloCompradoresYComerciantes = [autenticar, autorizar("COMPRADOR", "COMERCIANTE")];
+const soloCompradoresYComerciantes = [autenticar, autorizar("COMPRADOR", "COMERCIANTE", "REPARTIDOR")];
 
 router.get("/", ...soloCompradoresYComerciantes, CarritoController.obtener);
 router.post("/items", ...soloCompradoresYComerciantes, CarritoController.agregar);
