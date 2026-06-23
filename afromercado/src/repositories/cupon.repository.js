@@ -30,6 +30,7 @@ async function validarCuponBase(db, {
   subtotal,
   comercioIds = [],
   subtotalesPorComercio = null,
+  subtotalesElegibles = null,
   bloquear = false,
 }) {
   let cupon;
@@ -131,11 +132,23 @@ async function validarCuponBase(db, {
     };
   }
 
+  // Base del descuento: por defecto = subtotalAplicable. Si se pasan subtotales
+  // "elegibles" (p. ej. excluyendo productos en oferta cuando la regla
+  // cupon_combinable_con_oferta es false), el descuento se calcula sobre esa
+  // base menor; el total del pedido (subtotalTotal) no cambia.
+  let baseDescuento = subtotalAplicable;
+  if (subtotalesElegibles) {
+    const elegiblesMapa = normalizarSubtotalesPorComercio(subtotalesElegibles);
+    baseDescuento = comerciosRestringidos.length > 0
+      ? comerciosRestringidos.reduce((acc, cid) => acc + Number(elegiblesMapa.get(cid) ?? 0), 0)
+      : sumarSubtotales(elegiblesMapa);
+  }
+
   let descuento;
   if (cupon.tipo === "PORCENTAJE") {
-    descuento = Math.min(subtotalAplicable * (Number(cupon.valor) / 100), subtotalAplicable);
+    descuento = Math.min(baseDescuento * (Number(cupon.valor) / 100), baseDescuento);
   } else {
-    descuento = Math.min(Number(cupon.valor), subtotalAplicable);
+    descuento = Math.min(Number(cupon.valor), baseDescuento);
   }
 
   const descuentoRedondeado = Math.round(descuento);
@@ -173,12 +186,13 @@ const CuponRepository = {
    * Valida un cupón dentro de una transacción y bloquea la fila para evitar
    * carreras de consumo simultáneo.
    */
-  async validarParaCheckout(tx, { codigo, usuarioId, subtotal, subtotalesPorComercio = null }) {
+  async validarParaCheckout(tx, { codigo, usuarioId, subtotal, subtotalesPorComercio = null, subtotalesElegibles = null }) {
     return validarCuponBase(tx, {
       codigo,
       usuarioId,
       subtotal,
       subtotalesPorComercio,
+      subtotalesElegibles,
       bloquear: true,
     });
   },

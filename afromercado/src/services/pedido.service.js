@@ -6,7 +6,7 @@ const CarritoRepository = require("../repositories/carrito.repository");
 const DireccionRepository = require("../repositories/direccion.repository");
 const PedidoRepository = require("../repositories/pedido.repository");
 const CuponRepository = require("../repositories/cupon.repository");
-const { calcularDesglose } = require("../utils/comision");
+const { calcularDesglose, redondear } = require("../utils/comision");
 const config = require("../config");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
 const { ofertaTieneCupo, ofertaVigente, precioVigente } = require("../utils/ofertas");
@@ -282,20 +282,39 @@ const PedidoService = {
         totalGeneral = resultadoCupon.totalConDescuento + costoEnvioNum;
       }
 
+      // Regla comision_base: si es "post_descuento" (por defecto), la comisión
+      // se calcula sobre el monto YA descontado por el cupón, prorrateando el
+      // descuento entre comercios por su participación en el subtotal.
+      let comisionTotalFinal = comisionGeneral;
+      let subPedidosFinal = subPedidosData;
+      if (cuponDescuento && cuponDescuento > 0) {
+        const comisionBase = await Reglas.obtener("comision_base");
+        if (comisionBase === "post_descuento") {
+          comisionTotalFinal = 0;
+          subPedidosFinal = subPedidosData.map((sp) => {
+            const share = subtotalGeneral > 0 ? (sp.subtotal / subtotalGeneral) * cuponDescuento : 0;
+            const comision = redondear(Math.max(0, sp.subtotal - share) * sp.tasaComisionAplicada);
+            comisionTotalFinal += comision;
+            return { ...sp, comision, neto: redondear(sp.subtotal - comision) };
+          });
+          comisionTotalFinal = redondear(comisionTotalFinal);
+        }
+      }
+
       // 5b. Crear pedido con expiresAt = now + 30 min
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
       const nuevoPedido = await PedidoRepository.crear(
         {
           compradorId: usuarioId,
           subtotal: subtotalGeneral,
-          comisionTotal: comisionGeneral,
+          comisionTotal: comisionTotalFinal,
           total: totalGeneral,
           costoEnvio: costoEnvioNum,
           direccionTexto: direccionTexto.trim(),
           direccionId,
           notas,
           expiresAt,
-          subPedidos: subPedidosData,
+          subPedidos: subPedidosFinal,
           ...(cuponId !== null ? { cuponId, cuponDescuento } : {}),
         },
         tx
