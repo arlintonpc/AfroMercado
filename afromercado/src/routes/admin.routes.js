@@ -48,6 +48,9 @@ router.patch("/comercios/:id/verificar",        ...soloAdmin, AdminController.ve
 router.patch("/comercios/:id/whatsapp-visible", ...soloAdmin, AdminController.toggleWhatsappVisible);
 router.post("/comercios/:id/comision",          ...soloAdmin, AdminController.setComisionComercio);
 
+// Mantenimiento puntual
+router.post("/backfill-pesos", ...soloAdmin, AdminController.backfillPesos);
+
 // Config global
 router.get("/config",        ...soloAdmin, AdminController.listarConfig);
 router.get("/reglas",        ...soloAdmin, AdminController.listarReglas);

@@ -68,6 +68,24 @@ const AdminController = {
     } catch (e) { next(e); }
   },
 
+  // POST /admin/backfill-pesos — asigna peso por defecto a productos sin peso.
+  async backfillPesos(req, res, next) {
+    try {
+      const PESO_POR_UNIDAD = { KG: 1, LITRO: 1, MANOJO: 3, PAQUETE: 0.5, DOCENA: 1, UNIDAD: 1 };
+      const sinPeso = await prisma.producto.findMany({
+        where: { pesoKg: null },
+        select: { id: true, unidad: true },
+      });
+      for (const p of sinPeso) {
+        await prisma.producto.update({
+          where: { id: p.id },
+          data: { pesoKg: PESO_POR_UNIDAD[p.unidad] ?? 1 },
+        });
+      }
+      res.json({ ok: true, actualizados: sinPeso.length });
+    } catch (e) { next(e); }
+  },
+
   // GET /admin/email/estado
   async estadoEmail(req, res, next) {
     try {
