@@ -120,6 +120,15 @@ const DEFAULTS = {
     desc: "Muestra el botón de contacto por WhatsApp en la tienda.",
   },
 
+  // ── Marca ─────────────────────────────────────────────────
+  logo_url: {
+    valor: "",
+    tipo: "texto",
+    grupo: "Marca",
+    etiqueta: "Logo de la plataforma",
+    desc: "Se muestra en la cabecera. Súbelo desde el botón de arriba (o pega una URL de imagen). Vacío = se usa el texto 'AfroMercado'.",
+  },
+
   // ── Datos legales (aparecen en Términos y Habeas Data) ─────
   legal_razon_social: {
     valor: "",

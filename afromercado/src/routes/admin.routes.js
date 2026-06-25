@@ -51,6 +51,9 @@ router.post("/comercios/:id/comision",          ...soloAdmin, AdminController.se
 // Mantenimiento puntual
 router.post("/backfill-pesos", ...soloAdmin, AdminController.backfillPesos);
 
+// Marca: subir el logo de la plataforma
+router.post("/logo", ...soloAdmin, AdminController.uploadLogo, AdminController.subirLogo);
+
 // Config global
 router.get("/config",        ...soloAdmin, AdminController.listarConfig);
 router.get("/reglas",        ...soloAdmin, AdminController.listarReglas);

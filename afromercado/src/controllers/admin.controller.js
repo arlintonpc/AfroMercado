@@ -1,6 +1,8 @@
 const path = require("path");
 const fs = require("fs");
+const multer = require("multer");
 const prisma = require("../config/prisma");
+const { subirACloudinary } = require("../utils/cloudinary");
 const AdminService = require("../services/admin.service");
 const PagoRepository = require("../repositories/pago.repository");
 const UsuarioRepository = require("../repositories/usuario.repository");
@@ -13,6 +15,20 @@ const Reglas = require("../config/reglas");
 const NotificacionService = require("../services/notificacion.service");
 
 const RAIZ_PROYECTO = path.join(__dirname, "..", "..");
+
+const DIR_MARCA = path.join(RAIZ_PROYECTO, "uploads", "marca");
+fs.mkdirSync(DIR_MARCA, { recursive: true });
+const _uploadLogo = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, DIR_MARCA),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || ".png";
+      cb(null, `logo_${Date.now()}${ext}`);
+    },
+  }),
+  fileFilter: (req, file, cb) => cb(null, file.mimetype.startsWith("image/")),
+  limits: { fileSize: 3 * 1024 * 1024 },
+}).single("logo");
 
 const AdminController = {
   async pagosPendientes(req, res, next) {
@@ -83,6 +99,22 @@ const AdminController = {
         });
       }
       res.json({ ok: true, actualizados: sinPeso.length });
+    } catch (e) { next(e); }
+  },
+
+  // Middleware multer (campo "logo") para subir el logo de la plataforma.
+  uploadLogo: _uploadLogo,
+
+  // POST /admin/logo — sube el logo de la plataforma y lo guarda en config.
+  async subirLogo(req, res, next) {
+    try {
+      if (!req.file) throw new ErrorValidacion("Adjunta el logo (campo 'logo')");
+      const cloud = await subirACloudinary(req.file.path, "afromercado/marca");
+      const url = cloud
+        ? (() => { try { fs.unlinkSync(req.file.path); } catch { /* noop */ } return cloud; })()
+        : `${req.protocol}://${req.get("host")}/uploads/marca/${req.file.filename}`;
+      await ConfigRepository.guardar("logo_url", url);
+      res.json({ ok: true, url });
     } catch (e) { next(e); }
   },
 
@@ -194,6 +226,7 @@ const AdminController = {
       const rol = req.query.rol?.trim() ?? '';
       if (!q || q.length < 3) return res.json({ ok: true, data: [] });
       const where = {
+        activo: true,
         OR: [
           { telefono: { contains: q, mode: 'insensitive' } },
           { nombre:   { contains: q, mode: 'insensitive' } },
@@ -462,7 +495,7 @@ const AdminController = {
   async listarRepartidores(req, res, next) {
     try {
       const data = await prisma.usuario.findMany({
-        where: { rol: "REPARTIDOR" },
+        where: { rol: "REPARTIDOR", activo: true },
         select: { id: true, nombre: true, email: true, telefono: true, createdAt: true },
         orderBy: { nombre: "asc" },
       });

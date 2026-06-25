@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiFetch } from '@/lib/api/client'
+import SubidorLogo from '@/components/admin/SubidorLogo'
 
 interface Regla {
   clave: string
@@ -154,6 +155,8 @@ export default function PaginaReglas() {
           Configura las reglas de negocio sin tocar código. Los cambios tienen efecto inmediato.
         </p>
       </div>
+
+      <SubidorLogo />
 
       {cargando ? (
         <div className="flex flex-col gap-3">
