@@ -10,18 +10,8 @@ import {
   actualizarComercio,
   subirDocumentoComercio,
   type Comercio,
-  type TipoDocumento,
 } from '@/components/comerciante/api'
 import { obtenerReglasPublicas } from '@/lib/api/config'
-
-const TIPOS_DOCUMENTO: { valor: TipoDocumento; etiqueta: string }[] = [
-  { valor: 'CC',        etiqueta: 'Cédula de Ciudadanía (CC)' },
-  { valor: 'TI',        etiqueta: 'Tarjeta de Identidad (TI)' },
-  { valor: 'CE',        etiqueta: 'Cédula de Extranjería (CE)' },
-  { valor: 'PEP',       etiqueta: 'Permiso Especial de Permanencia (PEP)' },
-  { valor: 'PASAPORTE', etiqueta: 'Pasaporte' },
-  { valor: 'NIT',       etiqueta: 'NIT (empresa)' },
-]
 
 export default function PerfilComerciantePage() {
   const [comercio, setComercio] = useState<Comercio | null>(null)

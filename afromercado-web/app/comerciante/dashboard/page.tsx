@@ -1,4 +1,5 @@
 'use client'
+/* eslint-disable @next/next/no-img-element -- las imagenes de productos usan URLs externas configurables */
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -53,7 +54,7 @@ interface FormOferta {
   stockLimite: string
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')
 
 // ── Utilidades ────────────────────────────────────────────────
 

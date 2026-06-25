@@ -188,6 +188,8 @@ export default function PerfilPage() {
               title="Cambiar foto de perfil"
             >
               {perfil.avatarUrl ? (
+                // Los avatares pueden estar alojados en proveedores externos configurables.
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={perfil.avatarUrl}
                   alt={perfil.nombre}

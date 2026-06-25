@@ -1,7 +1,7 @@
 import { apiFetch, TOKEN_KEY } from './client'
 import type { Usuario, TipoDocumento } from '@/types/usuario'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')
 
 export interface DatosActualizarPerfil {
   nombre?: string

@@ -324,7 +324,7 @@ export default function Home() {
 
       // Visibilidades pagadas activas (HOME_DESTACADO y CATALOGO)
       try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+        const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')
         const r = await fetch(`${API_URL}/productos/destacados`)
         if (r.ok) {
           const j = await r.json()

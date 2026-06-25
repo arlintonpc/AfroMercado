@@ -199,7 +199,7 @@ export default function PaginaProducto({
     if (!producto?.comercioId) return
     let activo = true
     setCargandoTienda(true)
-    const url = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/productos?comercioId=${producto.comercioId}&porPagina=8`
+    const url = `${process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')}/productos?comercioId=${producto.comercioId}&porPagina=8`
     fetch(url)
       .then(r => r.json())
       .then(j => {

@@ -324,8 +324,6 @@ export default function SolicitudesRepartidorPage() {
     ? solicitudes
     : solicitudes.filter((s) => s.estado === filtro)
 
-  const pendientes = solicitudes.filter((s) => s.estado === 'PENDIENTE').length
-
   return (
     <div className="flex flex-col gap-6">
       {/* Encabezado */}

@@ -30,11 +30,21 @@ function horaCorta(iso: string): string {
   return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
 }
 
+function fusionarMensajes(prev: MensajeChat[], nuevos: MensajeChat[]): MensajeChat[] {
+  const idsActuales = new Set(prev.map((mensaje) => mensaje.id))
+  if (nuevos.every((mensaje) => idsActuales.has(mensaje.id))) return prev
+
+  const mapa = new Map<number, MensajeChat>()
+  for (const mensaje of prev) mapa.set(mensaje.id, mensaje)
+  for (const mensaje of nuevos) mapa.set(mensaje.id, mensaje)
+  return Array.from(mapa.values()).sort((a, b) => a.id - b.id)
+}
+
 function PaginaChatInner() {
   const router = useRouter()
   const params = useSearchParams()
   const { usuario, autenticado, cargando: cargandoAuth } = useAuth()
-  const { notificaciones } = useNotificaciones()
+  const { ultimoMensajeChat } = useNotificaciones()
 
   const [conversaciones, setConversaciones] = useState<ConversacionChat[]>([])
   const [activa, setActiva] = useState<ConversacionChat | null>(null)
@@ -42,10 +52,14 @@ function PaginaChatInner() {
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [cargandoMsgs, setCargandoMsgs] = useState(false)
+  const [cargandoMas, setCargandoMas] = useState(false)
+  const [puedeCargarMas, setPuedeCargarMas] = useState(false)
   const [vistaMovil, setVistaMovil] = useState<'lista' | 'chat'>('lista')
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const autoScrollRef = useRef(true)
+  const activaIdRef = useRef<number | null>(null)
 
   const cargarConversaciones = useCallback(async () => {
     try {
@@ -54,13 +68,46 @@ function PaginaChatInner() {
     } catch { /* silencioso */ }
   }, [])
 
-  const cargarMensajes = useCallback(async (convId: number) => {
-    setCargandoMsgs(true)
+  const cargarMensajes = useCallback(async (
+    convId: number,
+    opciones?: { antesDe?: number; reemplazar?: boolean },
+  ) => {
+    const cargarAnteriores = typeof opciones?.antesDe === 'number'
+    if (cargarAnteriores) {
+      setCargandoMas(true)
+    } else {
+      setCargandoMsgs(true)
+    }
     try {
-      const data = await obtenerMensajes(convId)
-      setMensajes(data)
+      const page = await obtenerMensajes(convId, opciones?.antesDe ? { antesDe: opciones.antesDe } : undefined)
+      if (activaIdRef.current !== convId) return
+
+      if (cargarAnteriores || opciones?.reemplazar !== false) {
+        setPuedeCargarMas(page.hasMore)
+      }
+      if (opciones?.reemplazar === false) {
+        setMensajes((prev) => {
+          const ultimoAnterior = prev[prev.length - 1]?.id ?? 0
+          const fusionados = fusionarMensajes(prev, page.items)
+          const ultimoNuevo = fusionados[fusionados.length - 1]?.id ?? 0
+          if (!cargarAnteriores && ultimoNuevo > ultimoAnterior) {
+            autoScrollRef.current = true
+          }
+          return fusionados
+        })
+      } else {
+        autoScrollRef.current = true
+        setMensajes(page.items)
+      }
     } catch { /* silencioso */ }
-    finally { setCargandoMsgs(false) }
+    finally {
+      if (activaIdRef.current !== convId) return
+      if (cargarAnteriores) {
+        setCargandoMas(false)
+      } else {
+        setCargandoMsgs(false)
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -87,50 +134,64 @@ function PaginaChatInner() {
 
   // SSE: escuchar mensajes nuevos
   useEffect(() => {
-    const nuevas = notificaciones.filter((n) => n.tipo === 'MENSAJE_NUEVO')
-    if (nuevas.length === 0) return
-    const ultima = nuevas[0]
-    const datos = ultima.datos as { conversacionId?: number } | null
-    if (!datos?.conversacionId) return
+    if (!ultimoMensajeChat?.conversacionId) return
 
     cargarConversaciones()
 
-    if (activa && datos.conversacionId === activa.id) {
-      cargarMensajes(activa.id)
+    if (activa && ultimoMensajeChat.conversacionId === activa.id) {
+      cargarMensajes(activa.id, { reemplazar: false })
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notificaciones])
+  }, [ultimoMensajeChat, activa, cargarConversaciones, cargarMensajes])
 
   // Polling cada 5s cuando hay conversación activa
   useEffect(() => {
     if (!activa) return
     const intervalo = setInterval(() => {
-      cargarMensajes(activa.id)
+      cargarMensajes(activa.id, { reemplazar: false })
     }, 5000)
     return () => clearInterval(intervalo)
   }, [activa, cargarMensajes])
 
   // Scroll al fondo al recibir nuevos mensajes
   useEffect(() => {
+    if (!autoScrollRef.current) {
+      autoScrollRef.current = true
+      return
+    }
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [mensajes])
 
   function seleccionarConversacion(conv: ConversacionChat) {
+    activaIdRef.current = conv.id
     setActiva(conv)
     setMensajes([])
+    setPuedeCargarMas(false)
+    autoScrollRef.current = true
     cargarMensajes(conv.id)
     setVistaMovil('chat')
     inputRef.current?.focus()
   }
 
+  async function cargarMensajesAnteriores() {
+    if (!activa || mensajes.length === 0 || !puedeCargarMas || cargandoMas) return
+    autoScrollRef.current = false
+    await cargarMensajes(activa.id, {
+      antesDe: mensajes[0].id,
+      reemplazar: false,
+    })
+  }
+
   async function handleEnviar() {
     if (!activa || !texto.trim() || enviando) return
+    const conversacionId = activa.id
     const contenido = texto.trim()
     setTexto('')
     setEnviando(true)
     try {
-      const nuevo = await enviarMensaje(activa.id, contenido)
-      setMensajes((prev) => [...prev, nuevo])
+      const nuevo = await enviarMensaje(conversacionId, contenido)
+      if (activaIdRef.current !== conversacionId) return
+      autoScrollRef.current = true
+      setMensajes((prev) => fusionarMensajes(prev, [nuevo]))
       await cargarConversaciones()
     } catch { /* silencioso */ }
     finally { setEnviando(false) }
@@ -252,6 +313,18 @@ function PaginaChatInner() {
 
                 {/* Burbuja de mensajes */}
                 <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-2">
+                  {puedeCargarMas && (
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => { void cargarMensajesAnteriores() }}
+                        disabled={cargandoMas}
+                        className="rounded-full border border-[#1A1A1A]/10 bg-white px-4 py-1.5 text-xs font-semibold text-[#1A1A1A]/60 hover:border-[#2D6A4F]/30 hover:text-[#2D6A4F] disabled:opacity-50"
+                      >
+                        {cargandoMas ? 'Cargando mensajes anteriores…' : 'Cargar mensajes anteriores'}
+                      </button>
+                    </div>
+                  )}
                   {cargandoMsgs && mensajes.length === 0 ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="w-6 h-6 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />

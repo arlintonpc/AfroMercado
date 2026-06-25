@@ -107,6 +107,7 @@ function Comprobante({ pagoId }: { pagoId: number }) {
   if (url) {
     return (
       <div className="mt-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt="Comprobante de pago" className="max-h-64 rounded-xl border border-[#1A1A1A]/10 object-contain" />
         <a href={url} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs text-[#2D6A4F] hover:underline">
           Abrir en nueva pestaña

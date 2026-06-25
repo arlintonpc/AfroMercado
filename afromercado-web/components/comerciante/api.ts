@@ -14,7 +14,7 @@
  */
 import { apiFetch, obtenerToken } from '@/lib/api/client'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')
 
 /** Comercio tal como lo devuelve el backend. */
 export interface Comercio {
@@ -408,7 +408,7 @@ export interface Liquidacion {
   id: number
   tipo: 'COMERCIANTE' | 'REPARTIDOR'
   monto: number
-  estado: 'PENDIENTE' | 'PAGADA'
+  estado: 'PENDIENTE' | 'PAGADA' | 'CANCELADA'
   periodoDesde: string
   periodoHasta: string
   cuentaDestino: string | null

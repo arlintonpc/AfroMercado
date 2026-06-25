@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiFetch } from '@/lib/api/client'
 import { formatearPrecio } from '@/lib/formatearPrecio'
@@ -27,7 +27,7 @@ export default function LogUsos() {
   const [desde, setDesde]       = useState('')
   const [hasta, setHasta]       = useState('')
 
-  async function cargar(pag = pagina) {
+  const cargar = useCallback(async (pag: number) => {
     setCargando(true)
     try {
       const p = new URLSearchParams({ pagina: String(pag), porPagina: '50' })
@@ -39,9 +39,9 @@ export default function LogUsos() {
       setItems(res?.data?.items ?? [])
       setTotal(res?.data?.total ?? 0)
     } catch { /* */ } finally { setCargando(false) }
-  }
+  }, [q, estado, desde, hasta])
 
-  useEffect(() => { cargar(1) }, [estado, desde, hasta])
+  useEffect(() => { void cargar(1) }, [cargar])
 
   function buscar() { setPagina(1); cargar(1) }
 

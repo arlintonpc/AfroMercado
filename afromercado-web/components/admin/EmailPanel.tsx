@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   obtenerEstadoEmail,
   actualizarConfigEmail,
@@ -36,12 +36,12 @@ export default function EmailPanel() {
   const [enviandoTest, setEnviandoTest] = useState(false)
   const [aviso, setAviso] = useState<Aviso | null>(null)
 
-  function mostrarAviso(tipo: Aviso['tipo'], texto: string) {
+  const mostrarAviso = useCallback((tipo: Aviso['tipo'], texto: string) => {
     setAviso({ tipo, texto })
     setTimeout(() => setAviso(null), 5000)
-  }
+  }, [])
 
-  async function cargar() {
+  const cargar = useCallback(async () => {
     try {
       const data = await obtenerEstadoEmail()
       setEstado(data)
@@ -58,9 +58,9 @@ export default function EmailPanel() {
     } finally {
       setCargando(false)
     }
-  }
+  }, [mostrarAviso])
 
-  useEffect(() => { void cargar() }, [])
+  useEffect(() => { void cargar() }, [cargar])
 
   function aplicarPreset(preset: (typeof PRESETS)[number]) {
     setSmtp(s => ({ ...s, host: preset.host, port: preset.port, secure: preset.secure }))

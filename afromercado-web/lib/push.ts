@@ -1,6 +1,6 @@
 import { apiFetch } from '@/lib/api/client'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')
 
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -15,11 +15,11 @@ export async function suscribirPush(token: string): Promise<boolean> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false
 
   try {
-    const { clavePublica, activo } = await apiFetch<{ clavePublica: string; activo: boolean }>(
+    const { clave, activo } = await apiFetch<{ clave: string | null; activo: boolean }>(
       '/push/clave-publica',
       { auth: false },
     )
-    if (!activo) return false
+    if (!activo || !clave) return false
 
     const registro = await navigator.serviceWorker.register('/sw.js')
     await navigator.serviceWorker.ready
@@ -29,7 +29,7 @@ export async function suscribirPush(token: string): Promise<boolean> {
 
     const suscripcion = await registro.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(clavePublica),
+      applicationServerKey: urlBase64ToUint8Array(clave),
     })
 
     const { endpoint, keys } = suscripcion.toJSON() as {
@@ -37,14 +37,15 @@ export async function suscribirPush(token: string): Promise<boolean> {
       keys: { p256dh: string; auth: string }
     }
 
-    await fetch(`${API_URL}/push/suscribir`, {
+    const respuesta = await fetch(`${API_URL}/push/suscribir`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ endpoint, p256dh: keys.p256dh, auth: keys.auth }),
+      body: JSON.stringify({ endpoint, keys }),
     })
+    if (!respuesta.ok) throw new Error('No se pudo registrar la suscripcion push')
 
     return true
   } catch {
@@ -60,7 +61,7 @@ export async function desuscribirPush(token: string): Promise<void> {
     if (!suscripcion) return
     const { endpoint } = suscripcion
     await suscripcion.unsubscribe()
-    await fetch(`${API_URL}/push/suscribir`, {
+    const respuesta = await fetch(`${API_URL}/push/suscribir`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -68,6 +69,7 @@ export async function desuscribirPush(token: string): Promise<void> {
       },
       body: JSON.stringify({ endpoint }),
     })
+    if (!respuesta.ok) throw new Error('No se pudo eliminar la suscripcion push')
   } catch {
     // silencioso
   }

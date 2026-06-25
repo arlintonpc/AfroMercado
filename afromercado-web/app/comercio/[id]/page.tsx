@@ -14,7 +14,7 @@ import { listarReviewsTienda, type ReviewTienda } from '@/lib/api/reviewsTienda'
 import { useAuth } from '@/context/AuthContext'
 import { iniciarConversacion } from '@/lib/api/chat'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')
 
 interface ComercioPublico {
   id: number

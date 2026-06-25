@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')
 
 // ── tipos ─────────────────────────────────────────────────────────────
 interface ResumenMes {
@@ -216,7 +216,7 @@ export default function AnalíticasPage() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  async function cargar() {
+  const cargar = useCallback(async () => {
     setCargando(true)
     setError(null)
     try {
@@ -232,12 +232,11 @@ export default function AnalíticasPage() {
     } finally {
       setCargando(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    cargar()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    void cargar()
+  }, [cargar])
 
   if (cargando) {
     return (

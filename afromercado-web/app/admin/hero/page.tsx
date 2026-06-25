@@ -39,7 +39,7 @@ function RadioGroup({ opciones, valor, onChange }: {
 }
 
 export default function AdminHeroPage() {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')
 
   const [modo,     setModo]     = useState<Modo>('FIJAS')
   const [fuente,   setFuente]   = useState<Fuente>('ORGANICO')

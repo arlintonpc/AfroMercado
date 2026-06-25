@@ -13,7 +13,7 @@ export const USUARIO_KEY = 'afromercado_usuario'
 // URL del backend. Si NEXT_PUBLIC_API_URL está definida, manda. Si no, el
 // valor por defecto depende del entorno de compilación: en producción apunta
 // al backend en Render; en desarrollo, al backend local.
-const API_URL =
+export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   (process.env.NODE_ENV === 'production'
     ? 'https://afromercado-api.onrender.com/api'

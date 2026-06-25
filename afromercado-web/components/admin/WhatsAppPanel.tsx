@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { obtenerEstadoWhatsApp, conectarWhatsApp, type EstadoWhatsApp } from './api'
 
 export default function WhatsAppPanel() {
@@ -9,7 +9,7 @@ export default function WhatsAppPanel() {
   const [error, setError] = useState<string | null>(null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  async function cargarEstado() {
+  const cargarEstado = useCallback(async () => {
     try {
       const s = await obtenerEstadoWhatsApp()
       setEstado(s)
@@ -17,16 +17,16 @@ export default function WhatsAppPanel() {
     } catch {
       return null
     }
-  }
+  }, [])
 
-  function detenerPolling() {
+  const detenerPolling = useCallback(() => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current)
       pollingRef.current = null
     }
-  }
+  }, [])
 
-  function iniciarPolling() {
+  const iniciarPolling = useCallback(() => {
     detenerPolling()
     pollingRef.current = setInterval(async () => {
       const s = await cargarEstado()
@@ -34,7 +34,7 @@ export default function WhatsAppPanel() {
         detenerPolling()
       }
     }, 3000)
-  }
+  }, [cargarEstado, detenerPolling])
 
   // Polling arranca siempre al montar — detecta QR aunque el backend
   // ya lo haya generado automáticamente al iniciar el servidor.
@@ -46,7 +46,7 @@ export default function WhatsAppPanel() {
       }
     })
     return () => detenerPolling()
-  }, [])
+  }, [cargarEstado, detenerPolling, iniciarPolling])
 
   async function handleConectar() {
     setError(null)

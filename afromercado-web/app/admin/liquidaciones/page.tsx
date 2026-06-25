@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 type TipoLiq = 'COMERCIANTE' | 'REPARTIDOR'
-type EstadoLiq = 'PENDIENTE' | 'PAGADA'
+type EstadoLiq = 'PENDIENTE' | 'PAGADA' | 'CANCELADA'
 
 interface LiqBeneficiario {
   id: number
@@ -54,9 +54,13 @@ function fecha(iso: string) {
 }
 
 function badgeEstado(estado: EstadoLiq) {
-  return estado === 'PAGADA'
-    ? 'bg-[#52B788]/15 text-[#2D6A4F] border-[#52B788]/30'
-    : 'bg-[#D4A017]/15 text-[#9B7300] border-[#D4A017]/30'
+  if (estado === 'PAGADA') {
+    return 'bg-[#52B788]/15 text-[#2D6A4F] border-[#52B788]/30'
+  }
+  if (estado === 'CANCELADA') {
+    return 'bg-red-50 text-red-600 border-red-200'
+  }
+  return 'bg-[#D4A017]/15 text-[#9B7300] border-[#D4A017]/30'
 }
 
 // ─── Modal crear liquidación ───────────────────────────────────────────────────
@@ -258,13 +262,13 @@ export default function AdminLiquidacionesPage() {
   }, [aviso])
 
   async function marcarPagada(id: number) {
-    const comprobante = window.prompt('URL del comprobante de pago (opcional):') ?? ''
+    const comprobante = window.prompt('URL del comprobante de pago (opcional):')
     if (comprobante === null) return
     setProcesandoId(id)
     try {
       await apiFetch(`/liquidaciones/admin/liquidaciones/${id}/pagar`, {
         method: 'PATCH',
-        body: { comprobanteUrl: comprobante || undefined },
+        body: { comprobante: comprobante?.trim() || undefined },
       })
       setAviso({ tipo: 'exito', texto: 'Liquidación marcada como pagada.' })
       await Promise.all([cargarResumen(), cargarTabla()])
@@ -272,6 +276,25 @@ export default function AdminLiquidacionesPage() {
       setAviso({
         tipo: 'error',
         texto: err instanceof Error ? err.message : 'No se pudo actualizar.',
+      })
+    } finally {
+      setProcesandoId(null)
+    }
+  }
+
+  async function cancelarLiquidacion(id: number) {
+    if (!window.confirm('¿Cancelar esta liquidación pendiente? El saldo volverá a estar disponible.')) return
+    setProcesandoId(id)
+    try {
+      await apiFetch(`/liquidaciones/admin/liquidaciones/${id}/cancelar`, {
+        method: 'PATCH',
+      })
+      setAviso({ tipo: 'exito', texto: 'Liquidación cancelada; el saldo fue liberado.' })
+      await Promise.all([cargarResumen(), cargarTabla()])
+    } catch (err) {
+      setAviso({
+        tipo: 'error',
+        texto: err instanceof Error ? err.message : 'No se pudo cancelar.',
       })
     } finally {
       setProcesandoId(null)
@@ -362,6 +385,7 @@ export default function AdminLiquidacionesPage() {
           <option value="">Todos los estados</option>
           <option value="PENDIENTE">Pendiente</option>
           <option value="PAGADA">Pagada</option>
+          <option value="CANCELADA">Cancelada</option>
         </select>
         <select
           value={filtroTipo}
@@ -428,18 +452,31 @@ export default function AdminLiquidacionesPage() {
                     </td>
                     <td className="px-4 py-4 text-right">
                       {liq.estado === 'PENDIENTE' && (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => marcarPagada(liq.id)}
-                          loading={procesandoId === liq.id}
-                          disabled={procesandoId !== null}
-                        >
-                          Marcar pagada
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => cancelarLiquidacion(liq.id)}
+                            disabled={procesandoId !== null}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => marcarPagada(liq.id)}
+                            loading={procesandoId === liq.id}
+                            disabled={procesandoId !== null}
+                          >
+                            Marcar pagada
+                          </Button>
+                        </div>
                       )}
                       {liq.estado === 'PAGADA' && liq.pagadoAt && (
                         <span className="text-xs text-[#1A1A1A]/40">{fecha(liq.pagadoAt)}</span>
+                      )}
+                      {liq.estado === 'CANCELADA' && (
+                        <span className="text-xs text-red-500">Cancelada</span>
                       )}
                     </td>
                   </tr>

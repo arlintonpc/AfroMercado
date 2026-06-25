@@ -116,10 +116,12 @@ export default function LiquidacionesPage() {
                   className={`rounded-full px-3 py-1 text-xs font-semibold ${
                     liq.estado === 'PAGADA'
                       ? 'bg-[#2D6A4F]/15 text-[#2D6A4F]'
-                      : 'bg-[#D4A017]/15 text-[#A07810]'
+                      : liq.estado === 'CANCELADA'
+                        ? 'bg-red-50 text-red-600'
+                        : 'bg-[#D4A017]/15 text-[#A07810]'
                   }`}
                 >
-                  {liq.estado === 'PAGADA' ? 'Pagada' : 'Pendiente'}
+                  {liq.estado === 'PAGADA' ? 'Pagada' : liq.estado === 'CANCELADA' ? 'Cancelada' : 'Pendiente'}
                 </span>
               </div>
 

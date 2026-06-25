@@ -169,7 +169,7 @@ export function SeccionResenas({ productoId }: { productoId: number }) {
     setCargando(true)
     try {
       const raw = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/productos/${productoId}/reviews`
+        `${process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')}/productos/${productoId}/reviews`
       )
       const json = await raw.json()
       setDatos(json.data)

@@ -54,6 +54,7 @@ export default function PaginaPedido({
   const [enviandoReview, setEnviandoReview] = useState(false)
   const [errorReview, setErrorReview] = useState<string | null>(null)
   const [graciasCalificacion, setGraciasCalificacion] = useState(false)
+  const estadoPedido = pedido?.estado
 
   useEffect(() => {
     if (!cargandoAuth && !autenticado) {
@@ -89,9 +90,9 @@ export default function PaginaPedido({
 
   // Polling: refresca el estado del pedido cada 30 s mientras no sea terminal.
   useEffect(() => {
-    if (!pedido || !autenticado) return
+    if (!estadoPedido || !autenticado) return
     const ESTADOS_TERMINALES = ['ENTREGADO', 'CANCELADO', 'EXPIRADO', 'PAGO_FALLIDO']
-    if (ESTADOS_TERMINALES.includes(pedido.estado)) return
+    if (ESTADOS_TERMINALES.includes(estadoPedido)) return
 
     const interval = setInterval(async () => {
       try {
@@ -111,7 +112,7 @@ export default function PaginaPedido({
     }, 30_000)
 
     return () => clearInterval(interval)
-  }, [pedido?.estado, id, autenticado])
+  }, [estadoPedido, id, autenticado])
 
   // Verifica si puede calificar cuando el pedido está ENTREGADO
   useEffect(() => {

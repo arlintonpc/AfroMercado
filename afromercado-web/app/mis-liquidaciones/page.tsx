@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useAuth } from '@/context/AuthContext'
 
-type EstadoLiq = 'PENDIENTE' | 'PAGADA'
+type EstadoLiq = 'PENDIENTE' | 'PAGADA' | 'CANCELADA'
 
 interface Liquidacion {
   id: number
@@ -19,7 +19,7 @@ interface Liquidacion {
   periodoHasta: string
   cuentaDestino?: string | null
   notas?: string | null
-  comprobanteUrl?: string | null
+  comprobante?: string | null
   pagadoAt?: string | null
   createdAt: string
 }
@@ -140,11 +140,11 @@ export default function MisLiquidacionesPage() {
                     {liq.estado === 'PAGADA' && liq.pagadoAt && (
                       <p className="text-xs text-[#2D6A4F] mt-1">
                         Pagado el {fecha(liq.pagadoAt)}
-                        {liq.comprobanteUrl && (
+                        {liq.comprobante && (
                           <>
                             {' '}—{' '}
                             <a
-                              href={liq.comprobanteUrl}
+                              href={liq.comprobante}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="underline"
@@ -165,10 +165,12 @@ export default function MisLiquidacionesPage() {
                         'inline-flex mt-1 items-center rounded-full border px-2 py-0.5 text-xs font-semibold',
                         liq.estado === 'PAGADA'
                           ? 'border-[#52B788]/30 bg-[#52B788]/10 text-[#2D6A4F]'
-                          : 'border-[#D4A017]/30 bg-[#D4A017]/10 text-[#9B7300]',
+                          : liq.estado === 'CANCELADA'
+                            ? 'border-red-200 bg-red-50 text-red-600'
+                            : 'border-[#D4A017]/30 bg-[#D4A017]/10 text-[#9B7300]',
                       ].join(' ')}
                     >
-                      {liq.estado === 'PAGADA' ? 'Pagada' : 'Pendiente'}
+                      {liq.estado === 'PAGADA' ? 'Pagada' : liq.estado === 'CANCELADA' ? 'Cancelada' : 'Pendiente'}
                     </span>
                   </div>
                 </div>

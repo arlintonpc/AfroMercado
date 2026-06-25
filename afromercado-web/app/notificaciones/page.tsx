@@ -1,26 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { apiFetch } from '@/lib/api/client'
 import { useAuth } from '@/context/AuthContext'
+import { useNotificaciones, type Notificacion } from '@/context/NotificacionContext'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
-
-interface Notificacion {
-  id: number
-  tipo: string
-  titulo: string
-  mensaje: string
-  url?: string | null
-  leida: boolean
-  createdAt: string
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -99,6 +89,9 @@ function ItemNotif({
           </p>
         </div>
         <p className="mt-0.5 text-sm text-[#1A1A1A]/55 line-clamp-2">{n.mensaje}</p>
+        <p className="mt-1 text-xs text-[#1A1A1A]/35">
+          {fechaCorta(n.createdAt)} · {horaCorta(n.createdAt)}
+        </p>
       </div>
       {!n.leida && (
         <span className="flex-shrink-0 mt-2 h-2 w-2 rounded-full bg-[#2D6A4F]" />
@@ -129,9 +122,14 @@ function ItemNotif({
 export default function NotificacionesPage() {
   const router = useRouter()
   const { autenticado, cargando: cargandoAuth } = useAuth()
+  const {
+    notificaciones,
+    noLeidas,
+    cargando,
+    marcarLeida: marcarLeidaGlobal,
+    marcarTodasLeidas,
+  } = useNotificaciones()
 
-  const [items, setItems]               = useState<Notificacion[]>([])
-  const [cargando, setCargando]         = useState(true)
   const [marcandoTodas, setMarcandoTodas] = useState(false)
 
   useEffect(() => {
@@ -140,45 +138,21 @@ export default function NotificacionesPage() {
     }
   }, [cargandoAuth, autenticado, router])
 
-  const cargar = useCallback(async () => {
-    if (!autenticado) return
-    setCargando(true)
-    try {
-      // El backend responde { ok, data: { notificaciones, noLeidas } }.
-      // Aceptamos también un arreglo directo por compatibilidad.
-      const res = await apiFetch<{
-        ok: boolean
-        data: Notificacion[] | { notificaciones?: Notificacion[]; noLeidas?: number }
-      }>('/notificaciones')
-      const data = res.data
-      const lista = Array.isArray(data) ? data : (data?.notificaciones ?? [])
-      setItems(lista)
-    } catch { /**/ } finally {
-      setCargando(false)
-    }
-  }, [autenticado])
-
-  useEffect(() => {
-    if (!cargandoAuth) void cargar()
-  }, [cargandoAuth, cargar])
-
   async function marcarLeida(id: number) {
-    setItems((prev) => prev.map((n) => n.id === id ? { ...n, leida: true } : n))
-    try { await apiFetch(`/notificaciones/${id}/leer`, { method: 'PATCH' }) } catch { /**/ }
+    await marcarLeidaGlobal(id)
   }
 
   async function marcarTodas() {
     setMarcandoTodas(true)
     try {
-      await apiFetch('/notificaciones/leer-todas', { method: 'PATCH' })
-      setItems((prev) => prev.map((n) => ({ ...n, leida: true })))
+      await marcarTodasLeidas()
     } catch { /**/ } finally {
       setMarcandoTodas(false)
     }
   }
 
-  const sinLeer = items.filter((n) => !n.leida).length
-  const grupos  = agrupar(items)
+  const sinLeer = noLeidas
+  const grupos  = agrupar(notificaciones)
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F5F0]">
@@ -212,7 +186,7 @@ export default function NotificacionesPage() {
               <Skeleton key={i} className="h-20 w-full rounded-2xl" />
             ))}
           </div>
-        ) : items.length === 0 ? (
+        ) : notificaciones.length === 0 ? (
           <div className="rounded-2xl border border-[#1A1A1A]/5 bg-white px-6 py-16 text-center shadow-sm">
             <p className="text-4xl mb-4">🔔</p>
             <p className="text-base font-semibold text-[#1A1A1A]/55">Sin notificaciones</p>

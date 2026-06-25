@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { apiFetch } from '@/lib/api/client'
@@ -208,7 +208,7 @@ function TabUsos({ cuponId }: { cuponId: number }) {
   const [estado, setEstado]     = useState('')
   const [q, setQ]               = useState('')
 
-  async function cargar(pag = pagina) {
+  const cargar = useCallback(async (pag: number) => {
     setCargando(true)
     try {
       const params = new URLSearchParams({ pagina: String(pag), porPagina: '50' })
@@ -218,8 +218,9 @@ function TabUsos({ cuponId }: { cuponId: number }) {
       setItems(res?.data?.items ?? [])
       setTotal(res?.data?.total ?? 0)
     } catch { /* */ } finally { setCargando(false) }
-  }
-  useEffect(() => { cargar(1) }, [estado])
+  }, [cuponId, estado, q])
+
+  useEffect(() => { void cargar(1) }, [cargar])
 
   return (
     <div className="flex flex-col gap-4">
