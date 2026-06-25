@@ -75,6 +75,8 @@ function CabeceraComercio({ c, onChatear }: { c: ComercioPublico; onChatear?: ()
       <div className="flex items-start gap-4">
         {/* Logo o inicial */}
         {c.logoUrl ? (
+          // La URL proviene del comercio y puede usar un host externo no conocido en build.
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={c.logoUrl}
             alt={c.nombre}
@@ -176,42 +178,6 @@ function CabeceraComercio({ c, onChatear }: { c: ComercioPublico; onChatear?: ()
 }
 
 // ── Estrellas interactivas ────────────────────────────────────
-
-function EstrellasInteractivas({
-  valor,
-  onChange,
-}: {
-  valor: number
-  onChange: (v: number) => void
-}) {
-  const [hover, setHover] = useState(0)
-  return (
-    <span className="flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <button
-          key={i}
-          type="button"
-          onClick={() => onChange(i)}
-          onMouseEnter={() => setHover(i)}
-          onMouseLeave={() => setHover(0)}
-          className="focus:outline-none"
-          aria-label={`${i} estrella${i > 1 ? 's' : ''}`}
-        >
-          <svg
-            width="28"
-            height="28"
-            viewBox="0 0 24 24"
-            fill={i <= (hover || valor) ? '#D4A017' : 'none'}
-            stroke="#D4A017"
-            strokeWidth="1.5"
-          >
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-          </svg>
-        </button>
-      ))}
-    </span>
-  )
-}
 
 // ── Iniciales del comprador ───────────────────────────────────
 
@@ -339,6 +305,8 @@ export default function PaginaComercio({ params }: { params: Promise<{ id: strin
   const [productos, setProductos] = useState<Producto[]>([])
   const [cargando, setCargando] = useState(true)
   const [noEncontrado, setNoEncontrado] = useState(false)
+  const [errorCarga, setErrorCarga] = useState<string | null>(null)
+  const [reintentos, setReintentos] = useState(0)
 
   const esComprador = autenticado && usuario?.rol === 'COMPRADOR'
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null)
@@ -356,16 +324,35 @@ export default function PaginaComercio({ params }: { params: Promise<{ id: strin
     let activo = true
     async function cargar() {
       setCargando(true)
-      const c = await fetchComercio(id)
-      if (!activo) return
-      if (!c) { setNoEncontrado(true); setCargando(false); return }
-      setComercio(c)
-      const prods = await fetchProductos(c.id)
-      if (activo) { setProductos(prods); setCargando(false) }
+      setErrorCarga(null)
+      setNoEncontrado(false)
+      setComercio(null)
+      setProductos([])
+
+      // Si el backend no responde, no queremos dejar el skeleton infinito.
+      // El estado final se resuelve siempre en este bloque.
+      try {
+        const c = await fetchComercio(id)
+        if (!activo) return
+        if (!c) {
+          setNoEncontrado(true)
+          return
+        }
+        setComercio(c)
+        const prods = await fetchProductos(c.id)
+        if (!activo) return
+        setProductos(prods)
+      } catch (err) {
+        if (!activo) return
+        console.error('Error cargando comercio:', err)
+        setErrorCarga('No pudimos cargar esta tienda. Revisa tu conexión o intenta de nuevo en unos segundos.')
+      } finally {
+        if (activo) setCargando(false)
+      }
     }
     cargar()
     return () => { activo = false }
-  }, [id])
+  }, [id, reintentos])
 
   // Extrae categorías únicas de los productos cargados
   const categoriasDisponibles = (() => {
@@ -415,6 +402,31 @@ export default function PaginaComercio({ params }: { params: Promise<{ id: strin
               ))}
             </div>
           </div>
+        ) : errorCarga ? (
+          comercio ? (
+            <div className="flex flex-col gap-6">
+              <CabeceraComercio c={comercio} onChatear={esComprador ? handleChatear : undefined} />
+              <EmptyState
+                titulo="No se pudo cargar la tienda"
+                descripcion={errorCarga}
+                onReintentar={() => setReintentos((n) => n + 1)}
+              >
+                <Link href="/" className="mt-2 text-sm text-[#2D6A4F] font-semibold hover:underline">
+                  Volver al inicio
+                </Link>
+              </EmptyState>
+            </div>
+          ) : (
+            <EmptyState
+              titulo="No se pudo cargar la tienda"
+              descripcion={errorCarga}
+              onReintentar={() => setReintentos((n) => n + 1)}
+            >
+              <Link href="/" className="mt-2 text-sm text-[#2D6A4F] font-semibold hover:underline">
+                Volver al inicio
+              </Link>
+            </EmptyState>
+          )
         ) : noEncontrado || !comercio ? (
           <EmptyState
             titulo="Comercio no encontrado"
