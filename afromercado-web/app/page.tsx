@@ -31,11 +31,11 @@ function tiempoRestante(fin: string): string {
 
 /* ─── Datos estáticos de presentación de categorías (solo visual) ──── */
 const CATEGORIAS = [
-  { emoji: '🌿', nombre: 'Del Campo',    fondo: 'bg-[#E8F5EE]', texto: 'text-[#2D6A4F]', proximamente: false },
-  { emoji: '🎨', nombre: 'Artesanías',   fondo: 'bg-[#FFF8E8]', texto: 'text-[#B8860B]', proximamente: true  },
-  { emoji: '🍽️', nombre: 'Gastronomía', fondo: 'bg-[#FFF3EE]', texto: 'text-[#B85A1A]', proximamente: true  },
-  { emoji: '🏞️', nombre: 'Turismo',     fondo: 'bg-[#EEF3FF]', texto: 'text-[#2A4AB8]', proximamente: true  },
-  { emoji: '🎭', nombre: 'Cultural',     fondo: 'bg-[#F5EEF8]', texto: 'text-[#7A2AB8]', proximamente: true  },
+  { emoji: '🌿', nombre: 'Del Campo',    slug: 'del-campo',  fondo: 'bg-[#E8F5EE]', texto: 'text-[#2D6A4F]', proximamente: false },
+  { emoji: '🎨', nombre: 'Artesanías',   slug: 'artesanias', fondo: 'bg-[#FFF8E8]', texto: 'text-[#B8860B]', proximamente: false },
+  { emoji: '🍽️', nombre: 'Gastronomía', slug: '',           fondo: 'bg-[#FFF3EE]', texto: 'text-[#B85A1A]', proximamente: true  },
+  { emoji: '🏞️', nombre: 'Turismo',     slug: '',           fondo: 'bg-[#EEF3FF]', texto: 'text-[#2A4AB8]', proximamente: true  },
+  { emoji: '🎭', nombre: 'Cultural',     slug: '',           fondo: 'bg-[#F5EEF8]', texto: 'text-[#7A2AB8]', proximamente: true  },
 ]
 
 interface VisibilidadActiva {
@@ -67,22 +67,34 @@ function SeccionCategorias() {
           className="flex gap-3 overflow-x-auto pb-1 justify-start md:justify-center"
           style={{ scrollbarWidth: 'none' } as React.CSSProperties}
         >
-          {CATEGORIAS.map((cat) => (
-            <div key={cat.nombre} className="relative flex-shrink-0">
-              <button
-                disabled={cat.proximamente}
-                className={`flex flex-col items-center gap-1.5 px-5 py-4 rounded-2xl transition-all duration-200 min-w-[90px] ${cat.fondo} ${cat.proximamente ? 'opacity-60 cursor-not-allowed' : 'hover:scale-105 hover:shadow-md'}`}
-              >
+          {CATEGORIAS.map((cat) => {
+            const claseBase = `flex flex-col items-center gap-1.5 px-5 py-4 rounded-2xl transition-all duration-200 min-w-[90px] ${cat.fondo}`
+            const contenido = (
+              <>
                 <span className="text-3xl leading-none">{cat.emoji}</span>
                 <span className={`text-xs font-semibold ${cat.texto} whitespace-nowrap`}>{cat.nombre}</span>
-              </button>
-              {cat.proximamente && (
-                <span className="absolute -top-1.5 -right-1.5 bg-[#D4A017] text-[#1A1A1A] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none whitespace-nowrap">
-                  Próximo
-                </span>
-              )}
-            </div>
-          ))}
+              </>
+            )
+            const activa = !cat.proximamente && !!cat.slug
+            return (
+              <div key={cat.nombre} className="relative flex-shrink-0">
+                {activa ? (
+                  <Link href={`/buscar?categoria=${cat.slug}`} className={`${claseBase} hover:scale-105 hover:shadow-md`}>
+                    {contenido}
+                  </Link>
+                ) : (
+                  <button disabled className={`${claseBase} opacity-60 cursor-not-allowed`}>
+                    {contenido}
+                  </button>
+                )}
+                {cat.proximamente && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-[#D4A017] text-[#1A1A1A] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none whitespace-nowrap">
+                    Próximo
+                  </span>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     </section>

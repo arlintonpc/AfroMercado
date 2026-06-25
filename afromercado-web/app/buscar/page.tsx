@@ -34,6 +34,7 @@ function Resultados() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const q = searchParams.get('q') ?? ''
+  const categoriaSlug = searchParams.get('categoria') ?? ''
 
   const [termino, setTermino] = useState(q)
   const [productos, setProductos] = useState<Producto[]>([])
@@ -56,6 +57,13 @@ function Resultados() {
   useEffect(() => {
     listarCategorias().then(setCategorias).catch(() => {})
   }, [])
+
+  // Si la URL trae ?categoria=<slug> (desde el home), aplica ese filtro.
+  useEffect(() => {
+    if (!categoriaSlug || categorias.length === 0) return
+    const cat = categorias.find((c) => c.slug === categoriaSlug)
+    if (cat) setFiltros((f) => ({ ...f, categoriaId: cat.id }))
+  }, [categoriaSlug, categorias])
 
   useEffect(() => {
     setTermino(q)
