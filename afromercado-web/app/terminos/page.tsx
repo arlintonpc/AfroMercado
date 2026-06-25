@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import { DatoLegal } from '@/components/legal/DatoLegal'
 
 function Bloque({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
@@ -31,15 +32,15 @@ export default function PaginaTerminos() {
             Estas condiciones regulan el uso de AfroMercado y la relación entre compradores, comercios y la
             plataforma. Al crear una cuenta o realizar un pedido aceptas estos términos.
           </p>
-          <p className="mt-2 text-xs text-[#1A1A1A]/45">Última actualización: [COMPLETAR fecha] · Aplica legislación de la República de Colombia.</p>
+          <p className="mt-2 text-xs text-[#1A1A1A]/45">Última actualización: 24 de junio de 2026 · Aplica legislación de la República de Colombia.</p>
         </div>
 
         <div className="grid gap-4">
           <Bloque titulo="1. Quiénes somos">
             <p>
-              AfroMercado es operado por <strong>[COMPLETAR: razón social]</strong>, identificada con
-              NIT <strong>[COMPLETAR: NIT]</strong>, con domicilio en <strong>[COMPLETAR: dirección, ciudad]</strong>,
-              correo <strong>[COMPLETAR: correo]</strong> y teléfono <strong>[COMPLETAR: teléfono/WhatsApp]</strong>.
+              AfroMercado es operado por <strong><DatoLegal campo="razonSocial" /></strong>, identificada con
+              NIT <strong><DatoLegal campo="nit" /></strong>, con domicilio en <strong><DatoLegal campo="direccion" /></strong>,
+              correo <strong><DatoLegal campo="email" /></strong> y teléfono <strong><DatoLegal campo="telefono" /></strong>.
             </p>
             <p>
               AfroMercado es un <strong>marketplace</strong>: una plataforma que conecta a compradores con productores
@@ -123,11 +124,11 @@ export default function PaginaTerminos() {
           <Bloque titulo="9. Cambios y contacto">
             <p>
               Podemos actualizar estos términos; publicaremos la versión vigente en esta página. Si tienes preguntas,
-              entra a la página de contacto o escríbenos a <strong>[COMPLETAR: correo de soporte]</strong>.
+              entra a la página de contacto o escríbenos a <strong><DatoLegal campo="email" /></strong>.
             </p>
             <p className="text-xs text-[#1A1A1A]/45">
-              Nota: este documento es una base general. Antes de publicar, recomendamos que un abogado en Colombia lo
-              revise y complete los campos marcados.
+              Nota: este documento es una base general. Recomendamos que un abogado en Colombia lo revise y ajuste
+              según tu operación. Los datos del operador (razón social, NIT, contacto) se configuran desde el panel.
             </p>
           </Bloque>
         </div>

@@ -16,6 +16,12 @@ export interface ReglasPublicas {
   cuponCombinableConOferta: boolean
   /** Si el botón de WhatsApp está visible en la tienda. */
   whatsappBotonActivo: boolean
+  /** Datos legales (Términos / Habeas Data). Vacío = aún sin definir. */
+  legalRazonSocial: string
+  legalNit: string
+  legalDireccion: string
+  legalEmail: string
+  legalTelefono: string
 }
 
 export async function obtenerReglasPublicas(): Promise<ReglasPublicas> {
@@ -30,5 +36,10 @@ export async function obtenerReglasPublicas(): Promise<ReglasPublicas> {
     envioPoliticaMulticomercio: d['envio_politica_multicomercio'] === 'consolidado' ? 'consolidado' : 'por_comercio',
     cuponCombinableConOferta: d['cupon_combinable_con_oferta'] === 'true',
     whatsappBotonActivo: d['whatsapp_boton_activo'] === 'true',
+    legalRazonSocial: d['legal_razon_social'] ?? '',
+    legalNit: d['legal_nit'] ?? '',
+    legalDireccion: d['legal_direccion'] ?? '',
+    legalEmail: d['legal_email'] ?? '',
+    legalTelefono: d['legal_telefono'] ?? '',
   }
 }

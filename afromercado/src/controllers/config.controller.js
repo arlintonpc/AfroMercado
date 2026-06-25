@@ -11,6 +11,11 @@ const REGLAS_PUBLICAS = [
   "envio_politica_multicomercio",
   "cupon_combinable_con_oferta",
   "whatsapp_boton_activo",
+  "legal_razon_social",
+  "legal_nit",
+  "legal_direccion",
+  "legal_email",
+  "legal_telefono",
 ];
 
 function upsert(clave, valor) {

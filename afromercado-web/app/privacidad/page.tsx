@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import { DatoLegal } from '@/components/legal/DatoLegal'
 
 function Bloque({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
@@ -31,16 +32,16 @@ export default function PaginaPrivacidad() {
             Esta Política de Tratamiento de Datos Personales se expide conforme a la Ley 1581 de 2012 y el Decreto 1377
             de 2013 de Colombia (Habeas Data), y explica cómo recolectamos, usamos y protegemos tu información.
           </p>
-          <p className="mt-2 text-xs text-[#1A1A1A]/45">Última actualización: [COMPLETAR fecha]</p>
+          <p className="mt-2 text-xs text-[#1A1A1A]/45">Última actualización: 24 de junio de 2026</p>
         </div>
 
         <div className="grid gap-4">
           <Bloque titulo="1. Responsable del tratamiento">
             <p>
-              El responsable del tratamiento de tus datos es <strong>[COMPLETAR: razón social]</strong>,
-              NIT <strong>[COMPLETAR: NIT]</strong>, con domicilio en <strong>[COMPLETAR: dirección, ciudad]</strong>.
-              Para asuntos de datos personales, escríbenos a <strong>[COMPLETAR: correo de protección de datos]</strong>
-              o al <strong>[COMPLETAR: teléfono/WhatsApp]</strong>.
+              El responsable del tratamiento de tus datos es <strong><DatoLegal campo="razonSocial" /></strong>,
+              NIT <strong><DatoLegal campo="nit" /></strong>, con domicilio en <strong><DatoLegal campo="direccion" /></strong>.
+              Para asuntos de datos personales, escríbenos a <strong><DatoLegal campo="email" /></strong>
+              o al <strong><DatoLegal campo="telefono" /></strong>.
             </p>
           </Bloque>
 
@@ -85,7 +86,7 @@ export default function PaginaPrivacidad() {
 
           <Bloque titulo="6. Cómo ejercer tus derechos">
             <p>
-              Envía tu consulta o reclamo a <strong>[COMPLETAR: correo de protección de datos]</strong>. Las consultas
+              Envía tu consulta o reclamo a <strong><DatoLegal campo="email" /></strong>. Las consultas
               se atienden en un máximo de <strong>diez (10) días hábiles</strong> y los reclamos en un máximo de
               <strong> quince (15) días hábiles</strong>, conforme a la ley.
             </p>
@@ -110,8 +111,8 @@ export default function PaginaPrivacidad() {
               seguras.
             </p>
             <p className="text-xs text-[#1A1A1A]/45">
-              Nota: este documento es una base general conforme a la normativa colombiana. Antes de publicar, recomendamos
-              que un abogado lo revise y complete los campos marcados.
+              Nota: este documento es una base general conforme a la normativa colombiana. Recomendamos que un abogado
+              lo revise y ajuste según tu operación. Los datos del responsable se configuran desde el panel.
             </p>
           </Bloque>
         </div>

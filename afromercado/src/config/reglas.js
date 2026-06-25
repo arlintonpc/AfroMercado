@@ -119,6 +119,43 @@ const DEFAULTS = {
     etiqueta: "Botón de WhatsApp visible",
     desc: "Muestra el botón de contacto por WhatsApp en la tienda.",
   },
+
+  // ── Datos legales (aparecen en Términos y Habeas Data) ─────
+  legal_razon_social: {
+    valor: "",
+    tipo: "texto",
+    grupo: "Datos legales",
+    etiqueta: "Razón social",
+    desc: "Nombre legal de quien opera AfroMercado.",
+  },
+  legal_nit: {
+    valor: "",
+    tipo: "texto",
+    grupo: "Datos legales",
+    etiqueta: "NIT o cédula",
+    desc: "Identificación tributaria. Si no hay NIT, usa la cédula o 'en trámite'.",
+  },
+  legal_direccion: {
+    valor: "",
+    tipo: "texto",
+    grupo: "Datos legales",
+    etiqueta: "Dirección y ciudad",
+    desc: "Domicilio que aparece en los documentos legales.",
+  },
+  legal_email: {
+    valor: "",
+    tipo: "texto",
+    grupo: "Datos legales",
+    etiqueta: "Correo de contacto / soporte",
+    desc: "Correo para soporte y protección de datos personales.",
+  },
+  legal_telefono: {
+    valor: "",
+    tipo: "texto",
+    grupo: "Datos legales",
+    etiqueta: "Teléfono / WhatsApp",
+    desc: "Teléfono de contacto de los documentos legales.",
+  },
 };
 
 /** Valor crudo (string) de una regla: el de Config si existe, si no el default. */
