@@ -198,10 +198,10 @@ async function main() {
   }
 
   // ── 4. Productos ────────────────────────────────────────────
-  const categoria = await prisma.categoria.findUnique({
-    where: { slug: "del-campo" },
-  });
-  if (!categoria) {
+  const categoriasTodas = await prisma.categoria.findMany();
+  const catPorSlug = Object.fromEntries(categoriasTodas.map((c) => [c.slug, c]));
+  const categoriaDefault = catPorSlug["del-campo"];
+  if (!categoriaDefault) {
     throw new Error('No se encontró la categoría con slug "del-campo".');
   }
 
@@ -285,13 +285,51 @@ async function main() {
       fotoUrl:
         "https://images.unsplash.com/photo-1589820296156-2454bb8a6ad1?w=800&q=80&auto=format&fit=crop",
     },
+    // ── Artesanías ──
+    {
+      comercio: "Mujeres Emprendedoras del Pacífico",
+      categoriaSlug: "artesanias",
+      nombre: "Canasto de Werregue tejido a mano",
+      descripcion: "Canasto tradicional tejido en fibra de werregue por mujeres del Litoral Pacífico. Pieza única, hecha a mano.",
+      precio: 120000,
+      unidad: "UNIDAD",
+      pesoKg: 0.8,
+      diasAlistamientoMin: 5,
+      diasAlistamientoMax: 12,
+      alcance: "NACIONAL",
+    },
+    {
+      comercio: "Mujeres Emprendedoras del Pacífico",
+      categoriaSlug: "artesanias",
+      nombre: "Bolso artesanal en fibra natural",
+      descripcion: "Bolso tejido a mano con fibras naturales del Pacífico chocoano. Resistente y con identidad.",
+      precio: 85000,
+      unidad: "UNIDAD",
+      pesoKg: 0.5,
+      diasAlistamientoMin: 4,
+      diasAlistamientoMax: 9,
+      alcance: "NACIONAL",
+    },
+    {
+      comercio: "Mujeres Emprendedoras del Pacífico",
+      categoriaSlug: "artesanias",
+      nombre: "Individuales tejidos (juego x4)",
+      descripcion: "Juego de 4 individuales de mesa tejidos a mano en fibra natural. Decoración con raíces del Chocó.",
+      precio: 55000,
+      unidad: "PAQUETE",
+      pesoKg: 0.6,
+      diasAlistamientoMin: 3,
+      diasAlistamientoMax: 8,
+      alcance: "NACIONAL",
+    },
   ];
 
   for (const p of productosSpec) {
     const comercio = comerciosPorNombre[p.comercio];
     if (!comercio) throw new Error(`Comercio no encontrado: ${p.comercio}`);
-    const { comercio: _omit, ...datos } = p;
-    const prod = await upsertProducto(comercio.id, categoria.id, {
+    const { comercio: _omit, categoriaSlug: _cat, ...datos } = p;
+    const cat = (p.categoriaSlug && catPorSlug[p.categoriaSlug]) || categoriaDefault;
+    const prod = await upsertProducto(comercio.id, cat.id, {
       ...datos,
       stock: 50,
       stockReservado: 0,
