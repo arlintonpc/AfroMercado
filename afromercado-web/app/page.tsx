@@ -34,8 +34,8 @@ const CATEGORIAS = [
   { emoji: '🌿', nombre: 'Del Campo',    slug: 'del-campo',  fondo: 'bg-[#E8F5EE]', texto: 'text-[#2D6A4F]', proximamente: false },
   { emoji: '🎨', nombre: 'Artesanías',   slug: 'artesanias', fondo: 'bg-[#FFF8E8]', texto: 'text-[#B8860B]', proximamente: false },
   { emoji: '🍽️', nombre: 'Gastronomía', slug: 'gastronomia', fondo: 'bg-[#FFF3EE]', texto: 'text-[#B85A1A]', proximamente: false },
-  { emoji: '🏞️', nombre: 'Turismo',     slug: '',           fondo: 'bg-[#EEF3FF]', texto: 'text-[#2A4AB8]', proximamente: true  },
-  { emoji: '🎭', nombre: 'Cultural',     slug: '',           fondo: 'bg-[#F5EEF8]', texto: 'text-[#7A2AB8]', proximamente: true  },
+  { emoji: '🏞️', nombre: 'Turismo',  slug: 'turismo',   fondo: 'bg-[#EEF3FF]', texto: 'text-[#2A4AB8]', proximamente: false },
+  { emoji: '🎭', nombre: 'Cultural', slug: 'cultural',  fondo: 'bg-[#F5EEF8]', texto: 'text-[#7A2AB8]', proximamente: false },
 ]
 
 interface VisibilidadActiva {
