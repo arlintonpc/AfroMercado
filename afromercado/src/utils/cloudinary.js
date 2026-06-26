@@ -48,6 +48,34 @@ function construirUrlDerivada(secureUrl, transformacion, extension = null) {
   return url;
 }
 
+function formatearSegundo(valor) {
+  const numero = Math.max(0, Math.round(Number(valor) * 1000) / 1000);
+  return Number.isInteger(numero)
+    ? String(numero)
+    : numero.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function construirTransformacionVideo(recorte = null) {
+  const partes = [];
+  if (recorte?.tieneRecorte) {
+    partes.push(`so_${formatearSegundo(recorte.inicio)}`);
+    partes.push(`du_${formatearSegundo(recorte.duracionFinal)}`);
+  }
+  partes.push("f_mp4", "q_auto", "w_960");
+  return partes.join(",");
+}
+
+function construirUrlVideoOptimizada(secureUrl, recorte = null) {
+  return construirUrlDerivada(secureUrl, construirTransformacionVideo(recorte));
+}
+
+function construirPosterVideo(secureUrl, recorte = null) {
+  const segundo = recorte?.tieneRecorte
+    ? recorte.inicio + Math.min(1, Math.max(recorte.duracionFinal / 2, 0))
+    : 1;
+  return construirUrlDerivada(secureUrl, `so_${formatearSegundo(segundo)}`, "jpg");
+}
+
 async function subirArchivoACloudinary(
   rutaArchivo,
   { carpeta = "afromercado/productos", resourceType = "image" } = {},
@@ -102,8 +130,8 @@ async function subirVideoACloudinary(rutaArchivo, carpeta = "afromercado/videos"
 
   return {
     secureUrl: subida.secure_url,
-    optimizedUrl: construirUrlDerivada(subida.secure_url, "f_mp4,q_auto,w_960"),
-    posterUrl: construirUrlDerivada(subida.secure_url, "so_1", "jpg"),
+    optimizedUrl: construirUrlVideoOptimizada(subida.secure_url),
+    posterUrl: construirPosterVideo(subida.secure_url),
     publicId: subida.public_id ?? null,
     format: subida.format ?? null,
     resourceType: subida.resource_type ?? "video",
@@ -147,4 +175,6 @@ module.exports = {
   eliminarDeCloudinary,
   cloudinaryActivo,
   construirUrlDerivada,
+  construirUrlVideoOptimizada,
+  construirPosterVideo,
 };

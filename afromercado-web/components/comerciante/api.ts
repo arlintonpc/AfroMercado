@@ -40,6 +40,9 @@ export interface Comercio {
   videoUrl?: string | null
   videoPosterUrl?: string | null
   videoDuracionSegundos?: number | null
+  videoDuracionOriginalSegundos?: number | null
+  videoRecorteInicioSegundos?: number | null
+  videoRecorteFinSegundos?: number | null
   videoPublicId?: string | null
   videoAncho?: number | null
   videoAlto?: number | null
@@ -67,6 +70,9 @@ export interface ProductoComerciante {
   videoUrl?: string | null
   videoPosterUrl?: string | null
   videoDuracionSegundos?: number | null
+  videoDuracionOriginalSegundos?: number | null
+  videoRecorteInicioSegundos?: number | null
+  videoRecorteFinSegundos?: number | null
   videoPublicId?: string | null
   videoAncho?: number | null
   videoAlto?: number | null
@@ -126,6 +132,8 @@ export interface VideoMetaCaptura {
   bytes: number
   mimeType: string
   formato: string
+  recorteInicioSegundos?: number
+  recorteFinSegundos?: number
 }
 
 export interface VideoEstado {
@@ -306,6 +314,12 @@ async function subirVideoMultipart(
   fd.append('bytes', String(meta.bytes))
   fd.append('mimeType', meta.mimeType)
   fd.append('formato', meta.formato)
+  if (meta.recorteInicioSegundos !== undefined) {
+    fd.append('recorteInicioSegundos', String(meta.recorteInicioSegundos))
+  }
+  if (meta.recorteFinSegundos !== undefined) {
+    fd.append('recorteFinSegundos', String(meta.recorteFinSegundos))
+  }
   const token = obtenerToken()
   return fetch(url, {
     method: 'POST',

@@ -183,6 +183,9 @@ model Comercio {
   videoPosterUrl String?
   videoPublicId String?
   videoDuracionSegundos Float?
+  videoDuracionOriginalSegundos Float?
+  videoRecorteInicioSegundos Float?
+  videoRecorteFinSegundos Float?
   videoAncho   Int?
   videoAlto    Int?
   videoBytes   Int?
@@ -243,6 +246,9 @@ model Producto {
   videoPosterUrl      String?
   videoPublicId       String?
   videoDuracionSegundos Float?
+  videoDuracionOriginalSegundos Float?
+  videoRecorteInicioSegundos Float?
+  videoRecorteFinSegundos Float?
   videoAncho          Int?
   videoAlto           Int?
   videoBytes          Int?

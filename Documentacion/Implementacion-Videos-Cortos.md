@@ -21,17 +21,19 @@ Se implemento:
 - subida de video para productos
 - subida de video para comercios
 - eliminacion o reemplazo del video
+- recorte de videos largos antes de publicar
 - vista publica del video en la pagina del producto
 - vista publica del video en la pagina del comercio
 - badge visual en tarjetas y dashboard cuando un producto tiene video
-- validacion de duracion maxima de 45 segundos
+- publicacion de fragmentos de maximo 45 segundos
 - validacion de peso maximo de 100 MB
 - conversion/optimizacion para reproduccion liviana
 - guardado de metadatos tecnicos del video
 
 ## Reglas de negocio
 
-- El video no puede superar 45 segundos.
+- El video publicado no puede superar 45 segundos.
+- Si el archivo original supera 45 segundos, el comerciante puede seleccionar el fragmento que quiere publicar.
 - El archivo puede llegar en formatos de video comunes; el backend acepta archivos cuyo MIME sea `video/*` y tambien extensiones de video frecuentes.
 - Si existe Cloudinary, el video se publica en una version optimizada para reproduccion.
 - Si Cloudinary no esta disponible, el sistema conserva una ruta local como respaldo.
@@ -112,6 +114,9 @@ Se agregaron campos para producto y comercio:
 - `videoPosterUrl`
 - `videoPublicId`
 - `videoDuracionSegundos`
+- `videoDuracionOriginalSegundos`
+- `videoRecorteInicioSegundos`
+- `videoRecorteFinSegundos`
 - `videoAncho`
 - `videoAlto`
 - `videoBytes`
@@ -132,6 +137,7 @@ Se agregaron columnas nuevas en:
 La migracion queda en:
 
 - `afromercado/prisma/migrations/20260626140000_video_media_fields/migration.sql`
+- `afromercado/prisma/migrations/20260626203000_video_trim_fields/migration.sql`
 
 ## Frontend
 
@@ -162,7 +168,9 @@ La migracion queda en:
   - permite subir o reemplazar video
   - permite eliminarlo
   - lee metadatos del archivo en el navegador
-  - valida que no pase de 45 segundos
+  - si el video dura mas de 45 segundos, muestra un selector de fragmento
+  - permite elegir inicio y duracion del tramo a publicar
+  - valida que el fragmento final no pase de 45 segundos
   - valida que no pase de 100 MB
 
 - `components/catalogo/VideoDestacado.tsx`
@@ -190,10 +198,12 @@ La migracion queda en:
 ## Compatibilidad de reproduccion
 
 - La subida acepta cualquier formato de video reconocido por el navegador y/o por la extension del archivo.
+- El archivo original puede durar mas de 45 segundos, pero el video publicado conserva solo el fragmento seleccionado.
 - La reproduccion publica usa la derivacion optimizada de Cloudinary:
   - `mp4`
   - calidad automatica
   - ancho maximo de 960px
+- Cuando hay recorte, la URL optimizada incluye inicio y duracion del fragmento.
 - El poster se genera automaticamente para dar mejor carga inicial.
 
 ## Verificacion realizada
@@ -214,4 +224,3 @@ Se ejecuto validacion tecnica y quedo correcta:
   - subtitulos
   - video destacado por categoria
   - analiticas de reproduccion
-

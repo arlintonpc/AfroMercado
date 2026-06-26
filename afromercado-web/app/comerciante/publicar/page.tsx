@@ -156,7 +156,7 @@ export default function PublicarProductoPage() {
         <div className="rounded-2xl border border-[#1A1A1A]/8 bg-white p-5 shadow-sm mb-4">
           <SubidorVideo
             titulo="Video del producto"
-            descripcion="Comparte un clip corto. La plataforma lo optimiza automaticamente y lo limita a 45 segundos."
+            descripcion="Comparte un video del producto. Si dura mas de 45 segundos, podras escoger el fragmento que quieres publicar."
             estadoInicial={{
               videoUrl: null,
               videoPosterUrl: null,

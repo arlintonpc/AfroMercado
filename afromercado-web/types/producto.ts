@@ -16,6 +16,9 @@ export interface Producto {
   videoUrl?: string | null
   videoPosterUrl?: string | null
   videoDuracionSegundos?: number | null
+  videoDuracionOriginalSegundos?: number | null
+  videoRecorteInicioSegundos?: number | null
+  videoRecorteFinSegundos?: number | null
   videoMimeType?: string | null
   activo: boolean
   comercio: {
@@ -30,6 +33,9 @@ export interface Producto {
     videoUrl?: string | null
     videoPosterUrl?: string | null
     videoDuracionSegundos?: number | null
+    videoDuracionOriginalSegundos?: number | null
+    videoRecorteInicioSegundos?: number | null
+    videoRecorteFinSegundos?: number | null
     videoMimeType?: string | null
   }
   categoriaId?: string

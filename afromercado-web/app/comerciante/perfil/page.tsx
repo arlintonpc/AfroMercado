@@ -263,8 +263,8 @@ export default function PerfilComerciantePage() {
 
       {comercio && (
         <SubidorVideo
-          titulo="Video de presentacion"
-          descripcion="Ideal para mostrar la finca, el proceso, el turismo o la experiencia de tu comercio."
+          titulo="Video de la tienda"
+          descripcion="Cuenta la historia de tu comercio, muestra tu finca, tu cocina, tu proceso o aquello que quieres que el cliente recuerde."
           estadoInicial={{
             videoUrl: comercio.videoUrl ?? null,
             videoPosterUrl: comercio.videoPosterUrl ?? null,

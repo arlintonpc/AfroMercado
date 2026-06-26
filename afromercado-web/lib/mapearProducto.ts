@@ -30,6 +30,9 @@ interface ComercioCrudo {
   videoUrl?: string | null
   videoPosterUrl?: string | null
   videoDuracionSegundos?: number | string | null
+  videoDuracionOriginalSegundos?: number | string | null
+  videoRecorteInicioSegundos?: number | string | null
+  videoRecorteFinSegundos?: number | string | null
   videoMimeType?: string | null
   calificacion?: number | string
   verificado?: boolean
@@ -67,6 +70,9 @@ export interface ProductoCrudo {
   videoUrl?: string | null
   videoPosterUrl?: string | null
   videoDuracionSegundos?: number | string | null
+  videoDuracionOriginalSegundos?: number | string | null
+  videoRecorteInicioSegundos?: number | string | null
+  videoRecorteFinSegundos?: number | string | null
   videoMimeType?: string | null
   activo?: boolean
   comercio?: ComercioCrudo | null
@@ -114,6 +120,9 @@ export function mapearProducto(crudo: ProductoCrudo): Producto {
     videoUrl: crudo.videoUrl ?? undefined,
     videoPosterUrl: crudo.videoPosterUrl ?? undefined,
     videoDuracionSegundos: crudo.videoDuracionSegundos != null ? aNumero(crudo.videoDuracionSegundos) : null,
+    videoDuracionOriginalSegundos: crudo.videoDuracionOriginalSegundos != null ? aNumero(crudo.videoDuracionOriginalSegundos) : null,
+    videoRecorteInicioSegundos: crudo.videoRecorteInicioSegundos != null ? aNumero(crudo.videoRecorteInicioSegundos) : null,
+    videoRecorteFinSegundos: crudo.videoRecorteFinSegundos != null ? aNumero(crudo.videoRecorteFinSegundos) : null,
     videoMimeType: crudo.videoMimeType ?? undefined,
     activo: crudo.activo ?? true,
     comercio: {
@@ -128,6 +137,9 @@ export function mapearProducto(crudo: ProductoCrudo): Producto {
       videoUrl: comercio.videoUrl ?? undefined,
       videoPosterUrl: comercio.videoPosterUrl ?? undefined,
       videoDuracionSegundos: comercio.videoDuracionSegundos != null ? aNumero(comercio.videoDuracionSegundos) : null,
+      videoDuracionOriginalSegundos: comercio.videoDuracionOriginalSegundos != null ? aNumero(comercio.videoDuracionOriginalSegundos) : null,
+      videoRecorteInicioSegundos: comercio.videoRecorteInicioSegundos != null ? aNumero(comercio.videoRecorteInicioSegundos) : null,
+      videoRecorteFinSegundos: comercio.videoRecorteFinSegundos != null ? aNumero(comercio.videoRecorteFinSegundos) : null,
       videoMimeType: comercio.videoMimeType ?? undefined,
     },
     categoriaId: aId(crudo.categoriaId) || undefined,

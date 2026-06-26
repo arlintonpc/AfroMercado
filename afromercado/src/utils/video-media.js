@@ -3,6 +3,9 @@ const path = require("path");
 const multer = require("multer");
 const { ErrorValidacion } = require("./errores");
 
+const VIDEO_DURACION_MAXIMA_SEGUNDOS = 45;
+const TOLERANCIA_SEGUNDOS = 0.05;
+
 const EXTENSIONES_VIDEO = new Set([
   ".mp4",
   ".mov",
@@ -67,6 +70,11 @@ function aNumero(valor, fallback = null) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function redondearSegundos(valor) {
+  if (valor === null || valor === undefined) return null;
+  return Math.round(Number(valor) * 1000) / 1000;
+}
+
 function extraerVideoMeta(body = {}) {
   return {
     durationSeconds: aNumero(body.duracionSegundos),
@@ -75,6 +83,52 @@ function extraerVideoMeta(body = {}) {
     bytes: aNumero(body.bytes),
     mimeType: typeof body.mimeType === "string" ? body.mimeType.trim() || null : null,
     format: typeof body.formato === "string" ? body.formato.trim() || null : null,
+    trimStartSeconds: aNumero(body.recorteInicioSegundos),
+    trimEndSeconds: aNumero(body.recorteFinSegundos),
+  };
+}
+
+function normalizarRecorteVideo(meta, duracionReal = null) {
+  const duracionOriginal = redondearSegundos(duracionReal ?? meta.durationSeconds);
+  const tieneRecorte = meta.trimStartSeconds !== null || meta.trimEndSeconds !== null;
+
+  if (!tieneRecorte) {
+    if (duracionOriginal !== null && duracionOriginal > VIDEO_DURACION_MAXIMA_SEGUNDOS + TOLERANCIA_SEGUNDOS) {
+      throw new ErrorValidacion("Selecciona un fragmento de maximo 45 segundos");
+    }
+    return {
+      tieneRecorte: false,
+      inicio: null,
+      fin: null,
+      duracionFinal: duracionOriginal,
+      duracionOriginal,
+    };
+  }
+
+  const inicio = Math.max(0, redondearSegundos(meta.trimStartSeconds ?? 0) ?? 0);
+  let fin = redondearSegundos(meta.trimEndSeconds);
+  if (fin === null) {
+    fin = inicio + VIDEO_DURACION_MAXIMA_SEGUNDOS;
+  }
+  if (duracionOriginal !== null) {
+    fin = Math.min(fin, duracionOriginal);
+  }
+  fin = redondearSegundos(fin);
+
+  const duracionFinal = redondearSegundos(fin - inicio);
+  if (duracionFinal === null || duracionFinal <= 0) {
+    throw new ErrorValidacion("El fragmento seleccionado no es valido");
+  }
+  if (duracionFinal > VIDEO_DURACION_MAXIMA_SEGUNDOS + TOLERANCIA_SEGUNDOS) {
+    throw new ErrorValidacion("El fragmento no puede superar 45 segundos");
+  }
+
+  return {
+    tieneRecorte: true,
+    inicio,
+    fin,
+    duracionFinal,
+    duracionOriginal,
   };
 }
 
@@ -101,9 +155,11 @@ function eliminarArchivoLocalDesdeUrl(url) {
 }
 
 module.exports = {
+  VIDEO_DURACION_MAXIMA_SEGUNDOS,
   crearUploadVideo,
   extraerVideoMeta,
   eliminarArchivoLocalDesdeUrl,
   esVideoPermitido,
+  normalizarRecorteVideo,
   urlLocalVideo,
 };

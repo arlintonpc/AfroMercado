@@ -172,7 +172,7 @@ export default function EditarProductoPage() {
           <>
             <SubidorVideo
               titulo="Video del producto"
-              descripcion="Muestra el producto en movimiento o en contexto. Se acepta cualquier formato común y se convierte automaticamente."
+              descripcion="Muestra el producto en movimiento o en contexto. Si el video es largo, selecciona el fragmento mas importante."
               estadoInicial={{
                 videoUrl: producto.videoUrl ?? null,
                 videoPosterUrl: producto.videoPosterUrl ?? null,

@@ -10,10 +10,16 @@ const ComercioService = require("../services/comercio.service");
 const NotificacionService = require("../services/notificacion.service");
 const prisma = require("../config/prisma");
 const { ErrorValidacion } = require("../utils/errores");
-const { subirVideoACloudinary, eliminarDeCloudinary } = require("../utils/cloudinary");
+const {
+  subirVideoACloudinary,
+  eliminarDeCloudinary,
+  construirUrlVideoOptimizada,
+  construirPosterVideo,
+} = require("../utils/cloudinary");
 const {
   crearUploadVideo,
   extraerVideoMeta,
+  normalizarRecorteVideo,
   urlLocalVideo,
 } = require("../utils/video-media");
 
@@ -89,35 +95,32 @@ const ComercioController = {
   uploadVideo: _uploadVideo,
 
   async subirVideo(req, res, next) {
+    let cloud = null;
     try {
       if (!req.file) {
         return res.status(400).json({ ok: false, error: "No se recibio video." });
       }
 
       const meta = extraerVideoMeta(req.body);
-      const duracion = meta.durationSeconds;
-      if (duracion !== null && duracion > 45) {
-        fs.unlink(req.file.path, () => {});
-        throw new ErrorValidacion("El video no puede superar 45 segundos");
-      }
+      normalizarRecorteVideo(meta);
 
       await ComercioService.obtenerMiComercio(req.usuario.id);
-      const cloud = await subirVideoACloudinary(req.file.path, "afromercado/videos/comercios");
-      const duracionFinal = cloud?.duration ?? duracion;
-      if (duracionFinal !== null && duracionFinal > 45) {
-        if (cloud?.publicId) {
-          await eliminarDeCloudinary(cloud.publicId, "video").catch(() => {});
-        }
-        fs.unlink(req.file.path, () => {});
-        throw new ErrorValidacion("El video no puede superar 45 segundos");
-      }
+      cloud = await subirVideoACloudinary(req.file.path, "afromercado/videos/comercios");
+      const recorte = normalizarRecorteVideo(meta, cloud?.duration ?? meta.durationSeconds);
+      const urlLocalBase = urlLocalVideo(req, `uploads/videos/comercios/${req.file.filename}`);
+      const urlLocalFinal = recorte.tieneRecorte
+        ? `${urlLocalBase}#t=${recorte.inicio},${recorte.fin}`
+        : urlLocalBase;
 
       const datosVideo = cloud
         ? {
-            videoUrl: cloud.optimizedUrl || cloud.secureUrl,
-            videoPosterUrl: cloud.posterUrl ?? null,
+            videoUrl: construirUrlVideoOptimizada(cloud.secureUrl, recorte) || cloud.optimizedUrl || cloud.secureUrl,
+            videoPosterUrl: construirPosterVideo(cloud.secureUrl, recorte) ?? cloud.posterUrl ?? null,
             videoPublicId: cloud.publicId ?? null,
-            videoDuracionSegundos: duracionFinal,
+            videoDuracionSegundos: recorte.duracionFinal,
+            videoDuracionOriginalSegundos: recorte.duracionOriginal,
+            videoRecorteInicioSegundos: recorte.tieneRecorte ? recorte.inicio : null,
+            videoRecorteFinSegundos: recorte.tieneRecorte ? recorte.fin : null,
             videoAncho: cloud.width ?? meta.width,
             videoAlto: cloud.height ?? meta.height,
             videoBytes: cloud.bytes ?? meta.bytes,
@@ -125,10 +128,13 @@ const ComercioController = {
             videoMimeType: cloud.mimeType ?? meta.mimeType,
           }
         : {
-            videoUrl: urlLocalVideo(req, `uploads/videos/comercios/${req.file.filename}`),
+            videoUrl: urlLocalFinal,
             videoPosterUrl: null,
             videoPublicId: null,
-            videoDuracionSegundos: duracion,
+            videoDuracionSegundos: recorte.duracionFinal,
+            videoDuracionOriginalSegundos: recorte.duracionOriginal,
+            videoRecorteInicioSegundos: recorte.tieneRecorte ? recorte.inicio : null,
+            videoRecorteFinSegundos: recorte.tieneRecorte ? recorte.fin : null,
             videoAncho: meta.width,
             videoAlto: meta.height,
             videoBytes: meta.bytes,
@@ -143,6 +149,9 @@ const ComercioController = {
       const comercio = await ComercioService.actualizarVideo(req.usuario.id, datosVideo);
       res.json({ ok: true, comercio });
     } catch (e) {
+      if (cloud?.publicId) {
+        await eliminarDeCloudinary(cloud.publicId, "video").catch(() => {});
+      }
       if (req.file?.path) fs.unlink(req.file.path, () => {});
       next(e);
     }
