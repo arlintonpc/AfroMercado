@@ -70,6 +70,7 @@ async function main() {
     { nombre: "Madera y muebles",     slug: "madera-muebles",      icono: "🪵" },
     { nombre: "Tejidos y textiles",   slug: "tejidos-textiles",    icono: "🧶" },
     { nombre: "Productos del mar",    slug: "productos-del-mar",   icono: "🐟" },
+    { nombre: "Gastronomía",          slug: "gastronomia",         icono: "🍽️" },
   ];
   for (const cat of CATEGORIAS_SEED) {
     await prisma.categoria.upsert({
@@ -321,6 +322,43 @@ async function main() {
       diasAlistamientoMin: 3,
       diasAlistamientoMax: 8,
       alcance: "NACIONAL",
+    },
+    // ── Gastronomía ──
+    {
+      comercio: "Mujeres Emprendedoras del Pacífico",
+      categoriaSlug: "gastronomia",
+      nombre: "Cocadas tradicionales del Pacífico (x6)",
+      descripcion: "Dulces de coco hechos a mano según la receta ancestral del Litoral. Paquete de 6 unidades.",
+      precio: 15000,
+      unidad: "PAQUETE",
+      pesoKg: 0.4,
+      diasAlistamientoMin: 1,
+      diasAlistamientoMax: 3,
+      alcance: "AMBOS",
+    },
+    {
+      comercio: "Mujeres Emprendedoras del Pacífico",
+      categoriaSlug: "gastronomia",
+      nombre: "Dulce de borojó artesanal (frasco)",
+      descripcion: "Dulce espeso de borojó, fruta emblemática del Chocó. Frasco de 250 g, sin conservantes.",
+      precio: 18000,
+      unidad: "UNIDAD",
+      pesoKg: 0.5,
+      diasAlistamientoMin: 2,
+      diasAlistamientoMax: 4,
+      alcance: "AMBOS",
+    },
+    {
+      comercio: "Mujeres Emprendedoras del Pacífico",
+      categoriaSlug: "gastronomia",
+      nombre: "Birimbí — bebida ancestral (botella)",
+      descripcion: "Bebida tradicional fermentada de maíz, preparada de forma artesanal. Botella de 750 ml.",
+      precio: 12000,
+      unidad: "UNIDAD",
+      pesoKg: 0.7,
+      diasAlistamientoMin: 1,
+      diasAlistamientoMax: 2,
+      alcance: "LOCAL",
     },
   ];
 
