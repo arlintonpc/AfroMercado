@@ -15,21 +15,29 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     })
     if (!res.ok) throw new Error('not found')
     const json = await res.json() as {
+      producto?: {
+        nombre?:      string
+        descripcion?: string
+        imagenes?:    ({ url?: string } | string)[]
+        fotoUrl?:     string | null
+        videoPosterUrl?: string | null
+      }
       data?: {
         nombre?:      string
         descripcion?: string
         imagenes?:    ({ url?: string } | string)[]
         fotoUrl?:     string | null
+        videoPosterUrl?: string | null
       }
     }
-    const p = json.data ?? {}
+    const p = json.producto ?? json.data ?? {}
     const nombre      = p.nombre ?? 'Producto artesanal'
     const descripcion = (p.descripcion ?? 'Descubre productos artesanales del Chocó en AfroMercado.').slice(0, 160)
 
     const imagenRaw = p.imagenes?.[0]
     const imagen = imagenRaw
       ? (typeof imagenRaw === 'string' ? imagenRaw : imagenRaw.url ?? null)
-      : p.fotoUrl ?? null
+      : p.videoPosterUrl ?? p.fotoUrl ?? null
 
     return {
       title:       `${nombre} — AfroMercado`,

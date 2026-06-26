@@ -7,11 +7,25 @@ const ProductoService = require("../services/producto.service");
 const prisma = require("../config/prisma");
 const VisibilidadRepository = require("../repositories/visibilidad.repository");
 const { ErrorValidacion } = require("../utils/errores");
-const { subirACloudinary } = require("../utils/cloudinary");
+const { subirACloudinary, subirVideoACloudinary, eliminarDeCloudinary } = require("../utils/cloudinary");
+const {
+  crearUploadVideo,
+  extraerVideoMeta,
+  urlLocalVideo,
+} = require("../utils/video-media");
 
 // Carpeta pública donde se guardan las fotos de productos.
 const DIR_PRODUCTOS = path.join(__dirname, "..", "..", "uploads", "productos");
 fs.mkdirSync(DIR_PRODUCTOS, { recursive: true });
+const DIR_VIDEOS_PRODUCTOS = path.join(
+  __dirname,
+  "..",
+  "..",
+  "uploads",
+  "videos",
+  "productos",
+);
+fs.mkdirSync(DIR_VIDEOS_PRODUCTOS, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -32,6 +46,12 @@ function fileFilter(req, file, cb) {
 }
 
 const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
+const uploadVideo = crearUploadVideo({
+  dir: DIR_VIDEOS_PRODUCTOS,
+  prefijo: "prod-video",
+  fieldName: "video",
+  maxFileSize: 100 * 1024 * 1024,
+});
 
 const ProductoController = {
   async crear(req, res, next) {
@@ -188,7 +208,17 @@ const ProductoController = {
             orderBy: [{ updatedAt: "desc" }],
             take: limite,
             include: {
-              comercio: { select: { id: true, nombre: true, municipio: true } },
+              comercio: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  municipio: true,
+                  videoUrl: true,
+                  videoPosterUrl: true,
+                  videoDuracionSegundos: true,
+                  videoMimeType: true,
+                },
+              },
               ofertas: {
                 where: { activa: true, fin: { gte: new Date() } },
                 take: 1,
@@ -217,7 +247,17 @@ const ProductoController = {
             where: { id: { in: idsPopulares }, activo: true },
             take: limite - productos.length,
             include: {
-              comercio: { select: { id: true, nombre: true, municipio: true } },
+              comercio: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  municipio: true,
+                  videoUrl: true,
+                  videoPosterUrl: true,
+                  videoDuracionSegundos: true,
+                  videoMimeType: true,
+                },
+              },
               ofertas: {
                 where: { activa: true, fin: { gte: new Date() } },
                 take: 1,
@@ -278,6 +318,7 @@ const ProductoController = {
   // ── Imágenes ───────────────────────────────────────────────
   // Middleware multer para varias fotos (campo "imagenes", hasta 6).
   uploadImagenes: upload.array("imagenes", 6),
+  uploadVideo,
 
   // POST /productos/:id/imagenes  (multipart)
   async subirImagenes(req, res, next) {
@@ -305,10 +346,81 @@ const ProductoController = {
     }
   },
 
+  // POST /productos/:id/video  (multipart)
+  async subirVideo(req, res, next) {
+    try {
+      if (!req.file) {
+        throw new ErrorValidacion("Adjunta un video en el campo 'video'");
+      }
+
+      const meta = extraerVideoMeta(req.body);
+      const duracion = meta.durationSeconds;
+      if (duracion !== null && duracion > 45) {
+        fs.unlink(req.file.path, () => {});
+        throw new ErrorValidacion("El video no puede superar 45 segundos");
+      }
+
+      await ProductoService._verificarPropiedad(req.usuario.id, req.params.id);
+      const cloud = await subirVideoACloudinary(req.file.path, "afromercado/videos/productos");
+      const duracionFinal = cloud?.duration ?? duracion;
+      if (duracionFinal !== null && duracionFinal > 45) {
+        if (cloud?.publicId) {
+          await eliminarDeCloudinary(cloud.publicId, "video").catch(() => {});
+        }
+        fs.unlink(req.file.path, () => {});
+        throw new ErrorValidacion("El video no puede superar 45 segundos");
+      }
+
+      const datosVideo = cloud
+        ? {
+            videoUrl: cloud.optimizedUrl || cloud.secureUrl,
+            videoPosterUrl: cloud.posterUrl ?? null,
+            videoPublicId: cloud.publicId ?? null,
+            videoDuracionSegundos: duracionFinal,
+            videoAncho: cloud.width ?? meta.width,
+            videoAlto: cloud.height ?? meta.height,
+            videoBytes: cloud.bytes ?? meta.bytes,
+            videoFormato: cloud.format ?? meta.format,
+            videoMimeType: cloud.mimeType ?? meta.mimeType,
+          }
+        : {
+            videoUrl: urlLocalVideo(req, `uploads/videos/productos/${req.file.filename}`),
+            videoPosterUrl: null,
+            videoPublicId: null,
+            videoDuracionSegundos: duracion,
+            videoAncho: meta.width,
+            videoAlto: meta.height,
+            videoBytes: meta.bytes,
+            videoFormato: meta.format,
+            videoMimeType: meta.mimeType,
+          };
+
+      if (cloud) {
+        fs.unlink(req.file.path, () => {});
+      }
+
+      const producto = await ProductoService.actualizarVideo(req.usuario.id, req.params.id, datosVideo);
+      res.status(201).json({ ok: true, producto });
+    } catch (err) {
+      if (req.file?.path) fs.unlink(req.file.path, () => {});
+      next(err);
+    }
+  },
+
   // DELETE /productos/:id/imagenes  (body: { url })
   async quitarImagen(req, res, next) {
     try {
       const producto = await ProductoService.quitarImagen(req.usuario.id, req.params.id, req.body.url);
+      res.json({ ok: true, producto });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // DELETE /productos/:id/video
+  async quitarVideo(req, res, next) {
+    try {
+      const producto = await ProductoService.quitarVideo(req.usuario.id, req.params.id);
       res.json({ ok: true, producto });
     } catch (err) {
       next(err);
@@ -342,7 +454,16 @@ const ProductoController = {
           producto: {
             where: { activo: true },
             include: {
-              comercio: { select: { nombre: true, municipio: true } },
+              comercio: {
+                select: {
+                  nombre: true,
+                  municipio: true,
+                  videoUrl: true,
+                  videoPosterUrl: true,
+                  videoDuracionSegundos: true,
+                  videoMimeType: true,
+                },
+              },
               categoria: { select: { nombre: true, slug: true } },
               ofertas: {
                 where: { activa: true, fin: { gte: new Date() } },

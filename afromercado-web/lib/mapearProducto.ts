@@ -27,6 +27,10 @@ interface ComercioCrudo {
   historia?: string
   whatsapp?: string | null
   whatsappVisible?: boolean
+  videoUrl?: string | null
+  videoPosterUrl?: string | null
+  videoDuracionSegundos?: number | string | null
+  videoMimeType?: string | null
   calificacion?: number | string
   verificado?: boolean
   totalVentas?: number
@@ -60,6 +64,10 @@ export interface ProductoCrudo {
   alcance?: Producto['alcance']
   fotoUrl?: string | null
   imagenes?: string[] | null
+  videoUrl?: string | null
+  videoPosterUrl?: string | null
+  videoDuracionSegundos?: number | string | null
+  videoMimeType?: string | null
   activo?: boolean
   comercio?: ComercioCrudo | null
   categoria?: CategoriaCruda | null
@@ -103,6 +111,10 @@ export function mapearProducto(crudo: ProductoCrudo): Producto {
     alcance: crudo.alcance ?? 'LOCAL',
     fotoUrl: crudo.fotoUrl ?? undefined,
     imagenes: Array.isArray(crudo.imagenes) ? crudo.imagenes : undefined,
+    videoUrl: crudo.videoUrl ?? undefined,
+    videoPosterUrl: crudo.videoPosterUrl ?? undefined,
+    videoDuracionSegundos: crudo.videoDuracionSegundos != null ? aNumero(crudo.videoDuracionSegundos) : null,
+    videoMimeType: crudo.videoMimeType ?? undefined,
     activo: crudo.activo ?? true,
     comercio: {
       nombre: comercio.nombre ?? '',
@@ -113,6 +125,10 @@ export function mapearProducto(crudo: ProductoCrudo): Producto {
       totalReviews: aNumero(comercio.totalReviews),
       historia: comercio.historia,
       whatsappVisible: crudo.comercio?.whatsappVisible ?? false,
+      videoUrl: comercio.videoUrl ?? undefined,
+      videoPosterUrl: comercio.videoPosterUrl ?? undefined,
+      videoDuracionSegundos: comercio.videoDuracionSegundos != null ? aNumero(comercio.videoDuracionSegundos) : null,
+      videoMimeType: comercio.videoMimeType ?? undefined,
     },
     categoriaId: aId(crudo.categoriaId) || undefined,
     comercioId: aId(crudo.comercioId) || undefined,

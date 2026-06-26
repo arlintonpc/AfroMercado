@@ -9,9 +9,12 @@ import {
   obtenerMiComercio,
   actualizarComercio,
   subirDocumentoComercio,
+  subirVideoComercio,
+  quitarVideoComercio,
   type Comercio,
 } from '@/components/comerciante/api'
 import { obtenerReglasPublicas } from '@/lib/api/config'
+import SubidorVideo from '@/components/comerciante/SubidorVideo'
 
 export default function PerfilComerciantePage() {
   const [comercio, setComercio] = useState<Comercio | null>(null)
@@ -257,6 +260,21 @@ export default function PerfilComerciantePage() {
           Guardar cambios
         </Button>
       </form>
+
+      {comercio && (
+        <SubidorVideo
+          titulo="Video de presentacion"
+          descripcion="Ideal para mostrar la finca, el proceso, el turismo o la experiencia de tu comercio."
+          estadoInicial={{
+            videoUrl: comercio.videoUrl ?? null,
+            videoPosterUrl: comercio.videoPosterUrl ?? null,
+            videoDuracionSegundos: comercio.videoDuracionSegundos ?? null,
+            videoMimeType: comercio.videoMimeType ?? null,
+          }}
+          onSubir={(file, meta) => subirVideoComercio(file, meta)}
+          onEliminar={() => quitarVideoComercio()}
+        />
+      )}
 
       {/* Sección de documento */}
       <div className="rounded-2xl border border-[#1A1A1A]/5 bg-white p-5 sm:p-6 shadow-sm flex flex-col gap-4">

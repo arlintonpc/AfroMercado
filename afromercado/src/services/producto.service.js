@@ -2,9 +2,22 @@
 const ProductoRepository = require("../repositories/producto.repository");
 const ComercioRepository = require("../repositories/comercio.repository");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorNoAutorizado } = require("../utils/errores");
+const { eliminarDeCloudinary } = require("../utils/cloudinary");
+const { eliminarArchivoLocalDesdeUrl } = require("../utils/video-media");
 
 const UNIDADES_VALIDAS = ["KG", "UNIDAD", "LITRO", "PAQUETE", "DOCENA", "MANOJO"];
 const ALCANCES_VALIDOS = ["LOCAL", "NACIONAL", "AMBOS"];
+
+async function limpiarVideoAnterior(producto) {
+  if (!producto) return;
+  if (producto.videoPublicId) {
+    await eliminarDeCloudinary(producto.videoPublicId, "video").catch(() => {});
+    return;
+  }
+  if (producto.videoUrl) {
+    eliminarArchivoLocalDesdeUrl(producto.videoUrl);
+  }
+}
 
 const ProductoService = {
   async crear(usuarioId, datos) {
@@ -145,6 +158,42 @@ const ProductoService = {
     if (!todas.includes(url))
       throw new ErrorValidacion("Esa imagen no pertenece al producto");
     return ProductoRepository.actualizar(productoId, { fotoUrl: url });
+  },
+
+  async actualizarVideo(usuarioId, productoId, video) {
+    const producto = await this._verificarPropiedad(usuarioId, productoId);
+    if (!video?.videoUrl) throw new ErrorValidacion("No se recibio video");
+
+    await limpiarVideoAnterior(producto);
+
+    return ProductoRepository.actualizar(productoId, {
+      videoUrl: video.videoUrl,
+      videoPosterUrl: video.videoPosterUrl ?? null,
+      videoPublicId: video.videoPublicId ?? null,
+      videoDuracionSegundos: video.videoDuracionSegundos ?? null,
+      videoAncho: video.videoAncho ?? null,
+      videoAlto: video.videoAlto ?? null,
+      videoBytes: video.videoBytes ?? null,
+      videoFormato: video.videoFormato ?? null,
+      videoMimeType: video.videoMimeType ?? null,
+    });
+  },
+
+  async quitarVideo(usuarioId, productoId) {
+    const producto = await this._verificarPropiedad(usuarioId, productoId);
+    await limpiarVideoAnterior(producto);
+
+    return ProductoRepository.actualizar(productoId, {
+      videoUrl: null,
+      videoPosterUrl: null,
+      videoPublicId: null,
+      videoDuracionSegundos: null,
+      videoAncho: null,
+      videoAlto: null,
+      videoBytes: null,
+      videoFormato: null,
+      videoMimeType: null,
+    });
   },
 };
 

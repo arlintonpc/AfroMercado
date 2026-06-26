@@ -9,9 +9,25 @@ const multer = require("multer");
 const ComercioService = require("../services/comercio.service");
 const NotificacionService = require("../services/notificacion.service");
 const prisma = require("../config/prisma");
+const { ErrorValidacion } = require("../utils/errores");
+const { subirVideoACloudinary, eliminarDeCloudinary } = require("../utils/cloudinary");
+const {
+  crearUploadVideo,
+  extraerVideoMeta,
+  urlLocalVideo,
+} = require("../utils/video-media");
 
 const DIR_DOCS = path.join(__dirname, "..", "..", "uploads", "documentos");
 fs.mkdirSync(DIR_DOCS, { recursive: true });
+const DIR_VIDEOS_COMERCIOS = path.join(
+  __dirname,
+  "..",
+  "..",
+  "uploads",
+  "videos",
+  "comercios",
+);
+fs.mkdirSync(DIR_VIDEOS_COMERCIOS, { recursive: true });
 
 const _uploadDoc = multer({
   storage: multer.diskStorage({
@@ -24,6 +40,13 @@ const _uploadDoc = multer({
   fileFilter: (req, file, cb) => cb(null, file.mimetype.startsWith("image/")),
   limits: { fileSize: 5 * 1024 * 1024 },
 }).single("documento");
+
+const _uploadVideo = crearUploadVideo({
+  dir: DIR_VIDEOS_COMERCIOS,
+  prefijo: "comercio-video",
+  fieldName: "video",
+  maxFileSize: 100 * 1024 * 1024,
+});
 
 const ComercioController = {
   async registrar(req, res, next) {
@@ -63,6 +86,77 @@ const ComercioController = {
   },
 
   // GET /comercios/mis-analiticas — analíticas completas del comerciante
+  uploadVideo: _uploadVideo,
+
+  async subirVideo(req, res, next) {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ ok: false, error: "No se recibio video." });
+      }
+
+      const meta = extraerVideoMeta(req.body);
+      const duracion = meta.durationSeconds;
+      if (duracion !== null && duracion > 45) {
+        fs.unlink(req.file.path, () => {});
+        throw new ErrorValidacion("El video no puede superar 45 segundos");
+      }
+
+      await ComercioService.obtenerMiComercio(req.usuario.id);
+      const cloud = await subirVideoACloudinary(req.file.path, "afromercado/videos/comercios");
+      const duracionFinal = cloud?.duration ?? duracion;
+      if (duracionFinal !== null && duracionFinal > 45) {
+        if (cloud?.publicId) {
+          await eliminarDeCloudinary(cloud.publicId, "video").catch(() => {});
+        }
+        fs.unlink(req.file.path, () => {});
+        throw new ErrorValidacion("El video no puede superar 45 segundos");
+      }
+
+      const datosVideo = cloud
+        ? {
+            videoUrl: cloud.optimizedUrl || cloud.secureUrl,
+            videoPosterUrl: cloud.posterUrl ?? null,
+            videoPublicId: cloud.publicId ?? null,
+            videoDuracionSegundos: duracionFinal,
+            videoAncho: cloud.width ?? meta.width,
+            videoAlto: cloud.height ?? meta.height,
+            videoBytes: cloud.bytes ?? meta.bytes,
+            videoFormato: cloud.format ?? meta.format,
+            videoMimeType: cloud.mimeType ?? meta.mimeType,
+          }
+        : {
+            videoUrl: urlLocalVideo(req, `uploads/videos/comercios/${req.file.filename}`),
+            videoPosterUrl: null,
+            videoPublicId: null,
+            videoDuracionSegundos: duracion,
+            videoAncho: meta.width,
+            videoAlto: meta.height,
+            videoBytes: meta.bytes,
+            videoFormato: meta.format,
+            videoMimeType: meta.mimeType,
+          };
+
+      if (cloud) {
+        fs.unlink(req.file.path, () => {});
+      }
+
+      const comercio = await ComercioService.actualizarVideo(req.usuario.id, datosVideo);
+      res.json({ ok: true, comercio });
+    } catch (e) {
+      if (req.file?.path) fs.unlink(req.file.path, () => {});
+      next(e);
+    }
+  },
+
+  async quitarVideo(req, res, next) {
+    try {
+      const comercio = await ComercioService.quitarVideo(req.usuario.id);
+      res.json({ ok: true, comercio });
+    } catch (e) {
+      next(e);
+    }
+  },
+
   async misAnaliticas(req, res, next) {
     try {
       const comercio = await ComercioService.obtenerMiComercio(req.usuario.id);

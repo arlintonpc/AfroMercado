@@ -116,6 +116,7 @@ enum TipoLiquidacion {
 enum EstadoLiquidacion {
   PENDIENTE
   PAGADA
+  CANCELADA
 }
 
 // ─── MODELOS ──────────────────────────────────────────────────
@@ -178,6 +179,15 @@ model Comercio {
   historia     String?
   whatsapp     String?
   logoUrl      String?
+  videoUrl     String?
+  videoPosterUrl String?
+  videoPublicId String?
+  videoDuracionSegundos Float?
+  videoAncho   Int?
+  videoAlto    Int?
+  videoBytes   Int?
+  videoFormato String?
+  videoMimeType String?
   calificacion Decimal   @default(0) @db.Decimal(3, 2)
   totalReviews Int       @default(0)
   totalVentas  Int       @default(0)
@@ -229,6 +239,15 @@ model Producto {
   stockReservado      Int          @default(0)
   fotoUrl             String?
   imagenes            String[]     @default([])
+  videoUrl            String?
+  videoPosterUrl      String?
+  videoPublicId       String?
+  videoDuracionSegundos Float?
+  videoAncho          Int?
+  videoAlto           Int?
+  videoBytes          Int?
+  videoFormato        String?
+  videoMimeType       String?
   activo              Boolean      @default(true)
   diasAlistamientoMin Int          @default(1)
   diasAlistamientoMax Int          @default(3)
@@ -391,6 +410,7 @@ model Entrega {
   estado       EstadoEntrega @default(ASIGNADA)
   direccion    String
   notas        String?
+  pagoRepartidor Decimal?     @db.Decimal(10, 2)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -664,6 +684,7 @@ model Mensaje {
   autor        Usuario      @relation(fields: [autorId], references: [id])
 
   @@index([conversacionId, createdAt])
+  @@index([conversacionId, id])
   @@index([autorId])
 }
 

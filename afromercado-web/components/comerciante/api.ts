@@ -37,6 +37,15 @@ export interface Comercio {
   fotoDocumentoUrl?: string | null
   whatsappVisible?: boolean
   vereda?: string | null
+  videoUrl?: string | null
+  videoPosterUrl?: string | null
+  videoDuracionSegundos?: number | null
+  videoPublicId?: string | null
+  videoAncho?: number | null
+  videoAlto?: number | null
+  videoBytes?: number | null
+  videoFormato?: string | null
+  videoMimeType?: string | null
   /** Monto mínimo para envío gratis de esta tienda (null = desactivado). */
   envioGratisDesde?: string | number | null
 }
@@ -55,6 +64,15 @@ export interface ProductoComerciante {
   stockReservado: number
   fotoUrl: string | null
   imagenes: string[]
+  videoUrl?: string | null
+  videoPosterUrl?: string | null
+  videoDuracionSegundos?: number | null
+  videoPublicId?: string | null
+  videoAncho?: number | null
+  videoAlto?: number | null
+  videoBytes?: number | null
+  videoFormato?: string | null
+  videoMimeType?: string | null
   activo: boolean
   diasAlistamientoMin: number
   diasAlistamientoMax: number
@@ -99,6 +117,22 @@ export interface DatosProducto {
   fotoUrl?: string
   categoriaId?: number
   pesoKg?: number
+}
+
+export interface VideoMetaCaptura {
+  duracionSegundos: number
+  ancho: number
+  alto: number
+  bytes: number
+  mimeType: string
+  formato: string
+}
+
+export interface VideoEstado {
+  videoUrl: string | null
+  videoPosterUrl: string | null
+  videoDuracionSegundos: number | null
+  videoMimeType: string | null
 }
 
 /**
@@ -238,6 +272,103 @@ export async function subirImagenesProducto(
   }
   const j = await res.json()
   return j.producto
+}
+
+function normalizarVideoEstado(
+  item: {
+    videoUrl?: string | null
+    videoPosterUrl?: string | null
+    videoDuracionSegundos?: number | string | null
+    videoMimeType?: string | null
+  } | null | undefined,
+): VideoEstado {
+  return {
+    videoUrl: item?.videoUrl ?? null,
+    videoPosterUrl: item?.videoPosterUrl ?? null,
+    videoDuracionSegundos:
+      item?.videoDuracionSegundos === null || item?.videoDuracionSegundos === undefined
+        ? null
+        : Number(item.videoDuracionSegundos),
+    videoMimeType: item?.videoMimeType ?? null,
+  }
+}
+
+async function subirVideoMultipart(
+  url: string,
+  file: File,
+  meta: VideoMetaCaptura,
+): Promise<Response> {
+  const fd = new FormData()
+  fd.append('video', file)
+  fd.append('duracionSegundos', String(meta.duracionSegundos))
+  fd.append('ancho', String(meta.ancho))
+  fd.append('alto', String(meta.alto))
+  fd.append('bytes', String(meta.bytes))
+  fd.append('mimeType', meta.mimeType)
+  fd.append('formato', meta.formato)
+  const token = obtenerToken()
+  return fetch(url, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: fd,
+  })
+}
+
+export async function subirVideoProducto(
+  id: number,
+  file: File,
+  meta: VideoMetaCaptura,
+): Promise<VideoEstado> {
+  const res = await subirVideoMultipart(`${API_URL}/productos/${id}/video`, file, meta)
+  if (!res.ok) {
+    let msg = 'No pudimos subir el video.'
+    try {
+      const j = await res.json()
+      if (j?.error) msg = j.error
+      else if (j?.message) msg = j.message
+    } catch {
+      // sin cuerpo
+    }
+    throw new Error(msg)
+  }
+  const j = await res.json()
+  return normalizarVideoEstado(j?.producto)
+}
+
+export async function quitarVideoProducto(id: number): Promise<VideoEstado> {
+  const resp = await apiFetch<{ ok: boolean; producto: ProductoComerciante }>(
+    `/productos/${id}/video`,
+    { method: 'DELETE' },
+  )
+  return normalizarVideoEstado(resp.producto)
+}
+
+export async function subirVideoComercio(
+  file: File,
+  meta: VideoMetaCaptura,
+): Promise<VideoEstado> {
+  const res = await subirVideoMultipart(`${API_URL}/comercios/video`, file, meta)
+  if (!res.ok) {
+    let msg = 'No pudimos subir el video.'
+    try {
+      const j = await res.json()
+      if (j?.error) msg = j.error
+      else if (j?.message) msg = j.message
+    } catch {
+      // sin cuerpo
+    }
+    throw new Error(msg)
+  }
+  const j = await res.json()
+  return normalizarVideoEstado(j?.comercio)
+}
+
+export async function quitarVideoComercio(): Promise<VideoEstado> {
+  const resp = await apiFetch<{ ok: boolean; comercio: Comercio }>(
+    '/comercios/video',
+    { method: 'DELETE' },
+  )
+  return normalizarVideoEstado(resp.comercio)
 }
 
 // ── Estadísticas del comerciante ──────────────────────────────

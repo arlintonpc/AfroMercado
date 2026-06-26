@@ -13,6 +13,10 @@ export interface Producto {
   fotoUrl?: string
   /** Galería: imágenes adicionales del producto (además de fotoUrl). */
   imagenes?: string[]
+  videoUrl?: string | null
+  videoPosterUrl?: string | null
+  videoDuracionSegundos?: number | null
+  videoMimeType?: string | null
   activo: boolean
   comercio: {
     nombre: string
@@ -23,6 +27,10 @@ export interface Producto {
     totalReviews: number
     historia?: string
     whatsappVisible?: boolean
+    videoUrl?: string | null
+    videoPosterUrl?: string | null
+    videoDuracionSegundos?: number | null
+    videoMimeType?: string | null
   }
   categoriaId?: string
   comercioId?: string

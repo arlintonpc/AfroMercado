@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import ProductoGaleria from '@/components/catalogo/ProductoGaleria'
+import VideoDestacado from '@/components/catalogo/VideoDestacado'
 import EstimadorEnvio from '@/components/catalogo/EstimadorEnvio'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
@@ -287,6 +288,10 @@ export default function PaginaProducto({
   const galeria = (producto.fotoUrl ? [producto.fotoUrl] : []).concat(
     (producto.imagenes ?? []).filter((u) => u && u !== producto.fotoUrl),
   )
+  const videoUrl = producto.videoUrl ?? producto.comercio.videoUrl ?? null
+  const videoPosterUrl = producto.videoPosterUrl ?? producto.comercio.videoPosterUrl ?? null
+  const videoDuracion = producto.videoDuracionSegundos ?? producto.comercio.videoDuracionSegundos ?? null
+  const videoMimeType = producto.videoMimeType ?? producto.comercio.videoMimeType ?? null
   const historia = producto.historia ?? producto.comercio.historia
 
   function decrementar() {
@@ -347,6 +352,21 @@ export default function PaginaProducto({
                 productoId={producto.id}
                 gradiente={gradiente}
               />
+              {videoUrl && (
+                <VideoDestacado
+                  className="mt-4"
+                  titulo={producto.videoUrl ? 'Video del producto' : 'Video del comercio'}
+                  descripcion={
+                    producto.videoUrl
+                      ? 'Un clip corto para mostrar el producto en uso o en contexto.'
+                      : 'Un vistazo rapido al comercio, la finca o la experiencia detras del producto.'
+                  }
+                  src={videoUrl}
+                  poster={videoPosterUrl}
+                  duracionSegundos={videoDuracion}
+                  mimeType={videoMimeType}
+                />
+              )}
             </div>
 
             {/* ——— INFO ——— */}

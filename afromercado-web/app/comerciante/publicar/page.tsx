@@ -9,9 +9,12 @@ import {
   crearProducto,
   listarCategorias,
   obtenerMiComercio,
+  subirVideoProducto,
+  quitarVideoProducto,
   type CategoriaComerciante,
 } from '@/components/comerciante/api'
 import SubidorImagenes from '@/components/comerciante/SubidorImagenes'
+import SubidorVideo from '@/components/comerciante/SubidorVideo'
 import { UNIDADES, ALCANCES, type Alcance } from '@/components/comerciante/constantes'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
@@ -151,6 +154,19 @@ export default function PublicarProductoPage() {
 
         {/* Subidor de imágenes */}
         <div className="rounded-2xl border border-[#1A1A1A]/8 bg-white p-5 shadow-sm mb-4">
+          <SubidorVideo
+            titulo="Video del producto"
+            descripcion="Comparte un clip corto. La plataforma lo optimiza automaticamente y lo limita a 45 segundos."
+            estadoInicial={{
+              videoUrl: null,
+              videoPosterUrl: null,
+              videoDuracionSegundos: null,
+              videoMimeType: null,
+            }}
+            onSubir={(file, meta) => subirVideoProducto(nuevoId, file, meta)}
+            onEliminar={() => quitarVideoProducto(nuevoId)}
+          />
+          <div className="h-px bg-[#1A1A1A]/10 my-5" />
           <SubidorImagenes
             productoId={nuevoId}
             fotoUrlInicial={null}

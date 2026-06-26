@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import TarjetaProducto from '@/components/catalogo/TarjetaProducto'
+import VideoDestacado from '@/components/catalogo/VideoDestacado'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { mapearProductos } from '@/lib/mapearProducto'
@@ -25,6 +26,10 @@ interface ComercioPublico {
   logoUrl?: string | null
   whatsapp?: string | null
   whatsappVisible: boolean
+  videoUrl?: string | null
+  videoPosterUrl?: string | null
+  videoDuracionSegundos?: number | null
+  videoMimeType?: string | null
   calificacion: string | number
   totalReviews: number
   totalVentas: number
@@ -172,6 +177,18 @@ function CabeceraComercio({ c, onChatear }: { c: ComercioPublico; onChatear?: ()
             </button>
           )}
         </div>
+      )}
+
+      {c.videoUrl && (
+        <VideoDestacado
+          className="mt-4 border-[#2D6A4F]/10 bg-[#F8F5F0]"
+          titulo="Video del comercio"
+          descripcion="Un clip corto para conocer mejor la finca, la cocina o la experiencia de la tienda."
+          src={c.videoUrl}
+          poster={c.videoPosterUrl}
+          duracionSegundos={c.videoDuracionSegundos}
+          mimeType={c.videoMimeType}
+        />
       )}
     </section>
   )

@@ -7,9 +7,12 @@ import { CampoTexto, CampoArea } from '@/components/comerciante/Campos'
 import {
   obtenerMiProducto,
   actualizarProducto,
+  subirVideoProducto,
+  quitarVideoProducto,
   type ProductoComerciante,
 } from '@/components/comerciante/api'
 import SubidorImagenes from '@/components/comerciante/SubidorImagenes'
+import SubidorVideo from '@/components/comerciante/SubidorVideo'
 import { ALCANCES, etiquetaUnidad, type Alcance } from '@/components/comerciante/constantes'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
@@ -167,6 +170,18 @@ export default function EditarProductoPage() {
       >
         {producto && (
           <>
+            <SubidorVideo
+              titulo="Video del producto"
+              descripcion="Muestra el producto en movimiento o en contexto. Se acepta cualquier formato común y se convierte automaticamente."
+              estadoInicial={{
+                videoUrl: producto.videoUrl ?? null,
+                videoPosterUrl: producto.videoPosterUrl ?? null,
+                videoDuracionSegundos: producto.videoDuracionSegundos ?? null,
+                videoMimeType: producto.videoMimeType ?? null,
+              }}
+              onSubir={(file, meta) => subirVideoProducto(producto.id, file, meta)}
+              onEliminar={() => quitarVideoProducto(producto.id)}
+            />
             <SubidorImagenes
               productoId={producto.id}
               fotoUrlInicial={producto.fotoUrl}

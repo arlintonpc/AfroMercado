@@ -155,6 +155,7 @@ function TarjetaProductoComerciante({
 
   const stockBajo = producto.stock > 0 && producto.stock <= 5
   const sinStock = producto.stock === 0
+  const tieneVideo = Boolean(producto.videoUrl)
 
   return (
     <li className="flex flex-col bg-white rounded-2xl border border-[#1A1A1A]/5 shadow-sm overflow-hidden">
@@ -175,6 +176,14 @@ function TarjetaProductoComerciante({
             </svg>
             <p className="text-sm text-[#2D6A4F]/60 font-medium leading-tight line-clamp-2">{producto.nombre}</p>
           </div>
+        )}
+        {tieneVideo && (
+          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            Video
+          </span>
         )}
         {/* Badge estado flotante */}
         <span className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${

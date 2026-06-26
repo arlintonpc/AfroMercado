@@ -34,6 +34,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
     : 0
   const agotado    = disponible === 0
   const stockBajo  = !agotado && disponible <= 5
+  const tieneVideo = Boolean(producto.videoUrl || producto.comercio.videoUrl)
 
   const mostrarPlaceholder = !producto.fotoUrl || imgError
   const href = `/producto/${producto.id}`
@@ -141,6 +142,15 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         {producto.oferta && !agotado && esDestacado && (
           <span className="absolute bottom-3 left-3 bg-[#2D6A4F] text-white text-[9px] font-bold px-2 py-0.5 rounded-full leading-none">
             -{descuentoPct}%
+          </span>
+        )}
+
+        {tieneVideo && (
+          <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            Video
           </span>
         )}
 

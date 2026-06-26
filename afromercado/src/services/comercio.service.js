@@ -6,10 +6,23 @@
 const ComercioRepository = require("../repositories/comercio.repository");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const prisma = require("../config/prisma");
+const { eliminarDeCloudinary } = require("../utils/cloudinary");
+const { eliminarArchivoLocalDesdeUrl } = require("../utils/video-media");
 
 const CAMPOS_EDITABLES = ["nombre", "descripcion", "municipio", "historia", "whatsapp", "logoUrl", "vereda", "fotoDocumentoUrl"];
 
 const TIPOS_DOCUMENTO_VALIDOS = ["CC", "TI", "CE", "PEP", "PASAPORTE", "NIT"];
+
+async function limpiarVideoAnterior(comercio) {
+  if (!comercio) return;
+  if (comercio.videoPublicId) {
+    await eliminarDeCloudinary(comercio.videoPublicId, "video").catch(() => {});
+    return;
+  }
+  if (comercio.videoUrl) {
+    eliminarArchivoLocalDesdeUrl(comercio.videoUrl);
+  }
+}
 
 // Envío gratis del vendedor: se guarda en la tabla Config por comercio
 // (clave `envio_gratis_comercio:<id>`), evitando una migración de esquema.
@@ -142,6 +155,55 @@ const ComercioService = {
     }
 
     const actualizado = await ComercioRepository.actualizar(comercio.id, cambios);
+    return { ...actualizado, envioGratisDesde: await leerEnvioGratis(comercio.id) };
+  },
+
+  async actualizarVideo(usuarioId, video) {
+    const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
+    if (!comercio) {
+      throw new ErrorNoEncontrado("No tienes un comercio registrado");
+    }
+    if (!video?.videoUrl) {
+      throw new ErrorValidacion("No se recibio video");
+    }
+
+    await limpiarVideoAnterior(comercio);
+
+    const actualizado = await ComercioRepository.actualizar(comercio.id, {
+      videoUrl: video.videoUrl,
+      videoPosterUrl: video.videoPosterUrl ?? null,
+      videoPublicId: video.videoPublicId ?? null,
+      videoDuracionSegundos: video.videoDuracionSegundos ?? null,
+      videoAncho: video.videoAncho ?? null,
+      videoAlto: video.videoAlto ?? null,
+      videoBytes: video.videoBytes ?? null,
+      videoFormato: video.videoFormato ?? null,
+      videoMimeType: video.videoMimeType ?? null,
+    });
+
+    return { ...actualizado, envioGratisDesde: await leerEnvioGratis(comercio.id) };
+  },
+
+  async quitarVideo(usuarioId) {
+    const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
+    if (!comercio) {
+      throw new ErrorNoEncontrado("No tienes un comercio registrado");
+    }
+
+    await limpiarVideoAnterior(comercio);
+
+    const actualizado = await ComercioRepository.actualizar(comercio.id, {
+      videoUrl: null,
+      videoPosterUrl: null,
+      videoPublicId: null,
+      videoDuracionSegundos: null,
+      videoAncho: null,
+      videoAlto: null,
+      videoBytes: null,
+      videoFormato: null,
+      videoMimeType: null,
+    });
+
     return { ...actualizado, envioGratisDesde: await leerEnvioGratis(comercio.id) };
   },
 };

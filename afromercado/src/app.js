@@ -44,6 +44,14 @@ app.use(
   "/uploads/productos",
   express.static(path.join(__dirname, "..", "uploads", "productos"))
 );
+app.use("/uploads/videos", (req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
+app.use(
+  "/uploads/videos",
+  express.static(path.join(__dirname, "..", "uploads", "videos"))
+);
 app.use("/uploads/campanas", (req, res, next) => {
   res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   next();

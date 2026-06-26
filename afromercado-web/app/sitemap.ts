@@ -19,9 +19,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })
     if (res.ok) {
       const json = await res.json() as {
+        items?: { id: number; updatedAt?: string }[]
         data?: { productos?: { id: number; updatedAt?: string }[] }
       }
-      const productos = json.data?.productos ?? []
+      const productos = json.items ?? json.data?.productos ?? []
       const dinamicas: MetadataRoute.Sitemap = productos.map((p) => ({
         url:             `${SITE}/producto/${p.id}`,
         lastModified:    p.updatedAt ? new Date(p.updatedAt) : new Date(),

@@ -35,7 +35,15 @@ router.post(
   ProductoController.uploadImagenes,
   ProductoController.subirImagenes
 );
+router.post(
+  "/:id/video",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ProductoController.uploadVideo,
+  ProductoController.subirVideo
+);
 router.delete("/:id/imagenes", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.quitarImagen);
+router.delete("/:id/video", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.quitarVideo);
 router.patch("/:id/foto-principal", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.fotoPrincipal);
 
 module.exports = router;
