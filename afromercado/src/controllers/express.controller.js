@@ -11,6 +11,14 @@ const ExpressController = {
 
   // ── CLIENTE ──────────────────────────────────────────────────
 
+  async festivosAnio(req, res, next) {
+    try {
+      const anio = req.query.anio ? Number(req.query.anio) : undefined;
+      const data = await ExpressService.festivosAnio(anio);
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
   async comerciosExpress(req, res, next) {
     try {
       const { municipio } = req.query;

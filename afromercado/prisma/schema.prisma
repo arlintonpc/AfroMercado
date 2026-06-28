@@ -1147,8 +1147,6 @@ model ConfigExpress {
   comercioId Int      @unique
   activo     Boolean  @default(false)
   abierto    Boolean  @default(false)
-  horarioApertura   String?
-  horarioCierre     String?
   tiempoPrepMinutos Int      @default(20)
   municipiosEntrega String[]
   modalidades       ModalidadExpress[]
@@ -1160,8 +1158,34 @@ model ConfigExpress {
 
   comercio        Comercio         @relation(fields: [comercioId], references: [id])
   pedidosExpress  PedidoExpress[]
+  horarios        HorarioExpress[]
 
   @@index([activo, abierto])
+}
+
+enum DiaSemana {
+  LUNES
+  MARTES
+  MIERCOLES
+  JUEVES
+  VIERNES
+  SABADO
+  DOMINGO
+  FESTIVO
+}
+
+model HorarioExpress {
+  id              Int           @id @default(autoincrement())
+  configExpressId Int
+  dia             DiaSemana
+  abierto         Boolean       @default(true)
+  apertura        String        // HH:MM
+  cierre          String        // HH:MM
+
+  configExpress   ConfigExpress @relation(fields: [configExpressId], references: [id], onDelete: Cascade)
+
+  @@unique([configExpressId, dia])
+  @@index([configExpressId])
 }
 
 model PedidoExpress {

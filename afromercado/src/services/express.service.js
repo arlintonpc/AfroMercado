@@ -1,5 +1,23 @@
 const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
+const { diaSemanaEnum, festivosAnio } = require("../utils/festivos-colombia");
+
+const DIAS_ORDEN = ['LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO','DOMINGO','FESTIVO'];
+
+function horaActualEnRango(apertura, cierre) {
+  const ahora = new Date();
+  const hhmm = `${String(ahora.getHours()).padStart(2,'0')}:${String(ahora.getMinutes()).padStart(2,'0')}`;
+  return hhmm >= apertura && hhmm < cierre;
+}
+
+function comercioAbiertoAhora(horarios) {
+  if (!horarios || horarios.length === 0) return false;
+  const hoy = new Date();
+  const diaEnum = diaSemanaEnum(hoy);
+  const horario = horarios.find(h => h.dia === diaEnum);
+  if (!horario || !horario.abierto) return false;
+  return horaActualEnRango(horario.apertura, horario.cierre);
+}
 
 const TASA_COMISION = 0.10;
 const TIMEOUT_ACEPTACION_MIN = 3;
@@ -15,27 +33,46 @@ const ExpressService = {
   // ── CONFIG DEL COMERCIO ──────────────────────────────────────
 
   async obtenerConfig(comercioId) {
-    const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
+    let cfg = await prisma.configExpress.findUnique({
+      where: { comercioId },
+      include: { horarios: { orderBy: { dia: 'asc' } } },
+    });
     if (!cfg) {
-      // Crear config por defecto
-      return prisma.configExpress.create({
+      cfg = await prisma.configExpress.create({
         data: { comercioId, modalidades: ["RECOGER"] },
+        include: { horarios: true },
       });
     }
     return cfg;
   },
 
   async actualizarConfig(comercioId, datos) {
-    const { activo, abierto, horarioApertura, horarioCierre,
-            tiempoPrepMinutos, municipiosEntrega, modalidades, costoEnvioBase } = datos;
-    return prisma.configExpress.upsert({
+    const { activo, tiempoPrepMinutos, municipiosEntrega, modalidades, costoEnvioBase, horarios } = datos;
+    const cfg = await prisma.configExpress.upsert({
       where:  { comercioId },
-      update: { activo, abierto, horarioApertura, horarioCierre,
-                tiempoPrepMinutos, municipiosEntrega, modalidades, costoEnvioBase, updatedAt: new Date() },
-      create: { comercioId, activo: activo ?? false, abierto: abierto ?? false,
-                horarioApertura, horarioCierre, tiempoPrepMinutos: tiempoPrepMinutos ?? 20,
-                municipiosEntrega: municipiosEntrega ?? [], modalidades: modalidades ?? ["RECOGER"],
+      update: { activo, tiempoPrepMinutos, municipiosEntrega, modalidades, costoEnvioBase, updatedAt: new Date() },
+      create: { comercioId, activo: activo ?? false,
+                tiempoPrepMinutos: tiempoPrepMinutos ?? 20,
+                municipiosEntrega: municipiosEntrega ?? [],
+                modalidades: modalidades ?? ["RECOGER"],
                 costoEnvioBase: costoEnvioBase ?? 3000 },
+    });
+
+    // Upsert horarios por día si vienen en el payload
+    if (Array.isArray(horarios) && horarios.length > 0) {
+      for (const h of horarios) {
+        await prisma.horarioExpress.upsert({
+          where:  { configExpressId_dia: { configExpressId: cfg.id, dia: h.dia } },
+          update: { abierto: h.abierto, apertura: h.apertura, cierre: h.cierre },
+          create: { configExpressId: cfg.id, dia: h.dia, abierto: h.abierto ?? true,
+                    apertura: h.apertura ?? '07:00', cierre: h.cierre ?? '20:00' },
+        });
+      }
+    }
+
+    return prisma.configExpress.findUnique({
+      where: { comercioId },
+      include: { horarios: { orderBy: { dia: 'asc' } } },
     });
   },
 
@@ -46,13 +83,23 @@ const ExpressService = {
     return prisma.configExpress.update({ where: { comercioId }, data: { abierto } });
   },
 
+  async festivosAnio(anio) {
+    const año = anio ?? new Date().getFullYear();
+    return { anio: año, festivos: festivosAnio(año) };
+  },
+
   // ── CREAR PEDIDO (CLIENTE) ───────────────────────────────────
 
   async crearPedido({ clienteId, comercioId, modalidad, metodoPago, items, notaCliente, direccionTexto, municipioEntrega }) {
-    const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
+    const cfg = await prisma.configExpress.findUnique({
+      where: { comercioId },
+      include: { horarios: true },
+    });
     if (!cfg) throw new ErrorNoEncontrado("Este comercio no tiene servicio Express");
     if (!cfg.activo) throw new ErrorValidacion("El servicio Express de este comercio no está activo");
-    if (!cfg.abierto) throw new ErrorValidacion("El comercio está cerrado en este momento");
+    // Verificar horario automático + override manual de abierto
+    const abiertoAhora = cfg.abierto && comercioAbiertoAhora(cfg.horarios);
+    if (!abiertoAhora) throw new ErrorValidacion("El comercio está cerrado en este momento");
     if (!cfg.modalidades.includes(modalidad)) {
       throw new ErrorValidacion(`Este comercio no ofrece la modalidad ${modalidad}`);
     }
@@ -174,18 +221,23 @@ const ExpressService = {
   // ── LISTADOS ─────────────────────────────────────────────────
 
   async listarComerciosExpress(municipio) {
-    const where = { activo: true, abierto: true };
+    const where = { activo: true };
     if (municipio) where.municipiosEntrega = { has: municipio };
     const configs = await prisma.configExpress.findMany({
       where,
       include: {
+        horarios: true,
         comercio: {
           select: { id: true, nombre: true, logoUrl: true, municipio: true,
                     calificacion: true, totalReviews: true },
         },
       },
     });
-    return configs;
+    // Enriquecer con estado abierto real basado en horario
+    return configs.map(cfg => ({
+      ...cfg,
+      abiertoAhora: cfg.abierto && comercioAbiertoAhora(cfg.horarios),
+    }));
   },
 
   async listarPedidosComercio(comercioId, estado) {

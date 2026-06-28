@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   obtenerConfigExpress, actualizarConfigExpress, toggleAbiertoExpress,
   pedidosComercioExpress, aceptarPedidoExpress, rechazarPedidoExpress, avanzarEstadoExpress,
-  type ConfigExpress, type PedidoExpress, type ModalidadExpress,
+  festivosColombia,
+  type ConfigExpress, type PedidoExpress, type ModalidadExpress, type DiaSemana, type HorarioExpress,
 } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
@@ -12,6 +13,24 @@ const MUNICIPIOS_CHOCO = [
   'Quibdó','Istmina','Tadó','Condoto','Bagadó','Acandí','Bahía Solano',
   'Nuquí','Riosucio','Carmen del Darién','Bojayá','Lloró','Cértegui',
 ]
+
+const DIAS: { dia: DiaSemana; label: string }[] = [
+  { dia: 'LUNES',     label: 'Lunes' },
+  { dia: 'MARTES',    label: 'Martes' },
+  { dia: 'MIERCOLES', label: 'Miércoles' },
+  { dia: 'JUEVES',    label: 'Jueves' },
+  { dia: 'VIERNES',   label: 'Viernes' },
+  { dia: 'SABADO',    label: 'Sábado' },
+  { dia: 'DOMINGO',   label: 'Domingo' },
+  { dia: 'FESTIVO',   label: '🎉 Festivos' },
+]
+
+const HORARIO_DEFAULT: HorarioExpress[] = DIAS.map(({ dia }) => ({
+  dia,
+  abierto:  !['DOMINGO'].includes(dia),
+  apertura: '07:00',
+  cierre:   '20:00',
+}))
 
 const MODALIDAD_LABEL: Record<ModalidadExpress, string> = {
   DOMICILIO: '🛵 Domicilio',
@@ -52,22 +71,34 @@ type Pestana = 'activos' | 'config' | 'historial'
 
 export default function ExpressComerciante() {
   const [pestana, setPestana]   = useState<Pestana>('activos')
-  const [config, setConfig]     = useState<ConfigExpress | null>(null)
-  const [pedidos, setPedidos]   = useState<PedidoExpress[]>([])
-  const [cargando, setCargando] = useState(true)
+  const [config, setConfig]       = useState<ConfigExpress | null>(null)
+  const [pedidos, setPedidos]     = useState<PedidoExpress[]>([])
+  const [cargando, setCargando]   = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [editConfig, setEditConfig] = useState<Partial<ConfigExpress>>({})
-  const [error, setError]       = useState('')
+  const [horarios, setHorarios]   = useState<HorarioExpress[]>(HORARIO_DEFAULT)
+  const [festivos, setFestivos]   = useState<string[]>([])
+  const [error, setError]         = useState('')
 
   const cargar = useCallback(async () => {
     try {
-      const [cfg, peds] = await Promise.all([
+      const [cfg, peds, fest] = await Promise.all([
         obtenerConfigExpress(),
         pedidosComercioExpress(),
+        festivosColombia(),
       ])
       setConfig(cfg)
       setEditConfig(cfg)
       setPedidos(peds)
+      setFestivos(fest.festivos)
+      // Mezclar horarios guardados con defaults
+      if (cfg.horarios && cfg.horarios.length > 0) {
+        const merged = HORARIO_DEFAULT.map(def => {
+          const guardado = cfg.horarios!.find(h => h.dia === def.dia)
+          return guardado ? { ...guardado } : def
+        })
+        setHorarios(merged)
+      }
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -92,12 +123,16 @@ export default function ExpressComerciante() {
   async function guardarConfig() {
     setGuardando(true)
     try {
-      const updated = await actualizarConfigExpress(editConfig)
+      const updated = await actualizarConfigExpress({ ...editConfig, horarios })
       setConfig(updated)
       setEditConfig(updated)
       setError('')
     } catch (e: any) { setError(e.message) }
     finally { setGuardando(false) }
+  }
+
+  function actualizarHorario(dia: DiaSemana, campo: keyof HorarioExpress, valor: any) {
+    setHorarios(prev => prev.map(h => h.dia === dia ? { ...h, [campo]: valor } : h))
   }
 
   async function aceptar(id: number) {
@@ -225,26 +260,76 @@ export default function ExpressComerciante() {
             <label htmlFor="activo" className="text-sm font-medium">Módulo Express activo</label>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Hora apertura</label>
-              <input
-                type="time"
-                value={editConfig.horarioApertura ?? ''}
-                onChange={e => setEditConfig(prev => ({ ...prev, horarioApertura: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Hora cierre</label>
-              <input
-                type="time"
-                value={editConfig.horarioCierre ?? ''}
-                onChange={e => setEditConfig(prev => ({ ...prev, horarioCierre: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-              />
+          {/* Editor de horarios por día */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-3">Horario por día</label>
+            <div className="space-y-2">
+              {DIAS.map(({ dia, label }) => {
+                const h = horarios.find(x => x.dia === dia) ?? { dia, abierto: false, apertura: '07:00', cierre: '20:00' }
+                return (
+                  <div key={dia} className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                    h.abierto ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    {/* Toggle abierto */}
+                    <button
+                      onClick={() => actualizarHorario(dia, 'abierto', !h.abierto)}
+                      className={`w-10 h-5 rounded-full transition-colors flex-shrink-0 relative ${
+                        h.abierto ? 'bg-green-500' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                        h.abierto ? 'translate-x-5' : 'translate-x-0.5'
+                      }`} />
+                    </button>
+
+                    {/* Nombre día */}
+                    <span className={`text-sm font-medium w-24 flex-shrink-0 ${h.abierto ? 'text-gray-800' : 'text-gray-400'}`}>
+                      {label}
+                    </span>
+
+                    {h.abierto ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          type="time"
+                          value={h.apertura}
+                          onChange={e => actualizarHorario(dia, 'apertura', e.target.value)}
+                          className="border border-gray-200 rounded-lg px-2 py-1 text-sm flex-1 min-w-0"
+                        />
+                        <span className="text-gray-400 text-xs flex-shrink-0">a</span>
+                        <input
+                          type="time"
+                          value={h.cierre}
+                          onChange={e => actualizarHorario(dia, 'cierre', e.target.value)}
+                          className="border border-gray-200 rounded-lg px-2 py-1 text-sm flex-1 min-w-0"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">Cerrado</span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
+
+          {/* Festivos del año */}
+          {festivos.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">
+                Festivos Colombia {new Date().getFullYear()} ({festivos.length} días)
+              </label>
+              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-3 bg-gray-50 rounded-xl border border-gray-200">
+                {festivos.map(f => (
+                  <span key={f} className="text-xs bg-white border border-gray-200 rounded-lg px-2 py-0.5 text-gray-600">
+                    {new Date(f + 'T00:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                En días festivos se aplica el horario de la fila 🎉 Festivos
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Tiempo de preparación (minutos)</label>

@@ -1,6 +1,15 @@
 import { apiFetch } from './client'
 
+export type DiaSemana = 'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES' | 'SABADO' | 'DOMINGO' | 'FESTIVO'
 export type ModalidadExpress  = 'DOMICILIO' | 'RECOGER' | 'MESA'
+
+export interface HorarioExpress {
+  id?: number
+  dia: DiaSemana
+  abierto: boolean
+  apertura: string
+  cierre: string
+}
 export type EstadoPedidoExpress =
   | 'PENDIENTE' | 'ACEPTADO' | 'EN_PREPARACION' | 'LISTO'
   | 'EN_CAMINO' | 'ENTREGADO' | 'CANCELADO' | 'RECHAZADO'
@@ -11,14 +20,13 @@ export interface ConfigExpress {
   comercioId: number
   activo: boolean
   abierto: boolean
-  horarioApertura: string | null
-  horarioCierre: string | null
   tiempoPrepMinutos: number
   municipiosEntrega: string[]
   modalidades: ModalidadExpress[]
   costoEnvioBase: number
   limiteCreditoEfectivo: number
   deudaEfectivoActual: number
+  horarios?: HorarioExpress[]
 }
 
 export interface ItemPedidoExpress {
@@ -107,8 +115,14 @@ export async function obtenerConfigExpress(): Promise<ConfigExpress> {
   return r.data
 }
 
-export async function actualizarConfigExpress(datos: Partial<ConfigExpress>): Promise<ConfigExpress> {
+export async function actualizarConfigExpress(datos: Partial<ConfigExpress> & { horarios?: HorarioExpress[] }): Promise<ConfigExpress> {
   const r = await apiFetch<{ ok: boolean; data: ConfigExpress }>('/express/config', { method: 'PUT', body: datos })
+  return r.data
+}
+
+export async function festivosColombia(anio?: number): Promise<{ anio: number; festivos: string[] }> {
+  const q = anio ? `?anio=${anio}` : ''
+  const r = await apiFetch<{ ok: boolean; data: { anio: number; festivos: string[] } }>(`/express/festivos${q}`)
   return r.data
 }
 
