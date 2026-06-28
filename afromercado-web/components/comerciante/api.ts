@@ -294,6 +294,7 @@ export interface DatosActualizarProducto {
   alcance?: 'LOCAL' | 'NACIONAL' | 'AMBOS'
   fotoUrl?: string
   pesoKg?: number | null
+  categoriaId?: number
   esExpress?: boolean
   tiempoEntregaMin?: number | null
 }

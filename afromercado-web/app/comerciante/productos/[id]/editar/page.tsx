@@ -3,13 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
-import { CampoTexto, CampoArea } from '@/components/comerciante/Campos'
+import { CampoTexto, CampoArea, CampoSelect } from '@/components/comerciante/Campos'
 import {
   obtenerMiProducto,
   actualizarProducto,
+  listarCategorias,
   subirVideoProducto,
   quitarVideoProducto,
   type ProductoComerciante,
+  type CategoriaComerciante,
 } from '@/components/comerciante/api'
 import SubidorImagenes from '@/components/comerciante/SubidorImagenes'
 import SubidorVideo from '@/components/comerciante/SubidorVideo'
@@ -23,6 +25,7 @@ export default function EditarProductoPage() {
   const idNum = Number(params.id)
 
   const [producto, setProducto] = useState<ProductoComerciante | null>(null)
+  const [categorias, setCategorias] = useState<CategoriaComerciante[]>([])
   const [cargando, setCargando] = useState(true)
   const [noEncontrado, setNoEncontrado] = useState(false)
 
@@ -31,6 +34,7 @@ export default function EditarProductoPage() {
   const [stock, setStock] = useState('')
   const [alcance, setAlcance] = useState<Alcance>('LOCAL')
   const [pesoKg, setPesoKg] = useState('')
+  const [categoriaId, setCategoriaId] = useState('')
   const [esExpress, setEsExpress] = useState(false)
   const [tiempoEntregaMin, setTiempoEntregaMin] = useState('20')
 
@@ -50,18 +54,23 @@ export default function EditarProductoPage() {
     async function cargar() {
       setCargando(true)
       try {
-        const p = Number.isFinite(idNum) ? await obtenerMiProducto(idNum) : null
+        const [p, cats] = await Promise.all([
+          Number.isFinite(idNum) ? obtenerMiProducto(idNum) : Promise.resolve(null),
+          listarCategorias(),
+        ])
         if (!activo) return
         if (!p) {
           setNoEncontrado(true)
           return
         }
+        setCategorias(cats)
         setProducto(p)
         setDescripcion(p.descripcion ?? '')
         setPrecio(String(Number(p.precio)))
         setStock(String(p.stock))
         setAlcance(p.alcance)
         setPesoKg(p.pesoKg !== undefined && p.pesoKg !== null ? String(Number(p.pesoKg)) : '')
+        setCategoriaId(p.categoria?.id ? String(p.categoria.id) : '')
         setEsExpress(p.esExpress ?? false)
         setTiempoEntregaMin(p.tiempoEntregaMin ? String(p.tiempoEntregaMin) : '20')
       } catch (err) {
@@ -104,6 +113,7 @@ export default function EditarProductoPage() {
         stock: Number(stock.replace(/\D/g, '')),
         alcance,
         pesoKg: pesoKgNum !== null && pesoKgNum > 0 ? pesoKgNum : null,
+        categoriaId: categoriaId ? Number(categoriaId) : undefined,
         esExpress,
         tiempoEntregaMin: esExpress && tiempoEntregaMin ? Number(tiempoEntregaMin) : null,
       })
@@ -198,6 +208,16 @@ export default function EditarProductoPage() {
           </>
         )}
 
+        {categorias.length > 0 && (
+          <CampoSelect
+            label="Categoría"
+            name="categoriaId"
+            value={categoriaId}
+            onChange={setCategoriaId}
+            opciones={categorias.map(c => ({ valor: String(c.id), etiqueta: c.nombre }))}
+          />
+        )}
+
         <CampoArea
           label="Descríbelo"
           name="descripcion"
@@ -287,7 +307,7 @@ export default function EditarProductoPage() {
         </fieldset>
 
         {/* Toggle Express */}
-        {(producto?.categoria?.nombre?.toLowerCase().includes('gastronom') || esExpress) && (
+        {(categorias.find(c => c.id === Number(categoriaId))?.nombre?.toLowerCase().includes('gastronom') || esExpress) && (
           <div className="space-y-3">
             <Toggle
               activo={esExpress}

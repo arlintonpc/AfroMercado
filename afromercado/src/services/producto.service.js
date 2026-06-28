@@ -113,6 +113,7 @@ const ProductoService = {
     if (datos.pesoKg !== undefined) {
       campos.pesoKg = datos.pesoKg !== null && datos.pesoKg !== '' ? parseFloat(datos.pesoKg) : null;
     }
+    if (datos.categoriaId !== undefined) campos.categoriaId = datos.categoriaId ? parseInt(datos.categoriaId) : null;
     if (datos.esExpress !== undefined) campos.esExpress = datos.esExpress === true || datos.esExpress === 'true';
     if (datos.tiempoEntregaMin !== undefined) campos.tiempoEntregaMin = datos.tiempoEntregaMin ? parseInt(datos.tiempoEntregaMin) : null;
 
