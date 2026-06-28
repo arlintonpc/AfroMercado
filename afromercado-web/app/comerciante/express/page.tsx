@@ -176,16 +176,25 @@ export default function ExpressComerciante() {
           <p className="text-sm text-gray-500">Gestiona tu servicio de comida en tiempo real</p>
         </div>
         {config && (
-          <button
-            onClick={toggleAbierto}
-            className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
-              config.abierto
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            {config.abierto ? '🟢 ABIERTO' : '🔴 CERRADO'}
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={toggleAbierto}
+              className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
+                config.abierto
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              {config.abierto ? '🟢 Módulo activo' : '⏸ Módulo pausado'}
+            </button>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+              (config as any).abiertoAhora
+                ? 'bg-green-100 text-green-700'
+                : 'bg-red-100 text-red-600'
+            }`}>
+              {(config as any).abiertoAhora ? '● Abierto ahora' : '● Cerrado según horario'}
+            </span>
+          </div>
         )}
       </div>
 
