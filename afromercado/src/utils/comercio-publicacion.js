@@ -23,9 +23,6 @@ function requisitosPendientesPublicacion(comercio) {
   if (!cuentaDispersionVerificada(comercio)) {
     pendientes.push("cuenta bancaria o billetera de dispersion verificada");
   }
-  if (process.env.NODE_ENV === "production" && comercio?.cuentaDispersion?.proveedor === "SANDBOX") {
-    pendientes.push("cuenta de pagos real, no SANDBOX");
-  }
 
   return pendientes;
 }
@@ -53,7 +50,6 @@ function filtroComercioPublicable() {
     cuentaDispersion: {
       is: {
         estado: "VERIFICADA",
-        ...(process.env.NODE_ENV === "production" ? { proveedor: { not: "SANDBOX" } } : {}),
       },
     },
   };
