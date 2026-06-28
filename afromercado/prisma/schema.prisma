@@ -201,6 +201,8 @@ model Usuario {
   liquidacionesBeneficiario Liquidacion[]       @relation("LiquidacionBeneficiario")
   liquidacionesCreadas      Liquidacion[]       @relation("LiquidacionAdmin")
   liquidacionesPagadas      Liquidacion[]       @relation("LiquidacionPagador")
+  pedidosExpressCliente     PedidoExpress[]     @relation("PedidosExpressCliente")
+  pedidosExpressRepartidor  PedidoExpress[]     @relation("PedidosExpressRepartidor")
 }
 
 model Comercio {
@@ -259,6 +261,7 @@ model Comercio {
   pagoDispersiones  PagoDispersion[]
   cambiosCriticos   CambioCriticoComercio[]
   solicitudesPublicidad SolicitudPublicidad[]
+  configExpress         ConfigExpress?
 }
 
 model Categoria {
@@ -315,6 +318,7 @@ model Producto {
   vistas           VistaProducto[]
   favoritos        Favorito[]
   solicitudesPublicidad SolicitudPublicidad[]
+  itemsExpress          ItemPedidoExpress[]
 
   @@index([comercioId, activo])
   @@index([categoriaId, activo])
@@ -1111,4 +1115,111 @@ model Liquidacion {
 
   @@index([beneficiarioId, estado])
   @@index([tipo, estado, createdAt])
+}
+
+// ─── PEDIDO EXPRESS ───────────────────────────────────────────
+
+enum ModalidadExpress {
+  DOMICILIO
+  RECOGER
+  MESA
+}
+
+enum EstadoPedidoExpress {
+  PENDIENTE
+  ACEPTADO
+  EN_PREPARACION
+  LISTO
+  EN_CAMINO
+  ENTREGADO
+  CANCELADO
+  RECHAZADO
+}
+
+enum MetodoPagoExpress {
+  EFECTIVO
+  NEQUI
+  WOMPI
+}
+
+model ConfigExpress {
+  id         Int      @id @default(autoincrement())
+  comercioId Int      @unique
+  activo     Boolean  @default(false)
+  abierto    Boolean  @default(false)
+  horarioApertura   String?
+  horarioCierre     String?
+  tiempoPrepMinutos Int      @default(20)
+  municipiosEntrega String[]
+  modalidades       ModalidadExpress[]
+  costoEnvioBase    Decimal  @default(3000) @db.Decimal(10, 2)
+  limiteCreditoEfectivo Decimal @default(30000) @db.Decimal(10, 2)
+  deudaEfectivoActual   Decimal @default(0)   @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  comercio        Comercio         @relation(fields: [comercioId], references: [id])
+  pedidosExpress  PedidoExpress[]
+
+  @@index([activo, abierto])
+}
+
+model PedidoExpress {
+  id               Int                 @id @default(autoincrement())
+  codigo           String              @unique
+  comercioId       Int
+  clienteId        Int
+  repartidorId     Int?
+  configExpressId  Int
+
+  modalidad        ModalidadExpress
+  estado           EstadoPedidoExpress @default(PENDIENTE)
+  metodoPago       MetodoPagoExpress
+  pagoConfirmado   Boolean             @default(false)
+
+  subtotal         Decimal             @db.Decimal(12, 2)
+  costoEnvio       Decimal             @default(0) @db.Decimal(10, 2)
+  comision         Decimal             @db.Decimal(12, 2)
+  total            Decimal             @db.Decimal(12, 2)
+
+  direccionTexto   String?
+  municipioEntrega String?
+  notaCliente      String?
+  motivoCancelacion String?
+
+  tiempoEstimadoMin Int               @default(30)
+  tiempoAjustadoMin Int?
+
+  creadoAt         DateTime            @default(now())
+  aceptadoAt       DateTime?
+  preparandoAt     DateTime?
+  listoAt          DateTime?
+  enCaminoAt       DateTime?
+  entregadoAt      DateTime?
+  canceladoAt      DateTime?
+  expiresAt        DateTime
+
+  cliente          Usuario             @relation("PedidosExpressCliente",    fields: [clienteId],      references: [id])
+  repartidor       Usuario?            @relation("PedidosExpressRepartidor", fields: [repartidorId],   references: [id])
+  configExpress    ConfigExpress       @relation(fields: [configExpressId],  references: [id])
+  items            ItemPedidoExpress[]
+
+  @@index([comercioId, estado])
+  @@index([clienteId,  estado])
+  @@index([estado, creadoAt])
+}
+
+model ItemPedidoExpress {
+  id              Int           @id @default(autoincrement())
+  pedidoExpressId Int
+  productoId      Int
+  cantidad        Int
+  precioUnitario  Decimal       @db.Decimal(12, 2)
+  subtotal        Decimal       @db.Decimal(12, 2)
+  nota            String?
+
+  pedidoExpress   PedidoExpress @relation(fields: [pedidoExpressId], references: [id])
+  producto        Producto      @relation(fields: [productoId],      references: [id])
+
+  @@index([pedidoExpressId])
 }

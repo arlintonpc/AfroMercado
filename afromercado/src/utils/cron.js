@@ -3,6 +3,16 @@
 const prisma = require("../config/prisma");
 const sseManager = require("./sse-manager");
 const { enviarMensajeWA } = require("./whatsapp");
+const ExpressService = require("../services/express.service");
+
+async function cancelarPedidosExpressExpirados() {
+  try {
+    const n = await ExpressService.cancelarExpirados();
+    if (n > 0) console.log(`[CRON] Express: ${n} pedido(s) cancelado(s) por expiración`);
+  } catch (err) {
+    console.error("[CRON] Express cancelarExpirados:", err.message);
+  }
+}
 
 const CADA_5_MIN  = 5  * 60 * 1000;
 const CADA_10_MIN = 10 * 60 * 1000;
@@ -276,6 +286,7 @@ function iniciarCron() {
   setInterval(alertasSinRepartidor,      CADA_5_MIN);
   setInterval(recordatoriosRecogida,     CADA_10_MIN);
   setInterval(recordatoriosResena,       CADA_1_HORA);
+  setInterval(cancelarPedidosExpressExpirados, 60_000); // cada 1 min
 
   console.log("[CRON] Jobs iniciados: expiración, recordatorios de pago, alertas de entrega, reseñas");
 }
