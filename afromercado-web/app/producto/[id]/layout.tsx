@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 
-const API  = process.env.NEXT_PUBLIC_API_URL  ?? 'http://localhost:3001/api'
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
+const API      = process.env.NEXT_PUBLIC_API_URL  ?? 'http://localhost:3001/api'
+const SITE     = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
+const OG_LOGO  = `${SITE}/og-logo.png`
 
 interface Props {
   params: Promise<{ id: string }>
@@ -35,9 +36,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const descripcion = (p.descripcion ?? 'Descubre productos artesanales del Chocó en AfroMercado.').slice(0, 160)
 
     const imagenRaw = p.imagenes?.[0]
-    const imagen = imagenRaw
+    const imagenProducto = imagenRaw
       ? (typeof imagenRaw === 'string' ? imagenRaw : imagenRaw.url ?? null)
       : p.videoPosterUrl ?? p.fotoUrl ?? null
+    const imagen = imagenProducto ?? OG_LOGO
 
     return {
       title:       `${nombre} — AfroMercado`,
@@ -48,19 +50,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         url:         `${SITE}/producto/${id}`,
         siteName:    'AfroMercado',
         type:        'website',
-        ...(imagen ? { images: [{ url: imagen, width: 800, height: 600, alt: nombre }] } : {}),
+        images: [{ url: imagen, width: 800, height: 600, alt: nombre }],
       },
       twitter: {
-        card:        imagen ? 'summary_large_image' : 'summary',
+        card:        'summary_large_image',
         title:       `${nombre} — AfroMercado`,
         description: descripcion,
-        ...(imagen ? { images: [imagen] } : {}),
+        images:      [imagen],
       },
     }
   } catch {
     return {
       title:       'Producto — AfroMercado',
       description: 'Descubre productos artesanales del Chocó en AfroMercado.',
+      openGraph: {
+        title:    'Producto — AfroMercado',
+        siteName: 'AfroMercado',
+        images:   [{ url: OG_LOGO, width: 800, height: 600, alt: 'AfroMercado' }],
+      },
     }
   }
 }
