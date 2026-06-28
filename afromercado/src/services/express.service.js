@@ -50,7 +50,7 @@ const ExpressService = {
         include: { horarios: true },
       });
     }
-    return cfg;
+    return { ...cfg, abiertoAhora: cfg.abierto && comercioAbiertoAhora(cfg.horarios) };
   },
 
   async actualizarConfig(comercioId, datos) {
