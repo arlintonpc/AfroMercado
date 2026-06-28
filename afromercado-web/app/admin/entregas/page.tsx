@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiFetch } from '@/lib/api/client'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -265,19 +266,21 @@ function ModalCrearRepartidor({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-[#1A1A1A]">Contraseña</label>
-              <input
-                type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+              <PasswordInput
+                value={password}
+                onChange={setPassword}
                 placeholder="Mín. 6 caracteres"
-                className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:border-[#2D6A4F] focus:outline-none ${errores.password ? 'border-red-400' : 'border-[#1A1A1A]/15'}`}
+                inputClassName={`rounded-xl border px-4 py-2.5 text-sm focus:border-[#2D6A4F] focus:outline-none ${errores.password ? 'border-red-400' : 'border-[#1A1A1A]/15'}`}
               />
               {errores.password && <p className="mt-1 text-xs text-red-600">{errores.password}</p>}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-[#1A1A1A]">Confirmar</label>
-              <input
-                type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
+              <PasswordInput
+                value={confirm}
+                onChange={setConfirm}
                 placeholder="Repite la clave"
-                className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:border-[#2D6A4F] focus:outline-none ${errores.confirm ? 'border-red-400' : 'border-[#1A1A1A]/15'}`}
+                inputClassName={`rounded-xl border px-4 py-2.5 text-sm focus:border-[#2D6A4F] focus:outline-none ${errores.confirm ? 'border-red-400' : 'border-[#1A1A1A]/15'}`}
               />
               {errores.confirm && <p className="mt-1 text-xs text-red-600">{errores.confirm}</p>}
             </div>

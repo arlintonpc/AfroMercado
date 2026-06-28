@@ -60,7 +60,7 @@ function mezclar<T>(arr: T[]): T[] {
 function badgeCampana(foto: FotoHero) {
   const esSocial = foto.tipoCampana === 'SOCIAL'
   return {
-    label: esSocial ? 'Comunidad' : 'Destacado',
+    label: esSocial ? 'Comunidad' : 'Publicidad',
     cls: esSocial
       ? 'bg-[#52B788] text-white'
       : 'bg-[#D4A017] text-[#1A1A1A]',

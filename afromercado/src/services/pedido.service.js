@@ -347,7 +347,7 @@ const PedidoService = {
     const resultado = {
       pedido,
       instruccionesPago: {
-        mensaje: "Tienes 30 minutos para completar el pago antes de que el pedido expire.",
+        mensaje: "Tienes 30 minutos para completar el pago en la pasarela antes de que el pedido expire.",
         expiresAt: pedido.expiresAt,
         total: pedido.total,
       },

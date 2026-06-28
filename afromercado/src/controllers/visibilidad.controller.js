@@ -48,6 +48,30 @@ const VisibilidadController = {
   },
 
   // GET /comerciante/visibilidad/metricas — solo el comerciante autenticado
+  async registrarClic(req, res, next) {
+    try {
+      await VisibilidadRepository.registrarClicProducto(req.params.id, {
+        usuarioId: req.usuario?.id ?? null,
+        sesionId: req.body?.sesionId || req.headers["x-afm-session-id"] || null,
+        userAgent: req.headers["user-agent"],
+        referer: req.headers.referer,
+      });
+      res.json({ ok: true });
+    } catch (err) { next(err); }
+  },
+
+  async registrarCarrito(req, res, next) {
+    try {
+      await VisibilidadRepository.registrarCarritoProducto(req.params.id, {
+        usuarioId: req.usuario?.id ?? null,
+        sesionId: req.body?.sesionId || req.headers["x-afm-session-id"] || null,
+        userAgent: req.headers["user-agent"],
+        referer: req.headers.referer,
+      });
+      res.json({ ok: true });
+    } catch (err) { next(err); }
+  },
+
   async metricasComerciante(req, res, next) {
     try {
       const prisma = require("../config/prisma");

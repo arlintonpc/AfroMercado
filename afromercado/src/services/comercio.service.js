@@ -4,14 +4,35 @@
 //  No habla directo con la BD; usa el repositorio.
 // ============================================================
 const ComercioRepository = require("../repositories/comercio.repository");
+const CuentaDispersionService = require("./cuenta-dispersion.service");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const prisma = require("../config/prisma");
 const { eliminarDeCloudinary } = require("../utils/cloudinary");
 const { eliminarArchivoLocalDesdeUrl } = require("../utils/video-media");
 
-const CAMPOS_EDITABLES = ["nombre", "descripcion", "municipio", "historia", "whatsapp", "logoUrl", "vereda", "fotoDocumentoUrl"];
+const CAMPOS_EDITABLES = [
+  "nombre",
+  "descripcion",
+  "municipio",
+  "historia",
+  "whatsapp",
+  "logoUrl",
+  "vereda",
+  "fotoDocumentoUrl",
+  "fotoDocumentoFrenteUrl",
+  "fotoDocumentoReversoUrl",
+];
 
 const TIPOS_DOCUMENTO_VALIDOS = ["CC", "TI", "CE", "PEP", "PASAPORTE", "NIT"];
+
+function traeCuentaDispersion(datos) {
+  return Boolean(
+    datos.bancoCodigo ||
+    datos.tipoCuenta ||
+    datos.numeroCuenta ||
+    datos.titularNombre
+  );
+}
 
 async function limpiarVideoAnterior(comercio) {
   if (!comercio) return;
@@ -66,6 +87,8 @@ const ComercioService = {
       whatsapp: datos.whatsapp ?? null,
       vereda: datos.vereda?.trim() ?? null,
       fotoDocumentoUrl: datos.fotoDocumentoUrl ?? null,
+      fotoDocumentoFrenteUrl: datos.fotoDocumentoFrenteUrl ?? datos.fotoDocumentoUrl ?? null,
+      fotoDocumentoReversoUrl: datos.fotoDocumentoReversoUrl ?? null,
     });
 
     // N-A-03: alertar a los admins del nuevo comercio pendiente de verificación
@@ -91,6 +114,10 @@ const ComercioService = {
         console.error("[NOTIF] nuevo comercio admin:", e.message);
       }
     });
+
+    if (traeCuentaDispersion(datos)) {
+      await CuentaDispersionService.guardar(usuarioId, datos);
+    }
 
     return comercio;
   },

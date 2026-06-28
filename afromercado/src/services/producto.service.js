@@ -4,6 +4,7 @@ const ComercioRepository = require("../repositories/comercio.repository");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorNoAutorizado } = require("../utils/errores");
 const { eliminarDeCloudinary } = require("../utils/cloudinary");
 const { eliminarArchivoLocalDesdeUrl } = require("../utils/video-media");
+const { assertPuedePublicar } = require("../utils/comercio-publicacion");
 
 const UNIDADES_VALIDAS = ["KG", "UNIDAD", "LITRO", "PAQUETE", "DOCENA", "MANOJO"];
 const ALCANCES_VALIDOS = ["LOCAL", "NACIONAL", "AMBOS"];
@@ -21,8 +22,9 @@ async function limpiarVideoAnterior(producto) {
 
 const ProductoService = {
   async crear(usuarioId, datos) {
-    const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
+    const comercio = await ComercioRepository.buscarPorUsuarioIdConCuenta(usuarioId);
     if (!comercio) throw new ErrorValidacion("Debes tener un comercio registrado para publicar productos");
+    assertPuedePublicar(comercio);
 
     const { nombre, descripcion, precio, unidad, stock, diasAlistamientoMin, diasAlistamientoMax, alcance, fotoUrl, categoriaId, pesoKg } = datos;
 
@@ -68,8 +70,8 @@ const ProductoService = {
   },
 
   async obtenerPorId(id) {
-    const producto = await ProductoRepository.buscarPorId(id);
-    if (!producto || !producto.activo) throw new ErrorNoEncontrado("Producto no encontrado");
+    const producto = await ProductoRepository.buscarPublicoPorId(id);
+    if (!producto) throw new ErrorNoEncontrado("Producto no encontrado");
     return producto;
   },
 
@@ -80,7 +82,9 @@ const ProductoService = {
   },
 
   async actualizar(usuarioId, productoId, datos) {
-    const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
+    const comercio = datos.activo === true
+      ? await ComercioRepository.buscarPorUsuarioIdConCuenta(usuarioId)
+      : await ComercioRepository.buscarPorUsuarioId(usuarioId);
     if (!comercio) throw new ErrorNoAutorizado("No tienes permiso para editar este producto");
 
     const producto = await ProductoRepository.buscarPorId(productoId);
@@ -100,7 +104,10 @@ const ProductoService = {
       if (!ALCANCES_VALIDOS.includes(datos.alcance)) throw new ErrorValidacion("Alcance inválido");
       campos.alcance = datos.alcance;
     }
-    if (datos.activo !== undefined) campos.activo = Boolean(datos.activo);
+    if (datos.activo !== undefined) {
+      if (Boolean(datos.activo)) assertPuedePublicar(comercio);
+      campos.activo = Boolean(datos.activo);
+    }
     if (datos.pesoKg !== undefined) {
       campos.pesoKg = datos.pesoKg !== null && datos.pesoKg !== '' ? parseFloat(datos.pesoKg) : null;
     }

@@ -9,6 +9,7 @@ import {
   type EstadoEmail,
   type InputSmtp,
 } from './api'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 
 const PRESETS: Array<{ label: string; host: string; port: number; secure: boolean }> = [
   { label: 'Gmail', host: 'smtp.gmail.com', port: 587, secure: false },
@@ -235,12 +236,11 @@ export default function EmailPanel() {
                   <label className="text-xs text-[#1A1A1A]/50 mb-1 block">
                     Contraseña {estado.smtp.tienePassword && <span className="text-[#2D6A4F]">(dejar vacío para no cambiar)</span>}
                   </label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     value={smtp.pass}
-                    onChange={e => setSmtp(s => ({ ...s, pass: e.target.value }))}
+                    onChange={(value) => setSmtp(s => ({ ...s, pass: value }))}
                     placeholder={estado.smtp.tienePassword ? '••••••••' : 'Contraseña o App Password'}
-                    className="w-full h-9 px-3 text-sm border border-[#1A1A1A]/15 rounded-lg focus:outline-none focus:border-[#2D6A4F]"
+                    inputClassName="h-9 px-3 text-sm border border-[#1A1A1A]/15 rounded-lg focus:outline-none focus:border-[#2D6A4F]"
                   />
                 </div>
 

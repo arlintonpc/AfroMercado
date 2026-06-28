@@ -12,6 +12,7 @@ const { estaConfigurado, obtenerFrom, enviarEmail, obtenerConfigSmtp } = require
 const { hashearPassword } = require("../utils/auth");
 const ConfigRepository = require("../repositories/config.repository");
 const Reglas = require("../config/reglas");
+const PaymentConfigService = require("../services/payment-config.service");
 const NotificacionService = require("../services/notificacion.service");
 
 const RAIZ_PROYECTO = path.join(__dirname, "..", "..");
@@ -364,6 +365,42 @@ const AdminController = {
         create: { clave, valor },
       });
       res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // GET /admin/pagos/configuracion
+  async obtenerConfiguracionPagos(req, res, next) {
+    try {
+      const data = await PaymentConfigService.obtenerConfiguracion();
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // PUT /admin/pagos/configuracion
+  async actualizarConfiguracionPagos(req, res, next) {
+    try {
+      const data = await PaymentConfigService.actualizarConfiguracion(req.body || {});
+      await prisma.accionModeracion.create({
+        data: {
+          adminId: req.usuario.id,
+          targetId: 0,
+          targetTipo: "PAGOS_CONFIG",
+          accion: "ACTUALIZAR_CONFIG_PAGOS",
+          motivo: JSON.stringify({
+            proveedor: data.proveedor,
+            pagosManualesHabilitados: data.pagosManualesHabilitados,
+          }),
+        },
+      });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // POST /admin/pagos/configuracion/probar
+  async probarConfiguracionPagos(req, res, next) {
+    try {
+      const data = await PaymentConfigService.probarConfiguracion();
+      res.json({ ok: data.ok, data });
     } catch (e) { next(e); }
   },
 

@@ -2,10 +2,13 @@ const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
 const prisma = require("../config/prisma");
-const Reglas = require("../config/reglas");
 const { subirACloudinary } = require("../utils/cloudinary");
 const { ErrorNoEncontrado, ErrorProhibido, ErrorValidacion } = require("../utils/errores");
 const NotificacionService = require("../services/notificacion.service");
+const {
+  obtenerConfiguracionPago,
+  calcularPagoEntrega,
+} = require("../services/pago-repartidor.service");
 
 const DIR_ENTREGAS = path.join(__dirname, "..", "..", "uploads", "entregas");
 fs.mkdirSync(DIR_ENTREGAS, { recursive: true });
@@ -44,20 +47,9 @@ const _uploadDoc = multer({
 }).single("foto");
 
 /** Pago al repartidor por una entrega, según el Centro de Reglas. */
-function calcularPagoEntrega(entrega, modo, valor) {
-  if (modo === "porcentaje_envio") {
-    const envio = Number(entrega.subPedido?.pedido?.costoEnvio ?? 0);
-    return Math.round(envio * (valor / 100));
-  }
-  return Math.round(valor); // fijo
-}
-
 /** Agrega pago calculado (y opcionalmente la foto de entrega) a una lista. */
 async function decorarEntregas(entregas, { conFoto = false } = {}) {
-  const [modo, valor] = await Promise.all([
-    Reglas.obtener("repartidor_pago_modo"),
-    Reglas.numero("repartidor_pago_valor"),
-  ]);
+  const { modo, valor } = await obtenerConfiguracionPago();
   let fotos = {};
   if (conFoto && entregas.length) {
     const claves = entregas.map((e) => claveFoto(e.id));
@@ -79,6 +71,7 @@ const INCLUDE_ENTREGA = {
           id: true,
           direccionTexto: true,
           costoEnvio: true,
+          _count: { select: { subPedidos: true } },
           comprador: { select: { id: true, nombre: true, telefono: true, email: true } },
         },
       },
@@ -90,6 +83,7 @@ const INCLUDE_ENTREGA = {
       },
     },
   },
+  repartidor: { select: { id: true, nombre: true, telefono: true } },
 };
 
 const TRANSICIONES = {
@@ -97,6 +91,68 @@ const TRANSICIONES = {
   RECOGIDA: ["EN_CAMINO", "FALLIDA"],
   EN_CAMINO: ["ENTREGADA", "FALLIDA"],
 };
+
+async function asignarRepartidorAtomica(tx, {
+  entregaId,
+  repartidorId,
+  compradorIdBloqueado = null,
+  permitirReasignacion = false,
+  mensajeOcupada = "Esta entrega ya tiene repartidor asignado",
+  mensajeBloqueada = "No puedes asignar esta entrega",
+}) {
+  const entrega = await tx.entrega.findUnique({
+    where: { id: entregaId },
+    select: {
+      id: true,
+      estado: true,
+      repartidorId: true,
+      subPedido: {
+        select: {
+          pedido: {
+            select: { compradorId: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (!entrega) {
+    throw new ErrorNoEncontrado("Entrega no encontrada");
+  }
+
+  if (["ENTREGADA", "FALLIDA"].includes(entrega.estado)) {
+    throw new ErrorValidacion("No se puede asignar o reasignar una entrega finalizada");
+  }
+  if (!permitirReasignacion && entrega.estado !== "ASIGNADA") {
+    throw new ErrorProhibido("Solo se pueden tomar entregas en estado ASIGNADA");
+  }
+
+  if (compradorIdBloqueado !== null && entrega.subPedido?.pedido?.compradorId === compradorIdBloqueado) {
+    throw new ErrorProhibido(mensajeBloqueada);
+  }
+
+  if (!permitirReasignacion && entrega.repartidorId !== null) {
+    throw new ErrorProhibido(mensajeOcupada);
+  }
+
+  const actualizacion = await tx.entrega.updateMany({
+    where: {
+      id: entregaId,
+      repartidorId: entrega.repartidorId,
+      estado: entrega.estado,
+    },
+    data: { repartidorId },
+  });
+
+  if (actualizacion.count === 0) {
+    throw new ErrorProhibido(mensajeOcupada);
+  }
+
+  return tx.entrega.findUnique({
+    where: { id: entregaId },
+    include: INCLUDE_ENTREGA,
+  });
+}
 
 const RepartidorController = {
   async misEntregas(req, res, next) {
@@ -149,6 +205,7 @@ const RepartidorController = {
       const entregas = await prisma.entrega.findMany({
         where: {
           repartidorId: null,
+          estado: "ASIGNADA",
           subPedido: subPedidoFiltro,
         },
         include: INCLUDE_ENTREGA,
@@ -164,21 +221,14 @@ const RepartidorController = {
   async tomar(req, res, next) {
     try {
       const id = Number(req.params.id);
-      const entrega = await prisma.entrega.findUnique({
-        where: { id },
-        include: { subPedido: { select: { pedido: { select: { compradorId: true } } } } },
-      });
-      if (!entrega) throw new ErrorNoEncontrado("Entrega no encontrada");
-      if (entrega.repartidorId !== null)
-        throw new ErrorProhibido("Esta entrega ya tiene repartidor asignado");
-      if (entrega.subPedido?.pedido?.compradorId === req.usuario.id)
-        throw new ErrorProhibido("No puedes tomar la entrega de tu propio pedido");
-
-      const actualizada = await prisma.entrega.update({
-        where: { id },
-        data: { repartidorId: req.usuario.id },
-        include: INCLUDE_ENTREGA,
-      });
+      const actualizada = await prisma.$transaction((tx) =>
+        asignarRepartidorAtomica(tx, {
+          entregaId: id,
+          repartidorId: req.usuario.id,
+          compradorIdBloqueado: req.usuario.id,
+          mensajeBloqueada: "No puedes tomar la entrega de tu propio pedido",
+        })
+      );
       res.json({ ok: true, data: actualizada });
     } catch (err) {
       next(err);
@@ -192,47 +242,76 @@ const RepartidorController = {
 
       if (!estado) throw new ErrorValidacion("El campo estado es requerido");
 
-      const entrega = await prisma.entrega.findUnique({ where: { id } });
-      if (!entrega) throw new ErrorNoEncontrado("Entrega no encontrada");
-      if (entrega.repartidorId !== req.usuario.id)
-        throw new ErrorProhibido("No eres el repartidor asignado a esta entrega");
+      const configuracionPago = estado === "ENTREGADA"
+        ? await obtenerConfiguracionPago()
+        : null;
 
-      const permitidos = TRANSICIONES[entrega.estado];
-      if (!permitidos || !permitidos.includes(estado))
-        throw new ErrorValidacion(
-          `No puedes pasar de ${entrega.estado} a ${estado}`
-        );
-
-      const actualizada = await prisma.entrega.update({
-        where: { id },
-        data: { estado, notas: notas ?? entrega.notas },
-        include: INCLUDE_ENTREGA,
-      });
-
-      if (estado === "ENTREGADA") {
-        await prisma.subPedido.update({
-          where: { id: entrega.subPedidoId },
-          data: { estado: "ENTREGADO" },
+      const actualizada = await prisma.$transaction(async (tx) => {
+        const entrega = await tx.entrega.findUnique({
+          where: { id },
+          include: INCLUDE_ENTREGA,
         });
+        if (!entrega) throw new ErrorNoEncontrado("Entrega no encontrada");
+        if (entrega.repartidorId !== req.usuario.id) {
+          throw new ErrorProhibido("No eres el repartidor asignado a esta entrega");
+        }
 
-        const subPedido = await prisma.subPedido.findUnique({
-          where: { id: entrega.subPedidoId },
-          select: { pedidoId: true },
+        const permitidos = TRANSICIONES[entrega.estado];
+        if (!permitidos || !permitidos.includes(estado)) {
+          throw new ErrorValidacion(`No puedes pasar de ${entrega.estado} a ${estado}`);
+        }
+
+        const pagoRepartidor = estado === "ENTREGADA"
+          ? calcularPagoEntrega(entrega, configuracionPago.modo, configuracionPago.valor)
+          : entrega.pagoRepartidor;
+        const cambio = await tx.entrega.updateMany({
+          where: {
+            id,
+            repartidorId: req.usuario.id,
+            estado: entrega.estado,
+          },
+          data: {
+            estado,
+            notas: notas ?? entrega.notas,
+            ...(estado === "ENTREGADA" ? { pagoRepartidor } : {}),
+          },
         });
+        if (cambio.count === 0) {
+          throw new ErrorProhibido("La entrega cambió de asignación o estado; recarga e intenta de nuevo");
+        }
 
-        if (subPedido) {
-          const todos = await prisma.subPedido.findMany({
-            where: { pedidoId: subPedido.pedidoId },
+        if (estado === "ENTREGADA") {
+          await tx.subPedido.update({
+            where: { id: entrega.subPedidoId },
+            data: { estado: "ENTREGADO" },
+          });
+
+          const todos = await tx.subPedido.findMany({
+            where: { pedidoId: entrega.subPedido.pedido.id },
             select: { estado: true },
           });
-          const todosEntregados = todos.every((s) => s.estado === "ENTREGADO");
-          if (todosEntregados) {
-            await prisma.pedido.update({
-              where: { id: subPedido.pedidoId },
+          if (todos.every((subPedido) => subPedido.estado === "ENTREGADO")) {
+            await tx.pedido.update({
+              where: { id: entrega.subPedido.pedido.id },
               data: { estado: "ENTREGADO" },
             });
           }
         }
+
+        return tx.entrega.findUnique({
+          where: { id },
+          include: INCLUDE_ENTREGA,
+        });
+      });
+
+      if (estado === "ENTREGADA" && actualizada?.subPedido?.pedido?.id) {
+        await prisma.pedido.updateMany({
+          where: {
+            id: actualizada.subPedido.pedido.id,
+            subPedidos: { every: { estado: "ENTREGADO" } },
+          },
+          data: { estado: "ENTREGADO" },
+        });
       }
 
       // Notificaciones en tiempo real según el nuevo estado
@@ -314,19 +393,22 @@ const RepartidorController = {
 
       const repartidor = await prisma.usuario.findUnique({
         where: { id: Number(repartidorId) },
-        select: { id: true, rol: true },
+        select: { id: true, rol: true, activo: true },
       });
-      if (!repartidor || repartidor.rol !== "REPARTIDOR")
+      if (!repartidor || repartidor.rol !== "REPARTIDOR" || !repartidor.activo)
         throw new ErrorValidacion("El usuario no es un repartidor válido");
-      // Candado: no asignar a un repartidor la entrega de su propio pedido.
       if (entrega.subPedido?.pedido?.compradorId === repartidor.id)
         throw new ErrorValidacion("No puedes asignar a un repartidor su propio pedido");
 
-      const actualizada = await prisma.entrega.update({
-        where: { id },
-        data: { repartidorId: repartidor.id },
-        include: INCLUDE_ENTREGA,
-      });
+      const actualizada = await prisma.$transaction((tx) =>
+        asignarRepartidorAtomica(tx, {
+          entregaId: id,
+          repartidorId: repartidor.id,
+          compradorIdBloqueado: repartidor.id,
+          permitirReasignacion: true,
+          mensajeBloqueada: "No puedes asignar a un repartidor su propio pedido",
+        })
+      );
 
       // N-R-04: notificar al repartidor
       setImmediate(async () => {

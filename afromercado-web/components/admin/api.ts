@@ -222,6 +222,22 @@ export async function conectarWhatsApp(): Promise<void> {
 
 export type EstadoComerciante = 'PENDIENTE_REVISION' | 'APROBADO' | 'RECHAZADO' | 'SUSPENDIDO'
 
+export interface CambioCriticoComercio {
+  id: number
+  comercioId: number
+  tipo: string
+  estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'SUSPENDIDO' | string
+  accion: string
+  snapshotAnterior: Record<string, unknown> | null
+  snapshotNuevo: Record<string, unknown> | null
+  solicitadoPor?: number | null
+  revisadoPor?: number | null
+  motivo?: string | null
+  productosDesactivados: number
+  createdAt: string
+  revisadoAt?: string | null
+}
+
 export interface AdminComercio {
   id: number
   nombre: string
@@ -234,6 +250,8 @@ export interface AdminComercio {
   revisadoAt?: string | null
   whatsappVisible: boolean
   fotoDocumentoUrl?: string | null
+  fotoDocumentoFrenteUrl?: string | null
+  fotoDocumentoReversoUrl?: string | null
   totalVentas: number
   calificacion: number | string
   createdAt: string
@@ -248,6 +266,7 @@ export interface AdminComercio {
   }
   _count: { productos: number }
   comisiones: Array<{ tasa: number | string; motivo?: string | null; desde: string; hasta?: string | null }>
+  cambiosCriticos?: CambioCriticoComercio[]
 }
 
 export async function listarComerciosAdmin(
@@ -296,6 +315,77 @@ export async function setComisionComercioAdmin(
 
 export async function actualizarConfigAdmin(clave: string, valor: string): Promise<void> {
   await apiFetch(`/admin/config/${clave}`, { method: 'PUT', body: { valor } })
+}
+
+// ——— Configuracion de pasarela ———
+
+export type ProveedorPagoAdmin = 'SANDBOX' | 'WOMPI'
+
+export interface VariablePagoAdmin {
+  nombre: string
+  alternativa: string | null
+  grupo: 'general' | 'checkout' | 'webhook' | 'dispersion' | string
+  requerida: boolean
+  configurada: boolean
+  vieneDeDefault: boolean
+  fuente?: 'ENV' | 'CONFIG' | 'DEFAULT' | 'NONE' | string
+  preview: string | null
+  problema: string | null
+}
+
+export interface ConfiguracionPagosAdmin {
+  proveedor: ProveedorPagoAdmin
+  proveedorFuente: 'CONFIG' | 'ENV' | 'DEFAULT' | string
+  proveedoresDisponibles: ProveedorPagoAdmin[]
+  pagosManualesHabilitados: boolean
+  pagosManualesFuente: 'CONFIG' | 'ENV' | string
+  entorno: string
+  webhookWompiPath: string
+  variables: VariablePagoAdmin[]
+  listoParaCobroReal: boolean
+  advertencias: string[]
+}
+
+export interface ResultadoPruebaPagos {
+  ok: boolean
+  proveedor: ProveedorPagoAdmin
+  mensaje: string
+  detalles: string[]
+}
+
+export async function obtenerConfiguracionPagosAdmin(): Promise<ConfiguracionPagosAdmin> {
+  const res = await apiFetch<RespuestaOk<ConfiguracionPagosAdmin>>('/admin/pagos/configuracion')
+  return res.data
+}
+
+export async function actualizarConfiguracionPagosAdmin(input: {
+  proveedor?: ProveedorPagoAdmin
+  pagosManualesHabilitados?: boolean
+  wompi?: Partial<Record<
+    | 'WOMPI_PUBLIC_KEY'
+    | 'WOMPI_INTEGRITY_SECRET'
+    | 'WOMPI_EVENTS_SECRET'
+    | 'WOMPI_PAYOUTS_API_URL'
+    | 'WOMPI_PAYOUTS_API_KEY'
+    | 'WOMPI_PAYOUTS_USER_PRINCIPAL_ID'
+    | 'WOMPI_PAYOUTS_ACCOUNT_ID'
+    | 'WOMPI_PAYOUTS_PAYMENT_TYPE'
+    | 'WOMPI_PAYOUT_BANK_MAP',
+    string
+  >>
+}): Promise<ConfiguracionPagosAdmin> {
+  const res = await apiFetch<RespuestaOk<ConfiguracionPagosAdmin>>('/admin/pagos/configuracion', {
+    method: 'PUT',
+    body: input,
+  })
+  return res.data
+}
+
+export async function probarConfiguracionPagosAdmin(): Promise<ResultadoPruebaPagos> {
+  const res = await apiFetch<{ ok: boolean; data: ResultadoPruebaPagos }>('/admin/pagos/configuracion/probar', {
+    method: 'POST',
+  })
+  return res.data
 }
 
 // ——— Pedidos (admin) ———

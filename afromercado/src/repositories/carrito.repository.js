@@ -2,6 +2,7 @@
 //  Repositorio de Carrito — capa de acceso a datos
 // ============================================================
 const prisma = require("../config/prisma");
+const { filtroComercioPublicable } = require("../utils/comercio-publicacion");
 
 const CarritoRepository = {
   async obtenerCarrito(usuarioId) {
@@ -9,7 +10,11 @@ const CarritoRepository = {
     return prisma.carritoItem.findMany({
       where: {
         usuarioId,
-        producto: { deletedAt: null },
+        producto: {
+          deletedAt: null,
+          activo: true,
+          comercio: filtroComercioPublicable(),
+        },
       },
       include: {
         producto: {

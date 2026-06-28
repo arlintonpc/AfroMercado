@@ -1,5 +1,36 @@
 // Capa de acceso a datos — Productos
 const prisma = require("../config/prisma");
+const { filtroComercioPublicable } = require("../utils/comercio-publicacion");
+
+function includeProductoPublico(ahora = new Date()) {
+  return {
+    comercio: {
+      select: {
+        id: true,
+        nombre: true,
+        municipio: true,
+        descripcion: true,
+        historia: true,
+        whatsapp: true,
+        whatsappVisible: true,
+        videoUrl: true,
+        videoPosterUrl: true,
+        videoDuracionSegundos: true,
+        videoMimeType: true,
+        calificacion: true,
+        verificado: true,
+        totalVentas: true,
+        totalReviews: true,
+      },
+    },
+    categoria: true,
+    ofertas: {
+      where: { activa: true, inicio: { lte: ahora }, fin: { gte: ahora } },
+      orderBy: { createdAt: "desc" },
+      take: 1,
+    },
+  };
+}
 
 const ProductoRepository = {
   async crear(data) {
@@ -9,33 +40,19 @@ const ProductoRepository = {
   async buscarPorId(id) {
     return prisma.producto.findUnique({
       where: { id: Number(id) },
-      include: {
-        comercio: {
-          select: {
-            id: true,
-            nombre: true,
-            municipio: true,
-            descripcion: true,
-            historia: true,
-            whatsapp: true,
-            whatsappVisible: true,
-            videoUrl: true,
-            videoPosterUrl: true,
-            videoDuracionSegundos: true,
-            videoMimeType: true,
-            calificacion: true,
-            verificado: true,
-            totalVentas: true,
-            totalReviews: true,
-          },
-        },
-        categoria: true,
-        ofertas: {
-          where: { activa: true, inicio: { lte: new Date() }, fin: { gte: new Date() } },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
+      include: includeProductoPublico(),
+    });
+  },
+
+  async buscarPublicoPorId(id) {
+    return prisma.producto.findFirst({
+      where: {
+        id: Number(id),
+        activo: true,
+        deletedAt: null,
+        comercio: filtroComercioPublicable(),
       },
+      include: includeProductoPublico(),
     });
   },
 
@@ -54,6 +71,7 @@ const ProductoRepository = {
     const where = {
       activo: true,
       deletedAt: null,
+      comercio: filtroComercioPublicable(),
       // Solo productos con stock disponible (stock > stockReservado)
       stock: { gt: 0 },
     };

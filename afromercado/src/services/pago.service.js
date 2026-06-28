@@ -10,8 +10,15 @@ const {
   ErrorProhibido,
 } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
+const PaymentConfigService = require("./payment-config.service");
 
 const METODOS_VALIDOS = ["NEQUI", "DAVIPLATA", "TRANSFERENCIA", "EFECTIVO"];
+
+async function validarPagosManualesActivos() {
+  if (!await PaymentConfigService.pagosManualesHabilitados()) {
+    throw new ErrorValidacion("Los pagos manuales estan deshabilitados. Usa el checkout digital.");
+  }
+}
 
 const PagoService = {
   /**
@@ -19,6 +26,7 @@ const PagoService = {
    * Idempotente: si el idempotencyKey ya existe, retorna el pago existente.
    */
   async crearPago(usuarioId, { pedidoId, metodo, referencia, idempotencyKey }) {
+    await validarPagosManualesActivos();
     if (!idempotencyKey) {
       throw new ErrorValidacion("El idempotencyKey es obligatorio");
     }
@@ -77,6 +85,7 @@ const PagoService = {
    * estado VERIFICANDO para que el administrador lo revise.
    */
   async adjuntarComprobante(usuarioId, pagoId, comprobanteUrl) {
+    await validarPagosManualesActivos();
     if (!comprobanteUrl) {
       throw new ErrorValidacion("Falta el comprobante");
     }
@@ -124,6 +133,7 @@ const PagoService = {
    * Daviplata de la plataforma transferir, el monto y la referencia sugerida.
    */
   async obtenerInstruccionesPago(pedidoId) {
+    await validarPagosManualesActivos();
     const pedido = await PedidoRepository.buscarPorId(Number(pedidoId));
     if (!pedido) throw new ErrorNoEncontrado("Pedido no encontrado");
 

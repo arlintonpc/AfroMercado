@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { solicitarCodigo, verificarCodigo, cambiarPassword } from '@/lib/api/recuperacion'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 
 type Paso = 'email' | 'codigo' | 'nueva-password' | 'exito'
 
@@ -25,7 +26,6 @@ export default function RecuperarPassword() {
   const [resetToken, setResetToken] = useState('')
   const [nuevaPassword, setNuevaPassword] = useState('')
   const [confirmarPassword, setConfirmarPassword] = useState('')
-  const [mostrarPassword, setMostrarPassword] = useState(false)
 
   // Estado general
   const [cargando, setCargando] = useState(false)
@@ -290,39 +290,24 @@ export default function RecuperarPassword() {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-[#1A1A1A]">Nueva contraseña</label>
-              <div className="relative">
-                <input
-                  type={mostrarPassword ? 'text' : 'password'}
-                  value={nuevaPassword}
-                  onChange={(e) => setNuevaPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
-                  required
-                  minLength={6}
-                  className="w-full h-11 px-4 pr-11 rounded-xl border border-[#1A1A1A]/15 bg-white text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] transition-colors"
-                />
-                <button
-                  type="button"
-                  onClick={() => setMostrarPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1A1A1A]/40 hover:text-[#1A1A1A]/70"
-                >
-                  {mostrarPassword ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                  )}
-                </button>
-              </div>
+              <PasswordInput
+                value={nuevaPassword}
+                onChange={setNuevaPassword}
+                placeholder="Mínimo 6 caracteres"
+                required
+                minLength={6}
+                inputClassName="h-11 px-4 rounded-xl border border-[#1A1A1A]/15 bg-white text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] transition-colors"
+              />
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-[#1A1A1A]">Confirmar contraseña</label>
-              <input
-                type={mostrarPassword ? 'text' : 'password'}
+              <PasswordInput
                 value={confirmarPassword}
-                onChange={(e) => setConfirmarPassword(e.target.value)}
+                onChange={setConfirmarPassword}
                 placeholder="Repite la contraseña"
                 required
-                className="w-full h-11 px-4 rounded-xl border border-[#1A1A1A]/15 bg-white text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] transition-colors"
+                inputClassName="h-11 px-4 rounded-xl border border-[#1A1A1A]/15 bg-white text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] transition-colors"
               />
             </div>
 

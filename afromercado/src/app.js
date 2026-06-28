@@ -29,7 +29,11 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());                    // parsea JSON del body
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString("utf8");
+  },
+}));                    // parsea JSON del body y conserva rawBody para webhooks
 app.use(express.urlencoded({ extended: true }));
 
 // Imágenes públicas de productos (subidas por los comerciantes).

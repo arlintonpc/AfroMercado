@@ -3,12 +3,12 @@
  *
  * El backend devuelve para el pedido una forma más rica que la del tipo
  * compartido `types/pedido.ts` (subPedidos por comercio, comisión, expiresAt,
- * estados de pago semi-manual, etc.). Como no debemos tocar `types/*`,
+ * estados de pago digital, etc.). Como no debemos tocar `types/*`,
  * definimos aquí las formas reales verificadas contra la API en vivo y las
  * consumimos solo dentro del flujo de compra.
  */
 
-/** Estados reales del pedido en el flujo de pago semi-manual. */
+/** Estados reales del pedido en el flujo de pago digital. */
 export type EstadoPedidoPago =
   | 'PENDIENTE_PAGO'
   | 'VERIFICANDO_PAGO'
@@ -86,7 +86,7 @@ export interface DatosPagoTransferencia {
   referencia?: string
 }
 
-export type MetodoPago = 'NEQUI' | 'DAVIPLATA' | 'TRANSFERENCIA' | 'EFECTIVO'
+export type MetodoPago = 'NEQUI' | 'DAVIPLATA' | 'TRANSFERENCIA' | 'EFECTIVO' | 'PASARELA'
 
 export interface PagoCreado {
   id: string | number

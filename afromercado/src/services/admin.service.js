@@ -9,8 +9,16 @@ const {
   ErrorNoEncontrado,
 } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
+const VisibilidadRepository = require("../repositories/visibilidad.repository");
 
 const ACCIONES_VALIDAS = ["APROBAR", "RECHAZAR"];
+
+function tieneDocumentoIdentidadCompleto(comercio) {
+  return Boolean(
+    (comercio.fotoDocumentoFrenteUrl || comercio.fotoDocumentoUrl) &&
+    comercio.fotoDocumentoReversoUrl
+  );
+}
 
 const AdminService = {
   /**
@@ -96,6 +104,8 @@ const AdminService = {
             data: { totalVentas: { increment: cantidad } },
           });
         }
+
+        await VisibilidadRepository.atribuirPedidoConfirmado(tx, pedido);
 
         // 4. Confirmar el pago.
         const pagoActualizado = await PagoRepository.actualizar(
@@ -266,6 +276,9 @@ const AdminService = {
     }
     const comercio = await prisma.comercio.findUnique({ where: { id: comercioId } });
     if (!comercio) throw new ErrorNoEncontrado("Comercio no encontrado");
+    if ((accion === "APROBAR" || accion === "REHABILITAR") && !tieneDocumentoIdentidadCompleto(comercio)) {
+      throw new ErrorValidacion("No se puede aprobar el comercio sin frente y reverso del documento de identidad.");
+    }
 
     const ESTADO_MAP = {
       APROBAR:     "APROBADO",
@@ -286,12 +299,44 @@ const AdminService = {
         revisadoPor:    adminId,
         revisadoAt:     new Date(),
       },
-      include: { usuario: { select: { id: true, nombre: true, email: true, telefono: true } } },
+      include: {
+        usuario: { select: { id: true, nombre: true, email: true, telefono: true } },
+        cambiosCriticos: { orderBy: { createdAt: "desc" }, take: 5 },
+      },
     });
 
     // Log de moderación
+    if (!estaActivo) {
+      await prisma.producto.updateMany({
+        where: { comercioId, activo: true },
+        data: { activo: false },
+      });
+    }
+
     await prisma.accionModeracion.create({
       data: { adminId, targetId: comercioId, targetTipo: "COMERCIO", accion, motivo: motivo?.trim() || null },
+    });
+
+    await prisma.cambioCriticoComercio.updateMany({
+      where: { comercioId, estado: "PENDIENTE" },
+      data: {
+        estado: accion === "APROBAR" || accion === "REHABILITAR"
+          ? "APROBADO"
+          : accion === "SUSPENDER"
+            ? "SUSPENDIDO"
+            : "RECHAZADO",
+        revisadoPor: adminId,
+        revisadoAt: new Date(),
+        motivo: motivo?.trim() || null,
+      },
+    });
+
+    const actualizadoFinal = await prisma.comercio.findUnique({
+      where: { id: comercioId },
+      include: {
+        usuario: { select: { id: true, nombre: true, email: true, telefono: true } },
+        cambiosCriticos: { orderBy: { createdAt: "desc" }, take: 5 },
+      },
     });
 
     // Notificar al comerciante
@@ -313,7 +358,7 @@ const AdminService = {
       }
     });
 
-    return actualizado;
+    return actualizadoFinal || actualizado;
   },
 
   async listarComerciosAdmin({ soloSinVerificar = false, estado = null } = {}) {
@@ -330,6 +375,7 @@ const AdminService = {
         usuario: { select: { id: true, nombre: true, email: true, telefono: true, tipoDocumento: true, numeroDocumento: true, createdAt: true } },
         _count: { select: { productos: true } },
         comisiones: { where: { OR: [{ hasta: null }, { hasta: { gt: new Date() } }] }, orderBy: { desde: "desc" }, take: 1 },
+        cambiosCriticos: { orderBy: { createdAt: "desc" }, take: 5 },
       },
     });
   },

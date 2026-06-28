@@ -34,7 +34,7 @@ const MAPA: Record<string, InfoEstado> = {
     variante: 'naranja',
     titulo: 'Estamos verificando tu pago',
     mensaje:
-      'Recibimos tu comprobante. Verificamos tu pago y te avisaremos pronto, máximo en 2 horas.',
+      'Estamos esperando la confirmacion oficial de la pasarela para activar tu pedido.',
   },
   PAGADO: {
     etiqueta: 'Pago confirmado',

@@ -67,7 +67,7 @@ export default function PaginaTerminos() {
             </p>
             <p>
               AfroMercado cobra una comisión sobre cada venta a los comercios (actualmente 10%). El pago se realiza por
-              los medios habilitados (Nequi, Daviplata, transferencia o efectivo) y es verificado por AfroMercado antes
+              la pasarela digital habilitada y es confirmado automaticamente por el proveedor antes
               de que el comercio prepare el pedido. Si el pago no se completa dentro del tiempo indicado, el pedido se
               cancela y el inventario se libera.
             </p>

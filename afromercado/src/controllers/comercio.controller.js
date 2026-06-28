@@ -7,7 +7,13 @@ const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
 const ComercioService = require("../services/comercio.service");
+const CuentaDispersionService = require("../services/cuenta-dispersion.service");
 const NotificacionService = require("../services/notificacion.service");
+const {
+  notificarRevisionCritica,
+  prepararRevisionPorCambioCritico,
+  registrarRevisionCriticaTx,
+} = require("../services/comercio-revision.service");
 const prisma = require("../config/prisma");
 const { ErrorValidacion } = require("../utils/errores");
 const {
@@ -22,6 +28,7 @@ const {
   normalizarRecorteVideo,
   urlLocalVideo,
 } = require("../utils/video-media");
+const { hashArchivo, validarDocumentoImagen } = require("../utils/documento-imagen");
 
 const DIR_DOCS = path.join(__dirname, "..", "..", "uploads", "documentos");
 fs.mkdirSync(DIR_DOCS, { recursive: true });
@@ -43,7 +50,10 @@ const _uploadDoc = multer({
       cb(null, `doc_${req.usuario.id}_${Date.now()}${ext}`);
     },
   }),
-  fileFilter: (req, file, cb) => cb(null, file.mimetype.startsWith("image/")),
+  fileFilter: (req, file, cb) => {
+    if (["image/jpeg", "image/png"].includes(file.mimetype)) return cb(null, true);
+    return cb(new ErrorValidacion("Sube una foto real del documento en JPG o PNG."));
+  },
   limits: { fileSize: 5 * 1024 * 1024 },
 }).single("documento");
 
@@ -53,6 +63,21 @@ const _uploadVideo = crearUploadVideo({
   fieldName: "video",
   maxFileSize: 100 * 1024 * 1024,
 });
+
+function hashDocumentoLocal(url) {
+  if (!url) return null;
+  try {
+    const pathname = new URL(url).pathname;
+    const filename = path.basename(pathname);
+    const dirDocs = path.resolve(DIR_DOCS);
+    const ruta = path.resolve(DIR_DOCS, filename);
+    if (!ruta.startsWith(`${dirDocs}${path.sep}`)) return null;
+    if (!fs.existsSync(ruta)) return null;
+    return hashArchivo(ruta);
+  } catch {
+    return null;
+  }
+}
 
 const ComercioController = {
   async registrar(req, res, next) {
@@ -92,6 +117,30 @@ const ComercioController = {
   },
 
   // GET /comercios/mis-analiticas — analíticas completas del comerciante
+  async obtenerCuentaDispersion(req, res, next) {
+    try {
+      const cuenta = await CuentaDispersionService.obtener(req.usuario.id);
+      res.json({ ok: true, data: cuenta });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async guardarCuentaDispersion(req, res, next) {
+    try {
+      const resultado = await CuentaDispersionService.guardar(req.usuario.id, req.body);
+      res.json({
+        ok: true,
+        data: resultado.cuenta,
+        comercio: resultado.comercio,
+        requiereRevision: resultado.requiereRevision,
+        productosDesactivados: resultado.productosDesactivados,
+      });
+    } catch (e) {
+      next(e);
+    }
+  },
+
   uploadVideo: _uploadVideo,
 
   async subirVideo(req, res, next) {
@@ -576,13 +625,116 @@ const ComercioController = {
       if (err) return next(err);
       if (!req.file) return res.status(400).json({ ok: false, error: "No se recibió imagen." });
       try {
+        const lado = String(req.body.lado || "FRENTE").trim().toUpperCase();
+        if (!["FRENTE", "REVERSO"].includes(lado)) {
+          fs.unlink(req.file.path, () => {});
+          throw new ErrorValidacion("Indica si la foto corresponde al frente o al reverso del documento.");
+        }
+
+        const validacion = validarDocumentoImagen(req.file);
+        if (!validacion.ok) {
+          fs.unlink(req.file.path, () => {});
+          throw new ErrorValidacion(validacion.mensaje);
+        }
+
+        const documentoHash = hashArchivo(req.file.path);
+        const comercioActual = await prisma.comercio.findUnique({
+          where: { usuarioId: req.usuario.id },
+          select: {
+            id: true,
+            usuarioId: true,
+            nombre: true,
+            municipio: true,
+            estadoRegistro: true,
+            verificado: true,
+            activo: true,
+            revisadoPor: true,
+            fotoDocumentoUrl: true,
+            fotoDocumentoFrenteUrl: true,
+            fotoDocumentoReversoUrl: true,
+            fotoDocumentoFrenteHash: true,
+            fotoDocumentoReversoHash: true,
+          },
+        });
+        const hashFrenteActual = comercioActual?.fotoDocumentoFrenteHash ||
+          hashDocumentoLocal(comercioActual?.fotoDocumentoFrenteUrl || comercioActual?.fotoDocumentoUrl);
+        const hashReversoActual = comercioActual?.fotoDocumentoReversoHash ||
+          hashDocumentoLocal(comercioActual?.fotoDocumentoReversoUrl);
+        const hashOtroLado = lado === "REVERSO" ? hashFrenteActual : hashReversoActual;
+
+        if (hashOtroLado && hashOtroLado === documentoHash) {
+          fs.unlink(req.file.path, () => {});
+          throw new ErrorValidacion("No puedes usar la misma foto para el frente y el reverso del documento.");
+        }
+
         const base = `${req.protocol}://${req.get("host")}`;
         const url = `${base}/uploads/documentos/${req.file.filename}`;
-        const comercio = await prisma.comercio.update({
-          where: { usuarioId: req.usuario.id },
-          data: { fotoDocumentoUrl: url },
+        const data = lado === "REVERSO"
+          ? { fotoDocumentoReversoUrl: url, fotoDocumentoReversoHash: documentoHash }
+          : { fotoDocumentoFrenteUrl: url, fotoDocumentoUrl: url, fotoDocumentoFrenteHash: documentoHash };
+        if (lado === "REVERSO" && hashFrenteActual && !comercioActual?.fotoDocumentoFrenteHash) {
+          data.fotoDocumentoFrenteHash = hashFrenteActual;
+        }
+        if (lado === "FRENTE" && hashReversoActual && !comercioActual?.fotoDocumentoReversoHash) {
+          data.fotoDocumentoReversoHash = hashReversoActual;
+        }
+
+        const hashMismoLadoActual = lado === "REVERSO" ? hashReversoActual : hashFrenteActual;
+        const cambioRealDocumento = hashMismoLadoActual !== documentoHash;
+        const documentoAnterior = {
+          frenteUrl: comercioActual?.fotoDocumentoFrenteUrl || comercioActual?.fotoDocumentoUrl || null,
+          reversoUrl: comercioActual?.fotoDocumentoReversoUrl || null,
+          frenteHash: hashFrenteActual || null,
+          reversoHash: hashReversoActual || null,
+        };
+        const documentoNuevo = {
+          ...documentoAnterior,
+          ladoModificado: lado,
+          frenteUrl: lado === "FRENTE" ? url : documentoAnterior.frenteUrl,
+          reversoUrl: lado === "REVERSO" ? url : documentoAnterior.reversoUrl,
+          frenteHash: lado === "FRENTE" ? documentoHash : documentoAnterior.frenteHash,
+          reversoHash: lado === "REVERSO" ? documentoHash : documentoAnterior.reversoHash,
+        };
+        const revision = cambioRealDocumento
+          ? prepararRevisionPorCambioCritico(comercioActual, {
+              tipoCambio: "la documentacion de identidad",
+              tipo: "DOCUMENTO_IDENTIDAD",
+              accion: "REVISION_AUTOMATICA_DOCUMENTO",
+              snapshotAnterior: documentoAnterior,
+              snapshotNuevo: documentoNuevo,
+              solicitadoPor: req.usuario.id,
+            })
+          : null;
+
+        if (revision?.data) {
+          Object.assign(data, revision.data);
+        }
+
+        const resultado = await prisma.$transaction(async (tx) => {
+          const comercio = await tx.comercio.update({
+            where: { usuarioId: req.usuario.id },
+            data,
+          });
+          const revisionResultado = revision
+            ? await registrarRevisionCriticaTx(tx, comercioActual, revision)
+            : { cambioCriticoId: null, productosDesactivados: 0 };
+          return { comercio, revisionResultado };
         });
-        res.json({ ok: true, url, comercio });
+
+        if (revision?.data) {
+          notificarRevisionCritica(resultado.comercio, revision);
+        }
+
+        res.json({
+          ok: true,
+          url,
+          lado,
+          hash: documentoHash,
+          validacion,
+          comercio: resultado.comercio,
+          requiereRevision: Boolean(revision?.requiereCambioEstado || resultado.revisionResultado.cambioCriticoId),
+          productosDesactivados: resultado.revisionResultado.productosDesactivados,
+        });
       } catch (e) {
         next(e);
       }

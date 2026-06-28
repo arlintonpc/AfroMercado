@@ -1,4 +1,7 @@
-import React, { useId } from "react";
+'use client'
+
+import React, { useId, useState } from "react";
+import { PasswordVisibilityButton } from "./PasswordVisibilityButton";
 
 interface InputProps {
   label: string;
@@ -25,10 +28,12 @@ export function Input({
   disabled = false,
   className = "",
 }: InputProps) {
+  const [mostrarPassword, setMostrarPassword] = useState(false);
   const generatedId = useId();
   const id = name ?? generatedId;
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
+  const esPassword = type === "password";
 
   const describedBy = [error ? errorId : null, hint ? hintId : null]
     .filter(Boolean)
@@ -49,7 +54,7 @@ export function Input({
         <input
           id={id}
           name={name}
-          type={type}
+          type={esPassword && mostrarPassword ? "text" : type}
           placeholder={placeholder}
           value={value}
           onChange={onChange}
@@ -62,6 +67,7 @@ export function Input({
             "border-b outline-none transition-colors duration-150",
             "placeholder:text-[#1A1A1A]/40",
             "font-[var(--font-inter)]",
+            esPassword ? "pr-11" : "",
             // Border color states
             error
               ? "border-[#C0392B] focus:border-[#C0392B]"
@@ -74,6 +80,13 @@ export function Input({
             .filter(Boolean)
             .join(" ")}
         />
+        {esPassword && (
+          <PasswordVisibilityButton
+            visible={mostrarPassword}
+            onToggle={() => setMostrarPassword((v) => !v)}
+            disabled={disabled}
+          />
+        )}
       </div>
 
       {/* Error message */}

@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useId } from 'react'
+import React, { useId, useState } from 'react'
+import { PasswordVisibilityButton } from '@/components/ui/PasswordVisibilityButton'
 
 /**
  * Campos de formulario grandes y claros para el área del comerciante.
@@ -86,10 +87,12 @@ export function CampoTexto({
   inputMode,
   prefijo,
 }: CampoTextoProps) {
+  const [mostrarPassword, setMostrarPassword] = useState(false)
   const generatedId = useId()
   const id = name ?? generatedId
   const errorId = `${id}-error`
   const hintId = `${id}-hint`
+  const esPassword = type === 'password'
   const describedBy = [error ? errorId : null, hint ? hintId : null]
     .filter(Boolean)
     .join(' ')
@@ -108,7 +111,7 @@ export function CampoTexto({
         <input
           id={id}
           name={name}
-          type={type}
+          type={esPassword && mostrarPassword ? 'text' : type}
           inputMode={inputMode}
           placeholder={placeholder}
           value={value}
@@ -116,10 +119,22 @@ export function CampoTexto({
           disabled={disabled}
           aria-invalid={!!error}
           aria-describedby={describedBy || undefined}
-          className={[cajaBase, bordeEstado(error, disabled), prefijo ? 'pl-9' : '']
+          className={[
+            cajaBase,
+            bordeEstado(error, disabled),
+            prefijo ? 'pl-9' : '',
+            esPassword ? 'pr-12' : '',
+          ]
             .filter(Boolean)
             .join(' ')}
         />
+        {esPassword && (
+          <PasswordVisibilityButton
+            visible={mostrarPassword}
+            onToggle={() => setMostrarPassword((v) => !v)}
+            disabled={disabled}
+          />
+        )}
       </div>
       <Mensajes error={error} hint={hint} errorId={errorId} hintId={hintId} />
     </div>

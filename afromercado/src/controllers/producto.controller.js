@@ -20,6 +20,7 @@ const {
   normalizarRecorteVideo,
   urlLocalVideo,
 } = require("../utils/video-media");
+const { filtroComercioPublicable } = require("../utils/comercio-publicacion");
 
 // Carpeta pública donde se guardan las fotos de productos.
 const DIR_PRODUCTOS = path.join(__dirname, "..", "..", "uploads", "productos");
@@ -196,7 +197,7 @@ const ProductoController = {
         // Traer los productos vistos para obtener sus categorías
         const productosVistos = productoIdsVistos.length
           ? await prisma.producto.findMany({
-              where: { id: { in: productoIdsVistos }, activo: true },
+              where: { id: { in: productoIdsVistos }, activo: true, comercio: filtroComercioPublicable() },
               select: { categoriaId: true },
             })
           : [];
@@ -209,6 +210,7 @@ const ProductoController = {
           productos = await prisma.producto.findMany({
             where: {
               activo: true,
+              comercio: filtroComercioPublicable(),
               id: { notIn: excluir },
               ...(categoriaIds.length > 0 ? { categoriaId: { in: categoriaIds } } : {}),
             },
@@ -251,7 +253,7 @@ const ProductoController = {
 
         if (idsPopulares.length > 0) {
           const relleno = await prisma.producto.findMany({
-            where: { id: { in: idsPopulares }, activo: true },
+            where: { id: { in: idsPopulares }, activo: true, comercio: filtroComercioPublicable() },
             take: limite - productos.length,
             include: {
               comercio: {
@@ -460,9 +462,13 @@ const ProductoController = {
         orderBy: { createdAt: "desc" },
         take: limite * 2,
         distinct: ["productoId"],
-        include: {
-          producto: {
-            where: { activo: true },
+        select: { productoId: true },
+      });
+
+      const ids = vistas.map((v) => v.productoId);
+      const encontrados = ids.length
+        ? await prisma.producto.findMany({
+            where: { id: { in: ids }, activo: true, comercio: filtroComercioPublicable() },
             include: {
               comercio: {
                 select: {
@@ -481,13 +487,12 @@ const ProductoController = {
                 take: 1,
               },
             },
-          },
-        },
-      });
-
-      const productos = vistas
-        .filter((v) => v.producto)
-        .map((v) => v.producto)
+          })
+        : [];
+      const porId = new Map(encontrados.map((producto) => [producto.id, producto]));
+      const productos = ids
+        .map((id) => porId.get(id))
+        .filter(Boolean)
         .slice(0, limite);
 
       res.json({ ok: true, data: productos });

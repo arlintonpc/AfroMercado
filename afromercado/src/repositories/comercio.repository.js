@@ -9,6 +9,13 @@ const ComercioRepository = {
     return prisma.comercio.findUnique({ where: { usuarioId } });
   },
 
+  async buscarPorUsuarioIdConCuenta(usuarioId) {
+    return prisma.comercio.findUnique({
+      where: { usuarioId },
+      include: { cuentaDispersion: true },
+    });
+  },
+
   async buscarPorId(id) {
     return prisma.comercio.findUnique({ where: { id: Number(id) } });
   },

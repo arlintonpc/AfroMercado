@@ -5,6 +5,7 @@ const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
 const PagoService = require("../services/pago.service");
+const PagoDigitalService = require("../services/pago-digital.service");
 const { subirACloudinary } = require("../utils/cloudinary");
 const { ErrorValidacion } = require("../utils/errores");
 
@@ -61,6 +62,54 @@ const PagoController = {
         idempotencyKey,
       });
       res.status(201).json({ ok: true, data: pago });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  // POST /pagos/checkout
+  async crearCheckoutDigital(req, res, next) {
+    try {
+      const { pedidoId, idempotencyKey } = req.body;
+      const pago = await PagoDigitalService.crearCheckout(req.usuario.id, {
+        pedidoId,
+        idempotencyKey,
+      });
+      res.status(201).json({ ok: true, data: pago });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  // GET /pagos/pedido/:pedidoId/estado
+  async estadoPorPedido(req, res, next) {
+    try {
+      const pago = await PagoDigitalService.consultarPorPedido(req.usuario.id, req.params.pedidoId);
+      res.json({ ok: true, data: pago });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  // GET /pagos/:id/estado
+  async estadoPorPago(req, res, next) {
+    try {
+      const pago = await PagoDigitalService.consultarPorPago(req.usuario.id, req.params.id);
+      res.json({ ok: true, data: pago });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  // POST /pagos/webhooks/:proveedor
+  async webhook(req, res, next) {
+    try {
+      const resultado = await PagoDigitalService.procesarWebhook(req.params.proveedor, {
+        body: req.body,
+        headers: req.headers,
+        rawBody: req.rawBody,
+      });
+      res.json(resultado);
     } catch (e) {
       next(e);
     }

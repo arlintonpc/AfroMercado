@@ -8,7 +8,7 @@
     "dev": "nodemon src/server.js",
     "build": "prisma generate",
     "postinstall": "prisma generate",
-    "test": "node tests/comision.test.js",
+    "test": "node tests/comision.test.js && node tests/producto.service.test.js && node tests/pago-repartidor.test.js",
     "test:e2e": "node tests/e2e-flujo.js && node tests/e2e-comerciante.js && node tests/e2e-comprobante.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

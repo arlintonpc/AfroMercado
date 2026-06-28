@@ -15,6 +15,7 @@ import { useAuth } from '@/context/AuthContext'
 import { mapearProductos, type ProductoCrudo } from '@/lib/mapearProducto'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { precioVigente } from '@/lib/precioProducto'
+import { registrarEventoPatrocinado } from '@/lib/publicidadTracking'
 import type { Producto } from '@/types/producto'
 import type { Categoria } from '@/types/categoria'
 
@@ -138,6 +139,9 @@ function SeccionDestacados({ productos, destacadosPagados, etiquetasPagadas }: {
             <Link
               key={producto.id}
               href={`/producto/${producto.id}`}
+              onClick={() => {
+                if (idsDestacados.has(producto.id)) registrarEventoPatrocinado(producto.id, 'clic')
+              }}
               className={`flex-1 rounded-2xl p-3 transition-shadow duration-200 flex items-center gap-3 ${
                 idsDestacados.has(producto.id)
                   ? 'bg-white shadow-[0_2px_12px_rgba(45,106,79,0.18)] ring-2 ring-[#2D6A4F]/35 hover:shadow-[0_4px_20px_rgba(45,106,79,0.25)]'
@@ -181,7 +185,7 @@ function SeccionDestacados({ productos, destacadosPagados, etiquetasPagadas }: {
                       <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <path d="M17 8C8 10 5.9 16.17 3.82 19.52 3.23 20.5 4.5 21.5 5.3 20.67 7 18.9 8.91 17.5 11 17c-1 3-4 4-4 4s6 0 9-8c1.5 2 2 3.5 2 5.5 0 0 2-10-1-10.5z"/>
                       </svg>
-                      {etiquetasPagadas.get(producto.id) ?? 'Selección Chocó'}
+                      {etiquetasPagadas.get(producto.id) ?? 'Patrocinado'}
                     </span>
                   ) : producto.comercio.totalVentas > 0 ? (
                     <span className="bg-[#D4A017]/15 text-[#B8860B] text-[10px] font-semibold px-2 py-0.5 rounded-full leading-none">
@@ -294,7 +298,7 @@ export default function Home() {
   const [destacados, setDestacados] = useState<Producto[]>([])
   const [destHome, setDestHome] = useState<Producto[]>([])
   const [destHomeEtiquetas, setDestHomeEtiquetas] = useState<Map<string, string>>(new Map())
-  // Map: productoId (string) → etiqueta del sello (o "Selección Chocó" si null)
+  // Map: productoId (string) -> etiqueta del sello publicitario.
   const [destCatalogo, setDestCatalogo] = useState<Map<string, string>>(new Map())
 
   /** Carga productos según el filtro de categoría activo. */
@@ -351,14 +355,14 @@ export default function Home() {
               .filter((v): v is VisibilidadActiva & { producto: ProductoCrudo } => (
                 v.tipo === 'CATALOGO' && visibilidadConProducto(v)
               ))
-              .map(v => [String(v.producto.id), v.etiqueta?.trim() || 'Selección Chocó'] as [string, string])
+              .map(v => [String(v.producto.id), v.etiqueta?.trim() || 'Patrocinado'] as [string, string])
           )
           const homeEtiquetas = new Map<string, string>(
             visibilidades
               .filter((v): v is VisibilidadActiva & { producto: ProductoCrudo } => (
                 v.tipo === 'HOME_DESTACADO' && visibilidadConProducto(v)
               ))
-              .map(v => [String(v.producto.id), v.etiqueta?.trim() || 'Selección Chocó'] as [string, string])
+              .map(v => [String(v.producto.id), v.etiqueta?.trim() || 'Patrocinado'] as [string, string])
           )
           if (!cancelado) {
             setDestHome(mapearProductos(homeProds.filter(Boolean) as ProductoCrudo[]))
@@ -505,10 +509,13 @@ export default function Home() {
           {/* Grid — destacados intercalados: 1 pagado cada 4 orgánicos */}
           {!cargando && !error && productos.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {intercalarDestacados(
-                productos.filter(p => destCatalogo.has(p.id)),
-                productos.filter(p => !destCatalogo.has(p.id)),
-              ).map(producto => (
+              {(() => {
+                const MAX_PATROCINADOS_PCT = 0.15
+                const maxPatrocinados = Math.max(1, Math.floor(productos.length * MAX_PATROCINADOS_PCT))
+                const patrocinados = productos.filter(p => destCatalogo.has(p.id)).slice(0, maxPatrocinados)
+                const organicos = productos.filter(p => !destCatalogo.has(p.id))
+                return intercalarDestacados(patrocinados, organicos)
+              })().map(producto => (
                 <TarjetaProducto
                   key={producto.id}
                   producto={producto}

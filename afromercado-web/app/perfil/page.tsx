@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { obtenerPerfil, actualizarPerfil, subirAvatar } from '@/lib/api/usuario'
 import { apiFetch } from '@/lib/api/client'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 import type { Usuario, TipoDocumento } from '@/types/usuario'
 
 const ETIQUETA_ROL: Record<string, string> = {
@@ -472,30 +473,27 @@ export default function PerfilPage() {
                 {errorPw && (
                   <p className="text-xs text-[#C0392B] bg-red-50 border border-red-200 rounded-lg px-3 py-2">{errorPw}</p>
                 )}
-                <input
-                  type="password"
+                <PasswordInput
                   placeholder="Contraseña actual"
                   value={pwActual}
-                  onChange={(e) => setPwActual(e.target.value)}
+                  onChange={setPwActual}
                   required
-                  className="h-10 px-3 rounded-xl border border-[#1A1A1A]/15 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+                  inputClassName="h-10 px-3 rounded-xl border border-[#1A1A1A]/15 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
                 />
-                <input
-                  type="password"
+                <PasswordInput
                   placeholder="Nueva contraseña (mínimo 6 caracteres)"
                   value={pwNueva}
-                  onChange={(e) => setPwNueva(e.target.value)}
+                  onChange={setPwNueva}
                   required
                   minLength={6}
-                  className="h-10 px-3 rounded-xl border border-[#1A1A1A]/15 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+                  inputClassName="h-10 px-3 rounded-xl border border-[#1A1A1A]/15 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
                 />
-                <input
-                  type="password"
+                <PasswordInput
                   placeholder="Confirmar nueva contraseña"
                   value={pwConfirm}
-                  onChange={(e) => setPwConfirm(e.target.value)}
+                  onChange={setPwConfirm}
                   required
-                  className="h-10 px-3 rounded-xl border border-[#1A1A1A]/15 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+                  inputClassName="h-10 px-3 rounded-xl border border-[#1A1A1A]/15 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
                 />
                 <button
                   type="submit"

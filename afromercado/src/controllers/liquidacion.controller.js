@@ -1,7 +1,9 @@
 const prisma = require("../config/prisma");
 const { ErrorNoEncontrado, ErrorValidacion } = require("../utils/errores");
-
-const TARIFA_ENTREGA_COP = Number(process.env.TARIFA_ENTREGA_COP || 5000);
+const {
+  obtenerConfiguracionPago,
+  calcularPagoEntrega,
+} = require("../services/pago-repartidor.service");
 
 function formatPeriodo(desde, hasta) {
   const d = new Date(desde).toLocaleDateString("es-CO", { day: "numeric", month: "short" });
@@ -9,14 +11,26 @@ function formatPeriodo(desde, hasta) {
   return `${d} – ${h}`;
 }
 
+function fechaPeriodo(valor, finDelDia = false) {
+  const texto = String(valor);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) {
+    return new Date(`${texto}T${finDelDia ? "23:59:59.999" : "00:00:00.000"}-05:00`);
+  }
+  return new Date(valor);
+}
+
 const LiquidacionController = {
   // GET /admin/liquidaciones?tipo=&estado=&pagina=
   async listar(req, res, next) {
     try {
       const { tipo, estado, pagina = 1 } = req.query;
+      const paginaNumero = Number(pagina);
+      if (!Number.isInteger(paginaNumero) || paginaNumero < 1) {
+        throw new ErrorValidacion("pagina debe ser un entero mayor o igual a 1");
+      }
       const where = {};
       if (tipo   && ["COMERCIANTE", "REPARTIDOR"].includes(tipo))   where.tipo   = tipo;
-      if (estado && ["PENDIENTE", "PAGADA"].includes(estado))       where.estado = estado;
+      if (estado && ["PENDIENTE", "PAGADA", "CANCELADA"].includes(estado)) where.estado = estado;
 
       const [items, total] = await Promise.all([
         prisma.liquidacion.findMany({
@@ -31,7 +45,7 @@ const LiquidacionController = {
           },
           orderBy: { createdAt: "desc" },
           take: 20,
-          skip: (Number(pagina) - 1) * 20,
+          skip: (paginaNumero - 1) * 20,
         }),
         prisma.liquidacion.count({ where }),
       ]);
@@ -42,7 +56,7 @@ const LiquidacionController = {
           items,
           total,
           paginas: Math.ceil(total / 20),
-          pagina: Number(pagina),
+          pagina: paginaNumero,
         },
       });
     } catch (e) { next(e); }
@@ -51,76 +65,137 @@ const LiquidacionController = {
   // GET /admin/liquidaciones/resumen — saldos pendientes por comerciante/repartidor
   async resumen(req, res, next) {
     try {
-      // Comerciantes con saldo pendiente
-      const comercios = await prisma.comercio.findMany({
-        where: { activo: true, verificado: true },
-        include: { usuario: { select: { id: true, nombre: true, telefono: true } } },
-      });
-
-      const comerciantes = [];
-      for (const c of comercios) {
-        const ganado = await prisma.subPedido.aggregate({
-          _sum: { neto: true },
-          where: { comercioId: c.id, estado: "ENTREGADO" },
-        });
-        const liquidado = await prisma.liquidacion.aggregate({
-          _sum: { monto: true },
-          where: { beneficiarioId: c.usuarioId, tipo: "COMERCIANTE", estado: "PAGADA" },
-        });
-        const pendiente = Number(ganado._sum.neto || 0) - Number(liquidado._sum.monto || 0);
-        if (pendiente > 0) {
-          comerciantes.push({
+      const [
+        comercios,
+        subPedidosEntregados,
+        liquidacionesComerciantes,
+        repartidores,
+        entregasEntregadas,
+        liquidacionesRepartidores,
+        configuracionPago,
+      ] = await Promise.all([
+        prisma.comercio.findMany({
+          include: {
             usuario: {
-              id: c.usuario.id,
-              nombre: c.usuario.nombre,
-              email: c.usuario.email,
+              select: { id: true, nombre: true, email: true, telefono: true },
+            },
+          },
+        }),
+        prisma.subPedido.groupBy({
+          by: ["comercioId"],
+          where: { estado: "ENTREGADO" },
+          _sum: { neto: true },
+        }),
+        prisma.liquidacion.groupBy({
+          by: ["beneficiarioId"],
+          where: { tipo: "COMERCIANTE", estado: { in: ["PENDIENTE", "PAGADA"] } },
+          _sum: { monto: true },
+        }),
+        prisma.usuario.findMany({
+          where: { rol: "REPARTIDOR" },
+          select: { id: true, nombre: true, email: true, telefono: true },
+        }),
+        prisma.entrega.findMany({
+          where: { estado: "ENTREGADA", repartidorId: { not: null } },
+          select: {
+            repartidorId: true,
+            pagoRepartidor: true,
+            subPedido: {
+              select: {
+                pedido: {
+                  select: {
+                    costoEnvio: true,
+                    _count: { select: { subPedidos: true } },
+                  },
+                },
+              },
+            },
+          },
+        }),
+        prisma.liquidacion.groupBy({
+          by: ["beneficiarioId"],
+          where: { tipo: "REPARTIDOR", estado: { in: ["PENDIENTE", "PAGADA"] } },
+          _sum: { monto: true },
+        }),
+        obtenerConfiguracionPago(),
+      ]);
+
+      const ganadoPorComercio = new Map(
+        subPedidosEntregados.map((row) => [row.comercioId, Number(row._sum.neto || 0)]),
+      );
+      const liquidadoPorComercio = new Map(
+        liquidacionesComerciantes.map((row) => [row.beneficiarioId, Number(row._sum.monto || 0)]),
+      );
+      const pagosPorRepartidor = new Map();
+      for (const entrega of entregasEntregadas) {
+        if (entrega.repartidorId === null) continue;
+        const acumulado = pagosPorRepartidor.get(entrega.repartidorId) || {
+          totalEntregas: 0,
+          totalGanado: 0,
+        };
+        acumulado.totalEntregas += 1;
+        acumulado.totalGanado += calcularPagoEntrega(
+          entrega,
+          configuracionPago.modo,
+          configuracionPago.valor,
+        );
+        pagosPorRepartidor.set(entrega.repartidorId, acumulado);
+      }
+      const liquidadoPorRepartidor = new Map(
+        liquidacionesRepartidores.map((row) => [row.beneficiarioId, Number(row._sum.monto || 0)]),
+      );
+
+      const comerciantes = comercios.reduce((acc, comercio) => {
+        const totalGanado = ganadoPorComercio.get(comercio.id) || 0;
+        const totalLiquidado = liquidadoPorComercio.get(comercio.usuarioId) || 0;
+        const pendiente = totalGanado - totalLiquidado;
+        if (pendiente > 0) {
+          acc.push({
+            usuario: {
+              id: comercio.usuario.id,
+              nombre: comercio.usuario.nombre,
+              email: comercio.usuario.email,
             },
             tipo: "COMERCIANTE",
             pendiente,
-            comercioNombre: c.nombre,
-            dueno: c.usuario.nombre,
-            telefono: c.usuario.telefono,
-            totalGanado: Number(ganado._sum.neto || 0),
-            totalLiquidado: Number(liquidado._sum.monto || 0),
+            comercioNombre: comercio.nombre,
+            dueno: comercio.usuario.nombre,
+            telefono: comercio.usuario.telefono,
+            totalGanado,
+            totalLiquidado,
           });
         }
-      }
+        return acc;
+      }, []);
       comerciantes.sort((a, b) => b.pendiente - a.pendiente);
 
-      // Repartidores con saldo pendiente
-      const repartidores = [];
-      const reps = await prisma.usuario.findMany({
-        where: { rol: "REPARTIDOR", activo: true },
-        select: { id: true, nombre: true, email: true, telefono: true },
-      });
-      for (const r of reps) {
-        const entregas = await prisma.entrega.count({
-          where: { repartidorId: r.id, estado: "ENTREGADA" },
-        });
-        const liquidado = await prisma.liquidacion.aggregate({
-          _sum: { monto: true },
-          where: { beneficiarioId: r.id, tipo: "REPARTIDOR", estado: "PAGADA" },
-        });
-        const totalGanado = entregas * TARIFA_ENTREGA_COP;
-        const pendiente = totalGanado - Number(liquidado._sum.monto || 0);
+      const repartidoresPendientes = repartidores.reduce((acc, repartidor) => {
+        const pago = pagosPorRepartidor.get(repartidor.id) || {
+          totalEntregas: 0,
+          totalGanado: 0,
+        };
+        const { totalEntregas, totalGanado } = pago;
+        const totalLiquidado = liquidadoPorRepartidor.get(repartidor.id) || 0;
+        const pendiente = totalGanado - totalLiquidado;
         if (pendiente > 0) {
-          repartidores.push({
+          acc.push({
             usuario: {
-              id: r.id,
-              nombre: r.nombre,
-              email: r.email,
+              id: repartidor.id,
+              nombre: repartidor.nombre,
+              email: repartidor.email,
             },
             tipo: "REPARTIDOR",
             pendiente,
-            nombre: r.nombre,
-            telefono: r.telefono,
-            totalEntregas: entregas,
+            nombre: repartidor.nombre,
+            telefono: repartidor.telefono,
+            totalEntregas,
             totalGanado,
-            totalLiquidado: Number(liquidado._sum.monto || 0),
+            totalLiquidado,
           });
         }
-      }
-      repartidores.sort((a, b) => b.pendiente - a.pendiente);
+        return acc;
+      }, []);
+      repartidoresPendientes.sort((a, b) => b.pendiente - a.pendiente);
 
       const resumen = [
         ...comerciantes.map((c) => ({
@@ -129,7 +204,7 @@ const LiquidacionController = {
           pendiente: c.pendiente,
           comercioNombre: c.comercioNombre,
         })),
-        ...repartidores.map((r) => ({
+        ...repartidoresPendientes.map((r) => ({
           usuario: r.usuario,
           tipo: r.tipo,
           pendiente: r.pendiente,
@@ -142,8 +217,9 @@ const LiquidacionController = {
         data: resumen,
         meta: {
           comerciantes,
-          repartidores,
-          tarifaEntrega: TARIFA_ENTREGA_COP,
+          repartidores: repartidoresPendientes,
+          tarifaEntrega: configuracionPago.modo === "fijo" ? configuracionPago.valor : null,
+          pagoRepartidor: configuracionPago,
         },
       });
     } catch (e) { next(e); }
@@ -159,79 +235,144 @@ const LiquidacionController = {
       if (!beneficiarioId) throw new ErrorValidacion("beneficiarioId es requerido");
       if (!periodoDesde || !periodoHasta) throw new ErrorValidacion("periodoDesde y periodoHasta son requeridos");
 
-      const desde = new Date(periodoDesde);
-      const hasta = new Date(periodoHasta);
-      if (hasta <= desde) throw new ErrorValidacion("periodoHasta debe ser posterior a periodoDesde");
-
-      let monto = 0;
-
-      if (tipo === "COMERCIANTE") {
-        const comercio = await prisma.comercio.findUnique({ where: { usuarioId: Number(beneficiarioId) } });
-        if (!comercio) throw new ErrorValidacion("El usuario no tiene comercio registrado");
-
-        const ganado = await prisma.subPedido.aggregate({
-          _sum: { neto: true },
-          where: { comercioId: comercio.id, estado: "ENTREGADO", updatedAt: { gte: desde, lte: hasta } },
-        });
-        const liquidado = await prisma.liquidacion.aggregate({
-          _sum: { monto: true },
-          where: { beneficiarioId: Number(beneficiarioId), tipo: "COMERCIANTE", estado: "PAGADA",
-                   periodoDesde: { gte: desde }, periodoHasta: { lte: hasta } },
-        });
-        monto = Number(ganado._sum.neto || 0) - Number(liquidado._sum.monto || 0);
-      } else {
-        const entregas = await prisma.entrega.count({
-          where: { repartidorId: Number(beneficiarioId), estado: "ENTREGADA", updatedAt: { gte: desde, lte: hasta } },
-        });
-        const liquidado = await prisma.liquidacion.aggregate({
-          _sum: { monto: true },
-          where: { beneficiarioId: Number(beneficiarioId), tipo: "REPARTIDOR", estado: "PAGADA",
-                   periodoDesde: { gte: desde }, periodoHasta: { lte: hasta } },
-        });
-        monto = (entregas * TARIFA_ENTREGA_COP) - Number(liquidado._sum.monto || 0);
+      const desde = fechaPeriodo(periodoDesde);
+      const hasta = fechaPeriodo(periodoHasta, true);
+      if (Number.isNaN(desde.getTime()) || Number.isNaN(hasta.getTime()) || hasta <= desde) {
+        throw new ErrorValidacion("periodoHasta debe ser posterior a periodoDesde");
       }
 
-      if (monto <= 0) throw new ErrorValidacion("No hay saldo pendiente a liquidar en ese período");
+      const beneficiarioNumero = Number(beneficiarioId);
+      if (!Number.isInteger(beneficiarioNumero) || beneficiarioNumero < 1) {
+        throw new ErrorValidacion("beneficiarioId debe ser un entero válido");
+      }
 
-      const liq = await prisma.liquidacion.create({
-        data: {
-          tipo,
-          beneficiarioId: Number(beneficiarioId),
-          monto,
-          periodoDesde:   desde,
-          periodoHasta:   hasta,
-          cuentaDestino:  cuentaDestino?.trim() || null,
-          notas:          notas?.trim() || null,
-          creadoPor:      req.usuario.id,
-        },
-        include: {
-          beneficiario: { select: { nombre: true, email: true, comercio: { select: { nombre: true } } } },
-        },
-      });
+      const configuracionPago = tipo === "REPARTIDOR"
+        ? await obtenerConfiguracionPago()
+        : null;
+
+      const liq = await prisma.$transaction(async (tx) => {
+        const existente = await tx.liquidacion.findFirst({
+          where: {
+            beneficiarioId: beneficiarioNumero,
+            tipo,
+            estado: { in: ["PENDIENTE", "PAGADA"] },
+            periodoDesde: { lte: hasta },
+            periodoHasta: { gte: desde },
+          },
+          select: { id: true },
+        });
+        if (existente) {
+          throw new ErrorValidacion("Ya existe una liquidación que cubre total o parcialmente ese período");
+        }
+
+        let monto = 0;
+        if (tipo === "COMERCIANTE") {
+          const comercio = await tx.comercio.findUnique({
+            where: { usuarioId: beneficiarioNumero },
+            select: { id: true },
+          });
+          if (!comercio) throw new ErrorValidacion("El usuario no tiene comercio registrado");
+
+          const ganado = await tx.subPedido.aggregate({
+            _sum: { neto: true },
+            where: {
+              comercioId: comercio.id,
+              estado: "ENTREGADO",
+              updatedAt: { gte: desde, lte: hasta },
+            },
+          });
+          monto = Number(ganado._sum.neto || 0);
+        } else {
+          const entregas = await tx.entrega.findMany({
+            where: {
+              repartidorId: beneficiarioNumero,
+              estado: "ENTREGADA",
+              updatedAt: { gte: desde, lte: hasta },
+            },
+            select: {
+              pagoRepartidor: true,
+              subPedido: {
+                select: {
+                  pedido: {
+                    select: {
+                      costoEnvio: true,
+                      _count: { select: { subPedidos: true } },
+                    },
+                  },
+                },
+              },
+            },
+          });
+          monto = entregas.reduce(
+            (total, entrega) => total + calcularPagoEntrega(
+              entrega,
+              configuracionPago.modo,
+              configuracionPago.valor,
+            ),
+            0,
+          );
+        }
+
+        if (monto <= 0) {
+          throw new ErrorValidacion("No hay saldo pendiente a liquidar en ese período");
+        }
+
+        return tx.liquidacion.create({
+          data: {
+            tipo,
+            beneficiarioId: beneficiarioNumero,
+            monto,
+            periodoDesde: desde,
+            periodoHasta: hasta,
+            cuentaDestino: cuentaDestino?.trim() || null,
+            notas: notas?.trim() || null,
+            creadoPor: req.usuario.id,
+          },
+          include: {
+            beneficiario: {
+              select: { nombre: true, email: true, comercio: { select: { nombre: true } } },
+            },
+          },
+        });
+      }, { isolationLevel: "Serializable" });
 
       res.status(201).json({ ok: true, data: liq });
-    } catch (e) { next(e); }
+    } catch (e) {
+      if (e?.code === "P2034") {
+        return next(new ErrorValidacion("La liquidación cambió mientras se procesaba; intenta de nuevo"));
+      }
+      next(e);
+    }
   },
 
   // PATCH /admin/liquidaciones/:id/pagar
   async marcarPagada(req, res, next) {
     try {
       const id = Number(req.params.id);
-      const { comprobante, notas } = req.body;
+      if (!Number.isInteger(id) || id < 1) {
+        throw new ErrorValidacion("id de liquidación inválido");
+      }
+      const { comprobante, comprobanteUrl, notas } = req.body || {};
+      const urlComprobante = typeof comprobante === "string" ? comprobante : comprobanteUrl;
 
-      const liq = await prisma.liquidacion.findUnique({ where: { id } });
-      if (!liq) throw new ErrorNoEncontrado("Liquidación no encontrada");
-      if (liq.estado === "PAGADA") throw new ErrorValidacion("Esta liquidación ya fue pagada");
-
-      const actualizada = await prisma.liquidacion.update({
-        where: { id },
+      const cambio = await prisma.liquidacion.updateMany({
+        where: { id, estado: "PENDIENTE" },
         data: {
           estado:      "PAGADA",
-          comprobante: comprobante?.trim() || null,
-          notas:       notas?.trim() || liq.notas,
+          comprobante: typeof urlComprobante === "string" ? urlComprobante.trim() || null : null,
+          ...(notas?.trim() ? { notas: notas.trim() } : {}),
           pagadoPor:   req.usuario.id,
           pagadoAt:    new Date(),
         },
+      });
+      if (cambio.count === 0) {
+        const existe = await prisma.liquidacion.findUnique({ where: { id }, select: { estado: true } });
+        if (!existe) throw new ErrorNoEncontrado("Liquidación no encontrada");
+        throw new ErrorValidacion("Solo se pueden pagar liquidaciones pendientes");
+      }
+
+      const actualizada = await prisma.liquidacion.findUnique({
+        where: { id },
         include: {
           beneficiario: { select: { nombre: true, email: true, telefono: true } },
         },
@@ -239,6 +380,37 @@ const LiquidacionController = {
 
       res.json({ ok: true, data: actualizada });
     } catch (e) { next(e); }
+  },
+
+  async cancelar(req, res, next) {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id < 1) {
+        throw new ErrorValidacion("id de liquidación inválido");
+      }
+      const { notas } = req.body || {};
+      const cambio = await prisma.liquidacion.updateMany({
+        where: { id, estado: "PENDIENTE" },
+        data: {
+          estado: "CANCELADA",
+          notas: notas?.trim() || undefined,
+        },
+      });
+      if (cambio.count === 0) {
+        const existe = await prisma.liquidacion.findUnique({ where: { id }, select: { estado: true } });
+        if (!existe) throw new ErrorNoEncontrado("Liquidación no encontrada");
+        throw new ErrorValidacion("Solo se pueden cancelar liquidaciones pendientes");
+      }
+      const actualizada = await prisma.liquidacion.findUnique({
+        where: { id },
+        include: {
+          beneficiario: { select: { nombre: true, email: true, telefono: true } },
+        },
+      });
+      res.json({ ok: true, data: actualizada });
+    } catch (e) {
+      next(e);
+    }
   },
 
   // GET /mis-liquidaciones — para comerciantes y repartidores

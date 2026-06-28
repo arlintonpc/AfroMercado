@@ -360,7 +360,7 @@ function FormNueva({ onCreada }: { onCreada: () => void }) {
             value={form.etiqueta}
             onChange={e => set('etiqueta', e.target.value)}
             maxLength={28}
-            placeholder="Selección Chocó"
+            placeholder="Patrocinado"
             className="w-full border border-[#1A1A1A]/15 rounded-xl px-3 py-2 pr-20 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
           />
           {/* Vista previa del sello */}
@@ -368,10 +368,10 @@ function FormNueva({ onCreada }: { onCreada: () => void }) {
             <svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M17 8C8 10 5.9 16.17 3.82 19.52 3.23 20.5 4.5 21.5 5.3 20.67 7 18.9 8.91 17.5 11 17c-1 3-4 4-4 4s6 0 9-8c1.5 2 2 3.5 2 5.5 0 0 2-10-1-10.5z"/>
             </svg>
-            {form.etiqueta.trim() || 'Selección Chocó'}
+            {form.etiqueta.trim() || 'Patrocinado'}
           </span>
         </div>
-        <p className="text-[10px] text-[#1A1A1A]/40">Si lo dejas vacío usa Selección Chocó. Máx. 28 caracteres.</p>
+        <p className="text-[10px] text-[#1A1A1A]/40">Si lo dejas vacío usa Patrocinado. Máx. 28 caracteres.</p>
       </div>
 
       {/* Notas */}

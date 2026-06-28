@@ -113,6 +113,7 @@ export default function ComercianteLayout({
   const [nombreComercio, setNombreComercio] = useState<string | null>(null)
   const [comercio, setComercio] = useState<Comercio | null | undefined>(undefined)
   const [menuAbierto, setMenuAbierto] = useState(false)
+  const [masAbierto, setMasAbierto] = useState(false)
 
   // Protección de ruta: sin sesión de comerciante → a ingresar.
   useEffect(() => {
@@ -142,6 +143,11 @@ export default function ComercianteLayout({
   }, [cargando, esRutaIngresar, esComerciante])
 
   // La pantalla de ingreso usa su propio diseño, sin protección ni chrome.
+  useEffect(() => {
+    setMenuAbierto(false)
+    setMasAbierto(false)
+  }, [pathname])
+
   if (esRutaIngresar) {
     return <>{children}</>
   }
@@ -177,17 +183,30 @@ export default function ComercianteLayout({
     { href: '/comerciante/publicar',       etiqueta: 'Publicar' },
     { href: '/comerciante/ofertas',        etiqueta: 'Ofertas' },
     { href: '/comerciante/cupones',        etiqueta: 'Cupones' },
+    { href: '/comerciante/publicidad',     etiqueta: 'Publicidad' },
     { href: '/comerciante/analytics',      etiqueta: 'Analíticas' },
     { href: '/comerciante/liquidaciones',  etiqueta: 'Liquidaciones' },
     { href: '/comerciante/perfil',         etiqueta: 'Mi tienda' },
     { href: '/notificaciones',             etiqueta: 'Notificaciones' },
   ]
+  const enlacesPrincipales = enlaces.filter((e) =>
+    [
+      '/comerciante/dashboard',
+      '/comerciante/pedidos',
+      '/comerciante/mis-productos',
+      '/comerciante/publicar',
+      '/comerciante/perfil',
+    ].includes(e.href)
+  )
+  const enlacesSecundarios = enlaces.filter((e) => !enlacesPrincipales.some((p) => p.href === e.href))
+  const enlaceActivo = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
+  const secundarioActivo = enlacesSecundarios.some((e) => enlaceActivo(e.href))
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F8F5F0] text-[#1A1A1A]">
       {/* Barra superior propia del vendedor */}
       <header className="sticky top-0 z-30 bg-[#2D6A4F] text-white shadow-sm">
-        <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-3 px-4">
+        <div className="mx-auto flex min-h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-baseline gap-2">
             <span
               className="text-xl leading-none"
@@ -199,15 +218,15 @@ export default function ComercianteLayout({
           </div>
 
           {/* Navegación en pantallas grandes */}
-          <nav className="hidden items-center gap-1 md:flex">
-            {enlaces.map((e) => {
-              const activo = pathname === e.href
+          <nav className="hidden items-center gap-1 lg:flex">
+            {enlacesPrincipales.map((e) => {
+              const activo = enlaceActivo(e.href)
               const esNotif = e.href === '/notificaciones'
               return (
                 <Link
                   key={e.href}
                   href={e.href}
-                  className={`relative rounded-lg px-3 py-2 text-base font-semibold transition-colors ${
+                  className={`relative whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold transition-colors ${
                     activo ? 'bg-white/15' : 'text-white/80 hover:bg-white/10'
                   }`}
                 >
@@ -220,10 +239,52 @@ export default function ComercianteLayout({
                 </Link>
               )
             })}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMasAbierto((v) => !v)}
+                className={`relative whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold transition-colors ${
+                  secundarioActivo || masAbierto ? 'bg-white/15' : 'text-white/80 hover:bg-white/10'
+                }`}
+                aria-expanded={masAbierto}
+              >
+                Más
+                {noLeidas > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#D4A017] px-1 text-[10px] font-bold text-[#1A1A1A]">
+                    {noLeidas > 9 ? '9+' : noLeidas}
+                  </span>
+                )}
+              </button>
+              {masAbierto && (
+                <div className="absolute right-0 top-full mt-2 w-60 rounded-2xl border border-white/10 bg-[#1F5A42] p-2 shadow-xl">
+                  {enlacesSecundarios.map((e) => {
+                    const activo = enlaceActivo(e.href)
+                    const esNotif = e.href === '/notificaciones'
+                    return (
+                      <Link
+                        key={e.href}
+                        href={e.href}
+                        onClick={() => setMasAbierto(false)}
+                        className={`relative flex items-center justify-between rounded-xl px-3 py-2 text-sm font-bold transition-colors ${
+                          activo ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10'
+                        }`}
+                      >
+                        <span>{e.etiqueta}</span>
+                        {esNotif && noLeidas > 0 && (
+                          <span className="rounded-full bg-[#D4A017] px-1.5 text-[10px] font-bold text-[#1A1A1A]">
+                            {noLeidas > 9 ? '9+' : noLeidas}
+                          </span>
+                        )}
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={manejarLogout}
-              className="ml-1 rounded-lg px-3 py-2 text-base font-semibold text-white/80 hover:bg-white/10"
+              className="ml-1 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold text-white/80 hover:bg-white/10"
             >
               Cerrar sesión
             </button>
@@ -235,7 +296,7 @@ export default function ComercianteLayout({
             onClick={() => setMenuAbierto((v) => !v)}
             aria-expanded={menuAbierto}
             aria-label="Menú"
-            className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-white/10 md:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-white/10 lg:hidden"
           >
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               {menuAbierto ? (
@@ -259,7 +320,7 @@ export default function ComercianteLayout({
 
         {/* Menú desplegable móvil */}
         {menuAbierto && (
-          <nav className="border-t border-white/15 bg-[#2D6A4F] px-4 py-2 md:hidden">
+          <nav className="border-t border-white/15 bg-[#2D6A4F] px-4 py-2 lg:hidden">
             {enlaces.map((e) => {
               const esNotif = e.href === '/notificaciones'
               return (
@@ -295,7 +356,7 @@ export default function ComercianteLayout({
       {/* Sub-barra con el nombre del comercio */}
       {nombreComercio && (
         <div className="border-b border-[#1A1A1A]/8 bg-white">
-          <div className="mx-auto w-full max-w-5xl px-4 py-2">
+          <div className="mx-auto w-full max-w-7xl px-4 py-2 sm:px-6 lg:px-8">
             <p className="truncate text-sm text-[#1A1A1A]/60">
               Tu tienda:{' '}
               <span className="font-semibold text-[#2D6A4F]">{nombreComercio}</span>
@@ -304,7 +365,7 @@ export default function ComercianteLayout({
         </div>
       )}
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
     </div>
   )
 }

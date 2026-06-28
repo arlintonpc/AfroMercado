@@ -23,6 +23,8 @@ router.get("/mis/productos", autenticar, autorizar("COMERCIANTE", "ADMIN"), Prod
 // Rutas dinámicas con :id
 router.get("/:id", ProductoController.obtener);
 router.post("/:id/vista", autenticarOpcional, ProductoController.registrarVista);
+router.post("/:id/clic-patrocinado", autenticarOpcional, VisibilidadController.registrarClic);
+router.post("/:id/carrito-patrocinado", autenticarOpcional, VisibilidadController.registrarCarrito);
 router.get("/:id/reviews", ReviewController.listar);
 router.patch("/:id", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.actualizar);
 router.delete("/:id", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.desactivar);

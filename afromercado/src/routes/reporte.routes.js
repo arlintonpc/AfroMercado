@@ -37,6 +37,20 @@ router.get("/admin/riesgo",       ...soloAdmin, ReporteController.riesgoAdmin);
 router.get("/admin/cohortes",     ...soloAdmin, ReporteController.cohortesAdmin);
 // GET /reportes/admin/cupones-roi
 router.get("/admin/cupones-roi",  ...soloAdmin, ReporteController.cuponesROIAdmin);
+// GET /reportes/admin/categorias
+router.get("/admin/categorias",   ...soloAdmin, ReporteController.categoriasAdmin);
+// GET /reportes/admin/productos
+router.get("/admin/productos",    ...soloAdmin, ReporteController.productosAdmin);
+// GET /reportes/admin/territorios
+router.get("/admin/territorios",  ...soloAdmin, ReporteController.territoriosAdmin);
+// GET /reportes/admin/pagos
+router.get("/admin/pagos",        ...soloAdmin, ReporteController.pagosAdmin);
+// GET /reportes/admin/logistica
+router.get("/admin/logistica",    ...soloAdmin, ReporteController.logisticaAdmin);
+// GET /reportes/admin/clientes
+router.get("/admin/clientes",     ...soloAdmin, ReporteController.clientesAdmin);
+// GET /reportes/admin/alertas
+router.get("/admin/alertas",      ...soloAdmin, ReporteController.alertasAdmin);
 // GET /reportes/admin/exportar  → descarga .xlsx
 router.get("/admin/exportar",     ...soloAdmin, ReporteController.exportarAdmin);
 

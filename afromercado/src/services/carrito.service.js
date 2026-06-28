@@ -94,7 +94,7 @@ const CarritoService = {
     if (!cantidad || cantidad < 1)
       throw new ErrorValidacion("La cantidad debe ser mayor a cero");
 
-    const producto = await ProductoRepository.buscarPorId(pid);
+    const producto = await ProductoRepository.buscarPublicoPorId(pid);
     if (!producto || !producto.activo || producto.deletedAt) {
       throw new ErrorNoEncontrado("Producto no encontrado o inactivo");
     }
@@ -120,7 +120,7 @@ const CarritoService = {
     if (!cantidad || cantidad < 1)
       throw new ErrorValidacion("La cantidad debe ser mayor a cero");
 
-    const producto = await ProductoRepository.buscarPorId(pid);
+    const producto = await ProductoRepository.buscarPublicoPorId(pid);
     if (!producto || !producto.activo) {
       throw new ErrorNoEncontrado("Producto no encontrado o inactivo");
     }

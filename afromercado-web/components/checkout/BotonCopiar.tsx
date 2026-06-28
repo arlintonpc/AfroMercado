@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 /**
  * Botón que copia `texto` al portapapeles y muestra "¡Copiado!" 2s.
- * Pensado para los números Nequi/Daviplata y la referencia de pago.
+ * Pensado para referencias, codigos y datos puntuales copiables.
  */
 export function BotonCopiar({
   texto,

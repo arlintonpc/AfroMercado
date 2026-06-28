@@ -5,9 +5,9 @@ const config = require("../config");
 function manejadorErrores(err, req, res, next) {
   const statusCode = err.statusCode || 500;
 
-  // En desarrollo mostramos el detalle; en producción, mensaje genérico para errores 500
+  // Los errores 500 se registran en servidor, pero no se exponen al usuario.
   const esError500 = statusCode === 500;
-  const mensaje = esError500 && config.entorno === "production"
+  const mensaje = esError500
     ? "Ocurrió un error en el servidor"
     : err.message;
 

@@ -24,6 +24,21 @@ router.get(
   ComercioController.miComercio,
 );
 
+// GET/PUT /comercios/cuenta-dispersion - cuenta bancaria/billetera para dispersion automatica
+router.get(
+  "/cuenta-dispersion",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.obtenerCuentaDispersion,
+);
+
+router.put(
+  "/cuenta-dispersion",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.guardarCuentaDispersion,
+);
+
 // GET /comercios/mis-estadisticas - dashboard del comerciante
 router.get(
   "/mis-estadisticas",

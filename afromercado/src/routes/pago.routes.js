@@ -9,6 +9,16 @@ const router = express.Router();
 
 const soloCompradores = [autenticar, autorizar("COMPRADOR", "COMERCIANTE", "REPARTIDOR")];
 
+// Webhooks de la pasarela (sin autenticacion de usuario; se valida por firma/proveedor)
+router.post("/webhooks/:proveedor", PagoController.webhook);
+
+// Crear checkout digital en pasarela
+router.post("/checkout", ...soloCompradores, PagoController.crearCheckoutDigital);
+
+// Consultar estado del pago digital
+router.get("/pedido/:pedidoId/estado", ...soloCompradores, PagoController.estadoPorPedido);
+router.get("/:id/estado", ...soloCompradores, PagoController.estadoPorPago);
+
 // Crear un pago para un pedido
 router.post("/", ...soloCompradores, PagoController.crear);
 

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "PowerShell(cd \"d:\\\\AfroMercado\\\\afromercado-web\"; npx tsc --noEmit 2>&1 | Select-String -Pattern \"reportes|FiltroFechas|BotonExportar|reporte\" | Select-Object -First 20 | ForEach-Object { $_.Line })",
+      "PowerShell(cd \"d:\\\\AfroMercado\\\\afromercado-web\"; npx tsc --noEmit 2>&1 | Where-Object { $_ -match \"reportes|FiltroFechas|BotonExportar\" })",
+      "PowerShell(cd \"d:\\\\AfroMercado\\\\afromercado-web\"; npx tsc --noEmit 2>&1 | Out-String | Select-String -Pattern \"error TS\" | Select-Object -First 25 | ForEach-Object { $_.Matches.Value })"
+    ]
+  }
+}

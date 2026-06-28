@@ -35,6 +35,10 @@ export interface Comercio {
   estadoRegistro?: 'PENDIENTE_REVISION' | 'APROBADO' | 'RECHAZADO' | 'SUSPENDIDO'
   motivoRechazo?: string | null
   fotoDocumentoUrl?: string | null
+  fotoDocumentoFrenteUrl?: string | null
+  fotoDocumentoReversoUrl?: string | null
+  fotoDocumentoFrenteHash?: string | null
+  fotoDocumentoReversoHash?: string | null
   whatsappVisible?: boolean
   vereda?: string | null
   videoUrl?: string | null
@@ -95,6 +99,44 @@ export interface CategoriaComerciante {
 }
 
 export type TipoDocumento = 'CC' | 'TI' | 'CE' | 'PEP' | 'PASAPORTE' | 'NIT'
+export type TipoCuentaDispersion = 'AHORROS' | 'CORRIENTE' | 'BILLETERA_DIGITAL'
+
+export interface CuentaDispersion {
+  id: number
+  comercioId: number
+  proveedor: 'SANDBOX' | 'WOMPI' | 'PAYU' | 'EPAYCO' | 'MERCADOPAGO'
+  estado: 'PENDIENTE_VERIFICACION' | 'VERIFICADA' | 'RECHAZADA' | 'SUSPENDIDA'
+  providerRecipientId?: string | null
+  titularNombre: string
+  tipoDocumento: TipoDocumento
+  numeroDocumento: string
+  bancoCodigo: string
+  bancoNombre: string
+  tipoCuenta: TipoCuentaDispersion
+  numeroCuentaUltimos4: string
+  emailNotificacion?: string | null
+  telefonoNotificacion?: string | null
+  motivoRechazo?: string | null
+  verificadaAt?: string | null
+}
+
+export interface DatosCuentaDispersion {
+  bancoCodigo: string
+  tipoCuenta: TipoCuentaDispersion
+  numeroCuenta: string
+  titularNombre?: string
+  tipoDocumento?: TipoDocumento
+  numeroDocumento?: string
+  emailNotificacion?: string
+  telefonoNotificacion?: string
+}
+
+export interface ResultadoGuardarCuentaDispersion {
+  cuenta: CuentaDispersion
+  comercio?: Comercio | null
+  requiereRevision?: boolean
+  productosDesactivados?: number
+}
 
 export interface DatosComercio {
   nombre: string
@@ -107,8 +149,18 @@ export interface DatosComercio {
   vereda?: string
   logoUrl?: string
   fotoDocumentoUrl?: string
+  fotoDocumentoFrenteUrl?: string
+  fotoDocumentoReversoUrl?: string
+  fotoDocumentoFrenteHash?: string
+  fotoDocumentoReversoHash?: string
   /** Monto mínimo para envío gratis de la tienda (null/0 = desactivado). */
   envioGratisDesde?: number | null
+  bancoCodigo?: string
+  tipoCuenta?: TipoCuentaDispersion
+  numeroCuenta?: string
+  titularNombre?: string
+  emailNotificacion?: string
+  telefonoNotificacion?: string
 }
 
 export interface DatosProducto {
@@ -171,6 +223,34 @@ export async function crearComercio(datos: DatosComercio): Promise<Comercio> {
     body: datos,
   })
   return resp.comercio
+}
+
+export async function obtenerCuentaDispersion(): Promise<CuentaDispersion | null> {
+  const resp = await apiFetch<{ ok: boolean; data: CuentaDispersion | null }>(
+    '/comercios/cuenta-dispersion',
+  )
+  return resp.data ?? null
+}
+
+export async function guardarCuentaDispersion(
+  datos: DatosCuentaDispersion,
+): Promise<ResultadoGuardarCuentaDispersion> {
+  const resp = await apiFetch<{
+    ok: boolean
+    data: CuentaDispersion
+    comercio?: Comercio | null
+    requiereRevision?: boolean
+    productosDesactivados?: number
+  }>(
+    '/comercios/cuenta-dispersion',
+    { method: 'PUT', body: datos },
+  )
+  return {
+    cuenta: resp.data,
+    comercio: resp.comercio ?? null,
+    requiereRevision: resp.requiereRevision,
+    productosDesactivados: resp.productosDesactivados,
+  }
 }
 
 /**
@@ -487,10 +567,20 @@ export async function actualizarComercio(datos: Partial<DatosComercio>): Promise
   return resp.comercio
 }
 
-export async function subirDocumentoComercio(file: File): Promise<{ url: string }> {
+export type LadoDocumento = 'FRENTE' | 'REVERSO'
+
+export async function subirDocumentoComercio(file: File, lado: LadoDocumento): Promise<{
+  url: string
+  lado: LadoDocumento
+  hash?: string
+  comercio?: Comercio
+  requiereRevision?: boolean
+  productosDesactivados?: number
+}> {
   const token = obtenerToken()
   const fd = new FormData()
   fd.append('documento', file)
+  fd.append('lado', lado)
   const res = await fetch(`${API_URL}/comercios/subir-documento`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,

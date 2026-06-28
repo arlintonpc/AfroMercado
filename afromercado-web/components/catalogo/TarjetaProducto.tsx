@@ -8,6 +8,7 @@ import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useCarrito } from '@/context/CarritoContext'
 import { useFavoritos } from '@/context/FavoritoContext'
 import { useAuth } from '@/context/AuthContext'
+import { registrarEventoPatrocinado } from '@/lib/publicidadTracking'
 
 interface TarjetaProductoProps {
   producto: Producto
@@ -16,7 +17,7 @@ interface TarjetaProductoProps {
 }
 
 export default function TarjetaProducto({ producto, esDestacado = false, etiquetaDestacado }: TarjetaProductoProps) {
-  const selloTexto = etiquetaDestacado?.trim() || 'Selección Chocó'
+  const selloTexto = etiquetaDestacado?.trim() || 'Patrocinado'
   const { agregar } = useCarrito()
   const { toggle: toggleFav, esFavorito } = useFavoritos()
   const { autenticado } = useAuth()
@@ -39,11 +40,17 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
   const mostrarPlaceholder = !producto.fotoUrl || imgError
   const href = `/producto/${producto.id}`
 
+  function registrarPatrocinado(evento: 'clic' | 'carrito') {
+    if (!esDestacado) return
+    registrarEventoPatrocinado(producto.id, evento)
+  }
+
   async function handleAgregar() {
     if (agregando || agotado) return
     setAgregando(true)
     try {
       await agregar(producto, 1)
+      registrarPatrocinado('carrito')
       setAgregado(true)
       setTimeout(() => setAgregado(false), 1600)
     } catch {
@@ -78,6 +85,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
       <Link
         href={href}
         aria-label={`Ver ${producto.nombre}`}
+        onClick={() => registrarPatrocinado('clic')}
         className="relative block w-full aspect-[3/4] overflow-hidden"
       >
         {mostrarPlaceholder ? (
@@ -196,6 +204,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         {/* Nombre */}
         <Link
           href={href}
+          onClick={() => registrarPatrocinado('clic')}
           className="block truncate font-semibold text-[#1A1A1A]"
           style={{ fontSize: 15, lineHeight: '17px', marginBottom: 2, minHeight: 0 }}
         >

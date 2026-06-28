@@ -9,7 +9,16 @@ const ComercioRepository = require("../src/repositories/comercio.repository");
 const ProductoRepository = require("../src/repositories/producto.repository");
 
 // Valores por defecto reutilizables en los tests
-const comercioFake = { id: "comercio-123", nombre: "Tienda AfroTest" };
+const comercioFake = {
+  id: "comercio-123",
+  nombre: "Tienda AfroTest",
+  activo: true,
+  verificado: true,
+  estadoRegistro: "APROBADO",
+  fotoDocumentoFrenteUrl: "https://docs/frente.jpg",
+  fotoDocumentoReversoUrl: "https://docs/reverso.jpg",
+  cuentaDispersion: { estado: "VERIFICADA", proveedor: "SANDBOX" },
+};
 const productoFake = { id: "prod-999", comercioId: "comercio-123", nombre: "Borojó", activo: true };
 
 // Estado mutable de los mocks (se puede sobreescribir por test)
@@ -19,6 +28,7 @@ let productoCreado = null;
 let productoActualizado = null;
 
 ComercioRepository.buscarPorUsuarioId = async () => mockComercio;
+ComercioRepository.buscarPorUsuarioIdConCuenta = async () => mockComercio;
 ProductoRepository.buscarPorId       = async () => mockProducto;
 ProductoRepository.crear             = async (data) => { productoCreado = data; return { id: "prod-nuevo", ...data }; };
 ProductoRepository.actualizar        = async (id, data) => { productoActualizado = data; return { id, ...data }; };
@@ -64,7 +74,7 @@ async function esperarRejection(descripcion, promesa, TipoError) {
 const datosValidos = {
   nombre: "Borojó fresco",
   precio: 8000,
-  unidad: "KILO",
+  unidad: "KG",
   stock: 50,
   diasAlistamientoMin: 1,
   diasAlistamientoMax: 3,
@@ -143,7 +153,15 @@ async function runCrearTests() {
     ErrorValidacion
   );
 
-  // 9. Acepta datos válidos y llama a ProductoRepository.crear con los campos correctos
+  // 9. Rechaza si el comercio aun no esta aprobado/documentado para vender
+  mockComercio = { ...comercioFake, estadoRegistro: "PENDIENTE_REVISION", verificado: false };
+  await esperarRejection(
+    "Rechaza si comercio no esta aprobado",
+    ProductoService.crear("u-pendiente", datosValidos),
+    ErrorValidacion
+  );
+
+  // 10. Acepta datos válidos y llama a ProductoRepository.crear con los campos correctos
   mockComercio = comercioFake;
   productoCreado = null;
   let resultado;

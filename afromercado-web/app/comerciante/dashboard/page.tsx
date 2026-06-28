@@ -12,9 +12,11 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import {
   obtenerMiComercio,
+  obtenerCuentaDispersion,
   listarMisProductos,
   obtenerMisEstadisticas,
   type Comercio,
+  type CuentaDispersion,
   type ProductoComerciante,
   type EstadisticasComerciante,
   type SubPedidoComerciante,
@@ -27,6 +29,12 @@ interface SlotMetrica {
   inicio: string
   fin: string
   vistas: number
+  clics: number
+  carritos: number
+  pedidosAtribuidos: number
+  unidadesAtribuidas: number
+  gmvAtribuido: number | string
+  montoCOP: number | string
   producto?: { nombre: string } | null
 }
 
@@ -227,16 +235,26 @@ function TarjetaProductoComerciante({
           {/* Toggle visible/oculto */}
           <button
             type="button"
+            role="switch"
+            aria-checked={producto.activo}
+            aria-label={producto.activo ? `Ocultar ${producto.nombre} del catalogo` : `Publicar ${producto.nombre} en el catalogo`}
             onClick={handleToggle}
             disabled={toggling}
             title={producto.activo ? 'Ocultar del catálogo' : 'Publicar en el catálogo'}
-            className={`relative flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#2D6A4F] focus:ring-offset-1 disabled:opacity-60 flex-shrink-0 ${
-              producto.activo ? 'bg-[#2D6A4F]' : 'bg-[#1A1A1A]/20'
-            }`}
+            className="group inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-full p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2D6A4F]/35 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-              producto.activo ? 'translate-x-[18px]' : 'translate-x-0.5'
-            }`} />
+            <span
+              className={`relative block h-7 w-12 rounded-full border transition-all duration-200 ${
+                producto.activo
+                  ? 'border-[#2D6A4F] bg-[#2D6A4F] shadow-sm shadow-[#2D6A4F]/20'
+                  : 'border-[#1A1A1A]/15 bg-[#EDE7DD]'
+              }`}
+              aria-hidden="true"
+            >
+              <span className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm ring-1 ring-black/5 transition-transform duration-200 ${
+                producto.activo ? 'translate-x-5' : 'translate-x-0'
+              }`} />
+            </span>
           </button>
           <span className="text-xs text-[#1A1A1A]/40 flex-1">
             {producto.activo ? 'Visible' : 'Oculto'}
@@ -262,6 +280,7 @@ function DashboardContenido() {
   const publicado = searchParams.get('publicado') === '1'
 
   const [comercio, setComercio] = useState<Comercio | null>(null)
+  const [cuentaDispersion, setCuentaDispersion] = useState<CuentaDispersion | null>(null)
   const [productos, setProductos] = useState<ProductoComerciante[]>([])
   const [stats, setStats] = useState<EstadisticasComerciante | null>(null)
   const [slotsActivos, setSlotsActivos] = useState<SlotMetrica[]>([])
@@ -288,7 +307,7 @@ function DashboardContenido() {
         if (!c) { router.replace('/comerciante/registro-comercio'); return }
         setComercio(c)
         const token = localStorage.getItem('afromercado_token')
-        const [prods, estadisticas, metrRes, ofertasRes] = await Promise.all([
+        const [prods, estadisticas, metrRes, ofertasRes, cuentaRes] = await Promise.all([
           listarMisProductos(),
           obtenerMisEstadisticas(),
           fetch(`${API_URL}/comercios/visibilidad/metricas`, {
@@ -297,12 +316,14 @@ function DashboardContenido() {
           fetch(`${API_URL}/ofertas/mis-ofertas`, {
             headers: { Authorization: `Bearer ${token}` },
           }).then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] })),
+          obtenerCuentaDispersion().catch(() => null),
         ])
         if (activo) {
           setProductos(prods)
           setStats(estadisticas)
           setSlotsActivos(metrRes.slots ?? [])
           setMisOfertas(ofertasRes.items ?? [])
+          setCuentaDispersion(cuentaRes)
         }
       } catch (err) {
         if (activo) setError(err instanceof Error ? err.message : 'No pudimos cargar tu información.')
@@ -500,6 +521,41 @@ function DashboardContenido() {
     return null
   }
 
+  function renderBannerCuentaDispersion() {
+    const cuentaRealVerificada = cuentaDispersion?.estado === 'VERIFICADA' && cuentaDispersion.proveedor !== 'SANDBOX'
+    const cuentaSandboxVerificada = cuentaDispersion?.estado === 'VERIFICADA' && cuentaDispersion.proveedor === 'SANDBOX'
+    if (cargando || cuentaRealVerificada) return null
+
+    let titulo = 'Tu cuenta de pagos aun no esta verificada'
+    let texto = 'La cuenta esta en revision o suspendida. Verifica que los datos coincidan con tu documento.'
+
+    if (!cuentaDispersion) {
+      titulo = 'Activa tus pagos digitales'
+      texto = 'Para que los compradores puedan pagar tus productos, registra la cuenta bancaria o billetera donde la pasarela te dispersara el dinero.'
+    } else if (cuentaSandboxVerificada) {
+      titulo = 'Pagos en modo prueba'
+      texto = 'La cuenta esta registrada en SANDBOX. Esto permite probar el flujo, pero no verifica la cuenta ni dispersa dinero real.'
+    } else if (cuentaDispersion.estado === 'RECHAZADA') {
+      titulo = 'Tu cuenta de pagos aun no esta verificada'
+      texto = 'La cuenta registrada fue rechazada. Revisa los datos del titular, banco y numero de cuenta.'
+    }
+
+    return (
+      <div role="status" className="flex flex-col gap-3 rounded-2xl border border-[#D4A017]/40 bg-[#D4A017]/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-[#9B7300]">{titulo}</p>
+          <p className="mt-0.5 text-sm text-[#9B7300]/80 leading-relaxed">{texto}</p>
+        </div>
+        <Link
+          href="/comerciante/perfil"
+          className="inline-flex min-h-[44px] flex-shrink-0 items-center justify-center rounded-xl bg-[#2D6A4F] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#245a42]"
+        >
+          Registrar cuenta
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Aviso publicación exitosa */}
@@ -530,6 +586,9 @@ function DashboardContenido() {
 
       {/* Banner de estado del comercio (pendiente / rechazado / suspendido) */}
       {renderBannerEstadoComercio()}
+
+      {/* Banner de pagos digitales */}
+      {renderBannerCuentaDispersion()}
 
       {/* Métricas */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -618,14 +677,14 @@ function DashboardContenido() {
         </section>
       )}
 
-      {/* Métricas de visibilidad activa — Selección Chocó */}
+      {/* Metricas de publicidad activa */}
       {!cargando && slotsActivos.length > 0 && (
         <section className="rounded-2xl border border-[#2D6A4F]/25 bg-[#2D6A4F]/5 p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="#2D6A4F" aria-hidden="true">
               <path d="M17 8C8 10 5.9 16.17 3.82 19.52 3.23 20.5 4.5 21.5 5.3 20.67 7 18.9 8.91 17.5 11 17c-1 3-4 4-4 4s6 0 9-8c1.5 2 2 3.5 2 5.5 0 0 2-10-1-10.5z"/>
             </svg>
-            <p className="text-xs font-bold text-[#2D6A4F] uppercase tracking-wider">Selección Chocó · Activo</p>
+            <p className="text-xs font-bold text-[#2D6A4F] uppercase tracking-wider">Publicidad activa</p>
           </div>
           {slotsActivos.map(slot => (
             <div key={slot.id} className="flex items-center justify-between gap-3 bg-white rounded-xl px-4 py-3 border border-[#1A1A1A]/5">
@@ -639,9 +698,23 @@ function DashboardContenido() {
                   {new Date(slot.fin).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
                 </p>
               </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-2xl font-bold text-[#2D6A4F] leading-none">{slot.vistas}</p>
-                <p className="text-[10px] text-[#1A1A1A]/40 mt-0.5">vistas al producto</p>
+              <div className="grid flex-shrink-0 grid-cols-2 gap-2 text-right sm:grid-cols-4">
+                <div>
+                  <p className="text-xl font-bold text-[#2D6A4F] leading-none">{slot.vistas}</p>
+                  <p className="text-[10px] text-[#1A1A1A]/40 mt-0.5">vistas</p>
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-[#2D6A4F] leading-none">{slot.clics}</p>
+                  <p className="text-[10px] text-[#1A1A1A]/40 mt-0.5">clics</p>
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-[#2D6A4F] leading-none">{slot.carritos}</p>
+                  <p className="text-[10px] text-[#1A1A1A]/40 mt-0.5">carritos</p>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-[#2D6A4F] leading-none">{formatearPrecio(Number(slot.gmvAtribuido || 0))}</p>
+                  <p className="text-[10px] text-[#1A1A1A]/40 mt-0.5">GMV</p>
+                </div>
               </div>
             </div>
           ))}
@@ -655,7 +728,7 @@ function DashboardContenido() {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="#2D6A4F" aria-hidden="true">
               <path d="M17 8C8 10 5.9 16.17 3.82 19.52 3.23 20.5 4.5 21.5 5.3 20.67 7 18.9 8.91 17.5 11 17c-1 3-4 4-4 4s6 0 9-8c1.5 2 2 3.5 2 5.5 0 0 2-10-1-10.5z"/>
             </svg>
-            <p className="text-xs font-bold text-[#2D6A4F] uppercase tracking-wide">Visibilidad prioritaria · Selección Chocó</p>
+            <p className="text-xs font-bold text-[#2D6A4F] uppercase tracking-wide">AfroMedia · visibilidad patrocinada</p>
           </div>
           <p className="text-sm text-[#1A1A1A]/70 leading-snug">
             Tu producto aparece primero en el catálogo para compradores de todo el país.
@@ -663,7 +736,7 @@ function DashboardContenido() {
           </p>
         </div>
         <a
-          href={`https://wa.me/${process.env.NEXT_PUBLIC_ADMIN_WHATSAPP ?? '573000000000'}?text=${encodeURIComponent('Hola, quiero que mi producto aparezca en la Selección Chocó de AfroMercado. ¿Cómo funciona?')}`}
+          href={`https://wa.me/${process.env.NEXT_PUBLIC_ADMIN_WHATSAPP ?? '573000000000'}?text=${encodeURIComponent('Hola, quiero promocionar mi producto con AfroMedia en AfroMercado. ¿Cómo funciona?')}`}
           target="_blank"
           rel="noopener noreferrer"
           className="flex-shrink-0 inline-flex items-center gap-2 rounded-xl bg-[#2D6A4F] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#245a42] transition-colors"

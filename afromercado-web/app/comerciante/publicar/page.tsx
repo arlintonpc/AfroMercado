@@ -9,20 +9,38 @@ import {
   crearProducto,
   listarCategorias,
   obtenerMiComercio,
+  obtenerCuentaDispersion,
   subirVideoProducto,
   quitarVideoProducto,
   type CategoriaComerciante,
+  type Comercio,
+  type CuentaDispersion,
 } from '@/components/comerciante/api'
 import SubidorImagenes from '@/components/comerciante/SubidorImagenes'
 import SubidorVideo from '@/components/comerciante/SubidorVideo'
 import { UNIDADES, ALCANCES, type Alcance } from '@/components/comerciante/constantes'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
+function pendientesParaPublicar(comercio: Comercio | null, cuenta: CuentaDispersion | null) {
+  const pendientes: string[] = []
+  if (!comercio?.activo || !comercio?.verificado || comercio?.estadoRegistro !== 'APROBADO') {
+    pendientes.push('Tu tienda debe estar aprobada por el administrador.')
+  }
+  if (!(comercio?.fotoDocumentoFrenteUrl || comercio?.fotoDocumentoUrl) || !comercio?.fotoDocumentoReversoUrl) {
+    pendientes.push('Debes cargar frente y reverso validos del documento de identidad.')
+  }
+  if (cuenta?.estado !== 'VERIFICADA') {
+    pendientes.push('Debes registrar y verificar la cuenta donde recibiras pagos.')
+  }
+  return pendientes
+}
+
 export default function PublicarProductoPage() {
   const router = useRouter()
 
   const [verificando, setVerificando] = useState(true)
   const [categorias, setCategorias] = useState<CategoriaComerciante[]>([])
+  const [bloqueosPublicacion, setBloqueosPublicacion] = useState<string[]>([])
 
   // Paso 2: ID del producto recién creado
   const [nuevoId, setNuevoId] = useState<number | null>(null)
@@ -45,11 +63,17 @@ export default function PublicarProductoPage() {
 
   useEffect(() => {
     let activo = true
-    obtenerMiComercio()
-      .then((c) => {
+    Promise.all([
+      obtenerMiComercio(),
+      obtenerCuentaDispersion().catch(() => null),
+    ])
+      .then(([c, cuenta]) => {
         if (!activo) return
         if (!c) router.replace('/comerciante/registro-comercio')
-        else setVerificando(false)
+        else {
+          setBloqueosPublicacion(pendientesParaPublicar(c, cuenta))
+          setVerificando(false)
+        }
       })
       .catch(() => { if (activo) setVerificando(false) })
     return () => { activo = false }
@@ -131,6 +155,37 @@ export default function PublicarProductoPage() {
   }
 
   // ── Paso 2: Producto creado → subir fotos ─────────────────────────────────
+  if (bloqueosPublicacion.length > 0) {
+    return (
+      <div className="mx-auto w-full max-w-xl rounded-2xl border border-[#D4A017]/30 bg-white p-6 shadow-sm">
+        <h1
+          className="text-3xl text-[#1A1A1A]"
+          style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
+        >
+          Aun no puedes publicar productos
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-[#1A1A1A]/60">
+          Para proteger a los compradores, AfroMercado solo permite publicar cuando el comercio ya paso la revision legal y de pagos.
+        </p>
+        <ul className="mt-4 space-y-2 text-sm text-[#9B7300]">
+          {bloqueosPublicacion.map((item) => (
+            <li key={item} className="rounded-xl border border-[#D4A017]/20 bg-[#D4A017]/8 px-3 py-2">
+              {item}
+            </li>
+          ))}
+        </ul>
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+          <Link href="/comerciante/perfil" className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#2D6A4F] px-4 py-2 text-sm font-bold text-white hover:bg-[#245a42]">
+            Completar mi tienda
+          </Link>
+          <Link href="/comerciante/mis-productos" className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#2D6A4F]/30 px-4 py-2 text-sm font-bold text-[#2D6A4F] hover:bg-[#2D6A4F]/5">
+            Ver mis productos
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   if (nuevoId !== null) {
     return (
       <div className="mx-auto w-full max-w-xl">

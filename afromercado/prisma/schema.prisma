@@ -68,6 +68,7 @@ enum MetodoPago {
   DAVIPLATA
   TRANSFERENCIA
   EFECTIVO
+  PASARELA
 }
 
 enum EstadoEntrega {
@@ -119,6 +120,37 @@ enum EstadoLiquidacion {
   CANCELADA
 }
 
+enum ProveedorPago {
+  SANDBOX
+  WOMPI
+  PAYU
+  EPAYCO
+  MERCADOPAGO
+}
+
+enum TipoCuentaDispersion {
+  AHORROS
+  CORRIENTE
+  BILLETERA_DIGITAL
+}
+
+enum EstadoCuentaDispersion {
+  PENDIENTE_VERIFICACION
+  VERIFICADA
+  RECHAZADA
+  SUSPENDIDA
+}
+
+enum EstadoDispersionPago {
+  PENDIENTE
+  PROGRAMADA
+  ENVIADA
+  CONFIRMADA
+  FALLIDA
+  CANCELADA
+  REVERTIDA
+}
+
 // ─── MODELOS ──────────────────────────────────────────────────
 
 model Usuario {
@@ -155,6 +187,7 @@ model Usuario {
   reviewsProducto      ReviewProducto[]
   visibilidadesAdmin   VisibilidadPagada[] @relation("VisibilidadAdmin")
   campanasAdmin        CampanaHero[]       @relation("CampanaAdmin")
+  solicitudesPublicidadRevisadas SolicitudPublicidad[] @relation("SolicitudPublicidadRevisor")
   notificaciones       Notificacion[]
   favoritos            Favorito[]
   busquedasHistorial   BusquedaHistorial[]
@@ -204,6 +237,10 @@ model Comercio {
   whatsappAprobadoAt  DateTime?
   vereda            String?
   fotoDocumentoUrl  String?
+  fotoDocumentoFrenteUrl  String?
+  fotoDocumentoReversoUrl String?
+  fotoDocumentoFrenteHash String?
+  fotoDocumentoReversoHash String?
   activo            Boolean           @default(true)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
@@ -218,6 +255,10 @@ model Comercio {
   conversaciones    Conversacion[]
   cuponComercio     CuponComercio[]
   comisiones        ComisionComercio[]
+  cuentaDispersion  CuentaDispersionComercio?
+  pagoDispersiones  PagoDispersion[]
+  cambiosCriticos   CambioCriticoComercio[]
+  solicitudesPublicidad SolicitudPublicidad[]
 }
 
 model Categoria {
@@ -273,6 +314,7 @@ model Producto {
   ofertas          Oferta[]
   vistas           VistaProducto[]
   favoritos        Favorito[]
+  solicitudesPublicidad SolicitudPublicidad[]
 
   @@index([comercioId, activo])
   @@index([categoriaId, activo])
@@ -368,6 +410,7 @@ model SubPedido {
   comercio Comercio     @relation(fields: [comercioId], references: [id])
   items    PedidoItem[]
   entrega  Entrega?
+  dispersionPago PagoDispersion?
 
   @@index([comercioId])
   @@index([pedidoId])
@@ -398,15 +441,127 @@ model Pago {
   referencia     String?
   comprobanteUrl String?
   idempotencyKey String     @unique
+  proveedor      ProveedorPago?
+  moneda         String     @default("COP")
+  providerPaymentId String? @unique
+  providerCheckoutUrl String?
+  providerReference String? @unique
+  providerStatus String?
+  providerPayload Json?
+  confirmadoAt  DateTime?
+  expiraAt      DateTime?
   verificadoPor  Int?
   verificadoAt   DateTime?
   notas          String?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  pedido Pedido @relation(fields: [pedidoId], references: [id])
+  pedido       Pedido           @relation(fields: [pedidoId], references: [id])
+  eventos      PagoEvento[]
+  dispersiones PagoDispersion[]
 
   @@index([pedidoId])
+}
+
+model CuentaDispersionComercio {
+  id                   Int                    @id @default(autoincrement())
+  comercioId           Int                    @unique
+  proveedor            ProveedorPago          @default(SANDBOX)
+  estado               EstadoCuentaDispersion @default(PENDIENTE_VERIFICACION)
+  providerRecipientId  String?                @unique
+  titularNombre        String
+  tipoDocumento        TipoDocumento
+  numeroDocumento      String
+  bancoCodigo          String
+  bancoNombre          String
+  tipoCuenta           TipoCuentaDispersion
+  numeroCuentaUltimos4 String
+  numeroCuentaHash     String
+  numeroCuentaCifrado  String?
+  providerBankId       String?
+  providerPayload      Json?
+  emailNotificacion    String?
+  telefonoNotificacion String?
+  motivoRechazo        String?
+  verificadaAt         DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  comercio     Comercio         @relation(fields: [comercioId], references: [id])
+  dispersiones PagoDispersion[]
+
+  @@index([estado])
+  @@index([proveedor, providerRecipientId])
+}
+
+model CambioCriticoComercio {
+  id                    Int      @id @default(autoincrement())
+  comercioId            Int
+  tipo                  String
+  estado                String   @default("PENDIENTE")
+  accion                String
+  snapshotAnterior      Json
+  snapshotNuevo         Json
+  solicitadoPor         Int?
+  revisadoPor           Int?
+  motivo                String?
+  productosDesactivados Int      @default(0)
+  createdAt             DateTime @default(now())
+  revisadoAt            DateTime?
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+
+  @@index([comercioId, estado, createdAt])
+  @@index([estado, createdAt])
+}
+
+model PagoEvento {
+  id           Int           @id @default(autoincrement())
+  pagoId       Int?
+  proveedor    ProveedorPago
+  eventoId     String?
+  tipo         String
+  estado       String?
+  payload      Json
+  firma        String?
+  procesado    Boolean       @default(false)
+  errorMensaje String?
+  createdAt    DateTime      @default(now())
+  processedAt  DateTime?
+
+  pago Pago? @relation(fields: [pagoId], references: [id])
+
+  @@unique([proveedor, eventoId])
+  @@index([pagoId, createdAt])
+}
+
+model PagoDispersion {
+  id                 Int                 @id @default(autoincrement())
+  pagoId             Int
+  subPedidoId        Int                 @unique
+  comercioId         Int
+  cuentaDispersionId Int
+  proveedor          ProveedorPago
+  estado             EstadoDispersionPago @default(PENDIENTE)
+  montoBruto         Decimal             @db.Decimal(12, 2)
+  comision           Decimal             @db.Decimal(12, 2)
+  montoNeto          Decimal             @db.Decimal(12, 2)
+  providerTransferId String?             @unique
+  providerStatus     String?
+  errorMensaje       String?
+  programadaAt       DateTime?
+  enviadaAt          DateTime?
+  confirmadaAt       DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  pago             Pago                       @relation(fields: [pagoId], references: [id])
+  subPedido        SubPedido                  @relation(fields: [subPedidoId], references: [id])
+  comercio         Comercio                   @relation(fields: [comercioId], references: [id])
+  cuentaDispersion CuentaDispersionComercio   @relation(fields: [cuentaDispersionId], references: [id])
+
+  @@index([comercioId, estado])
+  @@index([pagoId, estado])
 }
 
 model Entrega {
@@ -745,6 +900,11 @@ model VisibilidadPagada {
   notas      String?
   creadoPor  Int
   vistas     Int      @default(0)
+  clics      Int      @default(0)
+  carritos   Int      @default(0)
+  pedidosAtribuidos  Int     @default(0)
+  unidadesAtribuidas Int     @default(0)
+  gmvAtribuido       Decimal @default(0) @db.Decimal(12, 2)
   etiqueta   String?
   createdAt  DateTime @default(now())
 
@@ -754,6 +914,137 @@ model VisibilidadPagada {
 
   @@index([tipo, activa, fin])
   @@index([comercioId])
+}
+
+model PublicidadEvento {
+  id             Int      @id @default(autoincrement())
+  visibilidadId  Int
+  productoId     Int
+  comercioId     Int
+  usuarioId      Int?
+  sesionId       String?
+  tipo           String
+  userAgent      String?
+  referer        String?
+  createdAt      DateTime @default(now())
+
+  @@index([visibilidadId, tipo, createdAt])
+  @@index([productoId, tipo, createdAt])
+  @@index([usuarioId, productoId, tipo, createdAt])
+  @@index([sesionId, productoId, tipo, createdAt])
+}
+
+model PublicidadAtribucion {
+  id                 Int      @id @default(autoincrement())
+  pedidoId           Int
+  pedidoItemId       Int
+  visibilidadId      Int
+  publicidadEventoId Int?
+  productoId         Int
+  usuarioId          Int?
+  sesionId           String?
+  cantidad           Int
+  subtotal           Decimal  @db.Decimal(12, 2)
+  modelo             String   @default("ULTIMO_CLIC_7D")
+  createdAt          DateTime @default(now())
+
+  @@unique([pedidoItemId, modelo])
+  @@index([pedidoId])
+  @@index([visibilidadId, createdAt])
+  @@index([usuarioId, productoId, createdAt])
+}
+
+model SolicitudPublicidad {
+  id             Int      @id @default(autoincrement())
+  comercioId     Int
+  productoId     Int?
+  paquete        String
+  objetivo       String
+  presupuestoCOP Decimal? @db.Decimal(12, 2)
+  inicio         DateTime?
+  fin            DateTime?
+  mensaje        String?
+  estado         String   @default("PENDIENTE")
+  notasAdmin     String?
+  politicaAceptada Boolean @default(false)
+  politicaVersion  String?
+  politicaAceptadaAt DateTime?
+  politicaIp       String?
+  pagoEstado       String        @default("PENDIENTE")
+  pagoMontoCOP     Decimal?      @db.Decimal(12, 2)
+  pagoReferencia   String?       @unique
+  pagoProveedor    ProveedorPago?
+  pagoCheckoutUrl  String?
+  pagoProviderPaymentId String?  @unique
+  pagoProviderReference String?  @unique
+  pagoProviderStatus String?
+  pagoProviderPayload Json?
+  pagoConfirmadoAt DateTime?
+  pagoExpiraAt     DateTime?
+  pagoNotas        String?
+  pagoActualizadoPor Int?
+  pagoActualizadoAt DateTime?
+  revisadoPor    Int?
+  revisadoAt     DateTime?
+
+  // Editorial Video/Historia
+  videoUrl             String?
+  videoPortadaUrl      String?
+  videoTexto           String?
+  videoUbicacion       String?
+  videoDestino         String?
+  videoNotasComercio   String?
+  videoAprobado        Boolean?
+  videoNotasRevision   String?
+  videoRevisadoPor     Int?
+  videoRevisadoAt      DateTime?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  comercio     Comercio  @relation(fields: [comercioId], references: [id])
+  producto     Producto? @relation(fields: [productoId], references: [id])
+  adminRevisor Usuario?  @relation("SolicitudPublicidadRevisor", fields: [revisadoPor], references: [id])
+
+  @@index([estado, createdAt])
+  @@index([pagoEstado, createdAt])
+  @@index([pagoProveedor, pagoEstado])
+  @@index([comercioId, createdAt])
+  @@index([productoId])
+}
+
+model AuditoriaAfroMedia {
+  id          Int      @id @default(autoincrement())
+  tipo        String
+  entidad     String
+  entidadId   Int?
+  usuarioId   Int?
+  datos       Json?
+  ip          String?
+  createdAt   DateTime @default(now())
+
+  @@index([tipo, createdAt])
+  @@index([entidad, entidadId, createdAt])
+  @@index([usuarioId, createdAt])
+}
+
+model PublicidadPaqueteConfig {
+  id            Int      @id @default(autoincrement())
+  codigo        String   @unique
+  nombre        String
+  descripcion   String?
+  ideal         String?
+  precioBaseCOP Decimal  @default(0) @db.Decimal(12, 2)
+  duracionDias  Int      @default(7)
+  cuposSugeridos Int?
+  activo        Boolean  @default(true)
+  recomendado   Boolean  @default(false)
+  orden         Int      @default(0)
+  color         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([activo, orden])
 }
 
 model PushSubscripcion {

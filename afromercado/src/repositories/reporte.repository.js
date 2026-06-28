@@ -44,6 +44,17 @@ function buildWhereAdmin({ desde, hasta, comercioId: cid }) {
   };
 }
 
+function rangoPeriodo({ desde, hasta }, inicioPorDefecto = "mes") {
+  const now = new Date();
+  const d = desde
+    ? new Date(`${desde}T00:00:00`)
+    : inicioPorDefecto === "anio"
+      ? new Date(now.getFullYear(), 0, 1)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
+  const h = hasta ? new Date(`${hasta}T23:59:59.999`) : now;
+  return { d, h };
+}
+
 // ─── Comerciante ─────────────────────────────────────────────────────────────
 
 const ReporteRepository = {
@@ -147,7 +158,7 @@ const ReporteRepository = {
     if (desde) createdAt.gte = new Date(`${desde}T00:00:00`);
     if (hasta) createdAt.lte = new Date(`${hasta}T23:59:59.999`);
 
-    const [vendidos, vistas, productos] = await Promise.all([
+    const [vendidos, vistas, productos, reviews] = await Promise.all([
       prisma.pedidoItem.groupBy({
         by: ["productoId"],
         where: {
@@ -174,21 +185,27 @@ const ReporteRepository = {
           stock: true,
           stockReservado: true,
           activo: true,
-          calificacion: true,
-          totalReviews: true,
         },
         orderBy: { nombre: "asc" },
+      }),
+      prisma.reviewProducto.groupBy({
+        by: ["productoId"],
+        where: { producto: { comercioId } },
+        _avg: { calificacion: true },
+        _count: { _all: true },
       }),
     ]);
 
     const ventasMap = Object.fromEntries(vendidos.map((v) => [v.productoId, v]));
     const vistasMap = Object.fromEntries(vistas.map((v) => [v.productoId, v._count._all]));
+    const reviewsMap = Object.fromEntries(reviews.map((r) => [r.productoId, r]));
 
     return productos.map((p) => {
       const v = ventasMap[p.id];
       const unidades = Number(v?._sum?.cantidad ?? 0);
       const ingresos = Number(v?._sum?.subtotal ?? 0);
       const vistasCnt = vistasMap[p.id] ?? 0;
+      const review = reviewsMap[p.id];
       return {
         id: p.id,
         nombre: p.nombre,
@@ -199,8 +216,8 @@ const ReporteRepository = {
         stockReservado: p.stockReservado,
         stockDisponible: p.stock - p.stockReservado,
         activo: p.activo,
-        calificacion: Number(p.calificacion),
-        totalReviews: p.totalReviews,
+        calificacion: Number(review?._avg?.calificacion ?? 0),
+        totalReviews: Number(review?._count?._all ?? 0),
         unidades,
         ingresos,
         neto: ingresos * 0.9,
@@ -457,8 +474,7 @@ const ReporteRepository = {
 
   /** ROI de cupones en el periodo. */
   async cuponesROI({ desde, hasta }) {
-    const d = desde ? new Date(`${desde}T00:00:00`) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const h = hasta ? new Date(`${hasta}T23:59:59.999`) : new Date();
+    const { d, h } = rangoPeriodo({ desde, hasta });
     return prisma.$queryRaw`
       SELECT cu.id, cu.codigo, cu.tipo, cu.valor,
              COUNT(DISTINCT p.id)::int               AS pedidos,
@@ -474,6 +490,468 @@ const ReporteRepository = {
       GROUP BY cu.id
       ORDER BY resultado_neto DESC
     `;
+  },
+
+  /** Categorías que más venden en el marketplace. */
+  async categoriasAdmin({ desde, hasta, limite = 50 }) {
+    const { d, h } = rangoPeriodo({ desde, hasta });
+    return prisma.$queryRaw`
+      SELECT
+        COALESCE(cat.id, 0)::int                       AS id,
+        COALESCE(cat.nombre, 'Sin categoría')          AS categoria,
+        COUNT(DISTINCT pr.id)::int                     AS productos_vendidos,
+        COUNT(DISTINCT sp."comercioId")::int           AS comercios,
+        COUNT(DISTINCT sp."pedidoId")::int             AS pedidos,
+        COALESCE(SUM(pi.cantidad), 0)::int             AS unidades,
+        COALESCE(SUM(pi.subtotal), 0)::float           AS gmv,
+        COALESCE(SUM(
+          CASE WHEN sp.subtotal > 0 THEN (pi.subtotal / sp.subtotal) * sp.comision ELSE 0 END
+        ), 0)::float                                   AS comision_estimada
+      FROM "PedidoItem" pi
+      JOIN "SubPedido" sp ON sp.id = pi."subPedidoId"
+      JOIN "Pedido" ped   ON ped.id = sp."pedidoId"
+      JOIN "Producto" pr  ON pr.id = pi."productoId"
+      LEFT JOIN "Categoria" cat ON cat.id = pr."categoriaId"
+      WHERE ped.estado IN ('CONFIRMADO','ENTREGADO')
+        AND ped."createdAt" >= ${d} AND ped."createdAt" <= ${h}
+      GROUP BY cat.id, cat.nombre
+      ORDER BY gmv DESC
+      LIMIT ${Number(limite)}
+    `;
+  },
+
+  /** Productos líderes por ventas, unidades y conversión. */
+  async productosAdmin({ desde, hasta, limite = 50 }) {
+    const { d, h } = rangoPeriodo({ desde, hasta });
+    return prisma.$queryRaw`
+      WITH ventas AS (
+        SELECT
+          pr.id,
+          pr.nombre,
+          COALESCE(cat.nombre, 'Sin categoría')        AS categoria,
+          c.id                                        AS comercio_id,
+          c.nombre                                    AS comercio,
+          c.municipio                                 AS municipio,
+          COUNT(DISTINCT sp."pedidoId")::int          AS pedidos,
+          COALESCE(SUM(pi.cantidad), 0)::int          AS unidades,
+          COALESCE(SUM(pi.subtotal), 0)::float        AS gmv,
+          COALESCE(SUM(
+            CASE WHEN sp.subtotal > 0 THEN (pi.subtotal / sp.subtotal) * sp.comision ELSE 0 END
+          ), 0)::float                                AS comision_estimada,
+          AVG(pi."precioUnitario")::float             AS precio_promedio
+        FROM "PedidoItem" pi
+        JOIN "SubPedido" sp ON sp.id = pi."subPedidoId"
+        JOIN "Pedido" ped   ON ped.id = sp."pedidoId"
+        JOIN "Producto" pr  ON pr.id = pi."productoId"
+        JOIN "Comercio" c   ON c.id = pr."comercioId"
+        LEFT JOIN "Categoria" cat ON cat.id = pr."categoriaId"
+        WHERE ped.estado IN ('CONFIRMADO','ENTREGADO')
+          AND ped."createdAt" >= ${d} AND ped."createdAt" <= ${h}
+        GROUP BY pr.id, cat.nombre, c.id
+      ),
+      vistas AS (
+        SELECT "productoId" AS id, COUNT(*)::int AS vistas
+        FROM "VistaProducto"
+        WHERE "createdAt" >= ${d} AND "createdAt" <= ${h}
+        GROUP BY "productoId"
+      )
+      SELECT
+        v.*,
+        COALESCE(vis.vistas, 0)::int AS vistas,
+        CASE WHEN COALESCE(vis.vistas, 0) > 0
+          THEN ROUND(((v.unidades::numeric / vis.vistas::numeric) * 100), 2)::float
+          ELSE 0
+        END AS conversion
+      FROM ventas v
+      LEFT JOIN vistas vis ON vis.id = v.id
+      ORDER BY v.gmv DESC
+      LIMIT ${Number(limite)}
+    `;
+  },
+
+  /** Ventas por territorio de destino del comprador. */
+  async territoriosAdmin({ desde, hasta, limite = 80 }) {
+    const { d, h } = rangoPeriodo({ desde, hasta });
+    return prisma.$queryRaw`
+      SELECT
+        COALESCE(dir.departamento, 'Sin departamento') AS departamento,
+        COALESCE(dir.municipio, 'Sin municipio')       AS municipio,
+        COUNT(DISTINCT p.id)::int                      AS pedidos,
+        COUNT(DISTINCT p."compradorId")::int           AS compradores,
+        COUNT(DISTINCT sp."comercioId")::int           AS comercios,
+        COUNT(DISTINCT c.municipio)::int               AS municipios_origen,
+        COALESCE(SUM(sp.subtotal), 0)::float           AS gmv,
+        COALESCE(SUM(sp.comision), 0)::float           AS comision,
+        CASE WHEN COUNT(DISTINCT p.id) > 0
+          THEN (COALESCE(SUM(sp.subtotal), 0) / COUNT(DISTINCT p.id))::float
+          ELSE 0
+        END                                            AS ticket_promedio
+      FROM "SubPedido" sp
+      JOIN "Pedido" p      ON p.id = sp."pedidoId"
+      JOIN "Comercio" c    ON c.id = sp."comercioId"
+      LEFT JOIN "Direccion" dir ON dir.id = p."direccionId"
+      WHERE p.estado IN ('CONFIRMADO','ENTREGADO')
+        AND p."createdAt" >= ${d} AND p."createdAt" <= ${h}
+      GROUP BY dir.departamento, dir.municipio
+      ORDER BY gmv DESC
+      LIMIT ${Number(limite)}
+    `;
+  },
+
+  /** Estado de pagos y dispersiones para control financiero. */
+  async pagosAdmin({ desde, hasta }) {
+    const { d, h } = rangoPeriodo({ desde, hasta });
+    const [pagosPorEstado, pagosPorMetodo, dispersionesPorEstado, dispersionesPorProveedor] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT estado, COUNT(*)::int AS pagos, COALESCE(SUM(monto), 0)::float AS monto
+        FROM "Pago"
+        WHERE "createdAt" >= ${d} AND "createdAt" <= ${h}
+        GROUP BY estado
+        ORDER BY monto DESC
+      `,
+      prisma.$queryRaw`
+        SELECT metodo, COUNT(*)::int AS pagos, COALESCE(SUM(monto), 0)::float AS monto
+        FROM "Pago"
+        WHERE "createdAt" >= ${d} AND "createdAt" <= ${h}
+        GROUP BY metodo
+        ORDER BY monto DESC
+      `,
+      prisma.$queryRaw`
+        SELECT estado,
+               COUNT(*)::int AS dispersiones,
+               COALESCE(SUM("montoBruto"), 0)::float AS monto_bruto,
+               COALESCE(SUM(comision), 0)::float AS comision,
+               COALESCE(SUM("montoNeto"), 0)::float AS monto_neto
+        FROM "PagoDispersion"
+        WHERE "createdAt" >= ${d} AND "createdAt" <= ${h}
+        GROUP BY estado
+        ORDER BY monto_neto DESC
+      `,
+      prisma.$queryRaw`
+        SELECT proveedor,
+               COUNT(*)::int AS dispersiones,
+               COALESCE(SUM("montoNeto"), 0)::float AS monto_neto
+        FROM "PagoDispersion"
+        WHERE "createdAt" >= ${d} AND "createdAt" <= ${h}
+        GROUP BY proveedor
+        ORDER BY monto_neto DESC
+      `,
+    ]);
+
+    return { pagosPorEstado, pagosPorMetodo, dispersionesPorEstado, dispersionesPorProveedor };
+  },
+
+  /** Operación logística por estado, zona y repartidor. */
+  async logisticaAdmin({ desde, hasta, limite = 40 }) {
+    const { d, h } = rangoPeriodo({ desde, hasta });
+    const [porEstado, porZona, porRepartidor] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT e.estado,
+               COUNT(*)::int AS entregas,
+               COALESCE(SUM(e."pagoRepartidor"), 0)::float AS pago_repartidores
+        FROM "Entrega" e
+        JOIN "SubPedido" sp ON sp.id = e."subPedidoId"
+        JOIN "Pedido" p ON p.id = sp."pedidoId"
+        WHERE p."createdAt" >= ${d} AND p."createdAt" <= ${h}
+        GROUP BY e.estado
+        ORDER BY entregas DESC
+      `,
+      prisma.$queryRaw`
+        SELECT
+          COALESCE(dir.departamento, 'Sin departamento') AS departamento,
+          COALESCE(dir.municipio, 'Sin municipio')       AS municipio,
+          COUNT(*)::int                                  AS entregas,
+          COUNT(*) FILTER (WHERE e.estado = 'ENTREGADA')::int AS entregadas,
+          COUNT(*) FILTER (WHERE e.estado = 'FALLIDA')::int   AS fallidas,
+          COALESCE(SUM(e."pagoRepartidor"), 0)::float    AS pago_repartidores
+        FROM "Entrega" e
+        JOIN "SubPedido" sp ON sp.id = e."subPedidoId"
+        JOIN "Pedido" p ON p.id = sp."pedidoId"
+        LEFT JOIN "Direccion" dir ON dir.id = p."direccionId"
+        WHERE p."createdAt" >= ${d} AND p."createdAt" <= ${h}
+        GROUP BY dir.departamento, dir.municipio
+        ORDER BY entregas DESC
+        LIMIT ${Number(limite)}
+      `,
+      prisma.$queryRaw`
+        SELECT
+          u.id,
+          u.nombre,
+          COUNT(*)::int AS entregas,
+          COUNT(*) FILTER (WHERE e.estado = 'ENTREGADA')::int AS entregadas,
+          COUNT(*) FILTER (WHERE e.estado = 'FALLIDA')::int AS fallidas,
+          COALESCE(SUM(e."pagoRepartidor"), 0)::float AS pago_repartidores
+        FROM "Entrega" e
+        LEFT JOIN "Usuario" u ON u.id = e."repartidorId"
+        JOIN "SubPedido" sp ON sp.id = e."subPedidoId"
+        JOIN "Pedido" p ON p.id = sp."pedidoId"
+        WHERE p."createdAt" >= ${d} AND p."createdAt" <= ${h}
+        GROUP BY u.id, u.nombre
+        ORDER BY entregas DESC
+        LIMIT ${Number(limite)}
+      `,
+    ]);
+
+    return { porEstado, porZona, porRepartidor };
+  },
+
+  /** Clientes: nuevos vs recurrentes, top compradores y origen territorial. */
+  async clientesAdmin({ desde, hasta, limite = 50 }) {
+    const { d, h } = rangoPeriodo({ desde, hasta });
+    const [resumenRows, topClientes, porMunicipio] = await Promise.all([
+      prisma.$queryRaw`
+        WITH historico AS (
+          SELECT "compradorId", MIN("createdAt") AS primer_pedido
+          FROM "Pedido"
+          WHERE estado IN ('CONFIRMADO','ENTREGADO')
+          GROUP BY "compradorId"
+        ),
+        periodo AS (
+          SELECT *
+          FROM "Pedido"
+          WHERE estado IN ('CONFIRMADO','ENTREGADO')
+            AND "createdAt" >= ${d} AND "createdAt" <= ${h}
+        )
+        SELECT
+          COUNT(DISTINCT periodo."compradorId")::int AS compradores_activos,
+          COUNT(DISTINCT periodo."compradorId") FILTER (WHERE historico.primer_pedido >= ${d})::int AS compradores_nuevos,
+          COUNT(DISTINCT periodo."compradorId") FILTER (WHERE historico.primer_pedido < ${d})::int AS compradores_recurrentes,
+          COUNT(*)::int AS pedidos,
+          COALESCE(SUM(periodo.total), 0)::float AS gmv,
+          COALESCE(AVG(periodo.total), 0)::float AS ticket_promedio
+        FROM periodo
+        JOIN historico ON historico."compradorId" = periodo."compradorId"
+      `,
+      prisma.$queryRaw`
+        SELECT
+          u.id,
+          u.nombre,
+          u.email,
+          u.telefono,
+          MAX(COALESCE(u.municipio, dir.municipio, 'Sin municipio')) AS municipio,
+          COUNT(p.id)::int AS pedidos,
+          COALESCE(SUM(p.total), 0)::float AS gmv,
+          MAX(p."createdAt") AS ultima_compra
+        FROM "Pedido" p
+        JOIN "Usuario" u ON u.id = p."compradorId"
+        LEFT JOIN "Direccion" dir ON dir.id = p."direccionId"
+        WHERE p.estado IN ('CONFIRMADO','ENTREGADO')
+          AND p."createdAt" >= ${d} AND p."createdAt" <= ${h}
+        GROUP BY u.id
+        ORDER BY gmv DESC
+        LIMIT ${Number(limite)}
+      `,
+      prisma.$queryRaw`
+        SELECT
+          COALESCE(dir.departamento, 'Sin departamento') AS departamento,
+          COALESCE(dir.municipio, u.municipio, 'Sin municipio') AS municipio,
+          COUNT(DISTINCT p."compradorId")::int AS compradores,
+          COUNT(p.id)::int AS pedidos,
+          COALESCE(SUM(p.total), 0)::float AS gmv
+        FROM "Pedido" p
+        JOIN "Usuario" u ON u.id = p."compradorId"
+        LEFT JOIN "Direccion" dir ON dir.id = p."direccionId"
+        WHERE p.estado IN ('CONFIRMADO','ENTREGADO')
+          AND p."createdAt" >= ${d} AND p."createdAt" <= ${h}
+        GROUP BY dir.departamento, dir.municipio, u.municipio
+        ORDER BY gmv DESC
+        LIMIT ${Number(limite)}
+      `,
+    ]);
+
+    return { resumen: resumenRows[0] ?? {}, topClientes, porMunicipio };
+  },
+
+  /** Alertas accionables para priorizar decisiones de administracion. */
+  async alertasAdmin({ desde, hasta }) {
+    const { d, h } = rangoPeriodo({ desde, hasta });
+    const diffMs = Math.max(h.getTime() - d.getTime(), 864e5);
+    const dAnterior = new Date(d.getTime() - diffMs);
+    const hAnterior = new Date(d.getTime());
+
+    const [
+      productosSinStockConDemanda,
+      productosVistosSinVenta,
+      pagosAtencion,
+      dispersionesAtencion,
+      comerciosCaida,
+      zonasEntregaFallida,
+    ] = await Promise.all([
+      prisma.$queryRaw`
+        WITH vistas AS (
+          SELECT "productoId", COUNT(*)::int AS vistas
+          FROM "VistaProducto"
+          WHERE "createdAt" >= ${d} AND "createdAt" <= ${h}
+          GROUP BY "productoId"
+        ),
+        ventas AS (
+          SELECT pi."productoId", COALESCE(SUM(pi.cantidad), 0)::int AS unidades, COALESCE(SUM(pi.subtotal), 0)::float AS gmv
+          FROM "PedidoItem" pi
+          JOIN "SubPedido" sp ON sp.id = pi."subPedidoId"
+          JOIN "Pedido" ped ON ped.id = sp."pedidoId"
+          WHERE ped.estado IN ('CONFIRMADO','ENTREGADO')
+            AND ped."createdAt" >= ${d} AND ped."createdAt" <= ${h}
+          GROUP BY pi."productoId"
+        )
+        SELECT
+          pr.id,
+          pr.nombre,
+          COALESCE(cat.nombre, 'Sin categoría') AS categoria,
+          c.nombre AS comercio,
+          c.municipio,
+          (pr.stock - pr."stockReservado")::int AS stock_disponible,
+          COALESCE(vistas.vistas, 0)::int AS vistas,
+          COALESCE(ventas.unidades, 0)::int AS unidades,
+          COALESCE(ventas.gmv, 0)::float AS gmv
+        FROM "Producto" pr
+        JOIN "Comercio" c ON c.id = pr."comercioId"
+        LEFT JOIN "Categoria" cat ON cat.id = pr."categoriaId"
+        LEFT JOIN vistas ON vistas."productoId" = pr.id
+        LEFT JOIN ventas ON ventas."productoId" = pr.id
+        WHERE pr.activo = true
+          AND pr."deletedAt" IS NULL
+          AND (pr.stock - pr."stockReservado") <= 0
+          AND (COALESCE(vistas.vistas, 0) > 0 OR COALESCE(ventas.unidades, 0) > 0)
+        ORDER BY COALESCE(ventas.gmv, 0) DESC, COALESCE(vistas.vistas, 0) DESC
+        LIMIT 25
+      `,
+      prisma.$queryRaw`
+        WITH vistas AS (
+          SELECT "productoId", COUNT(*)::int AS vistas
+          FROM "VistaProducto"
+          WHERE "createdAt" >= ${d} AND "createdAt" <= ${h}
+          GROUP BY "productoId"
+        ),
+        ventas AS (
+          SELECT pi."productoId", COALESCE(SUM(pi.cantidad), 0)::int AS unidades
+          FROM "PedidoItem" pi
+          JOIN "SubPedido" sp ON sp.id = pi."subPedidoId"
+          JOIN "Pedido" ped ON ped.id = sp."pedidoId"
+          WHERE ped.estado IN ('CONFIRMADO','ENTREGADO')
+            AND ped."createdAt" >= ${d} AND ped."createdAt" <= ${h}
+          GROUP BY pi."productoId"
+        )
+        SELECT
+          pr.id,
+          pr.nombre,
+          COALESCE(cat.nombre, 'Sin categoría') AS categoria,
+          c.nombre AS comercio,
+          c.municipio,
+          (pr.stock - pr."stockReservado")::int AS stock_disponible,
+          COALESCE(vistas.vistas, 0)::int AS vistas
+        FROM "Producto" pr
+        JOIN "Comercio" c ON c.id = pr."comercioId"
+        LEFT JOIN "Categoria" cat ON cat.id = pr."categoriaId"
+        JOIN vistas ON vistas."productoId" = pr.id
+        LEFT JOIN ventas ON ventas."productoId" = pr.id
+        WHERE pr.activo = true
+          AND pr."deletedAt" IS NULL
+          AND (pr.stock - pr."stockReservado") > 0
+          AND vistas.vistas >= 10
+          AND COALESCE(ventas.unidades, 0) = 0
+        ORDER BY vistas.vistas DESC
+        LIMIT 25
+      `,
+      prisma.$queryRaw`
+        SELECT
+          estado,
+          COUNT(*)::int AS pagos,
+          COALESCE(SUM(monto), 0)::float AS monto,
+          MIN("createdAt") AS desde,
+          MAX("createdAt") AS ultimo
+        FROM "Pago"
+        WHERE "createdAt" >= ${d} AND "createdAt" <= ${h}
+          AND estado IN ('VERIFICANDO','FALLIDO')
+        GROUP BY estado
+        ORDER BY monto DESC
+      `,
+      prisma.$queryRaw`
+        SELECT
+          pd.estado,
+          c.id AS comercio_id,
+          c.nombre AS comercio,
+          c.municipio,
+          COUNT(*)::int AS dispersiones,
+          COALESCE(SUM(pd."montoNeto"), 0)::float AS monto_neto,
+          MAX(pd."errorMensaje") AS error_mensaje,
+          MIN(pd."createdAt") AS primer_evento,
+          MAX(pd."createdAt") AS ultimo_evento
+        FROM "PagoDispersion" pd
+        JOIN "Comercio" c ON c.id = pd."comercioId"
+        WHERE pd."createdAt" >= ${d} AND pd."createdAt" <= ${h}
+          AND (
+            pd.estado = 'FALLIDA'
+            OR (pd.estado = 'PENDIENTE' AND pd."createdAt" < NOW() - INTERVAL '24 hours')
+          )
+        GROUP BY pd.estado, c.id
+        ORDER BY monto_neto DESC
+        LIMIT 30
+      `,
+      prisma.$queryRaw`
+        WITH actual AS (
+          SELECT sp."comercioId", COUNT(DISTINCT sp."pedidoId")::int AS pedidos, COALESCE(SUM(sp.subtotal), 0)::float AS gmv
+          FROM "SubPedido" sp
+          JOIN "Pedido" p ON p.id = sp."pedidoId"
+          WHERE p.estado IN ('CONFIRMADO','ENTREGADO')
+            AND p."createdAt" >= ${d} AND p."createdAt" <= ${h}
+          GROUP BY sp."comercioId"
+        ),
+        anterior AS (
+          SELECT sp."comercioId", COUNT(DISTINCT sp."pedidoId")::int AS pedidos, COALESCE(SUM(sp.subtotal), 0)::float AS gmv
+          FROM "SubPedido" sp
+          JOIN "Pedido" p ON p.id = sp."pedidoId"
+          WHERE p.estado IN ('CONFIRMADO','ENTREGADO')
+            AND p."createdAt" >= ${dAnterior} AND p."createdAt" < ${hAnterior}
+          GROUP BY sp."comercioId"
+        )
+        SELECT
+          c.id,
+          c.nombre,
+          c.municipio,
+          COALESCE(actual.pedidos, 0)::int AS pedidos_actual,
+          anterior.pedidos::int AS pedidos_anterior,
+          COALESCE(actual.gmv, 0)::float AS gmv_actual,
+          anterior.gmv::float AS gmv_anterior,
+          ROUND(((COALESCE(actual.gmv, 0)::numeric - anterior.gmv::numeric) / NULLIF(anterior.gmv::numeric, 0)) * 100, 1)::float AS variacion_pct
+        FROM anterior
+        JOIN "Comercio" c ON c.id = anterior."comercioId"
+        LEFT JOIN actual ON actual."comercioId" = anterior."comercioId"
+        WHERE anterior.gmv > 0
+          AND COALESCE(actual.gmv, 0) < anterior.gmv * 0.5
+          AND c.activo = true
+          AND c."deletedAt" IS NULL
+        ORDER BY variacion_pct ASC
+        LIMIT 30
+      `,
+      prisma.$queryRaw`
+        SELECT
+          COALESCE(dir.departamento, 'Sin departamento') AS departamento,
+          COALESCE(dir.municipio, 'Sin municipio') AS municipio,
+          COUNT(*)::int AS entregas,
+          COUNT(*) FILTER (WHERE e.estado = 'FALLIDA')::int AS fallidas,
+          ROUND((COUNT(*) FILTER (WHERE e.estado = 'FALLIDA')::numeric / NULLIF(COUNT(*)::numeric, 0)) * 100, 1)::float AS tasa_falla,
+          COALESCE(SUM(e."pagoRepartidor"), 0)::float AS pago_repartidores
+        FROM "Entrega" e
+        JOIN "SubPedido" sp ON sp.id = e."subPedidoId"
+        JOIN "Pedido" p ON p.id = sp."pedidoId"
+        LEFT JOIN "Direccion" dir ON dir.id = p."direccionId"
+        WHERE p."createdAt" >= ${d} AND p."createdAt" <= ${h}
+        GROUP BY dir.departamento, dir.municipio
+        HAVING COUNT(*) >= 3
+           AND COUNT(*) FILTER (WHERE e.estado = 'FALLIDA') > 0
+        ORDER BY tasa_falla DESC, fallidas DESC
+        LIMIT 25
+      `,
+    ]);
+
+    return {
+      productosSinStockConDemanda,
+      productosVistosSinVenta,
+      pagosAtencion,
+      dispersionesAtencion,
+      comerciosCaida,
+      zonasEntregaFallida,
+    };
   },
 
   /** Datos completos para el Excel admin (multi-hoja). */

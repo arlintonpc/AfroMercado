@@ -181,18 +181,108 @@ const ReporteController = {
     } catch (e) { next(e); }
   },
 
+  // GET /reportes/admin/categorias?desde&hasta&limite
+  async categoriasAdmin(req, res, next) {
+    try {
+      const { desde, hasta, limite = 50 } = req.query;
+      validarFechas(desde, hasta);
+      const data = await ReporteRepository.categoriasAdmin({ desde, hasta, limite: Number(limite) });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // GET /reportes/admin/productos?desde&hasta&limite
+  async productosAdmin(req, res, next) {
+    try {
+      const { desde, hasta, limite = 50 } = req.query;
+      validarFechas(desde, hasta);
+      const data = await ReporteRepository.productosAdmin({ desde, hasta, limite: Number(limite) });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // GET /reportes/admin/territorios?desde&hasta&limite
+  async territoriosAdmin(req, res, next) {
+    try {
+      const { desde, hasta, limite = 80 } = req.query;
+      validarFechas(desde, hasta);
+      const data = await ReporteRepository.territoriosAdmin({ desde, hasta, limite: Number(limite) });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // GET /reportes/admin/pagos?desde&hasta
+  async pagosAdmin(req, res, next) {
+    try {
+      const { desde, hasta } = req.query;
+      validarFechas(desde, hasta);
+      const data = await ReporteRepository.pagosAdmin({ desde, hasta });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // GET /reportes/admin/logistica?desde&hasta&limite
+  async logisticaAdmin(req, res, next) {
+    try {
+      const { desde, hasta, limite = 40 } = req.query;
+      validarFechas(desde, hasta);
+      const data = await ReporteRepository.logisticaAdmin({ desde, hasta, limite: Number(limite) });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // GET /reportes/admin/clientes?desde&hasta&limite
+  async clientesAdmin(req, res, next) {
+    try {
+      const { desde, hasta, limite = 50 } = req.query;
+      validarFechas(desde, hasta);
+      const data = await ReporteRepository.clientesAdmin({ desde, hasta, limite: Number(limite) });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // GET /reportes/admin/alertas?desde&hasta
+  async alertasAdmin(req, res, next) {
+    try {
+      const { desde, hasta } = req.query;
+      validarFechas(desde, hasta);
+      const data = await ReporteRepository.alertasAdmin({ desde, hasta });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
   // GET /reportes/admin/exportar?desde&hasta
   async exportarAdmin(req, res, next) {
     try {
       const { desde, hasta } = req.query;
       validarFechas(desde, hasta);
 
-      const [kpis, serieData, municipios, ranking, cuponesROI] = await Promise.all([
+      const [
+        kpis,
+        serieData,
+        municipios,
+        ranking,
+        cuponesROI,
+        categorias,
+        productos,
+        territorios,
+        pagos,
+        logistica,
+        clientes,
+        alertas,
+      ] = await Promise.all([
         ReporteRepository.dashboardAdmin({ desde, hasta }),
         ReporteRepository.serieAdmin({ desde, hasta }),
         ReporteRepository.ingresosPorMunicipio({ desde, hasta }),
         ReporteRepository.rankingComercios({ desde, hasta }),
         ReporteRepository.cuponesROI({ desde, hasta }),
+        ReporteRepository.categoriasAdmin({ desde, hasta }),
+        ReporteRepository.productosAdmin({ desde, hasta }),
+        ReporteRepository.territoriosAdmin({ desde, hasta }),
+        ReporteRepository.pagosAdmin({ desde, hasta }),
+        ReporteRepository.logisticaAdmin({ desde, hasta }),
+        ReporteRepository.clientesAdmin({ desde, hasta }),
+        ReporteRepository.alertasAdmin({ desde, hasta }),
       ]);
 
       const nombre = `AfroMercado_Admin_${desde ?? "inicio"}_a_${hasta ?? "hoy"}.xlsx`;
@@ -208,6 +298,13 @@ const ReporteController = {
         municipios,
         ranking,
         cuponesROI,
+        categorias,
+        productos,
+        territorios,
+        pagos,
+        logistica,
+        clientes,
+        alertas,
         subPedidosGen: ReporteRepository.adminExcelStream({ desde, hasta }),
       });
     } catch (e) {

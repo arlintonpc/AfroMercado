@@ -5,6 +5,7 @@ const express = require("express");
 const { autenticar, autorizar } = require("../middlewares/auth");
 const AdminController = require("../controllers/admin.controller");
 const VisibilidadController = require("../controllers/visibilidad.controller");
+const PublicidadController = require("../controllers/publicidad.controller");
 
 const router = express.Router();
 
@@ -12,6 +13,11 @@ const soloAdmin = [autenticar, autorizar("ADMIN")];
 
 // Pagos a la espera de verificación
 router.get("/pagos/pendientes", ...soloAdmin, AdminController.pagosPendientes);
+
+// Configuracion de pasarela y pagos digitales
+router.get("/pagos/configuracion", ...soloAdmin, AdminController.obtenerConfiguracionPagos);
+router.put("/pagos/configuracion", ...soloAdmin, AdminController.actualizarConfiguracionPagos);
+router.post("/pagos/configuracion/probar", ...soloAdmin, AdminController.probarConfiguracionPagos);
 
 // Aprobar / rechazar un pago
 router.patch("/pagos/:id/verificar", ...soloAdmin, AdminController.verificarPago);
@@ -35,6 +41,22 @@ router.get("/usuarios/buscar", ...soloAdmin, AdminController.buscarUsuarios);
 router.post("/visibilidad", ...soloAdmin, VisibilidadController.crear);
 router.get("/visibilidad", ...soloAdmin, VisibilidadController.listarTodas);
 router.patch("/visibilidad/:id/desactivar", ...soloAdmin, VisibilidadController.desactivar);
+
+// AfroMedia: solicitudes y resumen publicitario
+router.get("/publicidad/resumen", ...soloAdmin, PublicidadController.resumenAdmin);
+router.get("/publicidad/analitica", ...soloAdmin, PublicidadController.analiticaAdmin);
+router.get("/publicidad/tendencias", ...soloAdmin, PublicidadController.tendenciasAdmin);
+router.get("/publicidad/inventario", ...soloAdmin, PublicidadController.inventarioAdmin);
+router.put("/publicidad/inventario/:tipo", ...soloAdmin, PublicidadController.actualizarInventarioAdmin);
+router.get("/publicidad/exportar", ...soloAdmin, PublicidadController.exportarAdmin);
+router.get("/publicidad/paquetes", ...soloAdmin, PublicidadController.listarPaquetesAdmin);
+router.put("/publicidad/paquetes/:codigo", ...soloAdmin, PublicidadController.actualizarPaqueteAdmin);
+router.get("/publicidad/solicitudes", ...soloAdmin, PublicidadController.listarAdmin);
+router.patch("/publicidad/solicitudes/:id", ...soloAdmin, PublicidadController.revisarAdmin);
+router.patch("/publicidad/solicitudes/:id/pago", ...soloAdmin, PublicidadController.actualizarPagoAdmin);
+router.post("/publicidad/solicitudes/:id/convertir", ...soloAdmin, PublicidadController.convertirAdmin);
+router.patch("/publicidad/solicitudes/:id/video", ...soloAdmin, PublicidadController.revisarVideoAdmin);
+router.get("/publicidad/auditoria", ...soloAdmin, PublicidadController.auditoriaAdmin);
 
 // Email
 router.get("/email/estado", ...soloAdmin, AdminController.estadoEmail);
