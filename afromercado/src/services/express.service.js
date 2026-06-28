@@ -4,15 +4,21 @@ const { diaSemanaEnum, festivosAnio } = require("../utils/festivos-colombia");
 
 const DIAS_ORDEN = ['LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO','DOMINGO','FESTIVO'];
 
+function ahoraEnColombia() {
+  // Colombia = UTC-5 fijo (no cambia horario de verano)
+  const utcMs = Date.now();
+  return new Date(utcMs - 5 * 60 * 60 * 1000);
+}
+
 function horaActualEnRango(apertura, cierre) {
-  const ahora = new Date();
-  const hhmm = `${String(ahora.getHours()).padStart(2,'0')}:${String(ahora.getMinutes()).padStart(2,'0')}`;
+  const ahora = ahoraEnColombia();
+  const hhmm = `${String(ahora.getUTCHours()).padStart(2,'0')}:${String(ahora.getUTCMinutes()).padStart(2,'0')}`;
   return hhmm >= apertura && hhmm < cierre;
 }
 
 function comercioAbiertoAhora(horarios) {
   if (!horarios || horarios.length === 0) return false;
-  const hoy = new Date();
+  const hoy = ahoraEnColombia();
   const diaEnum = diaSemanaEnum(hoy);
   const horario = horarios.find(h => h.dia === diaEnum);
   if (!horario || !horario.abierto) return false;

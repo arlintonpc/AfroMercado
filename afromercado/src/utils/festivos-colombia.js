@@ -96,7 +96,8 @@ function diaSemanaEnum(fecha) {
   if (esFestivo(fecha)) return 'FESTIVO';
   const DIAS = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
   const d = typeof fecha === 'string' ? new Date(fecha + 'T00:00:00') : new Date(fecha);
-  return DIAS[d.getDay()];
+  // Usamos getUTCDay porque ahoraEnColombia() ya ajustó el timestamp a UTC-5
+  return DIAS[d.getUTCDay()];
 }
 
 module.exports = { festivosAnio, esFestivo, diaSemanaEnum };
