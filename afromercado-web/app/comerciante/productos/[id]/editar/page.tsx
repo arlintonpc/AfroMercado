@@ -307,8 +307,7 @@ export default function EditarProductoPage() {
         </fieldset>
 
         {/* Toggle Express */}
-        {(categorias.find(c => c.id === Number(categoriaId))?.nombre?.toLowerCase().includes('gastronom') || esExpress) && (
-          <div className="space-y-3">
+        <div className="space-y-3">
             <Toggle
               activo={esExpress}
               onChange={setEsExpress}
@@ -331,8 +330,7 @@ export default function EditarProductoPage() {
                 </div>
               </div>
             )}
-          </div>
-        )}
+        </div>
 
         {errorGeneral && (
           <div
