@@ -298,18 +298,35 @@ export default function ExpressComerciante() {
 
                     {h.abierto ? (
                       <div className="flex items-center gap-2 flex-1">
+                        {/* Chip 24h */}
+                        <button
+                          onClick={() => {
+                            const es24h = h.apertura === '00:00' && h.cierre === '23:59'
+                            actualizarHorario(dia, 'apertura', es24h ? '07:00' : '00:00')
+                            actualizarHorario(dia, 'cierre',   es24h ? '20:00' : '23:59')
+                          }}
+                          className={`text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0 transition-colors ${
+                            h.apertura === '00:00' && h.cierre === '23:59'
+                              ? 'bg-amber-400 text-white'
+                              : 'bg-gray-100 text-gray-500 hover:bg-amber-100'
+                          }`}
+                        >
+                          24h
+                        </button>
                         <input
                           type="time"
                           value={h.apertura}
+                          disabled={h.apertura === '00:00' && h.cierre === '23:59'}
                           onChange={e => actualizarHorario(dia, 'apertura', e.target.value)}
-                          className="border border-gray-200 rounded-lg px-2 py-1 text-sm flex-1 min-w-0"
+                          className="border border-gray-200 rounded-lg px-2 py-1 text-sm flex-1 min-w-0 disabled:opacity-40"
                         />
                         <span className="text-gray-400 text-xs flex-shrink-0">a</span>
                         <input
                           type="time"
                           value={h.cierre}
+                          disabled={h.apertura === '00:00' && h.cierre === '23:59'}
                           onChange={e => actualizarHorario(dia, 'cierre', e.target.value)}
-                          className="border border-gray-200 rounded-lg px-2 py-1 text-sm flex-1 min-w-0"
+                          className="border border-gray-200 rounded-lg px-2 py-1 text-sm flex-1 min-w-0 disabled:opacity-40"
                         />
                       </div>
                     ) : (

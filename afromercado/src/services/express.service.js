@@ -11,6 +11,7 @@ function ahoraEnColombia() {
 }
 
 function horaActualEnRango(apertura, cierre) {
+  if (apertura === '00:00' && cierre === '23:59') return true; // 24 horas
   const ahora = ahoraEnColombia();
   const hhmm = `${String(ahora.getUTCHours()).padStart(2,'0')}:${String(ahora.getUTCMinutes()).padStart(2,'0')}`;
   return hhmm >= apertura && hhmm < cierre;
