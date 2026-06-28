@@ -88,6 +88,9 @@ export interface ProductoComerciante {
   diasAlistamientoMax: number
   alcance: 'LOCAL' | 'NACIONAL' | 'AMBOS'
   pesoKg?: string | number | null
+  esExpress?: boolean
+  tiempoEntregaMin?: number | null
+  categoria?: { id: number; nombre: string } | null
 }
 
 export interface CategoriaComerciante {
@@ -291,6 +294,8 @@ export interface DatosActualizarProducto {
   alcance?: 'LOCAL' | 'NACIONAL' | 'AMBOS'
   fotoUrl?: string
   pesoKg?: number | null
+  esExpress?: boolean
+  tiempoEntregaMin?: number | null
 }
 
 /**

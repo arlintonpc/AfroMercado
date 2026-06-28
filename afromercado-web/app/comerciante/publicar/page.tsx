@@ -19,6 +19,7 @@ import {
 import SubidorImagenes from '@/components/comerciante/SubidorImagenes'
 import SubidorVideo from '@/components/comerciante/SubidorVideo'
 import { UNIDADES, ALCANCES, type Alcance } from '@/components/comerciante/constantes'
+import Toggle from '@/components/ui/Toggle'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
 function pendientesParaPublicar(comercio: Comercio | null, cuenta: CuentaDispersion | null) {
@@ -296,31 +297,27 @@ export default function PublicarProductoPage() {
 
         {/* Toggle Express — solo visible cuando la categoría es Gastronomía */}
         {categorias.find(c => c.id === Number(categoriaId))?.nombre?.toLowerCase().includes('gastronom') && (
-          <div className="rounded-xl border border-[#E8DCC8] bg-[#FFFDF7] p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-[#1A1A1A]">⚡ Disponible en Express</p>
-                <p className="text-sm text-[#666]">El cliente puede pedirlo ahora y recibirlo en minutos</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEsExpress(v => !v)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${esExpress ? 'bg-[#2D6A4F]' : 'bg-[#CCC]'}`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${esExpress ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
+          <div className="space-y-3">
+            <Toggle
+              activo={esExpress}
+              onChange={setEsExpress}
+              etiqueta="⚡ Disponible en Express"
+              descripcion="El cliente puede pedirlo ahora y recibirlo en minutos desde el catálogo"
+            />
             {esExpress && (
-              <div>
-                <label className="block text-sm font-medium text-[#1A1A1A] mb-1">Tiempo estimado de entrega (minutos)</label>
-                <input
-                  type="number"
-                  min={5}
-                  max={120}
-                  value={tiempoEntregaMin}
-                  onChange={e => setTiempoEntregaMin(e.target.value)}
-                  className="w-28 rounded-lg border border-[#CCC] px-3 py-1.5 text-sm focus:outline-none focus:border-[#2D6A4F]"
-                />
+              <div className="flex items-center gap-3 px-1">
+                <label className="text-sm font-medium text-[#1A1A1A] whitespace-nowrap">Tiempo estimado de entrega</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={5}
+                    max={120}
+                    value={tiempoEntregaMin}
+                    onChange={e => setTiempoEntregaMin(e.target.value)}
+                    className="w-20 rounded-xl border-2 border-[#1A1A1A]/15 px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]"
+                  />
+                  <span className="text-sm text-[#666]">minutos</span>
+                </div>
               </div>
             )}
           </div>

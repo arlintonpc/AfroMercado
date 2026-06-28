@@ -13,6 +13,7 @@ import {
 } from '@/components/comerciante/api'
 import SubidorImagenes from '@/components/comerciante/SubidorImagenes'
 import SubidorVideo from '@/components/comerciante/SubidorVideo'
+import Toggle from '@/components/ui/Toggle'
 import { ALCANCES, etiquetaUnidad, type Alcance } from '@/components/comerciante/constantes'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
@@ -30,6 +31,8 @@ export default function EditarProductoPage() {
   const [stock, setStock] = useState('')
   const [alcance, setAlcance] = useState<Alcance>('LOCAL')
   const [pesoKg, setPesoKg] = useState('')
+  const [esExpress, setEsExpress] = useState(false)
+  const [tiempoEntregaMin, setTiempoEntregaMin] = useState('20')
 
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
@@ -59,6 +62,8 @@ export default function EditarProductoPage() {
         setStock(String(p.stock))
         setAlcance(p.alcance)
         setPesoKg(p.pesoKg !== undefined && p.pesoKg !== null ? String(Number(p.pesoKg)) : '')
+        setEsExpress(p.esExpress ?? false)
+        setTiempoEntregaMin(p.tiempoEntregaMin ? String(p.tiempoEntregaMin) : '20')
       } catch (err) {
         if (activo)
           setErrorGeneral(
@@ -99,6 +104,8 @@ export default function EditarProductoPage() {
         stock: Number(stock.replace(/\D/g, '')),
         alcance,
         pesoKg: pesoKgNum !== null && pesoKgNum > 0 ? pesoKgNum : null,
+        esExpress,
+        tiempoEntregaMin: esExpress && tiempoEntregaMin ? Number(tiempoEntregaMin) : null,
       })
       router.replace('/comerciante/dashboard')
     } catch (err) {
@@ -278,6 +285,34 @@ export default function EditarProductoPage() {
             })}
           </div>
         </fieldset>
+
+        {/* Toggle Express */}
+        {(producto?.categoria?.nombre?.toLowerCase().includes('gastronom') || esExpress) && (
+          <div className="space-y-3">
+            <Toggle
+              activo={esExpress}
+              onChange={setEsExpress}
+              etiqueta="⚡ Disponible en Express"
+              descripcion="El cliente puede pedirlo ahora y recibirlo en minutos desde el catálogo"
+            />
+            {esExpress && (
+              <div className="flex items-center gap-3 px-1">
+                <label className="text-sm font-medium text-[#1A1A1A] whitespace-nowrap">Tiempo estimado de entrega</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={5}
+                    max={120}
+                    value={tiempoEntregaMin}
+                    onChange={e => setTiempoEntregaMin(e.target.value)}
+                    className="w-20 rounded-xl border-2 border-[#1A1A1A]/15 px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]"
+                  />
+                  <span className="text-sm text-[#666]">minutos</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {errorGeneral && (
           <div
