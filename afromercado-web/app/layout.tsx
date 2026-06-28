@@ -4,14 +4,14 @@ import "./globals.css";
 import Providers from "@/components/Providers";
 
 const inter = Inter({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   variable: "--font-inter",
   display: "swap",
 });
 
 const dmSerifDisplay = DM_Serif_Display({
   weight: "400",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   variable: "--font-dm-serif",
   display: "swap",
 });
