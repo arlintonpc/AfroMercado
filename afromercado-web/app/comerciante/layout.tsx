@@ -179,6 +179,7 @@ export default function ComercianteLayout({
   const enlaces = [
     { href: '/comerciante/dashboard',      etiqueta: 'Inicio' },
     { href: '/comerciante/pedidos',        etiqueta: 'Pedidos' },
+    { href: '/comerciante/express',        etiqueta: '🍽️ Express' },
     { href: '/comerciante/mis-productos',  etiqueta: 'Mis productos' },
     { href: '/comerciante/publicar',       etiqueta: 'Publicar' },
     { href: '/comerciante/ofertas',        etiqueta: 'Ofertas' },
@@ -193,6 +194,7 @@ export default function ComercianteLayout({
     [
       '/comerciante/dashboard',
       '/comerciante/pedidos',
+      '/comerciante/express',
       '/comerciante/mis-productos',
       '/comerciante/publicar',
       '/comerciante/perfil',

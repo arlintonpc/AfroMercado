@@ -140,6 +140,12 @@ export default function Header({ itemsCarrito }: HeaderProps) {
 
         <nav className="hidden lg:flex items-center gap-1 mr-3">
           <Link
+            href="/express"
+            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-green-700 hover:bg-green-50 flex items-center gap-1"
+          >
+            🍽️ Express
+          </Link>
+          <Link
             href="/temporada"
             className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#D4A017] hover:bg-[#D4A017]/10 flex items-center"
           >

@@ -1,0 +1,151 @@
+import { apiFetch } from './client'
+
+export type ModalidadExpress  = 'DOMICILIO' | 'RECOGER' | 'MESA'
+export type EstadoPedidoExpress =
+  | 'PENDIENTE' | 'ACEPTADO' | 'EN_PREPARACION' | 'LISTO'
+  | 'EN_CAMINO' | 'ENTREGADO' | 'CANCELADO' | 'RECHAZADO'
+export type MetodoPagoExpress = 'EFECTIVO' | 'NEQUI' | 'WOMPI'
+
+export interface ConfigExpress {
+  id: number
+  comercioId: number
+  activo: boolean
+  abierto: boolean
+  horarioApertura: string | null
+  horarioCierre: string | null
+  tiempoPrepMinutos: number
+  municipiosEntrega: string[]
+  modalidades: ModalidadExpress[]
+  costoEnvioBase: number
+  limiteCreditoEfectivo: number
+  deudaEfectivoActual: number
+}
+
+export interface ItemPedidoExpress {
+  id: number
+  productoId: number
+  cantidad: number
+  precioUnitario: number
+  subtotal: number
+  nota: string | null
+  producto?: { nombre: string; fotoUrl: string | null }
+}
+
+export interface PedidoExpress {
+  id: number
+  codigo: string
+  comercioId: number
+  clienteId: number
+  modalidad: ModalidadExpress
+  estado: EstadoPedidoExpress
+  metodoPago: MetodoPagoExpress
+  subtotal: number
+  costoEnvio: number
+  comision: number
+  total: number
+  direccionTexto: string | null
+  municipioEntrega: string | null
+  notaCliente: string | null
+  motivoCancelacion: string | null
+  tiempoEstimadoMin: number
+  tiempoAjustadoMin: number | null
+  creadoAt: string
+  aceptadoAt: string | null
+  entregadoAt: string | null
+  expiresAt: string
+  items: ItemPedidoExpress[]
+  cliente?: { nombre: string; telefono: string | null }
+  configExpress?: { comercio: { nombre: string; logoUrl: string | null; municipio: string } }
+}
+
+export interface ComercioExpress {
+  id: number
+  activo: boolean
+  abierto: boolean
+  tiempoPrepMinutos: number
+  modalidades: ModalidadExpress[]
+  costoEnvioBase: number
+  municipiosEntrega: string[]
+  comercio: { id: number; nombre: string; logoUrl: string | null; municipio: string; calificacion: number; totalReviews: number }
+}
+
+// ── CLIENTE ──────────────────────────────────────────────────
+
+export async function listarComerciosExpress(municipio?: string): Promise<ComercioExpress[]> {
+  const q = municipio ? `?municipio=${encodeURIComponent(municipio)}` : ''
+  const r = await apiFetch<{ ok: boolean; data: ComercioExpress[] }>(`/express/comercios${q}`)
+  return r.data ?? []
+}
+
+export async function crearPedidoExpress(body: {
+  comercioId: number
+  modalidad: ModalidadExpress
+  metodoPago: MetodoPagoExpress
+  items: { productoId: number; cantidad: number; nota?: string }[]
+  notaCliente?: string
+  direccionTexto?: string
+  municipioEntrega?: string
+}): Promise<PedidoExpress> {
+  const r = await apiFetch<{ ok: boolean; data: PedidoExpress }>('/express/pedidos', { method: 'POST', body })
+  return r.data
+}
+
+export async function misPedidosExpress(): Promise<PedidoExpress[]> {
+  const r = await apiFetch<{ ok: boolean; data: PedidoExpress[] }>('/express/pedidos/mis')
+  return r.data ?? []
+}
+
+export async function obtenerPedidoExpress(id: number): Promise<PedidoExpress> {
+  const r = await apiFetch<{ ok: boolean; data: PedidoExpress }>(`/express/pedidos/${id}`)
+  return r.data
+}
+
+// ── COMERCIO ─────────────────────────────────────────────────
+
+export async function obtenerConfigExpress(): Promise<ConfigExpress> {
+  const r = await apiFetch<{ ok: boolean; data: ConfigExpress }>('/express/config')
+  return r.data
+}
+
+export async function actualizarConfigExpress(datos: Partial<ConfigExpress>): Promise<ConfigExpress> {
+  const r = await apiFetch<{ ok: boolean; data: ConfigExpress }>('/express/config', { method: 'PUT', body: datos })
+  return r.data
+}
+
+export async function toggleAbiertoExpress(abierto: boolean): Promise<ConfigExpress> {
+  const r = await apiFetch<{ ok: boolean; data: ConfigExpress }>('/express/config/abierto', { method: 'PATCH', body: { abierto } })
+  return r.data
+}
+
+export async function pedidosComercioExpress(estado?: EstadoPedidoExpress): Promise<PedidoExpress[]> {
+  const q = estado ? `?estado=${estado}` : ''
+  const r = await apiFetch<{ ok: boolean; data: PedidoExpress[] }>(`/express/mis-pedidos${q}`)
+  return r.data ?? []
+}
+
+export async function aceptarPedidoExpress(id: number, tiempoAjustadoMin?: number): Promise<PedidoExpress> {
+  const r = await apiFetch<{ ok: boolean; data: PedidoExpress }>(`/express/mis-pedidos/${id}/aceptar`, { method: 'POST', body: { tiempoAjustadoMin } })
+  return r.data
+}
+
+export async function rechazarPedidoExpress(id: number, motivo?: string): Promise<PedidoExpress> {
+  const r = await apiFetch<{ ok: boolean; data: PedidoExpress }>(`/express/mis-pedidos/${id}/rechazar`, { method: 'POST', body: { motivo } })
+  return r.data
+}
+
+export async function avanzarEstadoExpress(id: number): Promise<PedidoExpress> {
+  const r = await apiFetch<{ ok: boolean; data: PedidoExpress }>(`/express/mis-pedidos/${id}/avanzar`, { method: 'POST', body: {} })
+  return r.data
+}
+
+// ── ADMIN ────────────────────────────────────────────────────
+
+export async function deudasExpressAdmin(): Promise<(ConfigExpress & { comercio: { id: number; nombre: string; municipio: string } })[]> {
+  const r = await apiFetch<{ ok: boolean; data: any[] }>('/express/admin/deudas')
+  return r.data ?? []
+}
+
+export async function saldarDeudaAdmin(comercioId: number, monto: number): Promise<ConfigExpress> {
+  const r = await apiFetch<{ ok: boolean; data: ConfigExpress }>(`/express/admin/deudas/${comercioId}/saldar`, { method: 'POST', body: { monto } })
+  return r.data
+}
