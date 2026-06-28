@@ -175,6 +175,8 @@ export interface DatosProducto {
   fotoUrl?: string
   categoriaId?: number
   pesoKg?: number
+  esExpress?: boolean
+  tiempoEntregaMin?: number
 }
 
 export interface VideoMetaCaptura {

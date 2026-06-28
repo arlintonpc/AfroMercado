@@ -26,7 +26,7 @@ const ProductoService = {
     if (!comercio) throw new ErrorValidacion("Debes tener un comercio registrado para publicar productos");
     assertPuedePublicar(comercio);
 
-    const { nombre, descripcion, precio, unidad, stock, diasAlistamientoMin, diasAlistamientoMax, alcance, fotoUrl, categoriaId, pesoKg } = datos;
+    const { nombre, descripcion, precio, unidad, stock, diasAlistamientoMin, diasAlistamientoMax, alcance, fotoUrl, categoriaId, pesoKg, esExpress, tiempoEntregaMin } = datos;
 
     if (!nombre || !precio || !unidad) {
       throw new ErrorValidacion("Nombre, precio y unidad son obligatorios");
@@ -62,6 +62,8 @@ const ProductoService = {
       fotoUrl,
       ...(categoriaId ? { categoriaId: parseInt(categoriaId) } : {}),
       ...(pesoKg !== undefined && pesoKg !== null ? { pesoKg: parseFloat(pesoKg) } : {}),
+      esExpress: esExpress === true || esExpress === 'true',
+      ...(tiempoEntregaMin ? { tiempoEntregaMin: parseInt(tiempoEntregaMin) } : {}),
     });
   },
 
@@ -111,6 +113,8 @@ const ProductoService = {
     if (datos.pesoKg !== undefined) {
       campos.pesoKg = datos.pesoKg !== null && datos.pesoKg !== '' ? parseFloat(datos.pesoKg) : null;
     }
+    if (datos.esExpress !== undefined) campos.esExpress = datos.esExpress === true || datos.esExpress === 'true';
+    if (datos.tiempoEntregaMin !== undefined) campos.tiempoEntregaMin = datos.tiempoEntregaMin ? parseInt(datos.tiempoEntregaMin) : null;
 
     return ProductoRepository.actualizar(productoId, campos);
   },

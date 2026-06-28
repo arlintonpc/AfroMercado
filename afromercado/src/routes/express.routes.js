@@ -9,8 +9,9 @@ const soloComercio   = [autenticar, autorizar("COMERCIANTE")];
 const soloAdmin      = [autenticar, autorizar("ADMIN")];
 
 // ── PÚBLICO ──────────────────────────────────────────────────
-router.get("/comercios",  ExpressController.comerciosExpress);
-router.get("/festivos",   ExpressController.festivosAnio);
+router.get("/comercios",                    ExpressController.comerciosExpress);
+router.get("/festivos",                     ExpressController.festivosAnio);
+router.get("/comercios/:comercioId/menu",   ExpressController.menuComercio);
 
 // ── CLIENTE ──────────────────────────────────────────────────
 router.post(  "/pedidos",     ...soloAuth, ExpressController.crearPedido);

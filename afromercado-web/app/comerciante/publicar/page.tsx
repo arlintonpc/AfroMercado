@@ -56,6 +56,8 @@ export default function PublicarProductoPage() {
   const [diasMax, setDiasMax] = useState('')
   const [alcance, setAlcance] = useState<Alcance | ''>('')
   const [pesoKg, setPesoKg] = useState('')
+  const [esExpress, setEsExpress] = useState(false)
+  const [tiempoEntregaMin, setTiempoEntregaMin] = useState('20')
 
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
@@ -135,6 +137,8 @@ export default function PublicarProductoPage() {
         fotoUrl: '',
         categoriaId: categoriaId ? Number(categoriaId) : undefined,
         ...(pesoKgNum !== undefined && pesoKgNum > 0 ? { pesoKg: pesoKgNum } : {}),
+        esExpress,
+        ...(esExpress && tiempoEntregaMin ? { tiempoEntregaMin: Number(tiempoEntregaMin) } : {}),
       })
       setNuevoId(nuevo.id)
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -289,6 +293,38 @@ export default function PublicarProductoPage() {
           }))}
           error={errores.categoriaId}
         />
+
+        {/* Toggle Express — solo visible cuando la categoría es Gastronomía */}
+        {categorias.find(c => c.id === Number(categoriaId))?.nombre?.toLowerCase().includes('gastronom') && (
+          <div className="rounded-xl border border-[#E8DCC8] bg-[#FFFDF7] p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-[#1A1A1A]">⚡ Disponible en Express</p>
+                <p className="text-sm text-[#666]">El cliente puede pedirlo ahora y recibirlo en minutos</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEsExpress(v => !v)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${esExpress ? 'bg-[#2D6A4F]' : 'bg-[#CCC]'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${esExpress ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+            {esExpress && (
+              <div>
+                <label className="block text-sm font-medium text-[#1A1A1A] mb-1">Tiempo estimado de entrega (minutos)</label>
+                <input
+                  type="number"
+                  min={5}
+                  max={120}
+                  value={tiempoEntregaMin}
+                  onChange={e => setTiempoEntregaMin(e.target.value)}
+                  className="w-28 rounded-lg border border-[#CCC] px-3 py-1.5 text-sm focus:outline-none focus:border-[#2D6A4F]"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         <CampoArea
           label="Descríbelo"

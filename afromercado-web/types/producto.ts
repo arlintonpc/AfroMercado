@@ -42,6 +42,8 @@ export interface Producto {
   comercioId?: string
   categoria?: { id: string; nombre: string; slug?: string }
   pesoKg?: number | null
+  esExpress?: boolean
+  tiempoEntregaMin?: number | null
   oferta?: {
     id?:         number
     tipo:        'PORCENTAJE' | 'VALOR_FIJO'

@@ -240,6 +240,30 @@ const ExpressService = {
     }));
   },
 
+  async obtenerMenuComercio(comercioId) {
+    const cfg = await prisma.configExpress.findUnique({
+      where: { comercioId },
+      include: {
+        horarios: true,
+        comercio: {
+          select: { id: true, nombre: true, logoUrl: true, municipio: true,
+                    calificacion: true, totalReviews: true, whatsapp: true },
+        },
+      },
+    });
+    if (!cfg || !cfg.activo) return null;
+    const productos = await prisma.producto.findMany({
+      where: { comercioId, esExpress: true, activo: true, deletedAt: null },
+      include: { categoria: { select: { id: true, nombre: true } } },
+      orderBy: [{ categoriaId: "asc" }, { nombre: "asc" }],
+    });
+    return {
+      ...cfg,
+      abiertoAhora: cfg.abierto && comercioAbiertoAhora(cfg.horarios),
+      productos,
+    };
+  },
+
   async listarPedidosComercio(comercioId, estado) {
     const where = { comercioId };
     if (estado) where.estado = estado;

@@ -27,6 +27,15 @@ const ExpressController = {
     } catch (err) { next(err); }
   },
 
+  async menuComercio(req, res, next) {
+    try {
+      const comercioId = Number(req.params.comercioId);
+      const data = await ExpressService.obtenerMenuComercio(comercioId);
+      if (!data) return res.status(404).json({ ok: false, mensaje: "Comercio Express no disponible" });
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
   async crearPedido(req, res, next) {
     try {
       const clienteId = req.usuario.id;

@@ -79,6 +79,30 @@ export interface ComercioExpress {
 
 // ── CLIENTE ──────────────────────────────────────────────────
 
+export interface MenuComercioExpress extends ComercioExpress {
+  abiertoAhora: boolean
+  horarios?: HorarioExpress[]
+  productos: Array<{
+    id: number
+    nombre: string
+    descripcion: string | null
+    precio: number
+    unidad: string
+    fotoUrl: string | null
+    stock: number
+    stockReservado: number
+    tiempoEntregaMin: number | null
+    categoria: { id: number; nombre: string } | null
+  }>
+}
+
+export async function obtenerMenuComercioExpress(comercioId: number): Promise<MenuComercioExpress | null> {
+  try {
+    const r = await apiFetch<{ ok: boolean; data: MenuComercioExpress }>(`/express/comercios/${comercioId}/menu`)
+    return r.data ?? null
+  } catch { return null }
+}
+
 export async function listarComerciosExpress(municipio?: string): Promise<ComercioExpress[]> {
   const q = municipio ? `?municipio=${encodeURIComponent(municipio)}` : ''
   const r = await apiFetch<{ ok: boolean; data: ComercioExpress[] }>(`/express/comercios${q}`)

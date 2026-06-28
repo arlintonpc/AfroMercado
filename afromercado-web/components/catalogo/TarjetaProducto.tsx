@@ -153,8 +153,15 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
           </span>
         )}
 
+        {/* Badge Express */}
+        {producto.esExpress && !agotado && (
+          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-[#D4A017] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+            ⚡ {producto.tiempoEntregaMin ? `${producto.tiempoEntregaMin} min` : 'Express'}
+          </span>
+        )}
+
         {tieneVideo && (
-          <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur">
+          <span className={`absolute ${producto.esExpress && !agotado ? 'bottom-3 right-3' : 'bottom-3 right-3'} inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur`}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M8 5v14l11-7z" />
             </svg>
@@ -271,36 +278,51 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
               </svg>
             </a>
 
-            {/* Botón agregar al carrito */}
-            <button
-              type="button"
-              onClick={handleAgregar}
-              disabled={agregando || agotado}
-              aria-label={agotado ? `${producto.nombre} agotado` : `Agregar ${producto.nombre} al pedido`}
-              title={agotado ? 'Sin stock disponible' : undefined}
-              style={{ width: 36, height: 36, minWidth: 36, minHeight: 36 }}
-              className={`rounded-full transition-colors duration-200 flex items-center justify-center text-white shadow-sm ${
-                agotado
-                  ? 'bg-[#1A1A1A]/20 cursor-not-allowed'
-                  : agregado
-                  ? 'bg-[#2D6A4F]'
-                  : 'bg-[#2D6A4F] hover:bg-[#D4A017] disabled:opacity-70'
-              }`}
-            >
-              {agregado ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6L9 17l-5-5" />
+            {/* Botón: Express → ir al restaurante / Normal → agregar al carrito */}
+            {producto.esExpress ? (
+              <Link
+                href={`/express/${producto.comercioId}`}
+                onClick={(e) => e.stopPropagation()}
+                aria-label={`Pedir Express en ${producto.comercio.nombre}`}
+                title="Pedir ahora"
+                style={{ width: 36, height: 36, minWidth: 36, minHeight: 36 }}
+                className="rounded-full bg-[#D4A017] hover:bg-[#B8891A] transition-colors flex items-center justify-center text-white shadow-sm"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14M13 6l6 6-6 6" />
                 </svg>
-              ) : agotado ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              )}
-            </button>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={handleAgregar}
+                disabled={agregando || agotado}
+                aria-label={agotado ? `${producto.nombre} agotado` : `Agregar ${producto.nombre} al pedido`}
+                title={agotado ? 'Sin stock disponible' : undefined}
+                style={{ width: 36, height: 36, minWidth: 36, minHeight: 36 }}
+                className={`rounded-full transition-colors duration-200 flex items-center justify-center text-white shadow-sm ${
+                  agotado
+                    ? 'bg-[#1A1A1A]/20 cursor-not-allowed'
+                    : agregado
+                    ? 'bg-[#2D6A4F]'
+                    : 'bg-[#2D6A4F] hover:bg-[#D4A017] disabled:opacity-70'
+                }`}
+              >
+                {agregado ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                ) : agotado ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

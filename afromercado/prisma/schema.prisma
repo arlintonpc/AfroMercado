@@ -299,6 +299,8 @@ model Producto {
   videoFormato        String?
   videoMimeType       String?
   activo              Boolean      @default(true)
+  esExpress           Boolean      @default(false)
+  tiempoEntregaMin    Int?
   diasAlistamientoMin Int          @default(1)
   diasAlistamientoMax Int          @default(3)
   alcance             AlcanceVenta @default(LOCAL)
