@@ -138,7 +138,7 @@ export default function ExpressComerciante() {
   async function aceptar(id: number) {
     try {
       const updated = await aceptarPedidoExpress(id)
-      setPedidos(prev => prev.map(p => p.id === id ? updated : p))
+      setPedidos(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p))
     } catch (e: any) { setError(e.message) }
   }
 
@@ -146,14 +146,14 @@ export default function ExpressComerciante() {
     const motivo = prompt('Motivo del rechazo (opcional):') ?? undefined
     try {
       const updated = await rechazarPedidoExpress(id, motivo)
-      setPedidos(prev => prev.map(p => p.id === id ? updated : p))
+      setPedidos(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p))
     } catch (e: any) { setError(e.message) }
   }
 
   async function avanzar(id: number) {
     try {
       const updated = await avanzarEstadoExpress(id)
-      setPedidos(prev => prev.map(p => p.id === id ? updated : p))
+      setPedidos(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p))
     } catch (e: any) { setError(e.message) }
   }
 
