@@ -182,6 +182,7 @@ const ProductoRepository = {
     return prisma.producto.findMany({
       where: { comercioId },
       orderBy: { createdAt: "desc" },
+      include: { categoria: { select: { id: true, nombre: true } } },
     });
   },
 
