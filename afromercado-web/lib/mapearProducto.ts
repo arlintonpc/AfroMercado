@@ -75,6 +75,8 @@ export interface ProductoCrudo {
   videoRecorteFinSegundos?: number | string | null
   videoMimeType?: string | null
   activo?: boolean
+  esExpress?: boolean
+  tiempoEntregaMin?: number | null
   comercio?: ComercioCrudo | null
   categoria?: CategoriaCruda | null
   ofertas?: OfertaCruda[] | null
@@ -142,6 +144,8 @@ export function mapearProducto(crudo: ProductoCrudo): Producto {
       videoRecorteFinSegundos: comercio.videoRecorteFinSegundos != null ? aNumero(comercio.videoRecorteFinSegundos) : null,
       videoMimeType: comercio.videoMimeType ?? undefined,
     },
+    esExpress: crudo.esExpress ?? false,
+    tiempoEntregaMin: crudo.tiempoEntregaMin ?? null,
     categoriaId: aId(crudo.categoriaId) || undefined,
     comercioId: aId(crudo.comercioId) || undefined,
     categoria: crudo.categoria

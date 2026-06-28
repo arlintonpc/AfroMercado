@@ -21,6 +21,7 @@ import { useCarrito } from '@/context/CarritoContext'
 import { useFavoritos } from '@/context/FavoritoContext'
 import { useAuth } from '@/context/AuthContext'
 import { apiFetch } from '@/lib/api/client'
+import { obtenerMenuComercioExpress, type MenuComercioExpress } from '@/lib/api/express'
 import { SeccionResenas } from '@/components/reviews/SeccionResenas'
 import TarjetaProducto from '@/components/catalogo/TarjetaProducto'
 import { mapearProductos } from '@/lib/mapearProducto'
@@ -135,6 +136,8 @@ export default function PaginaProducto({
   const [masDeTienda, setMasDeTienda] = useState<Producto[]>([])
   const [cargandoTienda, setCargandoTienda] = useState(false)
 
+  const [menuExpress, setMenuExpress] = useState<MenuComercioExpress | null>(null)
+
   const [cantidad, setCantidad] = useState(1)
   const [agregando, setAgregando] = useState(false)
   const [agregado, setAgregado] = useState(false)
@@ -155,8 +158,12 @@ export default function PaginaProducto({
           setNoEncontrado(true)
           return
         }
-        setProducto(mapearProducto(crudo))
+        const mapeado = mapearProducto(crudo)
+        setProducto(mapeado)
         setWhatsapp(obtenerWhatsapp(crudo))
+        if (mapeado.esExpress && crudo.comercioId) {
+          obtenerMenuComercioExpress(Number(crudo.comercioId)).then(setMenuExpress)
+        }
       } catch (e) {
         if (cancelado) return
         const msg = e instanceof Error ? e.message : ''
@@ -317,6 +324,25 @@ export default function PaginaProducto({
     }
   }
 
+  // Estado Express: abierto/cerrado y próxima apertura
+  const expressAbierto = menuExpress?.abiertoAhora ?? false
+  const proximaApertura = (() => {
+    if (!menuExpress?.horarios?.length || expressAbierto) return null
+    const DIAS = ['DOMINGO','LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO']
+    const ahora = new Date()
+    for (let i = 1; i <= 7; i++) {
+      const d = new Date(ahora)
+      d.setDate(ahora.getDate() + i)
+      const diaEnum = DIAS[d.getDay()]
+      const h = menuExpress.horarios.find(h => h.dia === diaEnum && h.abierto)
+      if (h) {
+        const esManana = i === 1
+        return `${esManana ? 'Mañana' : DIAS[d.getDay()].charAt(0) + DIAS[d.getDay()].slice(1).toLowerCase()} a las ${h.apertura}`
+      }
+    }
+    return null
+  })()
+
   // Enlace de WhatsApp: solo se construye si hay número Y el comercio tiene whatsappVisible activo.
   const mensajeWa = `Hola, me interesa el producto "${producto.nombre}" de ${producto.comercio.nombre} en AfroMercado`
   const enlaceWa = whatsapp && producto.comercio.whatsappVisible
@@ -475,15 +501,33 @@ export default function PaginaProducto({
 
               {/* 7. Botón principal — Express o carrito normal */}
               {producto.esExpress && producto.comercioId ? (
-                <Link
-                  href={`/express/${producto.comercioId}`}
-                  className="w-full min-h-[56px] font-bold text-base rounded-2xl bg-[#D4A017] hover:bg-[#c09315] text-[#1A1A1A] hover:shadow-lg hover:shadow-[#D4A017]/30 transition-all duration-200 flex items-center justify-center gap-2"
-                >
-                  ⚡ Pedir ahora
-                  {producto.tiempoEntregaMin && (
-                    <span className="text-sm font-normal opacity-75">· {producto.tiempoEntregaMin} min</span>
+                <div className="space-y-2">
+                  {expressAbierto ? (
+                    <Link
+                      href={`/express/${producto.comercioId}`}
+                      className="w-full min-h-[56px] font-bold text-base rounded-2xl bg-[#D4A017] hover:bg-[#c09315] text-[#1A1A1A] hover:shadow-lg hover:shadow-[#D4A017]/30 transition-all duration-200 flex items-center justify-center gap-2"
+                    >
+                      ⚡ Pedir ahora
+                      {producto.tiempoEntregaMin && (
+                        <span className="text-sm font-normal opacity-75">· {producto.tiempoEntregaMin} min</span>
+                      )}
+                    </Link>
+                  ) : menuExpress !== null ? (
+                    <div className="w-full min-h-[56px] rounded-2xl bg-[#F0EBE3] border border-[#E8DCC8] flex flex-col items-center justify-center gap-0.5 px-4 py-3">
+                      <span className="font-bold text-[#666] text-base">🔴 Restaurante cerrado</span>
+                      {proximaApertura && (
+                        <span className="text-sm text-[#999]">Abre {proximaApertura}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <Link
+                      href={`/express/${producto.comercioId}`}
+                      className="w-full min-h-[56px] font-bold text-base rounded-2xl bg-[#D4A017] hover:bg-[#c09315] text-[#1A1A1A] hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+                    >
+                      ⚡ Ver menú Express
+                    </Link>
                   )}
-                </Link>
+                </div>
               ) : (
                 <button
                   onClick={handleAgregar}
@@ -515,9 +559,13 @@ export default function PaginaProducto({
 
               {/* 8. Nota de alistamiento o Express */}
               {producto.esExpress ? (
-                <p className="text-sm text-[#D4A017] flex items-center gap-1.5 font-medium">
+                <p className={`text-sm flex items-center gap-1.5 font-medium ${expressAbierto ? 'text-[#D4A017]' : 'text-[#999]'}`}>
                   <span>⚡</span>
-                  Pedido Express · El restaurante lo prepara y entrega en minutos
+                  {expressAbierto
+                    ? `Pedido Express · Listo en ~${producto.tiempoEntregaMin ?? 20} minutos`
+                    : proximaApertura
+                      ? `Abre ${proximaApertura}`
+                      : 'Servicio Express · Ver horarios en el menú'}
                 </p>
               ) : (
                 <p className="text-sm text-[#1A1A1A]/50 flex items-center gap-1.5">
