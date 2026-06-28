@@ -473,39 +473,58 @@ export default function PaginaProducto({
                 )}
               </div>
 
-              {/* 7. Botón Agregar al pedido */}
-              <button
-                onClick={handleAgregar}
-                disabled={agregando || disponible <= 0}
-                aria-busy={agregando}
-                className={`w-full min-h-[56px] font-bold text-base rounded-2xl transition-all duration-200 flex items-center justify-center gap-2 ${
-                  agregado
-                    ? 'bg-[#2D6A4F] text-white'
-                    : 'bg-[#D4A017] hover:bg-[#c09315] text-[#1A1A1A] hover:shadow-lg hover:shadow-[#D4A017]/30'
-                } disabled:opacity-60 disabled:cursor-not-allowed`}
-              >
-                {agregado ? (
-                  <>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                    Agregado al pedido
-                  </>
-                ) : (
-                  <>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    {agregando ? 'Agregando…' : 'Agregar al pedido'}
-                  </>
-                )}
-              </button>
+              {/* 7. Botón principal — Express o carrito normal */}
+              {producto.esExpress && producto.comercioId ? (
+                <Link
+                  href={`/express/${producto.comercioId}`}
+                  className="w-full min-h-[56px] font-bold text-base rounded-2xl bg-[#D4A017] hover:bg-[#c09315] text-[#1A1A1A] hover:shadow-lg hover:shadow-[#D4A017]/30 transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  ⚡ Pedir ahora
+                  {producto.tiempoEntregaMin && (
+                    <span className="text-sm font-normal opacity-75">· {producto.tiempoEntregaMin} min</span>
+                  )}
+                </Link>
+              ) : (
+                <button
+                  onClick={handleAgregar}
+                  disabled={agregando || disponible <= 0}
+                  aria-busy={agregando}
+                  className={`w-full min-h-[56px] font-bold text-base rounded-2xl transition-all duration-200 flex items-center justify-center gap-2 ${
+                    agregado
+                      ? 'bg-[#2D6A4F] text-white'
+                      : 'bg-[#D4A017] hover:bg-[#c09315] text-[#1A1A1A] hover:shadow-lg hover:shadow-[#D4A017]/30'
+                  } disabled:opacity-60 disabled:cursor-not-allowed`}
+                >
+                  {agregado ? (
+                    <>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                      Agregado al pedido
+                    </>
+                  ) : (
+                    <>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      {agregando ? 'Agregando…' : 'Agregar al pedido'}
+                    </>
+                  )}
+                </button>
+              )}
 
-              {/* 8. Nota de alistamiento */}
-              <p className="text-sm text-[#1A1A1A]/50 flex items-center gap-1.5">
-                <span>⏱</span>
-                Listo en {producto.diasAlistamientoMin}–{producto.diasAlistamientoMax} días · El productor prepara tu pedido con dedicación
-              </p>
+              {/* 8. Nota de alistamiento o Express */}
+              {producto.esExpress ? (
+                <p className="text-sm text-[#D4A017] flex items-center gap-1.5 font-medium">
+                  <span>⚡</span>
+                  Pedido Express · El restaurante lo prepara y entrega en minutos
+                </p>
+              ) : (
+                <p className="text-sm text-[#1A1A1A]/50 flex items-center gap-1.5">
+                  <span>⏱</span>
+                  Listo en {producto.diasAlistamientoMin}–{producto.diasAlistamientoMax} días · El productor prepara tu pedido con dedicación
+                </p>
+              )}
 
               {/* 9. Estimador de envío */}
               <EstimadorEnvio pesoKg={producto.pesoKg} />
