@@ -158,6 +158,7 @@ const HotelService = {
             comercio: { select: { nombre: true, municipio: true, logoUrl: true } },
           },
         },
+        review: { select: { id: true } },
       },
       orderBy: { creadoAt: "desc" },
     });

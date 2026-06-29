@@ -118,7 +118,7 @@ const TourService = {
   async misReservas(clienteId) {
     return prisma.reservaTour.findMany({
       where: { clienteId },
-      include: { configTour: { include: TOUR_INCLUDE } },
+      include: { configTour: { include: TOUR_INCLUDE }, review: { select: { id: true } } },
       orderBy: { creadoAt: "desc" },
     });
   },

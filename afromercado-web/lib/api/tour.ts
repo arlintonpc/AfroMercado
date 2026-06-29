@@ -51,6 +51,7 @@ export interface ReservaTour {
   creadoAt: string
   configTour?: ConfigTour
   cliente?: { id: number; nombre: string; email: string; telefono?: string | null }
+  review?: { id: number } | null
 }
 
 // ── PÚBLICO ─────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { obtenerTour, verificarDisponibilidadTour, crearReservaTour, type ConfigTour } from '@/lib/api/tour'
+import { obtenerTour, verificarDisponibilidadTour, crearReservaTour, misReservasTour, type ConfigTour } from '@/lib/api/tour'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import SeccionReviewsTour from '@/components/tours/SeccionReviewsTour'
@@ -140,10 +140,19 @@ export default function TourDetallePage() {
   const [fotoActual, setFotoActual] = useState(0)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [reservado, setReservado] = useState(false)
+  const [reservaElegibleId, setReservaElegibleId] = useState<number | undefined>()
 
   useEffect(() => {
     obtenerTour(Number(id)).then(d => { setTour(d); setCargando(false) }).catch(() => setCargando(false))
   }, [id])
+
+  useEffect(() => {
+    if (!usuario || !tour) return
+    misReservasTour().then(rs => {
+      const elegible = rs.find(r => r.configTourId === tour.id && r.estado === 'COMPLETADA' && !r.review)
+      setReservaElegibleId(elegible?.id)
+    }).catch(() => {})
+  }, [usuario, tour])
 
   if (cargando) return (
     <div className="min-h-screen bg-[#FAF8F5] flex items-center justify-center">
@@ -234,7 +243,7 @@ export default function TourDetallePage() {
           </div>
         )}
 
-        <SeccionReviewsTour configTourId={tour.id} />
+        <SeccionReviewsTour configTourId={tour.id} reservaElegibleId={reservaElegibleId} />
 
         {tour.politicaCancelacion && (
           <div className="bg-amber-50 rounded-2xl border border-amber-100 p-4 mb-4">

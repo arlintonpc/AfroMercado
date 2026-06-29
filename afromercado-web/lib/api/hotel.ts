@@ -68,6 +68,7 @@ export interface ReservaHotel {
     comercio: { nombre: string; municipio: string; logoUrl?: string | null }
   }
   cliente?: { nombre: string; email: string; telefono?: string | null }
+  review?: { id: number } | null
 }
 
 // ── PÚBLICO ──────────────────────────────────────────────────

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { obtenerHotel, verificarDisponibilidad, crearReserva, type ConfigHotel, type HabitacionTipo } from '@/lib/api/hotel'
+import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, type ConfigHotel, type HabitacionTipo } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
@@ -182,10 +182,19 @@ export default function HotelDetallePage() {
   const [habitacionSelec, setHabitacionSelec] = useState<HabitacionTipo | null>(null)
   const [reservaOk, setReservaOk] = useState(false)
   const [fotoActiva, setFotoActiva] = useState<Record<number, number>>({})
+  const [reservaElegibleId, setReservaElegibleId] = useState<number | undefined>()
 
   useEffect(() => {
     obtenerHotel(Number(id)).then(data => { setHotel(data); setCargando(false) }).catch(() => setCargando(false))
   }, [id])
+
+  useEffect(() => {
+    if (!autenticado || !hotel) return
+    misReservasHotel().then(rs => {
+      const elegible = rs.find(r => r.configHotelId === hotel.id && r.estado === 'CHECKOUT' && !r.review)
+      setReservaElegibleId(elegible?.id)
+    }).catch(() => {})
+  }, [autenticado, hotel])
 
   if (cargando) return <div className="min-h-screen bg-[#FAF8F5] flex items-center justify-center"><div className="w-8 h-8 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" /></div>
   if (!hotel) return <div className="min-h-screen bg-[#FAF8F5] flex items-center justify-center text-gray-400"><p>Hotel no encontrado</p></div>
@@ -286,7 +295,7 @@ export default function HotelDetallePage() {
         </div>
 
         {/* Reseñas */}
-        <SeccionReviewsHotel configHotelId={hotel.id} />
+        <SeccionReviewsHotel configHotelId={hotel.id} reservaElegibleId={reservaElegibleId} />
 
         {/* Habitaciones */}
         <div>
