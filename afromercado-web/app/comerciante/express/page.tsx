@@ -448,22 +448,47 @@ function TarjetaPedido({
     ? Math.max(0, Math.round((new Date(pedido.expiresAt).getTime() - Date.now()) / 1000))
     : null
 
+  const nombreCliente = (() => {
+    const c = pedido.cliente
+    if (!c) return 'Cliente'
+    const n = c.nombre?.trim()
+    // Si el nombre parece un email, usar la parte antes del @
+    if (!n || n.includes('@')) return c.email?.split('@')[0] ?? 'Cliente'
+    return n
+  })()
+
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
+      {/* Cabecera: código + estado */}
       <div className="flex items-start justify-between gap-2 flex-wrap">
-        <div>
-          <p className="font-semibold text-sm">{pedido.codigo}</p>
-          <p className="text-xs text-gray-500">
-            {pedido.cliente?.nombre} · {MODALIDAD_LABEL[pedido.modalidad]} · {pedido.metodoPago}
-          </p>
-        </div>
+        <p className="font-semibold text-sm tracking-wide text-gray-700">{pedido.codigo}</p>
         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${ESTADO_COLOR[pedido.estado]}`}>
           {ESTADO_LABEL[pedido.estado]}
         </span>
       </div>
 
+      {/* Info del cliente */}
+      <div className="bg-gray-50 rounded-xl px-3 py-2 space-y-0.5">
+        <p className="text-sm font-semibold text-gray-800">👤 {nombreCliente}</p>
+        {pedido.cliente?.telefono && (
+          <a href={`tel:${pedido.cliente.telefono}`}
+            className="text-xs text-blue-600 hover:underline block">
+            📞 {pedido.cliente.telefono}
+          </a>
+        )}
+        {pedido.cliente?.email && (
+          <p className="text-xs text-gray-500">{pedido.cliente.email}</p>
+        )}
+        <p className="text-xs text-gray-500 pt-0.5">
+          {MODALIDAD_LABEL[pedido.modalidad]} · {pedido.metodoPago}
+          {pedido.tiempoEstimadoMin ? ` · ~${pedido.tiempoEstimadoMin} min` : ''}
+        </p>
+      </div>
+
       {pedido.direccionTexto && (
-        <p className="text-xs text-gray-500">📍 {pedido.direccionTexto}</p>
+        <p className="text-xs text-gray-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+          📍 {pedido.direccionTexto}
+        </p>
       )}
 
       {pedido.notaCliente && (

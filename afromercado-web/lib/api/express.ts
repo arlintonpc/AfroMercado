@@ -62,7 +62,7 @@ export interface PedidoExpress {
   entregadoAt: string | null
   expiresAt: string
   items: ItemPedidoExpress[]
-  cliente?: { nombre: string; telefono: string | null }
+  cliente?: { nombre: string; email: string; telefono: string | null }
   configExpress?: { comercio: { nombre: string; logoUrl: string | null; municipio: string } }
 }
 

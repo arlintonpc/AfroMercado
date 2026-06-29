@@ -48,7 +48,7 @@ async function usuarioDelComercio(comercioId) {
 
 const PEDIDO_INCLUDE = {
   items: { include: { producto: { select: { nombre: true, fotoUrl: true } } } },
-  cliente: { select: { nombre: true, telefono: true } },
+  cliente: { select: { nombre: true, email: true, telefono: true } },
 };
 
 const TASA_COMISION = 0.10;
@@ -339,7 +339,7 @@ const ExpressService = {
       take: 50,
       include: {
         items: { include: { producto: { select: { nombre: true, fotoUrl: true } } } },
-        cliente: { select: { nombre: true, telefono: true } },
+        cliente: { select: { nombre: true, email: true, telefono: true } },
       },
     });
   },
