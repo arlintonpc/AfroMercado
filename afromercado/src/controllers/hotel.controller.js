@@ -192,7 +192,7 @@ const HotelController = {
   },
 
   // ── VIDEO HABITACIÓN ──────────────────────────────────────────
-  uploadVideoHabitacion: _uploadVideo.single("video"),
+  uploadVideoHabitacion: _uploadVideo,
 
   async subirVideoHabitacion(req, res, next) {
     let cloud = null;
