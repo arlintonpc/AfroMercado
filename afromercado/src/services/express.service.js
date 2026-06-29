@@ -1,6 +1,8 @@
 const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const { diaSemanaEnum, festivosAnio } = require("../utils/festivos-colombia");
+const { enviarPushAUsuario } = require("../utils/push");
+const sseManager = require("../utils/sse-manager");
 
 const DIAS_ORDEN = ['LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO','DOMINGO','FESTIVO'];
 
@@ -24,6 +26,24 @@ function comercioAbiertoAhora(horarios) {
   const horario = horarios.find(h => h.dia === diaEnum);
   if (!horario || !horario.abierto) return false;
   return horaActualEnRango(horario.apertura, horario.cierre);
+}
+
+async function notifExpress(usuarioId, titulo, cuerpo, url) {
+  if (!usuarioId) return;
+  try {
+    await prisma.notificacion.create({
+      data: { usuarioId, tipo: "EXPRESS", titulo, mensaje: cuerpo, url: url || null },
+    });
+    sseManager.enviar(usuarioId, "notificacion", { tipo: "EXPRESS", titulo, mensaje: cuerpo, url });
+    await enviarPushAUsuario(prisma, usuarioId, { titulo, cuerpo, url, icono: "/icon-192.svg" });
+  } catch (e) {
+    console.error("[NOTIF-EXPRESS]", e.message);
+  }
+}
+
+async function usuarioDelComercio(comercioId) {
+  const c = await prisma.comercio.findUnique({ where: { id: comercioId }, select: { usuarioId: true } });
+  return c?.usuarioId ?? null;
 }
 
 const PEDIDO_INCLUDE = {
@@ -176,6 +196,20 @@ const ExpressService = {
       include: { items: { include: { producto: { select: { nombre: true } } } } },
     });
 
+    // Notificar al comerciante
+    const uidComerciante = await usuarioDelComercio(comercioId);
+    notifExpress(uidComerciante,
+      "🛵 Nuevo pedido Express",
+      `Pedido ${pedido.codigo} · $${Number(total).toLocaleString("es-CO")}`,
+      "/comerciante/express"
+    );
+    // Notificar al cliente
+    notifExpress(clienteId,
+      "⚡ Pedido recibido",
+      `Tu pedido ${pedido.codigo} está siendo revisado por el restaurante`,
+      "/express/mis-pedidos"
+    );
+
     return pedido;
   },
 
@@ -185,11 +219,17 @@ const ExpressService = {
     const pedido = await this._getPedidoComercio(pedidoId, comercioId);
     if (pedido.estado !== "PENDIENTE") throw new ErrorValidacion("El pedido ya no está en estado PENDIENTE");
     if (new Date() > pedido.expiresAt) throw new ErrorValidacion("El tiempo para aceptar el pedido expiró");
-    return prisma.pedidoExpress.update({
+    const actualizado = await prisma.pedidoExpress.update({
       where: { id: pedidoId },
       data: { estado: "ACEPTADO", aceptadoAt: new Date(), tiempoAjustadoMin: tiempoAjustadoMin ?? null },
       include: PEDIDO_INCLUDE,
     });
+    notifExpress(pedido.clienteId,
+      "✅ Pedido aceptado",
+      `Tu pedido ${pedido.codigo} fue aceptado · listo en ~${actualizado.tiempoEstimadoMin ?? pedido.tiempoEstimadoMin} min`,
+      "/express/mis-pedidos"
+    );
+    return actualizado;
   },
 
   async rechazarPedido(pedidoId, comercioId, motivo) {
@@ -197,20 +237,30 @@ const ExpressService = {
     if (!["PENDIENTE", "ACEPTADO"].includes(pedido.estado)) {
       throw new ErrorValidacion("No se puede rechazar un pedido en este estado");
     }
-    return prisma.pedidoExpress.update({
+    const actualizado = await prisma.pedidoExpress.update({
       where: { id: pedidoId },
       data: { estado: "RECHAZADO", canceladoAt: new Date(), motivoCancelacion: motivo ?? "Rechazado por el comercio" },
       include: PEDIDO_INCLUDE,
     });
+    notifExpress(pedido.clienteId,
+      "❌ Pedido rechazado",
+      `Tu pedido ${pedido.codigo} no pudo ser atendido${motivo ? `: ${motivo}` : ""}`,
+      "/express/mis-pedidos"
+    );
+    return actualizado;
   },
 
   async avanzarEstado(pedidoId, comercioId) {
     const pedido = await this._getPedidoComercio(pedidoId, comercioId);
     const FLUJO = {
-      ACEPTADO:       { siguiente: "EN_PREPARACION", campo: "preparandoAt" },
-      EN_PREPARACION: { siguiente: "LISTO",           campo: "listoAt" },
-      LISTO:          { siguiente: "EN_CAMINO",        campo: "enCaminoAt" },
-      EN_CAMINO:      { siguiente: "ENTREGADO",        campo: "entregadoAt" },
+      ACEPTADO:       { siguiente: "EN_PREPARACION", campo: "preparandoAt",
+                        titulo: "👨‍🍳 En preparación", cuerpo: (c) => `Tu pedido ${c} está siendo preparado` },
+      EN_PREPARACION: { siguiente: "LISTO",           campo: "listoAt",
+                        titulo: "✅ ¡Pedido listo!",   cuerpo: (c) => `Tu pedido ${c} está listo para recoger / envío` },
+      LISTO:          { siguiente: "EN_CAMINO",        campo: "enCaminoAt",
+                        titulo: "🛵 En camino",         cuerpo: (c) => `Tu pedido ${c} está en camino hacia ti` },
+      EN_CAMINO:      { siguiente: "ENTREGADO",        campo: "entregadoAt",
+                        titulo: "🎉 Pedido entregado",  cuerpo: (c) => `Tu pedido ${c} fue entregado. ¡Buen provecho!` },
     };
     const paso = FLUJO[pedido.estado];
     if (!paso) throw new ErrorValidacion(`No se puede avanzar desde el estado ${pedido.estado}`);
@@ -220,6 +270,8 @@ const ExpressService = {
       data:  { estado: paso.siguiente, [paso.campo]: new Date() },
       include: PEDIDO_INCLUDE,
     });
+
+    notifExpress(pedido.clienteId, paso.titulo, paso.cuerpo(pedido.codigo), "/express/mis-pedidos");
 
     // Si se entrega en efectivo → acumular deuda de comisión
     if (paso.siguiente === "ENTREGADO" && pedido.metodoPago === "EFECTIVO") {
