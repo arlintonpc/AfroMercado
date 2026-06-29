@@ -205,6 +205,7 @@ model Usuario {
   pedidosExpressCliente     PedidoExpress[]     @relation("PedidosExpressCliente")
   pedidosExpressRepartidor  PedidoExpress[]     @relation("PedidosExpressRepartidor")
   reservasHotel             ReservaHotel[]      @relation("ReservasHotelCliente")
+  reservasTour              ReservaTour[]       @relation("ReservasTourCliente")
 }
 
 model Comercio {
@@ -268,6 +269,7 @@ model Comercio {
   solicitudesPublicidad SolicitudPublicidad[]
   configExpress         ConfigExpress?
   configHotel           ConfigHotel?
+  configTour            ConfigTour?
 }
 
 model Categoria {
@@ -1331,4 +1333,64 @@ model ReservaHotel {
   @@index([configHotelId, estado])
   @@index([clienteId])
   @@index([fechaEntrada, fechaSalida])
+}
+
+
+// ─── MÓDULO TOURS ─────────────────────────────────────────────
+
+enum EstadoReservaTour {
+  PENDIENTE
+  CONFIRMADA
+  CANCELADA
+  RECHAZADA
+  COMPLETADA
+}
+
+model ConfigTour {
+  id                  Int      @id @default(autoincrement())
+  comercioId          Int      @unique
+  activo              Boolean  @default(false)
+  nombre              String   @default("Tour")
+  descripcion         String?
+  duracionHoras       Float    @default(2)
+  precioPersona       Decimal  @db.Decimal(12, 2)
+  maxParticipantes    Int      @default(10)
+  puntoEncuentro      String?
+  fotos               String[]
+  servicios           String[]
+  idiomas             String[]
+  confirmacionAuto    Boolean  @default(false)
+  horasLimiteConfirm  Int      @default(2)
+  politicaCancelacion String?
+  creadoAt            DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  comercio Comercio      @relation(fields: [comercioId], references: [id])
+  reservas ReservaTour[]
+
+  @@index([activo])
+}
+
+model ReservaTour {
+  id               Int                @id @default(autoincrement())
+  codigo           String             @unique
+  configTourId     Int
+  clienteId        Int
+  fechaTour        DateTime
+  participantes    Int                @default(1)
+  total            Decimal            @db.Decimal(12, 2)
+  estado           EstadoReservaTour  @default(PENDIENTE)
+  metodoPago       String             @default("EFECTIVO")
+  notasCliente     String?
+  nombreContacto   String
+  telefonoContacto String
+  creadoAt         DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  configTour ConfigTour @relation(fields: [configTourId], references: [id])
+  cliente    Usuario    @relation("ReservasTourCliente", fields: [clienteId], references: [id])
+
+  @@index([configTourId, estado])
+  @@index([clienteId])
+  @@index([fechaTour])
 }

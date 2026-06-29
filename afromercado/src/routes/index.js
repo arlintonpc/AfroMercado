@@ -42,5 +42,6 @@ router.use("/liquidaciones", require("./liquidacion.routes"));
 router.use("/publicidad",    require("./publicidad.routes"));
 router.use("/express",       require("./express.routes"));
 router.use("/hoteles",       require("./hotel.routes"));
+router.use("/tours",         require("./tour.routes"));
 
 module.exports = router;

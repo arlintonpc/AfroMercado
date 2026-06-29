@@ -334,6 +334,38 @@ const HotelService = {
 
     return { habitaciones: cfg.habitaciones, reservas: reservasActivas };
   },
+
+  // ── ADMIN ──────────────────────────────────────────────────────
+  async adminListarHoteles() {
+    const hoteles = await prisma.configHotel.findMany({
+      include: {
+        comercio: { select: { id: true, nombre: true, municipio: true, departamento: true, logoUrl: true } },
+        habitaciones: { select: { id: true, nombre: true, cantidad: true, precioPorNoche: true } },
+        _count: { select: { reservas: true } },
+      },
+      orderBy: { creadoAt: "desc" },
+    });
+    return hoteles;
+  },
+
+  async adminCambiarEstado(configHotelId, activo) {
+    return prisma.configHotel.update({
+      where: { id: configHotelId },
+      data:  { activo },
+    });
+  },
+
+  async adminReservasHotel(configHotelId) {
+    return prisma.reservaHotel.findMany({
+      where: { configHotelId },
+      include: {
+        cliente: { select: { id: true, nombre: true, email: true } },
+        habitacionTipo: { select: { nombre: true } },
+      },
+      orderBy: { creadoAt: "desc" },
+      take: 100,
+    });
+  },
 };
 
 module.exports = HotelService;

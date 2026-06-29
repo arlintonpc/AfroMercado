@@ -172,3 +172,23 @@ export async function ocupacionHotel(): Promise<{ habitaciones: HabitacionTipo[]
   const r = await apiFetch<{ ok: boolean; data: { habitaciones: HabitacionTipo[]; reservas: ReservaHotel[] } }>('/hoteles/mi-hotel/ocupacion')
   return r.data
 }
+
+// ── ADMIN ─────────────────────────────────────────────────────
+export interface HotelAdmin extends ConfigHotel {
+  _count: { reservas: number }
+}
+
+export async function adminListarHoteles(): Promise<HotelAdmin[]> {
+  const r = await apiFetch<{ ok: boolean; data: HotelAdmin[] }>('/hoteles/admin/todos')
+  return r.data
+}
+
+export async function adminCambiarEstadoHotel(id: number, activo: boolean): Promise<ConfigHotel> {
+  const r = await apiFetch<{ ok: boolean; data: ConfigHotel }>(`/hoteles/admin/${id}/estado`, { method: 'PATCH', body: { activo } })
+  return r.data
+}
+
+export async function adminReservasHotel(id: number): Promise<ReservaHotel[]> {
+  const r = await apiFetch<{ ok: boolean; data: ReservaHotel[] }>(`/hoteles/admin/${id}/reservas`)
+  return r.data
+}

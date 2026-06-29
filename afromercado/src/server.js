@@ -67,6 +67,50 @@ async function aplicarMigraciones() {
       CONSTRAINT "ReservaHotel_habitacionTipoId_fkey" FOREIGN KEY ("habitacionTipoId") REFERENCES "HabitacionTipo"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
       CONSTRAINT "ReservaHotel_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE
     )`,
+    // Módulo Tours
+    `CREATE TABLE IF NOT EXISTS "ConfigTour" (
+      "id" SERIAL PRIMARY KEY,
+      "comercioId" INTEGER NOT NULL UNIQUE,
+      "activo" BOOLEAN NOT NULL DEFAULT false,
+      "nombre" TEXT NOT NULL DEFAULT 'Tour',
+      "descripcion" TEXT,
+      "duracionHoras" DOUBLE PRECISION NOT NULL DEFAULT 2,
+      "precioPersona" DECIMAL(12,2) NOT NULL DEFAULT 0,
+      "maxParticipantes" INTEGER NOT NULL DEFAULT 10,
+      "puntoEncuentro" TEXT,
+      "fotos" TEXT[] NOT NULL DEFAULT '{}',
+      "servicios" TEXT[] NOT NULL DEFAULT '{}',
+      "idiomas" TEXT[] NOT NULL DEFAULT '{}',
+      "confirmacionAuto" BOOLEAN NOT NULL DEFAULT false,
+      "horasLimiteConfirm" INTEGER NOT NULL DEFAULT 2,
+      "politicaCancelacion" TEXT,
+      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ConfigTour_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    )`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoReservaTour') THEN
+        CREATE TYPE "EstadoReservaTour" AS ENUM ('PENDIENTE','CONFIRMADA','CANCELADA','RECHAZADA','COMPLETADA');
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "ReservaTour" (
+      "id" SERIAL PRIMARY KEY,
+      "codigo" TEXT NOT NULL UNIQUE,
+      "configTourId" INTEGER NOT NULL,
+      "clienteId" INTEGER NOT NULL,
+      "fechaTour" TIMESTAMP(3) NOT NULL,
+      "participantes" INTEGER NOT NULL DEFAULT 1,
+      "total" DECIMAL(12,2) NOT NULL,
+      "estado" "EstadoReservaTour" NOT NULL DEFAULT 'PENDIENTE',
+      "metodoPago" TEXT NOT NULL DEFAULT 'EFECTIVO',
+      "notasCliente" TEXT,
+      "nombreContacto" TEXT NOT NULL,
+      "telefonoContacto" TEXT NOT NULL,
+      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ReservaTour_configTourId_fkey" FOREIGN KEY ("configTourId") REFERENCES "ConfigTour"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "ReservaTour_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    )`,
   ];
   for (const sql of migraciones) {
     try {

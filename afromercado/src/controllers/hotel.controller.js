@@ -132,6 +132,28 @@ const HotelController = {
       res.json({ ok: true, data: hab });
     } catch (e) { next(e); }
   },
+  // ── ADMIN ──────────────────────────────────────────────────────
+  async adminListar(req, res, next) {
+    try {
+      const data = await HotelService.adminListarHoteles();
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async adminCambiarEstado(req, res, next) {
+    try {
+      const { activo } = req.body;
+      const data = await HotelService.adminCambiarEstado(Number(req.params.id), activo);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async adminReservas(req, res, next) {
+    try {
+      const data = await HotelService.adminReservasHotel(Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
 };
 
 module.exports = HotelController;

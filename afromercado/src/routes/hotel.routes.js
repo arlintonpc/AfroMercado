@@ -8,6 +8,7 @@ const router = express.Router();
 
 const soloAuth     = [autenticar];
 const soloComercio = [autenticar, autorizar("COMERCIANTE")];
+const soloAdmin    = [autenticar, autorizar("ADMIN")];
 
 // Multer para fotos de habitaciones
 const _uploadFotos = multer({
@@ -44,5 +45,10 @@ router.delete("/mi-hotel/habitaciones/:id",     ...soloComercio, HotelController
 router.get(  "/mi-hotel/reservas",              ...soloComercio, HotelController.reservasHotelero);
 router.patch("/mi-hotel/reservas/:id/estado",   ...soloComercio, HotelController.cambiarEstado);
 router.get(  "/mi-hotel/ocupacion",             ...soloComercio, HotelController.ocupacion);
+
+// ── ADMIN ─────────────────────────────────────────────────────
+router.get(   "/admin/todos",         ...soloAdmin, HotelController.adminListar);
+router.patch( "/admin/:id/estado",    ...soloAdmin, HotelController.adminCambiarEstado);
+router.get(   "/admin/:id/reservas",  ...soloAdmin, HotelController.adminReservas);
 
 module.exports = router;

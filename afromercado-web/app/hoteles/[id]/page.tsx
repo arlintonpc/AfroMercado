@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import { obtenerHotel, verificarDisponibilidad, crearReserva, type ConfigHotel, type HabitacionTipo } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
+import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
 
 const MapaHoteles = dynamic(() => import('@/components/hoteles/MapaHoteles'), { ssr: false })
 
@@ -86,21 +87,15 @@ function FormReserva({ hotel, habitacion, onClose, onSuccess }: {
           </div>
 
           <div className="space-y-4">
-            {/* Fechas */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Check-in</label>
-                <input type="date" min={hoy} value={fechaEntrada} onChange={e => setFechaEntrada(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
-                <p className="text-[10px] text-gray-400 mt-0.5">Desde las {hotel.checkInHora}</p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Check-out</label>
-                <input type="date" min={fechaEntrada || hoy} value={fechaSalida} onChange={e => setFechaSalida(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
-                <p className="text-[10px] text-gray-400 mt-0.5">Hasta las {hotel.checkOutHora}</p>
-              </div>
-            </div>
+            {/* Calendario visual */}
+            <CalendarioReserva
+              fechaEntrada={fechaEntrada}
+              fechaSalida={fechaSalida}
+              onChangeFechaEntrada={setFechaEntrada}
+              onChangeFechaSalida={setFechaSalida}
+              checkInHora={hotel.checkInHora}
+              checkOutHora={hotel.checkOutHora}
+            />
 
             {/* Resumen noches + disponibilidad */}
             <div className={`rounded-xl p-3 text-sm flex items-center justify-between ${
