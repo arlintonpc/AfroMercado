@@ -74,7 +74,7 @@ export interface ComercioExpress {
   modalidades: ModalidadExpress[]
   costoEnvioBase: number
   municipiosEntrega: string[]
-  comercio: { id: number; nombre: string; logoUrl: string | null; municipio: string; calificacion: number; totalReviews: number }
+  comercio: { id: number; nombre: string; logoUrl: string | null; municipio: string; calificacion: number; totalReviews: number; latitud?: number | null; longitud?: number | null }
 }
 
 // ── CLIENTE ──────────────────────────────────────────────────

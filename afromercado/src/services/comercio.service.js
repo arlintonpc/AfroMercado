@@ -15,6 +15,8 @@ const CAMPOS_EDITABLES = [
   "descripcion",
   "departamento",
   "municipio",
+  "latitud",
+  "longitud",
   "historia",
   "whatsapp",
   "logoUrl",

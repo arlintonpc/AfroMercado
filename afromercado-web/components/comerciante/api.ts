@@ -23,6 +23,8 @@ export interface Comercio {
   nombre: string
   departamento?: string | null
   municipio: string
+  latitud?: number | null
+  longitud?: number | null
   descripcion?: string | null
   historia?: string | null
   whatsapp?: string | null
@@ -146,6 +148,8 @@ export interface DatosComercio {
   nombre: string
   departamento?: string
   municipio: string
+  latitud?: number | null
+  longitud?: number | null
   tipoDocumento: TipoDocumento
   numeroDocumento: string
   descripcion?: string

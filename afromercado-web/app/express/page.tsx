@@ -6,13 +6,28 @@ import Image from 'next/image'
 import { listarComerciosExpress, type ComercioExpress } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
+// Fórmula Haversine: distancia en km entre dos coordenadas
+function distanciaKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
+
+function formatearDistancia(km: number) {
+  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`
+}
+
 export default function ExpressPage() {
-  const [todos, setTodos]           = useState<ComercioExpress[]>([])
-  const [busqueda, setBusqueda]     = useState('')
-  const [gpsEstado, setGpsEstado]   = useState<'idle'|'buscando'|'ok'|'error'>('idle')
-  const [gpsCiudad, setGpsCiudad]   = useState('')
-  const [cargando, setCargando]     = useState(true)
-  const [error, setError]           = useState('')
+  const [todos, setTodos]               = useState<ComercioExpress[]>([])
+  const [busqueda, setBusqueda]         = useState('')
+  const [gpsEstado, setGpsEstado]       = useState<'idle'|'buscando'|'ok'|'error'>('idle')
+  const [gpsCiudad, setGpsCiudad]       = useState('')
+  const [userLat, setUserLat]           = useState<number | null>(null)
+  const [userLon, setUserLon]           = useState<number | null>(null)
+  const [cargando, setCargando]         = useState(true)
+  const [error, setError]               = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -37,12 +52,25 @@ export default function ExpressPage() {
 
   // Filtro: búsqueda de texto (nombre o municipio del comercio)
   const termino = busqueda.trim().toLowerCase()
-  const comercios = termino
+  const filtrados = termino
     ? todos.filter(c =>
         c.comercio.nombre.toLowerCase().includes(termino) ||
         (c.comercio.municipio ?? '').toLowerCase().includes(termino)
       )
     : todos
+
+  // Si el usuario tiene GPS y los comercios tienen coordenadas, ordenar por distancia
+  const comercios = userLat && userLon
+    ? [...filtrados].sort((a, b) => {
+        const dA = a.comercio.latitud && a.comercio.longitud
+          ? distanciaKm(userLat!, userLon!, a.comercio.latitud, a.comercio.longitud)
+          : Infinity
+        const dB = b.comercio.latitud && b.comercio.longitud
+          ? distanciaKm(userLat!, userLon!, b.comercio.latitud, b.comercio.longitud)
+          : Infinity
+        return dA - dB
+      })
+    : filtrados
 
   async function usarUbicacion() {
     if (!navigator.geolocation) {
@@ -52,6 +80,8 @@ export default function ExpressPage() {
     setGpsEstado('buscando')
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
+        setUserLat(coords.latitude)
+        setUserLon(coords.longitude)
         try {
           const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json&accept-language=es`,
@@ -67,12 +97,10 @@ export default function ExpressPage() {
           if (ciudad) {
             setBusqueda(ciudad)
             setGpsCiudad(ciudad)
-            setGpsEstado('ok')
-          } else {
-            setGpsEstado('error')
           }
+          setGpsEstado('ok')
         } catch {
-          setGpsEstado('error')
+          setGpsEstado('ok') // tenemos coords aunque no el nombre
         }
       },
       () => setGpsEstado('error'),
@@ -235,6 +263,11 @@ export default function ExpressPage() {
               <p className="text-xs text-gray-500 mt-0.5">
                 📍 {cfg.comercio.municipio}
                 {cfg.comercio.calificacion > 0 && ` · ⭐ ${Number(cfg.comercio.calificacion).toFixed(1)}`}
+                {userLat && userLon && cfg.comercio.latitud && cfg.comercio.longitud && (
+                  <span className="ml-1 text-green-600 font-medium">
+                    · 📏 {formatearDistancia(distanciaKm(userLat, userLon, cfg.comercio.latitud, cfg.comercio.longitud))}
+                  </span>
+                )}
               </p>
               <div className="flex gap-3 mt-1 text-xs text-gray-500">
                 <span>⏱ ~{cfg.tiempoPrepMinutos} min</span>

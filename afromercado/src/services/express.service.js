@@ -295,7 +295,7 @@ const ExpressService = {
         horarios: true,
         comercio: {
           select: { id: true, nombre: true, logoUrl: true, municipio: true,
-                    calificacion: true, totalReviews: true },
+                    calificacion: true, totalReviews: true, latitud: true, longitud: true },
         },
       },
     });

@@ -212,6 +212,8 @@ model Comercio {
   nombre       String
   municipio    String
   departamento String?
+  latitud      Float?
+  longitud     Float?
   descripcion  String?
   historia     String?
   whatsapp     String?
