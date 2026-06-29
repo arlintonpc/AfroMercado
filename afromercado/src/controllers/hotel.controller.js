@@ -132,6 +132,28 @@ const HotelController = {
       res.json({ ok: true, data: hab });
     } catch (e) { next(e); }
   },
+  // ── BLOQUEOS MANUALES ─────────────────────────────────────────
+  async listarBloqueos(req, res, next) {
+    try {
+      const data = await HotelService.listarBloqueos(req.usuario.comercio.id);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async crearBloqueo(req, res, next) {
+    try {
+      const data = await HotelService.crearBloqueo(req.usuario.comercio.id, req.body);
+      res.status(201).json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async eliminarBloqueo(req, res, next) {
+    try {
+      const data = await HotelService.eliminarBloqueo(req.usuario.comercio.id, req.params.bloqueoId);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
   // ── ADMIN ──────────────────────────────────────────────────────
   async adminListar(req, res, next) {
     try {

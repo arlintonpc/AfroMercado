@@ -46,6 +46,9 @@ router.delete("/mi-hotel/habitaciones/:id",     ...soloComercio, HotelController
 router.get(  "/mi-hotel/reservas",              ...soloComercio, HotelController.reservasHotelero);
 router.patch("/mi-hotel/reservas/:id/estado",   ...soloComercio, HotelController.cambiarEstado);
 router.get(  "/mi-hotel/ocupacion",             ...soloComercio, HotelController.ocupacion);
+router.get(   "/mi-hotel/bloqueos",             ...soloComercio, HotelController.listarBloqueos);
+router.post(  "/mi-hotel/bloqueos",             ...soloComercio, HotelController.crearBloqueo);
+router.delete("/mi-hotel/bloqueos/:bloqueoId",  ...soloComercio, HotelController.eliminarBloqueo);
 
 // ── REVIEWS ──────────────────────────────────────────────────
 router.get( "/:id/reviews",        ReviewController.reviewsHotel);

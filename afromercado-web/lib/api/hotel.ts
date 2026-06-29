@@ -193,3 +193,26 @@ export async function adminReservasHotel(id: number): Promise<ReservaHotel[]> {
   const r = await apiFetch<{ ok: boolean; data: ReservaHotel[] }>(`/hoteles/admin/${id}/reservas`)
   return r.data
 }
+
+// ── BLOQUEOS ─────────────────────────────────────────────────
+export interface BloqueoFecha {
+  id: string
+  habitacionId: number | null
+  fechaInicio: string
+  fechaFin: string
+  motivo: string | null
+}
+
+export async function listarBloqueos(): Promise<BloqueoFecha[]> {
+  const d = await apiFetch<{ ok: boolean; data: BloqueoFecha[] }>('/hotel/bloqueos', { auth: true })
+  return d.data
+}
+
+export async function crearBloqueo(datos: { habitacionId?: number | null; fechaInicio: string; fechaFin: string; motivo?: string }): Promise<BloqueoFecha> {
+  const d = await apiFetch<{ ok: boolean; data: BloqueoFecha }>('/hotel/bloqueos', { method: 'POST', body: datos, auth: true })
+  return d.data
+}
+
+export async function eliminarBloqueo(bloqueoId: string): Promise<void> {
+  await apiFetch(`/hotel/bloqueos/${bloqueoId}`, { method: 'DELETE', auth: true })
+}

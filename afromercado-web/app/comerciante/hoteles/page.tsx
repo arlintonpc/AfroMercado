@@ -5,7 +5,8 @@ import Link from 'next/link'
 import {
   obtenerMiHotel, actualizarMiHotel, agregarHabitacion, actualizarHabitacion, eliminarHabitacion,
   reservasHotelero, cambiarEstadoReserva, ocupacionHotel, subirFotosHabitacion,
-  type ConfigHotel, type HabitacionTipo, type ReservaHotel, type EstadoReservaHotel,
+  listarBloqueos, crearBloqueo, eliminarBloqueo,
+  type ConfigHotel, type HabitacionTipo, type ReservaHotel, type EstadoReservaHotel, type BloqueoFecha,
 } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
@@ -172,7 +173,12 @@ export default function ComercianteHotelesPage() {
   const [cfg, setCfg]               = useState<ConfigHotel | null>(null)
   const [reservas, setReservas]     = useState<ReservaHotel[]>([])
   const [ocupacion, setOcupacion]   = useState<{ habitaciones: HabitacionTipo[]; reservas: ReservaHotel[] } | null>(null)
-  const [tab, setTab]               = useState<'reservas' | 'habitaciones' | 'config' | 'ocupacion'>('reservas')
+  const [tab, setTab]               = useState<'reservas' | 'habitaciones' | 'config' | 'ocupacion' | 'bloqueos'>('reservas')
+  const [bloqueos, setBloqueos]     = useState<BloqueoFecha[]>([])
+  const [cargandoBloqueos, setCargandoBloqueos] = useState(false)
+  const [formBloqueo, setFormBloqueo] = useState<{ habitacionId: string; fechaInicio: string; fechaFin: string; motivo: string }>({ habitacionId: '', fechaInicio: '', fechaFin: '', motivo: '' })
+  const [guardandoBloqueo, setGuardandoBloqueo] = useState(false)
+  const [errorBloqueo, setErrorBloqueo] = useState('')
   const [cargando, setCargando]     = useState(true)
   const [guardando, setGuardando]   = useState(false)
   const [error, setError]           = useState('')
@@ -255,6 +261,44 @@ export default function ComercianteHotelesPage() {
     if (tab === 'ocupacion') cargarOcupacion()
   }, [tab])
 
+  async function cargarBloqueos() {
+    setCargandoBloqueos(true)
+    try {
+      const data = await listarBloqueos()
+      setBloqueos(data)
+    } catch {}
+    setCargandoBloqueos(false)
+  }
+
+  useEffect(() => {
+    if (tab === 'bloqueos') cargarBloqueos()
+  }, [tab])
+
+  async function handleCrearBloqueo() {
+    if (!formBloqueo.fechaInicio || !formBloqueo.fechaFin) { setErrorBloqueo('Selecciona fecha inicio y fecha fin'); return }
+    if (formBloqueo.fechaFin < formBloqueo.fechaInicio) { setErrorBloqueo('La fecha fin debe ser posterior a la fecha inicio'); return }
+    setGuardandoBloqueo(true); setErrorBloqueo('')
+    try {
+      await crearBloqueo({
+        habitacionId: formBloqueo.habitacionId ? Number(formBloqueo.habitacionId) : null,
+        fechaInicio: formBloqueo.fechaInicio,
+        fechaFin: formBloqueo.fechaFin,
+        motivo: formBloqueo.motivo || undefined,
+      })
+      setFormBloqueo({ habitacionId: '', fechaInicio: '', fechaFin: '', motivo: '' })
+      await cargarBloqueos()
+    } catch (e: any) { setErrorBloqueo(e.message) }
+    setGuardandoBloqueo(false)
+  }
+
+  async function handleEliminarBloqueo(id: string) {
+    if (!window.confirm('¿Eliminar este bloqueo de fechas?')) return
+    try {
+      await eliminarBloqueo(id)
+      setBloqueos(prev => prev.filter(b => b.id !== id))
+    } catch (e: any) { setErrorBloqueo(e.message) }
+  }
+
   async function guardarConfig() {
     setGuardando(true); setError(''); setExito('')
     try {
@@ -302,6 +346,7 @@ export default function ComercianteHotelesPage() {
               { key: 'reservas',     label: 'Reservas',     badge: pendientes },
               { key: 'ocupacion',    label: 'Ocupación',    badge: 0 },
               { key: 'habitaciones', label: 'Habitaciones', badge: 0 },
+              { key: 'bloqueos',     label: '🔒 Bloqueos',  badge: 0 },
               { key: 'config',       label: 'Configuración',badge: 0 },
             ] as const).map(t => (
               <button key={t.key} onClick={() => setTab(t.key)}
@@ -569,6 +614,123 @@ export default function ComercianteHotelesPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ── BLOQUEOS ── */}
+        {tab === 'bloqueos' && (
+          <div className="space-y-4">
+            {/* Formulario crear bloqueo */}
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-4">
+              <h2 className="font-bold text-[#1A1A1A]">Bloquear fechas</h2>
+
+              {/* Habitación */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Habitación</label>
+                <select
+                  value={formBloqueo.habitacionId}
+                  onChange={e => setFormBloqueo(p => ({ ...p, habitacionId: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]"
+                >
+                  <option value="">Todas las habitaciones</option>
+                  {(cfg?.habitaciones ?? []).map(h => (
+                    <option key={h.id} value={h.id}>{h.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Fechas */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Fecha inicio *</label>
+                  <input
+                    type="date"
+                    value={formBloqueo.fechaInicio}
+                    onChange={e => setFormBloqueo(p => ({ ...p, fechaInicio: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Fecha fin *</label>
+                  <input
+                    type="date"
+                    value={formBloqueo.fechaFin}
+                    onChange={e => setFormBloqueo(p => ({ ...p, fechaFin: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]"
+                  />
+                </div>
+              </div>
+
+              {/* Motivo */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Motivo (opcional)</label>
+                <input
+                  type="text"
+                  value={formBloqueo.motivo}
+                  onChange={e => setFormBloqueo(p => ({ ...p, motivo: e.target.value }))}
+                  placeholder="Mantenimiento, reserva directa, evento..."
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]"
+                />
+              </div>
+
+              {errorBloqueo && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{errorBloqueo}</p>
+              )}
+
+              <button
+                onClick={handleCrearBloqueo}
+                disabled={guardandoBloqueo}
+                className="w-full bg-[#1B4332] text-white font-bold py-2.5 rounded-xl text-sm hover:bg-[#2D6A4F] transition-colors disabled:opacity-50"
+              >
+                {guardandoBloqueo ? 'Bloqueando…' : '🔒 Bloquear fechas'}
+              </button>
+            </div>
+
+            {/* Lista bloqueos activos */}
+            <div className="bg-white border border-gray-100 rounded-2xl p-5">
+              <h2 className="font-bold text-[#1A1A1A] mb-3">Bloqueos activos</h2>
+
+              {cargandoBloqueos ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : bloqueos.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-3xl mb-2">🔓</p>
+                  <p className="text-sm">No hay bloqueos activos</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {bloqueos.map(b => {
+                    const hab = b.habitacionId
+                      ? (cfg?.habitaciones ?? []).find(h => h.id === b.habitacionId)
+                      : null
+                    const inicio = new Date(b.fechaInicio).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
+                    const fin    = new Date(b.fechaFin).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
+                    return (
+                      <div key={b.id} className="flex items-center justify-between gap-3 bg-gray-50 rounded-xl px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[#1A1A1A]">
+                            {inicio} → {fin}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {hab ? `🛏️ ${hab.nombre}` : '🏨 Todas las habitaciones'}
+                            {b.motivo ? ` · ${b.motivo}` : ''}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleEliminarBloqueo(b.id)}
+                          className="flex-shrink-0 text-red-400 hover:text-red-600 transition-colors text-lg"
+                          title="Eliminar bloqueo"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

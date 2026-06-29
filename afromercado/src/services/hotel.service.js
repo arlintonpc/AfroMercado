@@ -1,5 +1,6 @@
 const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
+const ConfigRepository = require("../repositories/config.repository");
 const sseManager = require("../utils/sse-manager");
 const { enviarPushAUsuario } = require("../utils/push");
 const { enviarEmail } = require("../utils/email");
@@ -92,7 +93,20 @@ const HotelService = {
       },
     });
 
-    const disponibles = tipo.cantidad - reservasSolapadas;
+    // Verificar bloqueos manuales
+    const cfg = await prisma.configHotel.findUnique({ where: { id: tipo.configHotelId } });
+    let bloqueado = false;
+    if (cfg) {
+      const rawBloqueos = await ConfigRepository.obtener(`HOTEL_BLOQUEOS_${cfg.id}`);
+      const bloqueos = rawBloqueos ? JSON.parse(rawBloqueos) : [];
+      bloqueado = bloqueos.some(b =>
+        (b.habitacionId === null || b.habitacionId === habitacionTipoId) &&
+        b.fechaInicio < fechaSalida.toISOString().slice(0, 10) &&
+        b.fechaFin > fechaEntrada.toISOString().slice(0, 10)
+      );
+    }
+
+    const disponibles = bloqueado ? 0 : tipo.cantidad - reservasSolapadas;
     return { disponibles, total: tipo.cantidad, tipo };
   },
 
@@ -357,6 +371,46 @@ const HotelService = {
     });
 
     return { habitaciones: cfg.habitaciones, reservas: reservasActivas };
+  },
+
+  // ── BLOQUEOS MANUALES ─────────────────────────────────────────
+
+  async listarBloqueos(comercioId) {
+    const cfg = await prisma.configHotel.findUnique({ where: { comercioId } });
+    if (!cfg) return [];
+    const raw = await ConfigRepository.obtener(`HOTEL_BLOQUEOS_${cfg.id}`);
+    return raw ? JSON.parse(raw) : [];
+  },
+
+  async crearBloqueo(comercioId, { habitacionId, fechaInicio, fechaFin, motivo }) {
+    if (!fechaInicio || !fechaFin) throw new ErrorValidacion("Fechas requeridas");
+    if (fechaFin <= fechaInicio) throw new ErrorValidacion("Fecha fin debe ser posterior");
+    const cfg = await prisma.configHotel.findUnique({ where: { comercioId } });
+    if (!cfg) throw new ErrorNoEncontrado("Hotel no encontrado");
+    const clave = `HOTEL_BLOQUEOS_${cfg.id}`;
+    const raw = await ConfigRepository.obtener(clave);
+    const bloqueos = raw ? JSON.parse(raw) : [];
+    const nuevo = {
+      id: Date.now().toString(36),
+      habitacionId: habitacionId ?? null,
+      fechaInicio,
+      fechaFin,
+      motivo: motivo || null,
+    };
+    bloqueos.push(nuevo);
+    await ConfigRepository.guardar(clave, JSON.stringify(bloqueos));
+    return nuevo;
+  },
+
+  async eliminarBloqueo(comercioId, bloqueoId) {
+    const cfg = await prisma.configHotel.findUnique({ where: { comercioId } });
+    if (!cfg) throw new ErrorNoEncontrado("Hotel no encontrado");
+    const clave = `HOTEL_BLOQUEOS_${cfg.id}`;
+    const raw = await ConfigRepository.obtener(clave);
+    const bloqueos = raw ? JSON.parse(raw) : [];
+    const filtrados = bloqueos.filter(b => b.id !== bloqueoId);
+    await ConfigRepository.guardar(clave, JSON.stringify(filtrados));
+    return { ok: true };
   },
 
   // ── ADMIN ──────────────────────────────────────────────────────
