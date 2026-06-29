@@ -3,6 +3,7 @@ const app = require("./app");
 const config = require("./config");
 const { cerrarConexion } = require("./utils/whatsapp");
 const { iniciarCron } = require("./utils/cron");
+const { iniciarJob: iniciarJobHotel } = require("./jobs/expirarReservasHotel");
 const prisma = require("./config/prisma");
 
 // Aplica migraciones DDL pendientes sin usar prisma migrate (Neon pooler)
@@ -227,5 +228,6 @@ aplicarMigraciones().then(() => {
     console.log(`🌿 AfroMercado API corriendo en http://localhost:${config.puerto}`);
     console.log(`   Entorno: ${config.entorno}`);
     iniciarCron();
+    iniciarJobHotel();
   });
 });
