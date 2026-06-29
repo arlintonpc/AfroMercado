@@ -76,13 +76,13 @@ function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat
           </div>
         )}
 
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3 flex items-end justify-between">
           <span className="text-xs text-gray-400">{hotel.habitaciones.length} tipo{hotel.habitaciones.length !== 1 ? 's' : ''}</span>
           {desde !== null && (
             <div className="text-right">
-              <span className="text-xs text-gray-400">Desde </span>
-              <span className="font-bold text-[#2D6A4F]">{formatearPrecio(desde)}</span>
-              <span className="text-xs text-gray-400">/noche</span>
+              <p className="text-xs text-gray-400 leading-none mb-0.5">Desde</p>
+              <p className="text-lg font-extrabold text-[#1B4332] leading-none">{formatearPrecio(desde)}</p>
+              <p className="text-xs text-gray-400 leading-none mt-0.5">por noche</p>
             </div>
           )}
         </div>
