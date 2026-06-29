@@ -324,6 +324,72 @@ export default function ComercianteHotelesPage() {
         {error && <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>}
         {exito && <div className="mb-4 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">{exito}</div>}
 
+        {/* ── ESTADÍSTICAS ── */}
+        {(() => {
+          const ahora = new Date()
+          const mesActual = ahora.getMonth()
+          const anioActual = ahora.getFullYear()
+
+          const reservasMes = reservas.filter(r => {
+            const f = new Date(r.creadoAt)
+            return f.getMonth() === mesActual && f.getFullYear() === anioActual
+          })
+
+          const ingresosMes = reservasMes
+            .filter(r => r.estado === 'CONFIRMADA' || r.estado === 'CHECKIN' || r.estado === 'CHECKOUT')
+            .reduce((acc, r) => acc + Number(r.total), 0)
+
+          const reservasActivas = reservas.filter(r =>
+            r.estado === 'PENDIENTE' || r.estado === 'CONFIRMADA' || r.estado === 'CHECKIN'
+          ).length
+
+          const capacidadTotal = (cfg?.habitaciones ?? []).reduce((acc, h) => acc + h.cantidad, 0) * 30
+          const tasaOcupacion = capacidadTotal > 0
+            ? Math.round((reservasActivas / capacidadTotal) * 100)
+            : 0
+
+          const reseñasPendientes = reservas.filter(r => r.estado === 'CHECKOUT' && !r.review).length
+
+          const tarjetas = [
+            {
+              icono: '📅',
+              valor: reservasMes.length,
+              etiqueta: 'Reservas este mes',
+            },
+            {
+              icono: '💰',
+              valor: ingresosMes >= 1_000_000
+                ? `$${(ingresosMes / 1_000_000).toFixed(1)}M`
+                : ingresosMes >= 1_000
+                ? `$${Math.round(ingresosMes / 1_000)}K`
+                : `$${ingresosMes}`,
+              etiqueta: 'Ingresos este mes',
+            },
+            {
+              icono: '📊',
+              valor: `${tasaOcupacion}%`,
+              etiqueta: 'Tasa de ocupación',
+            },
+            {
+              icono: '⭐',
+              valor: reseñasPendientes,
+              etiqueta: 'Reseñas pendientes',
+            },
+          ]
+
+          return (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+              {tarjetas.map((t, i) => (
+                <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col gap-1">
+                  <span className="text-xl" style={{ color: '#1B4332' }}>{t.icono}</span>
+                  <span className="text-3xl font-black text-gray-900 leading-none">{t.valor}</span>
+                  <span className="text-xs text-gray-400 font-medium">{t.etiqueta}</span>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
+
         {/* ── RESERVAS ── */}
         {tab === 'reservas' && (
           <div className="space-y-4">
