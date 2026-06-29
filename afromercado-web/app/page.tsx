@@ -17,6 +17,8 @@ import { formatearPrecio } from '@/lib/formatearPrecio'
 import { precioVigente } from '@/lib/precioProducto'
 import { registrarEventoPatrocinado } from '@/lib/publicidadTracking'
 import { listarHoteles, type ConfigHotel } from '@/lib/api/hotel'
+import { listarTours, type ConfigTour } from '@/lib/api/tour'
+import { listarTransportes, type ConfigTransporte } from '@/lib/api/transporte'
 import type { Producto } from '@/types/producto'
 import type { Categoria } from '@/types/categoria'
 
@@ -92,6 +94,91 @@ function SeccionHoteles({ hoteles }: { hoteles: ConfigHotel[] }) {
                       Desde {formatearPrecio(desde)}<span className="font-normal text-gray-400">/noche</span>
                     </p>
                   )}
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* ─── Componente SeccionTours ────────────────────────────────────── */
+function SeccionTours({ tours }: { tours: ConfigTour[] }) {
+  if (tours.length === 0) return null
+  return (
+    <section className="bg-[#F8F5F0] py-10">
+      <div className="max-w-7xl mx-auto px-4 md:px-6">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <p className="text-[#2D6A4F] text-xs font-semibold tracking-widest uppercase mb-1">Experiencias</p>
+            <h2 className="text-2xl md:text-3xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif)' }}>
+              Tours & Aventura
+            </h2>
+          </div>
+          <Link href="/tours" className="text-sm font-semibold text-[#2D6A4F] hover:underline whitespace-nowrap">Ver todos →</Link>
+        </div>
+        <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+          {tours.slice(0, 6).map(t => (
+            <Link key={t.id} href={`/tours/${t.id}`}
+              className="flex-shrink-0 w-52 bg-white rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
+              <div className="h-32 bg-gradient-to-br from-[#40916C] to-[#74C69D] flex items-center justify-center overflow-hidden">
+                {t.fotos[0]
+                  ? <img src={t.fotos[0]} alt={t.nombre} className="w-full h-full object-cover" />
+                  : <span className="text-4xl">🗺️</span>}
+              </div>
+              <div className="p-3">
+                <p className="font-semibold text-[#1A1A1A] text-sm truncate">{t.nombre}</p>
+                <p className="text-xs text-gray-500 truncate">📍 {t.comercio.municipio}</p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-[#2D6A4F] font-bold">{formatearPrecio(Number(t.precioPersona))}<span className="font-normal text-gray-400">/pers.</span></p>
+                  <p className="text-xs text-gray-400">⏱️ {t.duracionHoras}h</p>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* ─── Componente SeccionTransporte ───────────────────────────────── */
+const TIPO_ICONO: Record<string, string> = { LANCHA: '🛥️', BOTE: '⛵', CHALUPA: '🚤', CANOA: '🛶' }
+
+function SeccionTransporte({ transportes }: { transportes: ConfigTransporte[] }) {
+  if (transportes.length === 0) return null
+  return (
+    <section className="bg-white py-10">
+      <div className="max-w-7xl mx-auto px-4 md:px-6">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <p className="text-[#023E8A] text-xs font-semibold tracking-widest uppercase mb-1">Fluvial</p>
+            <h2 className="text-2xl md:text-3xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif)' }}>
+              Transporte Fluvial
+            </h2>
+          </div>
+          <Link href="/transportes" className="text-sm font-semibold text-[#023E8A] hover:underline whitespace-nowrap">Ver todos →</Link>
+        </div>
+        <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+          {transportes.slice(0, 6).map(t => {
+            const precioMin = t.rutas.length > 0 ? Math.min(...t.rutas.map(r => Number(r.precioAsiento))) : null
+            return (
+              <Link key={t.id} href={`/transportes/${t.id}`}
+                className="flex-shrink-0 w-52 bg-[#F8F5F0] rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
+                <div className="h-32 bg-gradient-to-br from-[#023E8A] to-[#0077B6] flex items-center justify-center overflow-hidden">
+                  {t.fotos[0]
+                    ? <img src={t.fotos[0]} alt={t.nombre} className="w-full h-full object-cover" />
+                    : <span className="text-4xl">{TIPO_ICONO[t.tipo] ?? '🛥️'}</span>}
+                </div>
+                <div className="p-3">
+                  <p className="font-semibold text-[#1A1A1A] text-sm truncate">{t.nombre}</p>
+                  <p className="text-xs text-gray-500 truncate">📍 {t.comercio.municipio}</p>
+                  {precioMin !== null && (
+                    <p className="text-xs text-[#023E8A] font-bold mt-1">Desde {formatearPrecio(precioMin)}<span className="font-normal text-gray-400">/asiento</span></p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-0.5">{t.rutas.length} ruta{t.rutas.length !== 1 ? 's' : ''}</p>
                 </div>
               </Link>
             )
@@ -352,6 +439,8 @@ export default function Home() {
   // Map: productoId (string) -> etiqueta del sello publicitario.
   const [destCatalogo, setDestCatalogo] = useState<Map<string, string>>(new Map())
   const [hoteles, setHoteles] = useState<ConfigHotel[]>([])
+  const [tours, setTours] = useState<ConfigTour[]>([])
+  const [transportes, setTransportes] = useState<ConfigTransporte[]>([])
 
   /** Carga productos según el filtro de categoría activo. */
   const cargarProductos = useCallback(async (filtro: string) => {
@@ -396,6 +485,14 @@ export default function Home() {
         if (!cancelado) setHoteles(hotelesData)
       } catch {
         if (!cancelado) setHoteles([])
+      }
+
+      // Tours y transporte
+      try {
+        const [toursData, transportesData] = await Promise.all([listarTours(), listarTransportes()])
+        if (!cancelado) { setTours(toursData); setTransportes(transportesData) }
+      } catch {
+        if (!cancelado) { setTours([]); setTransportes([]) }
       }
 
       // Visibilidades pagadas activas (HOME_DESTACADO y CATALOGO)
@@ -482,6 +579,12 @@ export default function Home() {
 
         {/* Hoteles & Turismo */}
         <SeccionHoteles hoteles={hoteles} />
+
+        {/* Tours & Aventura */}
+        <SeccionTours tours={tours} />
+
+        {/* Transporte Fluvial */}
+        <SeccionTransporte transportes={transportes} />
 
         {/* Mejores precios */}
         <SeccionOfertas productos={productos} />

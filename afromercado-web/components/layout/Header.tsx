@@ -287,6 +287,20 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                     className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
                     Mis favoritos
                   </Link>
+                  <div className="border-t border-[#1A1A1A]/10 my-1" />
+                  <Link href="/hoteles/mis-reservas" role="menuitem" onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    🏨 Reservas hotel
+                  </Link>
+                  <Link href="/tours/mis-reservas" role="menuitem" onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    🗺️ Reservas tour
+                  </Link>
+                  <Link href="/transportes/mis-reservas" role="menuitem" onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    🛥️ Reservas transporte
+                  </Link>
+                  <div className="border-t border-[#1A1A1A]/10 my-1" />
                   <Link href="/chat" role="menuitem" onClick={() => setMenuAbierto(false)}
                     className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
                     Mensajes
