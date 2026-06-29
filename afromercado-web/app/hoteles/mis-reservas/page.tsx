@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { misReservasHotel, cancelarReservaHotel, type ReservaHotel } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Toast, useToast } from '@/components/ui/Toast'
 
 const ESTADO_INFO: Record<string, { label: string; color: string; paso: number }> = {
   PENDIENTE:  { label: '⏳ Esperando confirmación', color: 'bg-amber-100 text-amber-700',  paso: 0 },
@@ -103,8 +104,16 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
 export default function MisReservasHotelPage() {
   const { autenticado, cargando: cargandoAuth } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const pagoOk = searchParams.get('pago') === 'ok'
+  const reservaIdPago = searchParams.get('reserva')
+  const { mostrar: mostrarToast, toastProps } = useToast()
   const [reservas, setReservas] = useState<ReservaHotel[]>([])
   const [cargando, setCargando] = useState(true)
+
+  useEffect(() => {
+    if (pagoOk) mostrarToast('¡Pago recibido! Tu reserva está siendo confirmada.')
+  }, [pagoOk])
 
   async function cargar() {
     const data = await misReservasHotel()
@@ -160,6 +169,7 @@ export default function MisReservasHotelPage() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F5]">
+      <Toast {...toastProps} />
       <header className="bg-white border-b border-[#E8DCC8] px-4 py-4 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <Link href="/hoteles" className="text-[#2D6A4F] p-1">

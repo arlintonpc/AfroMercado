@@ -176,6 +176,14 @@ const HotelController = {
       res.json({ ok: true, data });
     } catch (e) { next(e); }
   },
+
+  // ── PAGO DIGITAL ──────────────────────────────────────────────
+  async iniciarPagoReserva(req, res, next) {
+    try {
+      const resultado = await HotelService.iniciarPagoHotel(req.usuario.id, Number(req.params.id));
+      res.json({ ok: true, data: resultado });
+    } catch (e) { next(e); }
+  },
 };
 
 module.exports = HotelController;

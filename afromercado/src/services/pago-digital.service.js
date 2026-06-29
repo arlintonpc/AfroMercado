@@ -560,6 +560,24 @@ const PagoDigitalService = {
     }
 
     if (!pago) {
+      // Early-return para pagos de reservas de hotel (referencia HOTEL-...)
+      if (evento.providerReference && String(evento.providerReference).startsWith("HOTEL-")) {
+        const HotelService = require("./hotel.service");
+        try {
+          await HotelService.confirmarPagoHotel(evento.providerReference, evento.estado);
+          await prisma.pagoEvento.update({
+            where: { id: eventoDb.id },
+            data: { procesado: true, processedAt: new Date() },
+          });
+        } catch (e) {
+          await prisma.pagoEvento.update({
+            where: { id: eventoDb.id },
+            data: { errorMensaje: e.message },
+          });
+        }
+        return { ok: true, recibido: true, procesado: true, recurso: "HOTEL" };
+      }
+
       let solicitudPublicidad = null;
       try {
         solicitudPublicidad = await PagoPublicidadService.procesarWebhook(proveedorNombre, evento);

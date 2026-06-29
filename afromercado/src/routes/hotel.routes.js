@@ -32,9 +32,10 @@ router.get("/disponibilidad",           HotelController.disponibilidad);
 router.get("/:id",                      HotelController.obtener);
 
 // ── CLIENTE ──────────────────────────────────────────────────
-router.post(  "/reservas",              ...soloAuth, HotelController.reservar);
-router.get(   "/reservas/mis",          ...soloAuth, HotelController.misReservas);
-router.patch( "/reservas/:id/cancelar", ...soloAuth, HotelController.cancelarReserva);
+router.post(  "/reservas",                   ...soloAuth, HotelController.reservar);
+router.get(   "/reservas/mis",               ...soloAuth, HotelController.misReservas);
+router.patch( "/reservas/:id/cancelar",      ...soloAuth, HotelController.cancelarReserva);
+router.post(  "/reservas/:id/checkout",      ...soloAuth, HotelController.iniciarPagoReserva);
 
 // ── HOTELERO ─────────────────────────────────────────────────
 router.get(  "/mi-hotel/config",                ...soloComercio, HotelController.miConfig);

@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, type ConfigHotel, type HabitacionTipo } from '@/lib/api/hotel'
+import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, iniciarPagoReserva, type ConfigHotel, type HabitacionTipo } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
@@ -299,6 +299,7 @@ function FormReserva({ hotel, habitacion, onClose, onSuccess }: {
   const [notas,        setNotas]        = useState('')
   const [nombre,       setNombre]       = useState(usuario?.nombre ?? '')
   const [telefono,     setTelefono]     = useState(usuario?.telefono?.replace(/\D/g, '').replace(/^57/, '') ?? '')
+  const [pagarDeposito, setPagarDeposito] = useState(false)
   const [disponibilidad, setDisponibilidad] = useState<{ disponibles: number } | null>(null)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
@@ -316,7 +317,22 @@ function FormReserva({ hotel, habitacion, onClose, onSuccess }: {
     if (fechaSalida <= fechaEntrada) { setError('La fecha de salida debe ser posterior'); return }
     setError(''); setCargando(true)
     try {
-      await crearReserva({ habitacionTipoId: habitacion.id, fechaEntrada, fechaSalida, huespedes, metodoPago, notasCliente: notas || undefined, nombreHuesped: nombre.trim(), telefonoHuesped: telefono.trim() })
+      const metodoPagoFinal = pagarDeposito ? 'WOMPI' : metodoPago
+      const reservaCreada = await crearReserva({
+        habitacionTipoId: habitacion.id,
+        fechaEntrada, fechaSalida, huespedes,
+        metodoPago: metodoPagoFinal,
+        notasCliente: notas || undefined,
+        nombreHuesped: nombre.trim(),
+        telefonoHuesped: telefono.trim(),
+      })
+
+      if (pagarDeposito) {
+        const { checkoutUrl } = await iniciarPagoReserva(reservaCreada.id)
+        window.location.href = checkoutUrl
+        return
+      }
+
       onSuccess()
     } catch (e: any) { setError(e.message) } finally { setCargando(false) }
   }
@@ -374,14 +390,27 @@ function FormReserva({ hotel, habitacion, onClose, onSuccess }: {
             ))}
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Método de pago</label>
-            <select value={metodoPago} onChange={e => setMetodoPago(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#1B4332] bg-white">
-              <option value="EFECTIVO">💵  Efectivo al llegar</option>
-              <option value="NEQUI">📱  Nequi</option>
-              <option value="TRANSFERENCIA">🏦  Transferencia bancaria</option>
-            </select>
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿Cómo quieres pagar?</label>
+            {[
+              { id: false, icon: '💵', titulo: 'Pagar al llegar', desc: 'Sin cargo ahora. Efectivo, Nequi o transferencia al check-in.' },
+              { id: true,  icon: '💳', titulo: 'Reservar con depósito (30%)', desc: `Paga ${formatearPrecio(Math.round(total * 0.30))} ahora. Confirma inmediatamente. Resto al llegar.` },
+            ].map(op => (
+              <button key={String(op.id)} type="button"
+                onClick={() => setPagarDeposito(op.id)}
+                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${pagarDeposito === op.id ? 'border-[#1B4332] bg-[#F0FDF4]' : 'border-gray-200 hover:border-gray-300'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${pagarDeposito === op.id ? 'border-[#1B4332]' : 'border-gray-300'}`}>
+                    {pagarDeposito === op.id && <div className="w-2 h-2 rounded-full bg-[#1B4332]" />}
+                  </div>
+                  <span className="text-lg">{op.icon}</span>
+                  <div>
+                    <p className={`font-bold text-sm ${pagarDeposito === op.id ? 'text-[#1B4332]' : 'text-gray-800'}`}>{op.titulo}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{op.desc}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
           </div>
 
           <div>
@@ -396,7 +425,7 @@ function FormReserva({ hotel, habitacion, onClose, onSuccess }: {
           <button onClick={reservar}
             disabled={cargando || (disponibilidad !== null && disponibilidad.disponibles <= 0)}
             className="w-full bg-[#1B4332] text-white font-bold py-4 rounded-xl text-base hover:bg-[#15362A] transition-colors disabled:opacity-50 active:scale-[0.98] shadow-md">
-            {cargando ? 'Procesando…' : hotel.confirmacionAuto ? 'Confirmar reserva' : 'Solicitar reserva'}
+            {cargando ? 'Procesando…' : pagarDeposito ? 'Pagar depósito y reservar →' : hotel.confirmacionAuto ? 'Confirmar reserva' : 'Solicitar reserva'}
           </button>
 
           {!hotel.confirmacionAuto && (

@@ -444,6 +444,128 @@ const HotelService = {
       take: 100,
     });
   },
+
+  // ── PAGO DIGITAL (WOMPI) ──────────────────────────────────────
+
+  async iniciarPagoHotel(clienteId, reservaId) {
+    const reserva = await prisma.reservaHotel.findFirst({
+      where: { id: reservaId, clienteId },
+      include: {
+        habitacionTipo: { select: { nombre: true } },
+        configHotel: {
+          include: {
+            comercio: {
+              include: {
+                usuario: { select: { email: true, nombre: true, telefono: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
+    if (["CANCELADA", "RECHAZADA"].includes(reserva.estado)) {
+      throw new ErrorValidacion("No se puede pagar esta reserva");
+    }
+
+    // Porcentaje de depósito configurable (default 30%)
+    const pctRaw = await ConfigRepository.obtener("HOTEL_DEPOSITO_PORCENT");
+    const pct = Number(pctRaw) || 30;
+    const montoDeposito = Math.round(Number(reserva.total) * pct / 100);
+    if (montoDeposito < 1) throw new ErrorValidacion("El monto del depósito es muy bajo");
+
+    const referencia = `HOTEL-${reserva.id}-${Date.now()}`;
+    const expira = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 min
+
+    const WompiProvider = require("./payments/providers/wompi.provider");
+    const resultado = await WompiProvider.crearCheckout({
+      pago: {
+        monto: montoDeposito,
+        moneda: "COP",
+        providerReference: referencia,
+        expiraAt: expira,
+      },
+      pedido: {
+        id: reserva.id,
+        comprador: {
+          email: reserva.configHotel.comercio.usuario?.email,
+          nombre: reserva.nombreHuesped,
+          telefono: reserva.telefonoHuesped,
+        },
+      },
+    });
+
+    // Guardamos la referencia en Config para el webhook
+    await ConfigRepository.guardar(
+      `HOTEL_PAGO_${referencia}`,
+      JSON.stringify({ reservaId: reserva.id, monto: montoDeposito, pct })
+    );
+
+    // Reemplazamos el redirect-url por la página de mis-reservas del hotel
+    let checkoutUrl = resultado.checkoutUrl;
+    try {
+      const url = new URL(checkoutUrl);
+      url.searchParams.set(
+        "redirect-url",
+        `${process.env.FRONTEND_URL || "https://afromercado.vercel.app"}/hoteles/mis-reservas?pago=ok&reserva=${reserva.id}`
+      );
+      checkoutUrl = url.toString();
+    } catch { /* si la URL no es parseable, se devuelve la original */ }
+
+    return { checkoutUrl, referencia, montoDeposito, pct };
+  },
+
+  async confirmarPagoHotel(referencia, estadoWompi) {
+    const raw = await ConfigRepository.obtener(`HOTEL_PAGO_${referencia}`);
+    if (!raw) return null; // no es una reserva de hotel
+
+    const { reservaId, monto, pct } = JSON.parse(raw);
+    const APROBADOS = ["APPROVED", "CONFIRMED", "PAID", "SUCCESSFUL"];
+    const FALLIDOS  = ["DECLINED", "REJECTED", "FAILED", "ERROR", "CANCELLED", "EXPIRED"];
+
+    if (APROBADOS.includes(String(estadoWompi).toUpperCase())) {
+      const reserva = await prisma.reservaHotel.findUnique({
+        where: { id: reservaId },
+        include: {
+          configHotel: {
+            include: { comercio: { select: { usuarioId: true, nombre: true } } },
+          },
+          cliente: { select: { id: true, nombre: true } },
+        },
+      });
+      if (!reserva || reserva.estado === "CONFIRMADA") return reserva;
+
+      await prisma.reservaHotel.update({
+        where: { id: reservaId },
+        data: { estado: "CONFIRMADA", metodoPago: `WOMPI_${pct}PCT`, updatedAt: new Date() },
+      });
+
+      await notifHotel(
+        reserva.cliente.id,
+        "Pago recibido — Reserva confirmada",
+        `Tu depósito del ${pct}% fue procesado. ¡Reserva confirmada!`,
+        "/hoteles/mis-reservas"
+      );
+      await notifHotel(
+        reserva.configHotel.comercio.usuarioId,
+        "Pago de depósito recibido",
+        `${reserva.nombreHuesped} pagó el depósito. Reserva confirmada.`,
+        "/comerciante/hoteles"
+      );
+
+      await ConfigRepository.guardar(
+        `HOTEL_PAGO_${referencia}`,
+        JSON.stringify({ reservaId, monto, pct, confirmado: true })
+      );
+      return reserva;
+    }
+
+    if (FALLIDOS.includes(String(estadoWompi).toUpperCase())) {
+      console.log(`[HOTEL-PAGO] Pago fallido para reserva ${reservaId}`);
+    }
+
+    return null;
+  },
 };
 
 module.exports = HotelService;

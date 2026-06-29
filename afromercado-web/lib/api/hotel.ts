@@ -216,3 +216,8 @@ export async function crearBloqueo(datos: { habitacionId?: number | null; fechaI
 export async function eliminarBloqueo(bloqueoId: string): Promise<void> {
   await apiFetch(`/hotel/bloqueos/${bloqueoId}`, { method: 'DELETE', auth: true })
 }
+
+export async function iniciarPagoReserva(reservaId: number): Promise<{ checkoutUrl: string; referencia: string; montoDeposito: number; pct: number }> {
+  const d = await apiFetch<{ ok: boolean; data: any }>(`/hotel/reservas/${reservaId}/checkout`, { method: 'POST', auth: true })
+  return d.data
+}
