@@ -26,7 +26,7 @@ export default function SeccionReviewsHotel({ configHotelId, reservaElegibleId }
   }, [configHotelId])
 
   const promedio = reviews.length > 0 ? reviews.reduce((s, r) => s + r.calificacion, 0) / reviews.length : 0
-  const yaDejóReview = reviews.some(r => r.clienteId === usuario?.id)
+  const yaDejóReview = reviews.some(r => String(r.clienteId) === String(usuario?.id))
 
   async function enviarReview() {
     if (!reservaElegibleId) return
