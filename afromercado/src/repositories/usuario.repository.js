@@ -27,7 +27,10 @@ const UsuarioRepository = {
   },
 
   async buscarPorId(id) {
-    return prisma.usuario.findUnique({ where: { id } });
+    return prisma.usuario.findUnique({
+      where: { id },
+      include: { comercio: { select: { id: true, nombre: true, municipio: true } } },
+    });
   },
 
   async actualizar(id, datos) {

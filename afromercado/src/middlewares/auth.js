@@ -33,7 +33,7 @@ async function autenticar(req, res, next) {
       }
     }
 
-    req.usuario = { id: usuario.id, rol: usuario.rol, nombre: usuario.nombre };
+    req.usuario = { id: usuario.id, rol: usuario.rol, nombre: usuario.nombre, comercio: usuario.comercio ?? null };
     next();
   } catch (err) {
     next(new ErrorNoAutorizado("Token inválido o expirado."));
@@ -60,7 +60,7 @@ async function autenticarOpcional(req, res, next) {
     const payload = verificarToken(token);
     const usuario = await UsuarioRepository.buscarPorId(payload.id);
     if (usuario && usuario.activo) {
-      req.usuario = { id: usuario.id, rol: usuario.rol, nombre: usuario.nombre };
+      req.usuario = { id: usuario.id, rol: usuario.rol, nombre: usuario.nombre, comercio: usuario.comercio ?? null };
     }
   } catch { /* token inválido — continúa sin usuario */ }
   next();
