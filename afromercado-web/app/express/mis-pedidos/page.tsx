@@ -1,32 +1,114 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { misPedidosExpress, type PedidoExpress } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
+import { obtenerToken } from '@/lib/api/client'
 
-const ESTADO_LABEL: Record<string, string> = {
-  PENDIENTE:      '⏳ Pendiente',
-  ACEPTADO:       '✅ Aceptado',
-  EN_PREPARACION: '👨‍🍳 Preparando',
-  LISTO:          '🔔 Listo',
-  EN_CAMINO:      '🛵 En camino',
-  ENTREGADO:      '🎉 Entregado',
-  CANCELADO:      '❌ Cancelado',
-  RECHAZADO:      '🚫 Rechazado',
+const ESTADOS_ORDEN = ['PENDIENTE','ACEPTADO','EN_PREPARACION','LISTO','EN_CAMINO','ENTREGADO']
+
+const ESTADO_INFO: Record<string, { label: string; color: string; paso: number }> = {
+  PENDIENTE:      { label: '⏳ Pendiente de confirmación', color: 'bg-amber-100 text-amber-700',   paso: 0 },
+  ACEPTADO:       { label: '✅ Confirmado por el restaurante', color: 'bg-blue-100 text-blue-700',  paso: 1 },
+  EN_PREPARACION: { label: '👨‍🍳 Preparando tu pedido',         color: 'bg-blue-100 text-blue-700',  paso: 2 },
+  LISTO:          { label: '🔔 ¡Listo! Espera al repartidor', color: 'bg-green-100 text-green-700', paso: 3 },
+  EN_CAMINO:      { label: '🛵 En camino hacia ti',            color: 'bg-green-100 text-green-700', paso: 4 },
+  ENTREGADO:      { label: '🎉 ¡Entregado!',                   color: 'bg-green-100 text-green-700', paso: 5 },
+  CANCELADO:      { label: '❌ Cancelado',                     color: 'bg-red-100 text-red-600',     paso: -1 },
+  RECHAZADO:      { label: '🚫 Rechazado por el restaurante', color: 'bg-red-100 text-red-600',     paso: -1 },
 }
 
-const ESTADO_COLOR: Record<string, string> = {
-  PENDIENTE:      'bg-[#FFF3CD] text-[#856404]',
-  ACEPTADO:       'bg-[#D1E7DD] text-[#0F5132]',
-  EN_PREPARACION: 'bg-[#CCE5FF] text-[#004085]',
-  LISTO:          'bg-[#D4EDDA] text-[#155724]',
-  EN_CAMINO:      'bg-[#D1ECF1] text-[#0C5460]',
-  ENTREGADO:      'bg-[#D4EDDA] text-[#155724]',
-  CANCELADO:      'bg-[#F8D7DA] text-[#721C24]',
-  RECHAZADO:      'bg-[#F8D7DA] text-[#721C24]',
+const PASOS = ['Enviado', 'Aceptado', 'Preparando', 'Listo', 'En camino', 'Entregado']
+
+function BarraProgreso({ estado }: { estado: string }) {
+  const info = ESTADO_INFO[estado]
+  if (!info || info.paso < 0) return null
+  return (
+    <div className="mt-3">
+      <div className="flex justify-between mb-1">
+        {PASOS.map((p, i) => (
+          <div key={p} className="flex flex-col items-center gap-0.5" style={{ flex: 1 }}>
+            <div className={`w-4 h-4 rounded-full border-2 transition-all ${
+              i <= info.paso
+                ? 'bg-green-600 border-green-600'
+                : 'bg-white border-gray-300'
+            }`} />
+            <span className={`text-[9px] text-center leading-tight ${i <= info.paso ? 'text-green-700 font-medium' : 'text-gray-400'}`}>
+              {p}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="relative h-1 bg-gray-200 rounded-full mt-0.5">
+        <div
+          className="absolute h-1 bg-green-600 rounded-full transition-all duration-700"
+          style={{ width: `${(info.paso / (PASOS.length - 1)) * 100}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function TarjetaPedido({ pedido, onActualizar }: { pedido: PedidoExpress; onActualizar?: () => void }) {
+  const info = ESTADO_INFO[pedido.estado] ?? { label: pedido.estado, color: 'bg-gray-100 text-gray-600', paso: -1 }
+  const activo = !['ENTREGADO','CANCELADO','RECHAZADO'].includes(pedido.estado)
+
+  return (
+    <div className={`bg-white rounded-2xl shadow-sm p-4 border-l-4 transition-all ${
+      activo ? 'border-green-500' : 'border-gray-200'
+    }`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-bold text-[#1A1A1A] truncate">
+            {pedido.configExpress?.comercio.nombre ?? `Pedido #${pedido.id}`}
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {new Date(pedido.creadoAt).toLocaleDateString('es-CO', {
+              day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+            })}
+          </p>
+        </div>
+        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${info.color}`}>
+          {info.label}
+        </span>
+      </div>
+
+      {/* Barra de progreso */}
+      {activo && <BarraProgreso estado={pedido.estado} />}
+
+      {/* Items */}
+      <div className="mt-3 space-y-0.5">
+        {pedido.items.map(i => (
+          <p key={i.id} className="text-sm text-gray-600">
+            {i.cantidad}× {i.producto?.nombre ?? `Producto #${i.productoId}`}
+          </p>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+        <span className="text-xs text-gray-400">
+          {pedido.modalidad === 'DOMICILIO' ? '🛵 Domicilio' : pedido.modalidad === 'MESA' ? '🪑 Mesa' : '🏪 Recoger'}
+          {' · '}
+          {pedido.metodoPago === 'EFECTIVO' ? 'Efectivo' : pedido.metodoPago}
+        </span>
+        <span className="font-bold text-[#1A1A1A]">{formatearPrecio(pedido.total)}</span>
+      </div>
+
+      {/* Pedir de nuevo */}
+      {['ENTREGADO'].includes(pedido.estado) && pedido.configExpress && (
+        <Link
+          href={`/express/${pedido.configExpress.comercio.nombre ? pedido.comercioId ?? '' : ''}`}
+          className="mt-3 block text-center text-xs font-semibold text-green-700 border border-green-300 rounded-xl py-2 hover:bg-green-50 transition-colors"
+        >
+          Pedir de nuevo →
+        </Link>
+      )}
+    </div>
+  )
 }
 
 export default function MisPedidosExpressPage() {
@@ -34,17 +116,51 @@ export default function MisPedidosExpressPage() {
   const router = useRouter()
   const [pedidos, setPedidos] = useState<PedidoExpress[]>([])
   const [cargando, setCargando] = useState(true)
+  const sseRef = useRef<EventSource | null>(null)
+
+  async function cargar() {
+    const data = await misPedidosExpress()
+    setPedidos(data)
+    setCargando(false)
+  }
 
   useEffect(() => {
     if (cargandoAuth) return
     if (!autenticado) { router.push('/login'); return }
-    misPedidosExpress().then(data => { setPedidos(data); setCargando(false) })
+    cargar()
   }, [autenticado, cargandoAuth, router])
+
+  // SSE: actualizar pedidos en tiempo real cuando cambia el estado
+  useEffect(() => {
+    if (!autenticado) return
+    const token = obtenerToken()
+    if (!token) return
+
+    const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
+    const url = `${API}/notificaciones/stream?token=${encodeURIComponent(token)}`
+    const es = new EventSource(url)
+    sseRef.current = es
+
+    es.addEventListener('notificacion', (e) => {
+      try {
+        const notif = JSON.parse((e as MessageEvent).data)
+        // Si la notif es sobre un pedido Express, recargar
+        if (notif?.tipo?.startsWith('EXPRESS_') || notif?.url?.includes('mis-pedidos')) {
+          cargar()
+        }
+      } catch {}
+    })
+
+    return () => { es.close(); sseRef.current = null }
+  }, [autenticado])
+
+  const activos = pedidos.filter(p => !['ENTREGADO','CANCELADO','RECHAZADO'].includes(p.estado))
+  const anteriores = pedidos.filter(p => ['ENTREGADO','CANCELADO','RECHAZADO'].includes(p.estado))
 
   if (cargando) {
     return (
       <div className="min-h-screen bg-[#FAF8F5] flex items-center justify-center">
-        <div className="animate-pulse text-[#2D6A4F]">Cargando pedidos...</div>
+        <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -54,52 +170,47 @@ export default function MisPedidosExpressPage() {
       <header className="bg-white border-b border-[#E8DCC8] px-4 py-4 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <Link href="/express" className="text-[#2D6A4F] p-1">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M19 12H5M12 5l-7 7 7 7"/>
+            </svg>
           </Link>
           <h1 className="font-bold text-[#1A1A1A] text-lg">Mis pedidos Express</h1>
+          {activos.length > 0 && (
+            <span className="ml-auto bg-green-600 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
+              {activos.length} activo{activos.length > 1 ? 's' : ''}
+            </span>
+          )}
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto p-4 space-y-3">
+      <main className="max-w-lg mx-auto p-4 space-y-4 pb-10">
         {pedidos.length === 0 ? (
           <div className="text-center py-16 text-[#999]">
             <p className="text-4xl mb-3">🛵</p>
             <p className="font-medium">Aún no tienes pedidos Express</p>
-            <Link href="/express" className="mt-4 inline-block text-[#2D6A4F] underline text-sm">Ver restaurantes</Link>
+            <Link href="/express" className="mt-4 inline-block text-[#2D6A4F] underline text-sm">
+              Ver restaurantes
+            </Link>
           </div>
         ) : (
-          pedidos.map(p => (
-            <div key={p.id} className="bg-white rounded-2xl shadow-sm p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-bold text-[#1A1A1A]">
-                    {p.configExpress?.comercio.nombre ?? `Pedido #${p.id}`}
-                  </p>
-                  <p className="text-xs text-[#999] mt-0.5">
-                    {new Date(p.creadoAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  </p>
+          <>
+            {activos.length > 0 && (
+              <section>
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">En curso</h2>
+                <div className="space-y-3">
+                  {activos.map(p => <TarjetaPedido key={p.id} pedido={p} onActualizar={cargar} />)}
                 </div>
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${ESTADO_COLOR[p.estado] ?? 'bg-[#EEE] text-[#666]'}`}>
-                  {ESTADO_LABEL[p.estado] ?? p.estado}
-                </span>
-              </div>
-
-              <div className="mt-3 space-y-1">
-                {p.items.map(i => (
-                  <p key={i.id} className="text-sm text-[#444]">
-                    {i.cantidad}× {i.producto?.nombre ?? `Producto #${i.productoId}`}
-                  </p>
-                ))}
-              </div>
-
-              <div className="mt-3 pt-3 border-t border-[#F0EBE3] flex justify-between items-center">
-                <span className="text-xs text-[#999]">
-                  {p.modalidad === 'DOMICILIO' ? '🛵 Domicilio' : p.modalidad === 'MESA' ? '🪑 Mesa' : '🏪 Recoger'} · {p.metodoPago}
-                </span>
-                <span className="font-bold text-[#1A1A1A]">{formatearPrecio(p.total)}</span>
-              </div>
-            </div>
-          ))
+              </section>
+            )}
+            {anteriores.length > 0 && (
+              <section>
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Anteriores</h2>
+                <div className="space-y-3">
+                  {anteriores.map(p => <TarjetaPedido key={p.id} pedido={p} onActualizar={cargar} />)}
+                </div>
+              </section>
+            )}
+          </>
         )}
       </main>
     </div>

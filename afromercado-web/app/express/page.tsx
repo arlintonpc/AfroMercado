@@ -33,6 +33,7 @@ function formatearDistancia(km: number) {
 export default function ExpressPage() {
   const [todos, setTodos]               = useState<ComercioExpress[]>([])
   const [busqueda, setBusqueda]         = useState('')
+  const [soloAbiertos, setSoloAbiertos] = useState(false)
   const [vista, setVista]               = useState<'lista'|'mapa'>('lista')
   const [gpsEstado, setGpsEstado]       = useState<'idle'|'buscando'|'ok'|'error'>('idle')
   const [gpsCiudad, setGpsCiudad]       = useState('')
@@ -62,14 +63,14 @@ export default function ExpressPage() {
   // Municipios únicos de los comercios reales
   const municipios = Array.from(new Set(todos.map(c => c.comercio.municipio).filter(Boolean)))
 
-  // Filtro: búsqueda de texto (nombre o municipio del comercio)
+  // Filtro: búsqueda de texto y toggle abiertos
   const termino = busqueda.trim().toLowerCase()
-  const filtrados = termino
-    ? todos.filter(c =>
-        c.comercio.nombre.toLowerCase().includes(termino) ||
-        (c.comercio.municipio ?? '').toLowerCase().includes(termino)
-      )
-    : todos
+  const filtrados = todos
+    .filter(c => !soloAbiertos || c.abierto)
+    .filter(c => !termino ||
+      c.comercio.nombre.toLowerCase().includes(termino) ||
+      (c.comercio.municipio ?? '').toLowerCase().includes(termino)
+    )
 
   // Si el usuario tiene GPS y los comercios tienen coordenadas, ordenar por distancia
   const comercios = userLat && userLon
@@ -220,6 +221,19 @@ export default function ExpressPage() {
         )}
       </div>
 
+      {/* Filtros: solo abiertos + lista/mapa */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          onClick={() => setSoloAbiertos(v => !v)}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${
+            soloAbiertos ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          <span className={`w-2 h-2 rounded-full ${soloAbiertos ? 'bg-white' : 'bg-green-500'}`} />
+          Solo abiertos
+          {soloAbiertos && <span className="ml-1 bg-white/20 rounded-full px-1.5 text-xs">{filtrados.length}</span>}
+        </button>
+
       {/* Toggle Lista / Mapa */}
       <div className="flex rounded-xl border border-gray-200 overflow-hidden w-fit">
         <button
@@ -245,6 +259,7 @@ export default function ExpressPage() {
           Mapa
         </button>
       </div>
+      </div>{/* fin filtros */}
 
       {error && (
         <div className="bg-red-50 text-red-700 border border-red-200 rounded-xl px-4 py-3 text-sm">{error}</div>

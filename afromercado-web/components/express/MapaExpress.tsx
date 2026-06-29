@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet'
 import L from 'leaflet'
 import Link from 'next/link'
@@ -43,10 +43,21 @@ function formatearDistancia(km: number) {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`
 }
 
-// Centra el mapa cuando cambia la ubicación del usuario
-function CentrarMapa({ lat, lon }: { lat: number; lon: number }) {
+// Centra el mapa y ajusta el zoom para mostrar todos los puntos
+function AjustarVista({ comercios, userLat, userLon }: {
+  comercios: ComercioExpress[]; userLat: number | null; userLon: number | null
+}) {
   const map = useMap()
-  useEffect(() => { map.setView([lat, lon], map.getZoom()) }, [lat, lon, map])
+  useEffect(() => {
+    const puntos: [number, number][] = comercios
+      .filter(c => c.comercio.latitud && c.comercio.longitud)
+      .map(c => [c.comercio.latitud!, c.comercio.longitud!])
+    if (userLat && userLon) puntos.push([userLat, userLon])
+    if (puntos.length === 0) return
+    if (puntos.length === 1) { map.setView(puntos[0], 13); return }
+    const bounds = L.latLngBounds(puntos)
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 })
+  }, [comercios, userLat, userLon, map])
   return null
 }
 
@@ -58,16 +69,26 @@ interface Props {
 
 export default function MapaExpress({ comercios, userLat, userLon }: Props) {
   const conCoordenadas = comercios.filter(c => c.comercio.latitud && c.comercio.longitud)
+  const markerRefs = useRef<Record<number, L.Marker>>({})
 
-  // Centro inicial: promedio de comercios con coords, o Colombia si no hay ninguno
+  // Centro inicial: primer comercio con coords, o Colombia
   const centroInicial: [number, number] = conCoordenadas.length > 0
-    ? [
-        conCoordenadas.reduce((s, c) => s + c.comercio.latitud!, 0) / conCoordenadas.length,
-        conCoordenadas.reduce((s, c) => s + c.comercio.longitud!, 0) / conCoordenadas.length,
-      ]
-    : [5.0, -75.5] // Colombia central
+    ? [conCoordenadas[0].comercio.latitud!, conCoordenadas[0].comercio.longitud!]
+    : [5.0, -75.5]
 
-  const zoom = userLat && userLon ? 10 : conCoordenadas.length > 0 ? 8 : 6
+  // Abrir popup del más cercano cuando el usuario activa GPS
+  useEffect(() => {
+    if (!userLat || !userLon || conCoordenadas.length === 0) return
+    const masC = conCoordenadas.reduce((prev, curr) => {
+      const dP = distanciaKm(userLat, userLon, prev.comercio.latitud!, prev.comercio.longitud!)
+      const dC = distanciaKm(userLat, userLon, curr.comercio.latitud!, curr.comercio.longitud!)
+      return dC < dP ? curr : prev
+    })
+    const marker = markerRefs.current[masC.id]
+    if (marker) setTimeout(() => marker.openPopup(), 600)
+  }, [userLat, userLon])
+
+  const zoom = 6
 
   return (
     <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: 420 }}>
@@ -82,6 +103,8 @@ export default function MapaExpress({ comercios, userLat, userLon }: Props) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        <AjustarVista comercios={comercios} userLat={userLat} userLon={userLon} />
+
         {/* Posición del usuario */}
         {userLat && userLon && (
           <>
@@ -93,7 +116,6 @@ export default function MapaExpress({ comercios, userLat, userLon }: Props) {
               radius={500}
               pathOptions={{ color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.08, weight: 1.5 }}
             />
-            <CentrarMapa lat={userLat} lon={userLon} />
           </>
         )}
 
@@ -104,7 +126,9 @@ export default function MapaExpress({ comercios, userLat, userLon }: Props) {
           const dist = userLat && userLon ? distanciaKm(userLat, userLon, lat, lon) : null
 
           return (
-            <Marker key={cfg.id} position={[lat, lon]} icon={iconoRestaurante}>
+            <Marker key={cfg.id} position={[lat, lon]} icon={iconoRestaurante}
+              ref={m => { if (m) markerRefs.current[cfg.id] = m }}
+            >
               <Popup minWidth={200}>
                 <div className="space-y-1">
                   <div className="flex items-center gap-1.5">

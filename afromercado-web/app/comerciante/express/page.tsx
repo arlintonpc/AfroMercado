@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   obtenerConfigExpress, actualizarConfigExpress, toggleAbiertoExpress,
   pedidosComercioExpress, aceptarPedidoExpress, rechazarPedidoExpress, avanzarEstadoExpress,
@@ -8,6 +8,7 @@ import {
   type ConfigExpress, type PedidoExpress, type ModalidadExpress, type DiaSemana, type HorarioExpress,
 } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import { obtenerToken } from '@/lib/api/client'
 
 const MUNICIPIOS_CHOCO = [
   'Quibdó','Istmina','Tadó','Condoto','Bagadó','Acandí','Bahía Solano',
@@ -74,6 +75,8 @@ export default function ExpressComerciante() {
   const [config, setConfig]       = useState<ConfigExpress | null>(null)
   const [pedidos, setPedidos]     = useState<PedidoExpress[]>([])
   const [cargando, setCargando]   = useState(true)
+  const [pedidosNuevos, setPedidosNuevos] = useState(0)
+  const pedidosRef = useRef<PedidoExpress[]>([])
   const [guardando, setGuardando] = useState(false)
   const [editConfig, setEditConfig] = useState<Partial<ConfigExpress>>({})
   const [horarios, setHorarios]   = useState<HorarioExpress[]>(HORARIO_DEFAULT)
@@ -89,6 +92,27 @@ export default function ExpressComerciante() {
       ])
       setConfig(cfg)
       setEditConfig(cfg)
+      // Detectar pedidos PENDIENTE nuevos vs los que ya teníamos
+      const prevIds = new Set(pedidosRef.current.map(p => p.id))
+      const nuevos = peds.filter(p => p.estado === 'PENDIENTE' && !prevIds.has(p.id))
+      if (nuevos.length > 0 && pedidosRef.current.length > 0) {
+        setPedidosNuevos(n => n + nuevos.length)
+        // Alerta sonora con Web Audio API (sin archivo externo)
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+          ;[0, 150, 300].forEach(delay => {
+            const osc = ctx.createOscillator()
+            const gain = ctx.createGain()
+            osc.connect(gain); gain.connect(ctx.destination)
+            osc.frequency.value = 880
+            gain.gain.setValueAtTime(0.3, ctx.currentTime + delay / 1000)
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay / 1000 + 0.3)
+            osc.start(ctx.currentTime + delay / 1000)
+            osc.stop(ctx.currentTime + delay / 1000 + 0.3)
+          })
+        } catch {}
+      }
+      pedidosRef.current = peds
       setPedidos(peds)
       setFestivos(fest.festivos)
       // Mezclar horarios guardados con defaults
@@ -111,6 +135,23 @@ export default function ExpressComerciante() {
     const interval = setInterval(cargar, 20_000)
     return () => clearInterval(interval)
   }, [cargar])
+
+  // SSE: recarga inmediata cuando llega notificación de nuevo pedido
+  useEffect(() => {
+    const token = obtenerToken()
+    if (!token) return
+    const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
+    const es = new EventSource(`${API}/notificaciones/stream?token=${encodeURIComponent(token)}`)
+    es.addEventListener('notificacion', (e) => {
+      try {
+        const notif = JSON.parse((e as MessageEvent).data)
+        if (notif?.tipo === 'NUEVO_PEDIDO_EXPRESS' || notif?.url?.includes('express')) {
+          cargar()
+        }
+      } catch {}
+    })
+    return () => es.close()
+  }, [])
 
   async function toggleAbierto() {
     if (!config) return
@@ -218,12 +259,17 @@ export default function ExpressComerciante() {
         {([['activos', `Activos (${activos.length})`], ['historial', 'Historial'], ['config', 'Configuración']] as [Pestana, string][]).map(([id, label]) => (
           <button
             key={id}
-            onClick={() => setPestana(id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            onClick={() => { setPestana(id); if (id === 'activos') setPedidosNuevos(0) }}
+            className={`relative px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               pestana === id ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             {label}
+            {id === 'activos' && pedidosNuevos > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-bounce">
+                {pedidosNuevos}
+              </span>
+            )}
           </button>
         ))}
       </div>

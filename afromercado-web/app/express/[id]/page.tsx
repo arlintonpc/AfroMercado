@@ -47,6 +47,13 @@ export default function MenuExpressPage() {
   const [notaCliente, setNotaCliente] = useState('')
   const [mesa, setMesa] = useState('')
 
+  // Pre-llenar teléfono desde el perfil del usuario
+  useEffect(() => {
+    if (usuario?.telefono && !telefonoEntrega) {
+      setTelefonoEntrega(usuario.telefono.replace(/\D/g, '').replace(/^57/, ''))
+    }
+  }, [usuario])
+
   const cargar = useCallback(async () => {
     const data = await obtenerMenuComercioExpress(comercioId)
     setMenu(data)
