@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { obtenerMiTour, actualizarMiTour, reservasOperadorTour, cambiarEstadoReservaTour, type ConfigTour, type ReservaTour, type EstadoReservaTour } from '@/lib/api/tour'
+import { obtenerMiTour, actualizarMiTour, reservasOperadorTour, cambiarEstadoReservaTour, subirFotosTour, type ConfigTour, type ReservaTour, type EstadoReservaTour } from '@/lib/api/tour'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
 const SERVICIOS_OPCIONES = [
@@ -36,8 +36,10 @@ export default function ComercianteTourPage() {
   const [reservas, setReservas] = useState<ReservaTour[]>([])
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
+  const [subiendoFotos, setSubiendoFotos] = useState(false)
   const [editConfig, setEditConfig] = useState<Partial<ConfigTour>>({})
   const reservasRef = useRef<ReservaTour[]>([])
+  const inputFotoRef = useRef<HTMLInputElement>(null)
 
   const pendientes = reservas.filter(r => r.estado === 'PENDIENTE')
 
@@ -83,6 +85,18 @@ export default function ComercianteTourPage() {
       setReservas(prev => prev.map(r => r.id === id ? { ...r, estado } : r))
     } catch (e: any) {
       alert(e.message)
+    }
+  }
+
+  async function subirFotos(archivos: FileList) {
+    setSubiendoFotos(true)
+    try {
+      const t = await subirFotosTour(archivos)
+      setTour(t)
+    } catch (e: any) {
+      alert(e.message)
+    } finally {
+      setSubiendoFotos(false)
     }
   }
 
@@ -283,6 +297,24 @@ export default function ComercianteTourPage() {
                 )
               })}
             </div>
+          </div>
+
+          {/* Fotos */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+            <h3 className="font-semibold text-[#1A1A1A] mb-3">Fotos del tour</h3>
+            {(tour?.fotos ?? []).length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {tour?.fotos.map((f, i) => (
+                  <img key={i} src={f} alt="" className="w-full h-20 object-cover rounded-xl" />
+                ))}
+              </div>
+            )}
+            <input ref={inputFotoRef} type="file" accept="image/*" multiple className="hidden"
+              onChange={e => e.target.files && subirFotos(e.target.files)} />
+            <button onClick={() => inputFotoRef.current?.click()} disabled={subiendoFotos}
+              className="w-full border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm text-gray-500 hover:border-[#2D6A4F] hover:text-[#2D6A4F] disabled:opacity-50 transition-colors">
+              {subiendoFotos ? '⏳ Subiendo…' : '📸 Agregar fotos'}
+            </button>
           </div>
 
           {/* Política cancelación */}

@@ -8,6 +8,7 @@ import { obtenerHotel, verificarDisponibilidad, crearReserva, type ConfigHotel, 
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
+import SeccionReviewsHotel from '@/components/hoteles/SeccionReviewsHotel'
 
 const MapaHoteles = dynamic(() => import('@/components/hoteles/MapaHoteles'), { ssr: false })
 
@@ -283,6 +284,9 @@ export default function HotelDetallePage() {
             </a>
           )}
         </div>
+
+        {/* Reseñas */}
+        <SeccionReviewsHotel configHotelId={hotel.id} />
 
         {/* Habitaciones */}
         <div>

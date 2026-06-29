@@ -25,6 +25,7 @@ const NAV_LINKS = [
   { href: '/admin/reportes',             label: 'Reportes'       },
   { href: '/admin/hoteles',              label: '🏨 Hoteles'     },
   { href: '/admin/tours',               label: '🗺️ Tours'       },
+  { href: '/admin/transportes',         label: '🛥️ Transporte'  },
   { href: '/admin/config',               label: 'Config'         },
 ]
 

@@ -111,6 +111,86 @@ async function aplicarMigraciones() {
       CONSTRAINT "ReservaTour_configTourId_fkey" FOREIGN KEY ("configTourId") REFERENCES "ConfigTour"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
       CONSTRAINT "ReservaTour_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE
     )`,
+    // Categorías base de turismo
+    `INSERT INTO "Categoria" ("nombre","slug","icono","activa")
+      VALUES ('Hotelería','hoteleria','🏨',true),
+             ('Tours & Experiencias','tours','🗺️',true)
+      ON CONFLICT ("slug") DO NOTHING`,
+    // Reviews de hoteles
+    `CREATE TABLE IF NOT EXISTS "ReviewHotel" (
+      "id" SERIAL PRIMARY KEY,
+      "configHotelId" INTEGER NOT NULL,
+      "clienteId" INTEGER NOT NULL,
+      "reservaHotelId" INTEGER NOT NULL UNIQUE,
+      "calificacion" INTEGER NOT NULL CHECK ("calificacion" BETWEEN 1 AND 5),
+      "comentario" TEXT,
+      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ReviewHotel_configHotelId_fkey" FOREIGN KEY ("configHotelId") REFERENCES "ConfigHotel"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "ReviewHotel_clienteId_fkey"    FOREIGN KEY ("clienteId")    REFERENCES "Usuario"("id")     ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "ReviewHotel_reservaHotelId_fkey" FOREIGN KEY ("reservaHotelId") REFERENCES "ReservaHotel"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    )`,
+    // Reviews de tours
+    `CREATE TABLE IF NOT EXISTS "ReviewTour" (
+      "id" SERIAL PRIMARY KEY,
+      "configTourId" INTEGER NOT NULL,
+      "clienteId" INTEGER NOT NULL,
+      "reservaTourId" INTEGER NOT NULL UNIQUE,
+      "calificacion" INTEGER NOT NULL CHECK ("calificacion" BETWEEN 1 AND 5),
+      "comentario" TEXT,
+      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ReviewTour_configTourId_fkey"   FOREIGN KEY ("configTourId")   REFERENCES "ConfigTour"("id")   ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "ReviewTour_clienteId_fkey"      FOREIGN KEY ("clienteId")      REFERENCES "Usuario"("id")      ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "ReviewTour_reservaTourId_fkey"  FOREIGN KEY ("reservaTourId")  REFERENCES "ReservaTour"("id")  ON DELETE CASCADE ON UPDATE CASCADE
+    )`,
+    // Módulo Transporte fluvial
+    `CREATE TABLE IF NOT EXISTS "ConfigTransporte" (
+      "id" SERIAL PRIMARY KEY,
+      "comercioId" INTEGER NOT NULL UNIQUE,
+      "activo" BOOLEAN NOT NULL DEFAULT false,
+      "nombre" TEXT NOT NULL DEFAULT 'Mi Servicio',
+      "descripcion" TEXT,
+      "tipo" TEXT NOT NULL DEFAULT 'LANCHA',
+      "fotos" TEXT[] NOT NULL DEFAULT '{}',
+      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ConfigTransporte_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    )`,
+    `CREATE TABLE IF NOT EXISTS "RutaTransporte" (
+      "id" SERIAL PRIMARY KEY,
+      "configTransporteId" INTEGER NOT NULL,
+      "origen" TEXT NOT NULL,
+      "destino" TEXT NOT NULL,
+      "horario" TEXT NOT NULL,
+      "diasSemana" TEXT[] NOT NULL DEFAULT '{}',
+      "capacidad" INTEGER NOT NULL DEFAULT 10,
+      "precioAsiento" DECIMAL(12,2) NOT NULL DEFAULT 0,
+      "activo" BOOLEAN NOT NULL DEFAULT true,
+      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "RutaTransporte_configTransporteId_fkey" FOREIGN KEY ("configTransporteId") REFERENCES "ConfigTransporte"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    )`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoReservaTransporte') THEN
+        CREATE TYPE "EstadoReservaTransporte" AS ENUM ('PENDIENTE','CONFIRMADA','CANCELADA','RECHAZADA','COMPLETADA');
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "ReservaTransporte" (
+      "id" SERIAL PRIMARY KEY,
+      "codigo" TEXT NOT NULL UNIQUE,
+      "rutaTransporteId" INTEGER NOT NULL,
+      "clienteId" INTEGER NOT NULL,
+      "fechaViaje" TIMESTAMP(3) NOT NULL,
+      "asientos" INTEGER NOT NULL DEFAULT 1,
+      "total" DECIMAL(12,2) NOT NULL,
+      "estado" "EstadoReservaTransporte" NOT NULL DEFAULT 'PENDIENTE',
+      "metodoPago" TEXT NOT NULL DEFAULT 'EFECTIVO',
+      "notasCliente" TEXT,
+      "nombreContacto" TEXT NOT NULL,
+      "telefonoContacto" TEXT NOT NULL,
+      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ReservaTransporte_rutaTransporteId_fkey" FOREIGN KEY ("rutaTransporteId") REFERENCES "RutaTransporte"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "ReservaTransporte_clienteId_fkey"        FOREIGN KEY ("clienteId")        REFERENCES "Usuario"("id")          ON DELETE RESTRICT ON UPDATE CASCADE
+    )`,
   ];
   for (const sql of migraciones) {
     try {

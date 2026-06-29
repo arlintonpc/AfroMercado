@@ -2,7 +2,8 @@ const express = require("express");
 const multer  = require("multer");
 const path    = require("path");
 const { autenticar, autorizar } = require("../middlewares/auth");
-const HotelController = require("../controllers/hotel.controller");
+const HotelController  = require("../controllers/hotel.controller");
+const ReviewController = require("../controllers/review.controller");
 
 const router = express.Router();
 
@@ -45,6 +46,10 @@ router.delete("/mi-hotel/habitaciones/:id",     ...soloComercio, HotelController
 router.get(  "/mi-hotel/reservas",              ...soloComercio, HotelController.reservasHotelero);
 router.patch("/mi-hotel/reservas/:id/estado",   ...soloComercio, HotelController.cambiarEstado);
 router.get(  "/mi-hotel/ocupacion",             ...soloComercio, HotelController.ocupacion);
+
+// ── REVIEWS ──────────────────────────────────────────────────
+router.get( "/:id/reviews",        ReviewController.reviewsHotel);
+router.post("/reservas/:id/review",...soloAuth, ReviewController.crearReviewHotel);
 
 // ── ADMIN ─────────────────────────────────────────────────────
 router.get(   "/admin/todos",         ...soloAdmin, HotelController.adminListar);

@@ -195,6 +195,15 @@ const TourService = {
     return actualizada;
   },
 
+  async agregarFotos(comercioId, urls) {
+    const tour = await prisma.configTour.findUnique({ where: { comercioId } });
+    if (!tour) throw new ErrorNoEncontrado("Tour no encontrado");
+    return prisma.configTour.update({
+      where: { comercioId },
+      data: { fotos: [...tour.fotos, ...urls], updatedAt: new Date() },
+    });
+  },
+
   // Admin
   async adminListar() {
     return prisma.configTour.findMany({

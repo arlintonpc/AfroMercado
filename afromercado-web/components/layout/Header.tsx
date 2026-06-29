@@ -158,6 +158,12 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             🗺️ Tours
           </Link>
           <Link
+            href="/transportes"
+            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#023E8A] hover:bg-[#023E8A]/10 flex items-center gap-1"
+          >
+            🛥️ Transporte
+          </Link>
+          <Link
             href="/temporada"
             className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#D4A017] hover:bg-[#D4A017]/10 flex items-center"
           >

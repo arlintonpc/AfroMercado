@@ -132,3 +132,17 @@ export async function adminCambiarEstadoTour(id: number, activo: boolean): Promi
   const r = await apiFetch<{ ok: boolean; data: ConfigTour }>(`/tours/admin/${id}/estado`, { method: 'PATCH', body: { activo } })
   return r.data
 }
+
+export async function subirFotosTour(archivos: FileList): Promise<ConfigTour> {
+  const form = new FormData()
+  Array.from(archivos).forEach(f => form.append('fotos', f))
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tours/mi-tour/config/fotos`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.message ?? 'Error al subir fotos')
+  return json.data
+}

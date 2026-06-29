@@ -43,5 +43,6 @@ router.use("/publicidad",    require("./publicidad.routes"));
 router.use("/express",       require("./express.routes"));
 router.use("/hoteles",       require("./hotel.routes"));
 router.use("/tours",         require("./tour.routes"));
+router.use("/transportes",   require("./transporte.routes"));
 
 module.exports = router;

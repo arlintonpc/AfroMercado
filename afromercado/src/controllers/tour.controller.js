@@ -1,3 +1,5 @@
+const fs = require("fs");
+const { subirACloudinary } = require("../utils/cloudinary");
 const TourService = require("../services/tour.service");
 
 const TourController = {
@@ -74,6 +76,20 @@ const TourController = {
   async adminCambiarEstado(req, res, next) {
     try {
       res.json({ ok: true, data: await TourService.adminCambiarEstado(Number(req.params.id), req.body.activo) });
+    } catch (e) { next(e); }
+  },
+
+  async subirFotos(req, res, next) {
+    try {
+      const files = req.files ?? [];
+      const urls = [];
+      for (const f of files) {
+        const url = await subirACloudinary(f.path, "afromercado/tours");
+        urls.push(url ?? `/uploads/tours/${f.filename}`);
+        try { if (url) fs.unlinkSync(f.path); } catch {}
+      }
+      const tour = await TourService.agregarFotos(req.usuario.comercio.id, urls);
+      res.json({ ok: true, data: tour });
     } catch (e) { next(e); }
   },
 };

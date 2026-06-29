@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { obtenerTour, verificarDisponibilidadTour, crearReservaTour, type ConfigTour } from '@/lib/api/tour'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
+import SeccionReviewsTour from '@/components/tours/SeccionReviewsTour'
 
 const SERVICIOS_LABELS: Record<string, string> = {
   transporte: '🚐 Transporte incluido', almuerzo: '🍱 Almuerzo incluido',
@@ -232,6 +233,8 @@ export default function TourDetallePage() {
             <p className="text-sm text-gray-600">📍 {tour.puntoEncuentro}</p>
           </div>
         )}
+
+        <SeccionReviewsTour configTourId={tour.id} />
 
         {tour.politicaCancelacion && (
           <div className="bg-amber-50 rounded-2xl border border-amber-100 p-4 mb-4">

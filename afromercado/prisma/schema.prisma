@@ -206,6 +206,9 @@ model Usuario {
   pedidosExpressRepartidor  PedidoExpress[]     @relation("PedidosExpressRepartidor")
   reservasHotel             ReservaHotel[]      @relation("ReservasHotelCliente")
   reservasTour              ReservaTour[]       @relation("ReservasTourCliente")
+  reservasTransporte        ReservaTransporte[] @relation("ReservasTransporteCliente")
+  reviewsHotel              ReviewHotel[]       @relation("ReviewsHotelCliente")
+  reviewsTour               ReviewTour[]        @relation("ReviewsTourCliente")
 }
 
 model Comercio {
@@ -270,6 +273,7 @@ model Comercio {
   configExpress         ConfigExpress?
   configHotel           ConfigHotel?
   configTour            ConfigTour?
+  configTransporte      ConfigTransporte?
 }
 
 model Categoria {
@@ -1285,6 +1289,7 @@ model ConfigHotel {
   comercio      Comercio         @relation(fields: [comercioId], references: [id])
   habitaciones  HabitacionTipo[]
   reservas      ReservaHotel[]
+  reviews       ReviewHotel[]
 
   @@index([activo])
 }
@@ -1329,6 +1334,7 @@ model ReservaHotel {
   configHotel    ConfigHotel    @relation(fields: [configHotelId],    references: [id])
   habitacionTipo HabitacionTipo @relation(fields: [habitacionTipoId], references: [id])
   cliente        Usuario        @relation("ReservasHotelCliente",     fields: [clienteId], references: [id])
+  review         ReviewHotel?
 
   @@index([configHotelId, estado])
   @@index([clienteId])
@@ -1367,6 +1373,7 @@ model ConfigTour {
 
   comercio Comercio      @relation(fields: [comercioId], references: [id])
   reservas ReservaTour[]
+  reviews  ReviewTour[]
 
   @@index([activo])
 }
@@ -1389,8 +1396,112 @@ model ReservaTour {
 
   configTour ConfigTour @relation(fields: [configTourId], references: [id])
   cliente    Usuario    @relation("ReservasTourCliente", fields: [clienteId], references: [id])
+  review     ReviewTour?
 
   @@index([configTourId, estado])
   @@index([clienteId])
   @@index([fechaTour])
+}
+
+// ─── MÓDULO TRANSPORTE FLUVIAL ────────────────────────────────
+
+model ConfigTransporte {
+  id          Int      @id @default(autoincrement())
+  comercioId  Int      @unique
+  activo      Boolean  @default(false)
+  nombre      String   @default("Mi Servicio")
+  descripcion String?
+  tipo        String   @default("LANCHA")
+  fotos       String[]
+  creadoAt    DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  comercio Comercio         @relation(fields: [comercioId], references: [id])
+  rutas    RutaTransporte[]
+
+  @@index([activo])
+}
+
+model RutaTransporte {
+  id                  Int      @id @default(autoincrement())
+  configTransporteId  Int
+  origen              String
+  destino             String
+  horario             String
+  diasSemana          String[]
+  capacidad           Int      @default(10)
+  precioAsiento       Decimal  @db.Decimal(12, 2)
+  activo              Boolean  @default(true)
+  creadoAt            DateTime @default(now())
+
+  configTransporte ConfigTransporte    @relation(fields: [configTransporteId], references: [id], onDelete: Cascade)
+  reservas         ReservaTransporte[]
+
+  @@index([configTransporteId, activo])
+}
+
+enum EstadoReservaTransporte {
+  PENDIENTE
+  CONFIRMADA
+  CANCELADA
+  RECHAZADA
+  COMPLETADA
+}
+
+model ReservaTransporte {
+  id               Int                     @id @default(autoincrement())
+  codigo           String                  @unique
+  rutaTransporteId Int
+  clienteId        Int
+  fechaViaje       DateTime
+  asientos         Int                     @default(1)
+  total            Decimal                 @db.Decimal(12, 2)
+  estado           EstadoReservaTransporte @default(PENDIENTE)
+  metodoPago       String                  @default("EFECTIVO")
+  notasCliente     String?
+  nombreContacto   String
+  telefonoContacto String
+  creadoAt         DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  ruta    RutaTransporte @relation(fields: [rutaTransporteId], references: [id])
+  cliente Usuario        @relation("ReservasTransporteCliente", fields: [clienteId], references: [id])
+
+  @@index([rutaTransporteId, estado])
+  @@index([clienteId])
+  @@index([fechaViaje])
+}
+
+// ─── REVIEWS ─────────────────────────────────────────────────
+
+model ReviewHotel {
+  id             Int      @id @default(autoincrement())
+  configHotelId  Int
+  clienteId      Int
+  reservaHotelId Int      @unique
+  calificacion   Int
+  comentario     String?
+  creadoAt       DateTime @default(now())
+
+  configHotel  ConfigHotel  @relation(fields: [configHotelId],  references: [id], onDelete: Cascade)
+  cliente      Usuario      @relation("ReviewsHotelCliente",    fields: [clienteId],      references: [id])
+  reservaHotel ReservaHotel @relation(fields: [reservaHotelId], references: [id], onDelete: Cascade)
+
+  @@index([configHotelId])
+}
+
+model ReviewTour {
+  id            Int      @id @default(autoincrement())
+  configTourId  Int
+  clienteId     Int
+  reservaTourId Int      @unique
+  calificacion  Int
+  comentario    String?
+  creadoAt      DateTime @default(now())
+
+  configTour  ConfigTour  @relation(fields: [configTourId],  references: [id], onDelete: Cascade)
+  cliente     Usuario     @relation("ReviewsTourCliente",    fields: [clienteId],     references: [id])
+  reservaTour ReservaTour @relation(fields: [reservaTourId], references: [id], onDelete: Cascade)
+
+  @@index([configTourId])
 }
