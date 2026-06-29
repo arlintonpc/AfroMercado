@@ -2,6 +2,8 @@ const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const sseManager = require("../utils/sse-manager");
 const { enviarPushAUsuario } = require("../utils/push");
+const { enviarEmail } = require("../utils/email");
+const emailHotel = require("../utils/templates/email-hotel");
 
 function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -102,6 +104,7 @@ const HotelService = {
     const entrada = new Date(fechaEntrada);
     const salida  = new Date(fechaSalida);
     if (isNaN(entrada) || isNaN(salida)) throw new ErrorValidacion("Fechas inválidas");
+    if (entrada < new Date(new Date().toDateString())) throw new ErrorValidacion("La fecha de entrada no puede ser en el pasado");
     if (salida <= entrada) throw new ErrorValidacion("La fecha de salida debe ser posterior a la de entrada");
     const noches = Math.ceil((salida - entrada) / (1000 * 60 * 60 * 24));
 
@@ -131,7 +134,7 @@ const HotelService = {
       },
       include: {
         habitacionTipo: true,
-        configHotel: { include: { comercio: { select: { usuarioId: true, nombre: true } } } },
+        configHotel: { include: { comercio: { include: { usuario: { select: { email: true, nombre: true } } } } } },
       },
     });
 
@@ -143,6 +146,26 @@ const HotelService = {
       `${nombreHuesped} · ${tipo.nombre} · ${noches} noche(s)`,
       "/comerciante/hoteles"
     );
+
+    // Email al hotelero (fire and forget)
+    const emailHotelero = reserva.configHotel.comercio.usuario?.email;
+    if (emailHotelero) {
+      setImmediate(() => {
+        enviarEmail({
+          to: emailHotelero,
+          subject: `Nueva reserva — ${nombreHuesped} · ${tipo.nombre} — AfroMercado`,
+          html: emailHotel.reservaNueva({
+            nombreHotelero: reserva.configHotel.comercio.usuario.nombre || "Hotelero",
+            nombreHuesped,
+            habitacion: tipo.nombre,
+            fechaEntrada: entrada,
+            fechaSalida:  salida,
+            noches,
+            total,
+          }),
+        }).catch((err) => console.error("[EMAIL-HOTEL]", err.message));
+      });
+    }
 
     return reserva;
   },

@@ -12,8 +12,9 @@ async function fetchHotel(id: string) {
   } catch { return null }
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const data = await fetchHotel(params.id)
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params
+  const data = await fetchHotel(id)
   if (!data) return { title: 'Hotel | AfroMercado' }
   const foto = data.habitaciones?.[0]?.fotos?.[0]
   const desde = data.habitaciones?.length > 0
