@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { obtenerTransporte, verificarDisponibilidadTransporte, crearReservaTransporte, type ConfigTransporte, type RutaTransporte } from '@/lib/api/transporte'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
+import { Toast, useToast } from '@/components/ui/Toast'
 
 const TIPO_ICONO: Record<string, string> = { LANCHA: '🛥️', BOTE: '⛵', CHALUPA: '🚤', CANOA: '🛶' }
 const DIAS_LABEL: Record<string, string> = {
@@ -135,6 +137,7 @@ export default function TransporteDetallePage() {
   const [rutaSeleccionada, setRutaSeleccionada] = useState<RutaTransporte | null>(null)
   const [reservado, setReservado] = useState(false)
   const [fotoActual, setFotoActual] = useState(0)
+  const { mostrar: mostrarToast, toastProps } = useToast()
 
   useEffect(() => {
     obtenerTransporte(Number(id)).then(d => { setTransporte(d); setCargando(false) }).catch(() => setCargando(false))
@@ -169,11 +172,17 @@ export default function TransporteDetallePage() {
         <button onClick={async () => {
           const url = window.location.href
           if (navigator.share) { try { await navigator.share({ title: transporte.nombre, url }) } catch {} }
-          else { navigator.clipboard.writeText(url).catch(() => {}); alert('¡Enlace copiado!') }
+          else { navigator.clipboard.writeText(url).catch(() => {}); mostrarToast('¡Enlace copiado!') }
         }} className="absolute top-4 right-4 bg-black/40 rounded-full p-2 text-white hover:bg-black/60">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
         </button>
       </div>
+
+      <Breadcrumbs items={[
+        { label: 'Inicio', href: '/' },
+        { label: 'Transportes', href: '/transportes' },
+        { label: transporte.nombre },
+      ]} />
 
       <div className="max-w-2xl mx-auto px-4 py-5 pb-10">
         <h1 className="text-xl font-bold text-[#1A1A1A] mb-1">{transporte.nombre}</h1>
@@ -254,6 +263,7 @@ export default function TransporteDetallePage() {
           onSuccess={() => { setRutaSeleccionada(null); setReservado(true) }}
         />
       )}
+      <Toast {...toastProps} />
     </div>
   )
 }

@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { listarTransportes, type ConfigTransporte } from '@/lib/api/transporte'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+
+const MapaTransportes = dynamic(() => import('@/components/hoteles/MapaTransportes'), { ssr: false })
 
 const DIAS_LABEL: Record<string, string> = {
   lunes: 'Lu', martes: 'Ma', miercoles: 'Mi', jueves: 'Ju',
@@ -117,14 +120,17 @@ const TIPOS = ['LANCHA', 'BOTE', 'CHALUPA', 'CANOA']
 export default function TransportesPage() {
   const [transportes, setTransportes] = useState<ConfigTransporte[]>([])
   const [cargando, setCargando] = useState(true)
+  const [tardando, setTardando] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [userLat, setUserLat] = useState<number | null>(null)
   const [userLon, setUserLon] = useState<number | null>(null)
   const [gpsCargando, setGpsCargando] = useState(false)
   const [tipoFiltro, setTipoFiltro] = useState('')
+  const [vista, setVista] = useState<'lista' | 'mapa'>('lista')
 
   useEffect(() => {
-    listarTransportes().then(d => { setTransportes(d); setCargando(false) })
+    const t = setTimeout(() => setTardando(true), 6000)
+    listarTransportes().then(d => { setTransportes(d); setCargando(false) }).finally(() => clearTimeout(t))
   }, [])
 
   function activarGPS() {
@@ -179,6 +185,14 @@ export default function TransportesPage() {
               }`}>
               {gpsCargando ? <span className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /> : '📍'}
             </button>
+            <div className="flex border border-gray-200 rounded-xl overflow-hidden">
+              <button onClick={() => setVista('lista')} className={`px-2.5 py-2 text-sm transition-colors ${vista === 'lista' ? 'bg-[#023E8A] text-white' : 'bg-white text-gray-500'}`} title="Lista">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              </button>
+              <button onClick={() => setVista('mapa')} className={`px-2.5 py-2 text-sm transition-colors ${vista === 'mapa' ? 'bg-[#023E8A] text-white' : 'bg-white text-gray-500'}`} title="Mapa">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+              </button>
+            </div>
           </div>
 
           {tiposDisponibles.length > 1 && (
@@ -201,11 +215,23 @@ export default function TransportesPage() {
       <main className="max-w-2xl mx-auto px-4 py-4 pb-10">
         <p className="text-xs text-gray-400 mb-3">{ordenados.length} servicio{ordenados.length !== 1 ? 's' : ''}</p>
 
+        {vista === 'mapa' && !cargando && (
+          <div className="mb-4">
+            <MapaTransportes transportes={ordenados} userLat={userLat} userLon={userLon} />
+          </div>
+        )}
+
+        {cargando && tardando && (
+          <p className="text-xs text-center text-amber-600 bg-amber-50 rounded-xl px-4 py-2 mb-2">
+            ⏳ La API está despertando… puede tardar hasta 30 segundos la primera vez del día.
+          </p>
+        )}
+
         {cargando ? (
           <div className="grid gap-4 sm:grid-cols-2">
             {Array.from({ length: 6 }).map((_, i) => <SkeletonTransporte key={i} />)}
           </div>
-        ) : ordenados.length === 0 ? (
+        ) : vista === 'mapa' ? null : ordenados.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
             <p className="text-5xl mb-4">🛥️</p>
             <p className="font-semibold text-gray-600">Sin servicios disponibles</p>

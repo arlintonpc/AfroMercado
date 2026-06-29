@@ -121,7 +121,42 @@ export default function MisReservasHotelPage() {
   const activas   = reservas.filter(r => !['CHECKOUT', 'CANCELADA', 'RECHAZADA'].includes(r.estado))
   const anteriores = reservas.filter(r => ['CHECKOUT', 'CANCELADA', 'RECHAZADA'].includes(r.estado))
 
-  if (cargando) return <div className="min-h-screen bg-[#FAF8F5] flex items-center justify-center"><div className="w-8 h-8 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" /></div>
+  if (cargando) return (
+    <div className="min-h-screen bg-[#FAF8F5]">
+      <header className="bg-white border-b border-[#E8DCC8] px-4 py-4 sticky top-0 z-10">
+        <div className="max-w-lg mx-auto flex items-center gap-3">
+          <Link href="/hoteles" className="text-[#2D6A4F] p-1">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          </Link>
+          <h1 className="font-bold text-[#1A1A1A] text-lg">Mis reservas</h1>
+        </div>
+      </header>
+      <main className="max-w-lg mx-auto p-4 space-y-4 pb-10">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse space-y-3">
+            <div className="flex items-start justify-between">
+              <div className="h-4 bg-gray-200 rounded w-2/5" />
+              <div className="h-5 bg-gray-100 rounded w-28" />
+            </div>
+            <div className="flex gap-2">
+              {[0,1,2,3].map(j => (
+                <div key={j} className="flex-1 flex flex-col items-center gap-0.5">
+                  <div className="w-4 h-4 rounded-full bg-gray-200" />
+                  <div className="h-2 bg-gray-100 rounded w-8" />
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="h-12 bg-gray-100 rounded-xl" />
+              <div className="h-12 bg-gray-100 rounded-xl" />
+              <div className="h-12 bg-gray-100 rounded-xl" />
+            </div>
+            <div className="h-3 bg-gray-100 rounded w-1/3" />
+          </div>
+        ))}
+      </main>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-[#FAF8F5]">

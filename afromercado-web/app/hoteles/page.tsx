@@ -182,6 +182,7 @@ function PanelFiltros({ onClose, filtros, onChange }: {
 export default function HotelesPage() {
   const [hoteles, setHoteles] = useState<ConfigHotel[]>([])
   const [cargando, setCargando] = useState(true)
+  const [tardando, setTardando] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [vista, setVista] = useState<'lista' | 'mapa'>('lista')
   const [userLat, setUserLat] = useState<number | null>(null)
@@ -192,7 +193,8 @@ export default function HotelesPage() {
   const [filtros, setFiltros] = useState({ precioMax: 0, capacidad: 1, servicios: [] as string[] })
 
   useEffect(() => {
-    listarHoteles().then(data => { setHoteles(data); setCargando(false) })
+    const t = setTimeout(() => setTardando(true), 6000)
+    listarHoteles().then(data => { setHoteles(data); setCargando(false) }).finally(() => clearTimeout(t))
   }, [])
 
   function activarGPS() {
@@ -302,9 +304,28 @@ export default function HotelesPage() {
           </div>
         )}
 
+        {cargando && tardando && (
+          <p className="text-xs text-center text-amber-600 bg-amber-50 rounded-xl px-4 py-2 mb-2">
+            ⏳ La API está despertando… puede tardar hasta 30 segundos la primera vez del día.
+          </p>
+        )}
+
         {cargando ? (
-          <div className="flex justify-center py-16">
-            <div className="w-8 h-8 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
+                <div className="h-44 bg-gray-200" />
+                <div className="p-4 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-3/4" />
+                  <div className="h-3 bg-gray-100 rounded w-1/2" />
+                  <div className="h-3 bg-gray-100 rounded w-full mt-3" />
+                  <div className="flex justify-between mt-3">
+                    <div className="h-3 bg-gray-100 rounded w-16" />
+                    <div className="h-5 bg-gray-200 rounded w-24" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : ordenados.length === 0 ? (
           <div className="text-center py-16 text-gray-400">

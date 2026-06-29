@@ -7,6 +7,8 @@ import { obtenerTour, verificarDisponibilidadTour, crearReservaTour, misReservas
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import SeccionReviewsTour from '@/components/tours/SeccionReviewsTour'
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
+import { Toast, useToast } from '@/components/ui/Toast'
 
 const SERVICIOS_LABELS: Record<string, string> = {
   transporte: '🚐 Transporte incluido', almuerzo: '🍱 Almuerzo incluido',
@@ -141,6 +143,7 @@ export default function TourDetallePage() {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [reservado, setReservado] = useState(false)
   const [reservaElegibleId, setReservaElegibleId] = useState<number | undefined>()
+  const { mostrar: mostrarToast, toastProps } = useToast()
 
   useEffect(() => {
     obtenerTour(Number(id)).then(d => { setTour(d); setCargando(false) }).catch(() => setCargando(false))
@@ -188,11 +191,17 @@ export default function TourDetallePage() {
         <button onClick={async () => {
           const url = window.location.href
           if (navigator.share) { try { await navigator.share({ title: tour.nombre, url }) } catch {} }
-          else { navigator.clipboard.writeText(url).catch(() => {}); alert('¡Enlace copiado!') }
+          else { navigator.clipboard.writeText(url).catch(() => {}); mostrarToast('¡Enlace copiado!') }
         }} className="absolute top-4 right-4 bg-black/40 rounded-full p-2 text-white hover:bg-black/60">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
         </button>
       </div>
+
+      <Breadcrumbs items={[
+        { label: 'Inicio', href: '/' },
+        { label: 'Tours', href: '/tours' },
+        { label: tour.nombre },
+      ]} />
 
       <div className="max-w-2xl mx-auto px-4 py-5 pb-28">
         <div className="flex items-start justify-between gap-3 mb-2">
@@ -287,6 +296,7 @@ export default function TourDetallePage() {
       {mostrarForm && tour && (
         <FormReservaTour tour={tour} onClose={() => setMostrarForm(false)} onSuccess={() => { setMostrarForm(false); setReservado(true) }} />
       )}
+      <Toast {...toastProps} />
     </div>
   )
 }

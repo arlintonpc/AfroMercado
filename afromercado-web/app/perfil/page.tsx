@@ -592,6 +592,37 @@ export default function PerfilPage() {
           </Link>
         </div>
 
+        {/* Reservas turismo */}
+        <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-[#1A1A1A]">🏨 Mis reservas de hotel</p>
+            <p className="text-xs text-[#1A1A1A]/45 mt-0.5">Habitaciones reservadas</p>
+          </div>
+          <Link href="/hoteles/mis-reservas" className="text-sm font-semibold text-[#2D6A4F] hover:underline">
+            Ver &rarr;
+          </Link>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-[#1A1A1A]">🗺️ Mis reservas de tours</p>
+            <p className="text-xs text-[#1A1A1A]/45 mt-0.5">Tours y experiencias reservados</p>
+          </div>
+          <Link href="/tours/mis-reservas" className="text-sm font-semibold text-[#2D6A4F] hover:underline">
+            Ver &rarr;
+          </Link>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-[#1A1A1A]">🛥️ Mis viajes reservados</p>
+            <p className="text-xs text-[#1A1A1A]/45 mt-0.5">Transporte fluvial reservado</p>
+          </div>
+          <Link href="/transportes/mis-reservas" className="text-sm font-semibold text-[#2D6A4F] hover:underline">
+            Ver &rarr;
+          </Link>
+        </div>
+
       </div>
     </div>
   )
