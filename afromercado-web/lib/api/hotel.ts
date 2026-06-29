@@ -172,13 +172,27 @@ export async function subirFotosHabitacion(habitacionId: number, files: File[]):
   return j.data
 }
 
-export async function subirVideoHabitacion(habitacionId: number, file: File): Promise<{ videoUrl: string; videoPosterUrl?: string; videoDuracionSeg?: number }> {
+export async function subirVideoHabitacion(
+  habitacionId: number,
+  file: File,
+  meta?: { duracionSegundos?: number; ancho?: number; alto?: number; bytes?: number; mimeType?: string; formato?: string; recorteInicioSegundos?: number; recorteFinSegundos?: number }
+): Promise<{ videoUrl: string; videoPosterUrl?: string; videoDuracionSeg?: number }> {
   const fd = new FormData()
   fd.append('video', file)
+  if (meta) {
+    if (meta.duracionSegundos != null) fd.append('duracionSegundos', String(meta.duracionSegundos))
+    if (meta.ancho != null)            fd.append('ancho', String(meta.ancho))
+    if (meta.alto != null)             fd.append('alto', String(meta.alto))
+    if (meta.bytes != null)            fd.append('bytes', String(meta.bytes))
+    if (meta.mimeType)                 fd.append('mimeType', meta.mimeType)
+    if (meta.formato)                  fd.append('formato', meta.formato)
+    if (meta.recorteInicioSegundos != null) fd.append('recorteInicioSegundos', String(meta.recorteInicioSegundos))
+    if (meta.recorteFinSegundos != null)    fd.append('recorteFinSegundos', String(meta.recorteFinSegundos))
+  }
   const { obtenerToken } = await import('./client')
   const token = obtenerToken()
   const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
-  const res = await fetch(`${API}/hotel/habitaciones/${habitacionId}/video`, {
+  const res = await fetch(`${API}/hoteles/mi-hotel/habitaciones/${habitacionId}/video`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: fd,
@@ -190,7 +204,7 @@ export async function subirVideoHabitacion(habitacionId: number, file: File): Pr
 
 export async function quitarVideoHabitacion(habitacionId: number): Promise<void> {
   await apiFetch<{ ok: boolean }>(
-    `/hotel/habitaciones/${habitacionId}/video`,
+    `/hoteles/mi-hotel/habitaciones/${habitacionId}/video`,
     { method: 'DELETE', auth: true }
   )
 }

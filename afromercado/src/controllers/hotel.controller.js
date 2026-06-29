@@ -1,29 +1,19 @@
 const fs = require("fs");
 const path = require("path");
-const multer = require("multer");
-const { subirACloudinary, subirVideoACloudinary, construirUrlVideoOptimizada } = require("../utils/cloudinary");
+const { subirVideoACloudinary, construirUrlVideoOptimizada, construirPosterVideo } = require("../utils/cloudinary");
 const HotelService = require("../services/hotel.service");
 const { ErrorValidacion } = require("../utils/errores");
+const {
+  crearUploadVideo,
+  extraerVideoMeta,
+  normalizarRecorteVideo,
+  urlLocalVideo,
+} = require("../utils/video-media");
 
-// Multer para videos de habitaciones
-const _storageVideo = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, "../../uploads/videos/habitaciones");
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || ".mp4";
-    cb(null, `hab-${req.params.id}-${Date.now()}${ext}`);
-  },
-});
-const _uploadVideo = multer({
-  storage: _storageVideo,
-  fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith("video/")) return cb(new Error("Solo se permiten videos"));
-    cb(null, true);
-  },
-  limits: { fileSize: 100 * 1024 * 1024 },
+const _uploadVideo = crearUploadVideo({
+  dir: path.join(__dirname, "../../uploads/videos/habitaciones"),
+  prefijo: "hab-video",
+  fieldName: "video",
 });
 
 const HotelController = {
@@ -205,31 +195,45 @@ const HotelController = {
   uploadVideoHabitacion: _uploadVideo.single("video"),
 
   async subirVideoHabitacion(req, res, next) {
-    let rutaLocal = null;
+    let cloud = null;
     try {
       if (!req.file) throw new ErrorValidacion('Adjunta un video en el campo "video"');
-      rutaLocal = req.file.path;
-      const cloud = await subirVideoACloudinary(rutaLocal, "afromercado/videos/habitaciones");
-      const videoUrl = (cloud && (construirUrlVideoOptimizada(cloud.secureUrl) || cloud.optimizedUrl || cloud.secureUrl))
-        || `${req.protocol}://${req.get("host")}/uploads/videos/habitaciones/${req.file.filename}`;
-      if (cloud) fs.unlink(rutaLocal, () => {});
-      rutaLocal = cloud ? null : rutaLocal; // mantener local si no hubo cloud
-      const posterUrl = cloud?.posterUrl || null;
-      const duracion  = cloud?.duration  || null;
+
+      const meta = extraerVideoMeta(req.body);
+      normalizarRecorteVideo(meta);
+
+      cloud = await subirVideoACloudinary(req.file.path, "afromercado/videos/habitaciones");
+      const recorte = normalizarRecorteVideo(meta, cloud?.duration ?? meta.durationSeconds);
+
+      const urlLocalBase = urlLocalVideo(req, `uploads/videos/habitaciones/${req.file.filename}`);
+      const urlLocalFinal = recorte.tieneRecorte
+        ? `${urlLocalBase}#t=${recorte.inicio},${recorte.fin}`
+        : urlLocalBase;
+
+      const videoUrl = cloud
+        ? (construirUrlVideoOptimizada(cloud.secureUrl, recorte) || cloud.optimizedUrl || cloud.secureUrl)
+        : urlLocalFinal;
+      const posterUrl = cloud ? (construirPosterVideo?.(cloud.secureUrl, recorte) ?? cloud.posterUrl ?? null) : null;
+      const duracion  = recorte.duracionFinal ?? cloud?.duration ?? null;
+
+      if (cloud) fs.unlink(req.file.path, () => {});
+
       const hab = await HotelService.subirVideoHabitacion(
         req.usuario.comercio.id, Number(req.params.id), videoUrl, posterUrl, duracion
       );
-      res.json({ ok: true, data: { videoUrl, videoPosterUrl: hab.videoPosterUrl, videoDuracionSeg: hab.videoDuracionSeg } });
+      res.json({ ok: true, data: {
+        videoUrl: hab.videoUrl,
+        videoPosterUrl: hab.videoPosterUrl,
+        videoDuracionSeg: hab.videoDuracionSeg,
+      }});
     } catch (e) {
-      if (rutaLocal) fs.unlink(rutaLocal, () => {});
+      if (req.file?.path) fs.unlink(req.file.path, () => {});
       next(e);
     }
   },
 
   async quitarVideoHabitacion(req, res, next) {
     try {
-      const { videoUrl } = req.body;
-      if (!videoUrl) throw new ErrorValidacion("videoUrl requerida");
       await HotelService.quitarVideoHabitacion(req.usuario.comercio.id, Number(req.params.id));
       res.json({ ok: true });
     } catch (e) { next(e); }

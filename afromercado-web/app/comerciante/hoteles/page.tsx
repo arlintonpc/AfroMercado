@@ -5,11 +5,14 @@ import Link from 'next/link'
 import {
   obtenerMiHotel, actualizarMiHotel, agregarHabitacion, actualizarHabitacion, eliminarHabitacion,
   reservasHotelero, cambiarEstadoReserva, ocupacionHotel, subirFotosHabitacion, subirVideoHabitacion,
+  quitarVideoHabitacion,
   listarBloqueos, crearBloqueo, eliminarBloqueo,
   type ConfigHotel, type HabitacionTipo, type ReservaHotel, type EstadoReservaHotel, type BloqueoFecha,
 } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
+import SubidorVideo from '@/components/comerciante/SubidorVideo'
+import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
 
 const SERVICIOS_OPCIONES = ['wifi', 'desayuno', 'parking', 'piscina', 'restaurante', 'aire', 'gym', 'spa', 'bar', 'mascotas']
 const SERVICIOS_LABELS: Record<string, string> = {
@@ -38,25 +41,31 @@ function esVideo(url: string): boolean {
 
 function FormHabitacion({ inicial, onGuardar, onCancelar }: {
   inicial?: Partial<HabitacionTipo>
-  onGuardar: (datos: Partial<HabitacionTipo>, archivos?: File[], archivosVideo?: File[]) => Promise<void>
+  onGuardar: (datos: Partial<HabitacionTipo>, archivos?: File[]) => Promise<void>
   onCancelar: () => void
 }) {
-  const [form, setForm] = useState<Partial<HabitacionTipo> & { videoUrl?: string }>({
+  const [form, setForm] = useState<Partial<HabitacionTipo>>({
     nombre: '', descripcion: '', capacidad: 2, precioPorNoche: 80000, cantidad: 1,
-    fotos: [], serviciosExtra: [], videoUrl: inicial?.videoUrl ?? undefined, ...inicial,
+    fotos: [], serviciosExtra: [], ...inicial,
   })
   const [subiendoFotos, setSubiendoFotos] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   const inputFotoRef = useRef<HTMLInputElement>(null)
   const archivosRef = useRef<File[]>([])
-  const archivosVideoRef = useRef<File[]>([])
+
+  // Estado de video para SubidorVideo — se inicializa con el video ya guardado
+  const [videoEstado, setVideoEstado] = useState<VideoEstado>({
+    videoUrl: inicial?.videoUrl ?? null,
+    videoPosterUrl: inicial?.videoPosterUrl ?? null,
+    videoDuracionSegundos: inicial?.videoDuracionSeg ?? null,
+    videoMimeType: null,
+  })
 
   async function handleFotos(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     if (!files.length) return
     if (inicial?.id) {
-      // Edición: subir directo a Cloudinary
       setSubiendoFotos(true)
       try {
         const hab = await subirFotosHabitacion(inicial.id, files)
@@ -64,7 +73,6 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
       } catch (err: any) { setError(err.message) }
       setSubiendoFotos(false)
     } else {
-      // Nueva habitación: guardar File para subir al crear, preview con blob URL
       archivosRef.current = [...archivosRef.current, ...files]
       const urls = files.map(f => URL.createObjectURL(f))
       setForm(p => ({ ...p, fotos: [...(p.fotos ?? []), ...urls] }))
@@ -72,15 +80,39 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
     if (inputFotoRef.current) inputFotoRef.current.value = ''
   }
 
+  // Callbacks para SubidorVideo — solo disponibles cuando la habitación ya tiene ID
+  async function handleSubirVideo(file: File, meta: VideoMetaCaptura): Promise<VideoEstado> {
+    if (!inicial?.id) {
+      // Habitación nueva: guardamos el archivo para subirlo después del create
+      archivosRef.current  // no usamos para video aquí — se maneja en onGuardar
+      throw new Error('Guarda primero la habitación y luego sube el video.')
+    }
+    const result = await subirVideoHabitacion(inicial.id, file, meta)
+    const nuevo: VideoEstado = {
+      videoUrl: result.videoUrl,
+      videoPosterUrl: result.videoPosterUrl ?? null,
+      videoDuracionSegundos: result.videoDuracionSeg ?? null,
+      videoMimeType: null,
+    }
+    setVideoEstado(nuevo)
+    return nuevo
+  }
+
+  async function handleQuitarVideo(): Promise<VideoEstado> {
+    if (inicial?.id) await quitarVideoHabitacion(inicial.id)
+    const vacio: VideoEstado = { videoUrl: null, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
+    setVideoEstado(vacio)
+    return vacio
+  }
+
   async function handleGuardar() {
     if (!form.nombre?.trim() || !form.precioPorNoche) { setError('Nombre y precio son obligatorios'); return }
     setGuardando(true); setError('')
     try {
-      // Para habitación nueva: quitar blob URLs del form, los archivos reales van aparte
       const datos = inicial?.id
         ? form
         : { ...form, fotos: (form.fotos ?? []).filter(f => !f.startsWith('blob:')) }
-      await onGuardar(datos, !inicial?.id ? archivosRef.current : undefined, archivosVideoRef.current)
+      await onGuardar(datos, !inicial?.id ? archivosRef.current : undefined)
     } catch (e: any) { setError(e.message) }
     setGuardando(false)
   }
@@ -145,28 +177,18 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
 
               {/* Video de la habitación */}
               <div className="mt-4">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Video (opcional)</p>
-                {form.videoUrl && (
-                  <div className="relative rounded-xl overflow-hidden mb-2 bg-black" style={{ aspectRatio: '16/9' }}>
-                    <video src={form.videoUrl} controls className="w-full h-full object-contain" />
-                    <button
-                      type="button"
-                      onClick={() => { archivosVideoRef.current = []; setForm(p => ({ ...p, videoUrl: undefined })) }}
-                      className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold hover:bg-red-600 transition-colors">×</button>
-                  </div>
-                )}
-                {!form.videoUrl && (
-                  <label className="flex items-center gap-2 cursor-pointer border-2 border-dashed border-gray-200 rounded-xl p-4 hover:border-[#2D6A4F] transition-colors">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-                    <span className="text-sm text-gray-500">Agregar video de la habitación (máx. 100 MB)</span>
-                    <input type="file" accept="video/*" className="hidden" onChange={e => {
-                      const file = e.target.files?.[0]
-                      if (!file) return
-                      archivosVideoRef.current = [file]
-                      setForm(p => ({ ...p, videoUrl: URL.createObjectURL(file) }))
-                      e.target.value = ''
-                    }} />
-                  </label>
+                {inicial?.id ? (
+                  <SubidorVideo
+                    titulo="Video de la habitación"
+                    descripcion="Sube un clip de hasta 45 segundos. Si el video es más largo, elige el fragmento que quieres publicar."
+                    estadoInicial={videoEstado}
+                    onSubir={handleSubirVideo}
+                    onEliminar={handleQuitarVideo}
+                  />
+                ) : (
+                  <p className="text-xs text-gray-400 bg-gray-50 rounded-xl px-4 py-3 text-center">
+                    💡 Guarda la habitación primero y luego podrás subir el video.
+                  </p>
                 )}
               </div>
             </div>
@@ -866,20 +888,13 @@ export default function ComercianteHotelesPage() {
         <FormHabitacion
           inicial={formHab.inicial}
           onCancelar={() => setFormHab({ visible: false })}
-          onGuardar={async (datos, archivos, archivosVideo) => {
-            const habId = formHab.inicial?.id
-            if (habId) {
-              await actualizarHabitacion(habId, datos)
-              if (archivosVideo && archivosVideo.length > 0) {
-                await subirVideoHabitacion(habId, archivosVideo[0])
-              }
+          onGuardar={async (datos, archivos) => {
+            if (formHab.inicial?.id) {
+              await actualizarHabitacion(formHab.inicial.id, datos)
             } else {
               const nueva = await agregarHabitacion(datos)
               if (archivos && archivos.length > 0) {
                 await subirFotosHabitacion(nueva.id, archivos)
-              }
-              if (archivosVideo && archivosVideo.length > 0) {
-                await subirVideoHabitacion(nueva.id, archivosVideo[0])
               }
             }
             setFormHab({ visible: false })
