@@ -9,11 +9,8 @@ import {
 } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
-
-const MUNICIPIOS_CHOCO = [
-  'Quibdó','Istmina','Tadó','Condoto','Bagadó','Acandí','Bahía Solano',
-  'Nuquí','Riosucio','Carmen del Darién','Bojayá','Lloró','Cértegui',
-]
+import { obtenerMiComercio } from '@/components/comerciante/api'
+import { MUNICIPIOS_POR_DEPARTAMENTO } from '@/components/comerciante/constantes'
 
 const DIAS: { dia: DiaSemana; label: string }[] = [
   { dia: 'LUNES',     label: 'Lunes' },
@@ -72,11 +69,15 @@ type Pestana = 'activos' | 'config' | 'historial'
 
 export default function ExpressComerciante() {
   const [pestana, setPestana]   = useState<Pestana>('activos')
-  const [config, setConfig]       = useState<ConfigExpress | null>(null)
-  const [pedidos, setPedidos]     = useState<PedidoExpress[]>([])
-  const [cargando, setCargando]   = useState(true)
+  const [config, setConfig]           = useState<ConfigExpress | null>(null)
+  const [pedidos, setPedidos]         = useState<PedidoExpress[]>([])
+  const [cargando, setCargando]       = useState(true)
   const [pedidosNuevos, setPedidosNuevos] = useState(0)
-  const pedidosRef = useRef<PedidoExpress[]>([])
+  const pedidosRef                    = useRef<PedidoExpress[]>([])
+  const [comercioDep, setComercioDep] = useState('Chocó')
+  const [comercioMun, setComercioMun] = useState('')
+  const [busqMunicipio, setBusqMunicipio] = useState('')
+  const [municipioCustom, setMunicipioCustom] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [editConfig, setEditConfig] = useState<Partial<ConfigExpress>>({})
   const [horarios, setHorarios]   = useState<HorarioExpress[]>(HORARIO_DEFAULT)
@@ -85,11 +86,17 @@ export default function ExpressComerciante() {
 
   const cargar = useCallback(async () => {
     try {
-      const [cfg, peds, fest] = await Promise.all([
+      const [cfg, peds, fest, comercio] = await Promise.all([
         obtenerConfigExpress(),
         pedidosComercioExpress(),
         festivosColombia(),
+        obtenerMiComercio().catch(() => null),
       ])
+      if (comercio) {
+        const dep = (comercio as any).departamento ?? 'Chocó'
+        setComercioDep(dep)
+        setComercioMun(comercio.municipio ?? '')
+      }
       setConfig(cfg)
       setEditConfig(cfg)
       // Detectar pedidos PENDIENTE nuevos vs los que ya teníamos
@@ -447,25 +454,104 @@ export default function ExpressComerciante() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">Municipios de entrega</label>
-            <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
-              {MUNICIPIOS_CHOCO.map(mun => {
-                const sel = (editConfig.municipiosEntrega ?? []).includes(mun)
-                return (
-                  <button
-                    key={mun}
-                    onClick={() => setEditConfig(prev => {
-                      const list = prev.municipiosEntrega ?? []
-                      return { ...prev, municipiosEntrega: sel ? list.filter(x => x !== mun) : [...list, mun] }
-                    })}
-                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      sel ? 'bg-green-100 text-green-800 border-green-300' : 'bg-gray-50 text-gray-500 border-gray-200'
-                    }`}
-                  >
+            <label className="block text-xs font-medium text-gray-600 mb-1">Municipios de entrega</label>
+            <p className="text-xs text-gray-400 mb-2">
+              Seleccionados del departamento de <strong>{comercioDep}</strong>. Puedes agregar otros municipios manualmente.
+            </p>
+
+            {/* Seleccionados actualmente */}
+            {(editConfig.municipiosEntrega ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3 p-2 bg-green-50 rounded-xl border border-green-200">
+                {(editConfig.municipiosEntrega ?? []).map(mun => (
+                  <span key={mun} className="flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium border border-green-300">
                     {mun}
-                  </button>
-                )
-              })}
+                    <button
+                      onClick={() => setEditConfig(prev => ({
+                        ...prev,
+                        municipiosEntrega: (prev.municipiosEntrega ?? []).filter(x => x !== mun)
+                      }))}
+                      className="text-green-600 hover:text-red-500 ml-0.5 font-bold leading-none"
+                    >×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Buscador */}
+            <input
+              type="text"
+              value={busqMunicipio}
+              onChange={e => setBusqMunicipio(e.target.value)}
+              placeholder={`Buscar en ${comercioDep}...`}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:border-green-400"
+            />
+
+            {/* Lista de municipios del departamento del comercio */}
+            <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+              {(MUNICIPIOS_POR_DEPARTAMENTO[comercioDep] ?? [])
+                .filter(m => !busqMunicipio || m.toLowerCase().includes(busqMunicipio.toLowerCase()))
+                .map(mun => {
+                  const sel = (editConfig.municipiosEntrega ?? []).includes(mun)
+                  const esPrincipal = mun === comercioMun
+                  return (
+                    <button
+                      key={mun}
+                      onClick={() => setEditConfig(prev => {
+                        const list = prev.municipiosEntrega ?? []
+                        return { ...prev, municipiosEntrega: sel ? list.filter(x => x !== mun) : [...list, mun] }
+                      })}
+                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        sel
+                          ? 'bg-green-100 text-green-800 border-green-300'
+                          : esPrincipal
+                          ? 'bg-blue-50 text-blue-700 border-blue-200 ring-1 ring-blue-300'
+                          : 'bg-gray-50 text-gray-500 border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      {esPrincipal && !sel && <span className="mr-1">📍</span>}
+                      {mun}
+                    </button>
+                  )
+                })}
+            </div>
+
+            {/* Agregar municipio de otro departamento */}
+            <div className="mt-3 flex gap-2">
+              <input
+                type="text"
+                value={municipioCustom}
+                onChange={e => setMunicipioCustom(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && municipioCustom.trim()) {
+                    const m = municipioCustom.trim()
+                    setEditConfig(prev => ({
+                      ...prev,
+                      municipiosEntrega: (prev.municipiosEntrega ?? []).includes(m)
+                        ? prev.municipiosEntrega
+                        : [...(prev.municipiosEntrega ?? []), m]
+                    }))
+                    setMunicipioCustom('')
+                  }
+                }}
+                placeholder="Agregar otro municipio o ciudad…"
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-400"
+              />
+              <button
+                onClick={() => {
+                  const m = municipioCustom.trim()
+                  if (!m) return
+                  setEditConfig(prev => ({
+                    ...prev,
+                    municipiosEntrega: (prev.municipiosEntrega ?? []).includes(m)
+                      ? prev.municipiosEntrega
+                      : [...(prev.municipiosEntrega ?? []), m]
+                  }))
+                  setMunicipioCustom('')
+                }}
+                className="px-3 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors"
+              >
+                + Agregar
+              </button>
             </div>
           </div>
 
