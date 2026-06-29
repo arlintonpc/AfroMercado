@@ -215,9 +215,13 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                 aria-haspopup="menu"
                 aria-expanded={menuAbierto}
               >
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-[#2D6A4F] text-white text-xs font-bold uppercase">
-                  {(usuario?.nombre ?? '?').charAt(0)}
-                </span>
+                {usuario?.avatarUrl ? (
+                  <img src={usuario.avatarUrl} alt={usuario.nombre} className="w-7 h-7 rounded-full object-cover" />
+                ) : (
+                  <span className="flex items-center justify-center w-7 h-7 rounded-full bg-[#2D6A4F] text-white text-xs font-bold uppercase">
+                    {(usuario?.nombre ?? '?').charAt(0)}
+                  </span>
+                )}
                 <span className="hidden sm:inline max-w-[120px] truncate">
                   {usuario?.nombre}
                 </span>

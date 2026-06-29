@@ -215,9 +215,18 @@ export default function HotelDetallePage() {
           <h1 className="font-bold text-[#1A1A1A] truncate">{hotel.comercio.nombre}</h1>
           <p className="text-xs text-gray-500">📍 {hotel.comercio.municipio}{hotel.comercio.departamento ? `, ${hotel.comercio.departamento}` : ''}</p>
         </div>
-        {autenticado && (
-          <Link href="/hoteles/mis-reservas" className="ml-auto text-xs text-[#2D6A4F] font-medium whitespace-nowrap">Mis reservas</Link>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {autenticado && (
+            <Link href="/hoteles/mis-reservas" className="text-xs text-[#2D6A4F] font-medium whitespace-nowrap">Mis reservas</Link>
+          )}
+          <button onClick={async () => {
+            const url = window.location.href
+            if (navigator.share) { try { await navigator.share({ title: hotel.comercio.nombre, url }) } catch {} }
+            else { navigator.clipboard.writeText(url).catch(() => {}); alert('¡Enlace copiado!') }
+          }} className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          </button>
+        </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-5 pb-16 space-y-6">

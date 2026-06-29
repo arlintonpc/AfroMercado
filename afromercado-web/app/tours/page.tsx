@@ -18,67 +18,106 @@ function distanciaKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+function SkeletonTour() {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
+      <div className="h-44 bg-gray-200" />
+      <div className="p-4 space-y-2">
+        <div className="h-4 bg-gray-200 rounded w-3/4" />
+        <div className="h-3 bg-gray-100 rounded w-1/2" />
+        <div className="h-3 bg-gray-100 rounded w-full" />
+        <div className="flex justify-between mt-3">
+          <div className="h-3 bg-gray-100 rounded w-16" />
+          <div className="h-5 bg-gray-200 rounded w-20" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EstrellasMini({ valor, total }: { valor: number | string; total: number }) {
+  const n = Number(valor)
+  if (total === 0) return null
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-[#D4A017] text-xs">{'★'.repeat(Math.round(n))}{'☆'.repeat(5 - Math.round(n))}</span>
+      <span className="text-[10px] text-gray-400">({total})</span>
+    </div>
+  )
+}
+
 function TarjetaTour({ tour, userLat, userLon }: { tour: ConfigTour; userLat: number | null; userLon: number | null }) {
   const dist = userLat && userLon && tour.comercio.latitud && tour.comercio.longitud
     ? distanciaKm(userLat, userLon, tour.comercio.latitud, tour.comercio.longitud)
     : null
 
   return (
-    <Link href={`/tours/${tour.id}`} className="block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+    <Link href={`/tours/${tour.id}`} className="block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all hover:-translate-y-0.5">
       <div className="h-44 bg-gradient-to-br from-[#40916C] to-[#74C69D] relative flex items-center justify-center">
         {tour.fotos[0] ? (
           <img src={tour.fotos[0]} alt={tour.nombre} className="w-full h-full object-cover" />
         ) : (
           <span className="text-5xl">🗺️</span>
         )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         <div className="absolute top-2 left-2 flex gap-1">
-          <span className="bg-black/60 text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
+          <span className="bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
             ⏱️ {tour.duracionHoras}h
           </span>
           {tour.maxParticipantes > 0 && (
-            <span className="bg-black/60 text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
-              👥 máx. {tour.maxParticipantes}
+            <span className="bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
+              👥 {tour.maxParticipantes}
             </span>
           )}
         </div>
         {dist !== null && (
-          <span className="absolute top-2 right-2 bg-black/60 text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
+          <span className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
             📍 {dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`}
+          </span>
+        )}
+        {tour.confirmacionAuto && (
+          <span className="absolute bottom-2 left-2 bg-green-500/90 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+            ✓ Confirmación inmediata
           </span>
         )}
       </div>
 
       <div className="p-4">
         <h3 className="font-bold text-[#1A1A1A] truncate">{tour.nombre}</h3>
-        <p className="text-xs text-gray-500 mt-0.5">
-          {tour.comercio.nombre} · 📍 {tour.comercio.municipio}
-        </p>
+        <p className="text-xs text-gray-500 mt-0.5 truncate">📍 {tour.comercio.municipio}</p>
+
+        <EstrellasMini valor={tour.comercio.calificacion} total={tour.comercio.totalReviews} />
 
         {tour.descripcion && (
-          <p className="text-xs text-gray-600 mt-2 line-clamp-2">{tour.descripcion}</p>
+          <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">{tour.descripcion}</p>
         )}
 
         {tour.servicios.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-2">
+          <div className="flex gap-1.5 mt-2">
             {tour.servicios.slice(0, 5).map(s => (
-              <span key={s} className="text-sm" title={s}>{SERVICIOS_ICONOS[s] ?? '✓'}</span>
+              <span key={s} className="text-base" title={s}>{SERVICIOS_ICONOS[s] ?? '✓'}</span>
             ))}
           </div>
         )}
 
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-xs text-gray-400">
-            {tour.idiomas.length > 0 ? `🗣️ ${tour.idiomas.join(' · ')}` : ''}
-          </span>
+        <div className="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between">
+          <span className="text-xs text-gray-400">{tour.idiomas[0] ?? 'Español'}</span>
           <div className="text-right">
-            <span className="font-bold text-[#2D6A4F]">{formatearPrecio(Number(tour.precioPersona))}</span>
-            <span className="text-xs text-gray-400">/persona</span>
+            <span className="font-bold text-[#2D6A4F] text-base">{formatearPrecio(Number(tour.precioPersona))}</span>
+            <span className="text-xs text-gray-400">/pers.</span>
           </div>
         </div>
       </div>
     </Link>
   )
 }
+
+const SERVICIOS_FILTRO = [
+  { key: 'transporte', label: '🚐 Transporte' },
+  { key: 'almuerzo',   label: '🍱 Almuerzo' },
+  { key: 'guia',       label: '🧭 Guía' },
+  { key: 'seguro',     label: '🛡️ Seguro' },
+]
 
 export default function ToursPage() {
   const [tours, setTours] = useState<ConfigTour[]>([])
@@ -88,6 +127,10 @@ export default function ToursPage() {
   const [userLon, setUserLon] = useState<number | null>(null)
   const [gpsCargando, setGpsCargando] = useState(false)
   const [gpsCiudad, setGpsCiudad] = useState('')
+  const [mostrarFiltros, setMostrarFiltros] = useState(false)
+  const [precioMax, setPrecioMax] = useState(0)
+  const [durMax, setDurMax] = useState(0)
+  const [serviciosFiltro, setServiciosFiltro] = useState<string[]>([])
 
   useEffect(() => {
     listarTours().then(d => { setTours(d); setCargando(false) })
@@ -111,12 +154,18 @@ export default function ToursPage() {
     )
   }
 
+  const maxPrecioReal = tours.length > 0 ? Math.max(...tours.map(t => Number(t.precioPersona))) : 0
+  const maxDurReal = tours.length > 0 ? Math.max(...tours.map(t => t.duracionHoras)) : 0
+
   const filtrados = tours.filter(t => {
-    if (!busqueda) return true
-    const q = busqueda.toLowerCase()
-    return t.nombre.toLowerCase().includes(q) ||
-      t.comercio.nombre.toLowerCase().includes(q) ||
-      t.comercio.municipio.toLowerCase().includes(q)
+    if (busqueda) {
+      const q = busqueda.toLowerCase()
+      if (!t.nombre.toLowerCase().includes(q) && !t.comercio.nombre.toLowerCase().includes(q) && !t.comercio.municipio.toLowerCase().includes(q)) return false
+    }
+    if (precioMax > 0 && Number(t.precioPersona) > precioMax) return false
+    if (durMax > 0 && t.duracionHoras > durMax) return false
+    if (serviciosFiltro.length > 0 && !serviciosFiltro.every(s => t.servicios.includes(s))) return false
+    return true
   })
 
   const ordenados = userLat && userLon
@@ -126,6 +175,8 @@ export default function ToursPage() {
         return da - db
       })
     : filtrados
+
+  const filtrosActivos = (precioMax > 0 ? 1 : 0) + (durMax > 0 ? 1 : 0) + serviciosFiltro.length
 
   return (
     <div className="min-h-screen bg-[#FAF8F5]">
@@ -154,7 +205,60 @@ export default function ToursPage() {
               {gpsCargando ? <span className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /> : '📍'}
               {gpsCiudad || 'GPS'}
             </button>
+            <button onClick={() => setMostrarFiltros(v => !v)}
+              className={`relative px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                mostrarFiltros || filtrosActivos > 0 ? 'bg-[#2D6A4F] text-white border-[#2D6A4F]' : 'bg-white text-gray-600 border-gray-200'
+              }`}>
+              ⚙️
+              {filtrosActivos > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#D4A017] text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {filtrosActivos}
+                </span>
+              )}
+            </button>
           </div>
+
+          {mostrarFiltros && (
+            <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+              <div>
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>Precio máximo</span>
+                  <span className="font-medium text-[#2D6A4F]">{precioMax > 0 ? `$${precioMax.toLocaleString('es-CO')}` : 'Cualquiera'}</span>
+                </div>
+                <input type="range" min={0} max={maxPrecioReal || 500000} step={10000} value={precioMax}
+                  onChange={e => setPrecioMax(Number(e.target.value))}
+                  className="w-full accent-[#2D6A4F]" />
+              </div>
+              <div>
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>Duración máxima</span>
+                  <span className="font-medium text-[#2D6A4F]">{durMax > 0 ? `${durMax}h` : 'Cualquiera'}</span>
+                </div>
+                <input type="range" min={0} max={maxDurReal || 24} step={1} value={durMax}
+                  onChange={e => setDurMax(Number(e.target.value))}
+                  className="w-full accent-[#2D6A4F]" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-2">Incluye</p>
+                <div className="flex flex-wrap gap-2">
+                  {SERVICIOS_FILTRO.map(s => {
+                    const sel = serviciosFiltro.includes(s.key)
+                    return (
+                      <button key={s.key} onClick={() => setServiciosFiltro(prev =>
+                        sel ? prev.filter(x => x !== s.key) : [...prev, s.key]
+                      )} className={`px-2.5 py-1 rounded-full text-xs border font-medium transition-colors ${
+                        sel ? 'bg-[#2D6A4F] text-white border-[#2D6A4F]' : 'bg-gray-50 text-gray-600 border-gray-200'
+                      }`}>{s.label}</button>
+                    )
+                  })}
+                </div>
+              </div>
+              {filtrosActivos > 0 && (
+                <button onClick={() => { setPrecioMax(0); setDurMax(0); setServiciosFiltro([]) }}
+                  className="text-xs text-red-500 hover:text-red-700">Limpiar filtros</button>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -165,13 +269,14 @@ export default function ToursPage() {
         </p>
 
         {cargando ? (
-          <div className="flex justify-center py-16">
-            <div className="w-8 h-8 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {Array.from({ length: 6 }).map((_, i) => <SkeletonTour key={i} />)}
           </div>
         ) : ordenados.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
-            <p className="text-4xl mb-3">🗺️</p>
-            <p className="font-medium">No hay tours disponibles</p>
+          <div className="text-center py-20 text-gray-400">
+            <p className="text-5xl mb-4">🗺️</p>
+            <p className="font-semibold text-gray-600">No hay tours disponibles</p>
+            <p className="text-sm mt-1">Prueba con otra búsqueda</p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">

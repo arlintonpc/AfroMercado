@@ -185,6 +185,13 @@ export default function TourDetallePage() {
         <Link href="/tours" className="absolute top-4 left-4 bg-black/40 rounded-full p-2 text-white">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
         </Link>
+        <button onClick={async () => {
+          const url = window.location.href
+          if (navigator.share) { try { await navigator.share({ title: tour.nombre, url }) } catch {} }
+          else { navigator.clipboard.writeText(url).catch(() => {}); alert('¡Enlace copiado!') }
+        }} className="absolute top-4 right-4 bg-black/40 rounded-full p-2 text-white hover:bg-black/60">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        </button>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-5 pb-28">
@@ -250,6 +257,15 @@ export default function TourDetallePage() {
             <h2 className="font-semibold text-amber-800 mb-1">Política de cancelación</h2>
             <p className="text-sm text-amber-700 leading-relaxed">{tour.politicaCancelacion}</p>
           </div>
+        )}
+
+        {tour.comercio.whatsapp && (
+          <a href={`https://wa.me/57${tour.comercio.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, me interesa el tour "${tour.nombre}". ¿Tienen disponibilidad?`)}`}
+            target="_blank" rel="noopener"
+            className="flex items-center gap-2 justify-center w-full border border-green-300 text-green-700 font-medium py-3 rounded-2xl text-sm hover:bg-green-50 transition-colors mb-4">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.533 5.854L.057 23.428a.5.5 0 0 0 .617.601l5.7-1.498A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.956 0-3.789-.574-5.33-1.56l-.382-.232-3.384.889.903-3.295-.249-.399A9.935 9.935 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+            Consultar por WhatsApp
+          </a>
         )}
       </div>
 
