@@ -1,3 +1,5 @@
+const fs = require("fs");
+const { subirACloudinary } = require("../utils/cloudinary");
 const HotelService = require("../services/hotel.service");
 
 const HotelController = {
@@ -105,6 +107,29 @@ const HotelController = {
     try {
       const data = await HotelService.ocupacion(req.usuario.comercio.id);
       res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async subirFotosHabitacion(req, res, next) {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ ok: false, error: "Adjunta al menos una foto" });
+      }
+      const base = `${req.protocol}://${req.get("host")}`;
+      const urls = [];
+      for (const f of req.files) {
+        const cloudUrl = await subirACloudinary(f.path, "afromercado/hoteles");
+        if (cloudUrl) {
+          urls.push(cloudUrl);
+          fs.unlink(f.path, () => {});
+        } else {
+          urls.push(`${base}/uploads/hoteles/${f.filename}`);
+        }
+      }
+      const hab = await HotelService.agregarFotosHabitacion(
+        req.usuario.comercio.id, Number(req.params.id), urls
+      );
+      res.json({ ok: true, data: hab });
     } catch (e) { next(e); }
   },
 };

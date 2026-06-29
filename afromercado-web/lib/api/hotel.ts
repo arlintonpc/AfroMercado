@@ -152,6 +152,22 @@ export async function cambiarEstadoReserva(id: number, estado: EstadoReservaHote
   return r.data
 }
 
+export async function subirFotosHabitacion(habitacionId: number, files: File[]): Promise<HabitacionTipo> {
+  const fd = new FormData()
+  files.forEach(f => fd.append('fotos', f))
+  const { obtenerToken } = await import('./client')
+  const token = obtenerToken()
+  const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
+  const res = await fetch(`${API}/hoteles/mi-hotel/habitaciones/${habitacionId}/fotos`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: fd,
+  })
+  const j = await res.json()
+  if (!res.ok) throw new Error(j?.error ?? 'Error al subir fotos')
+  return j.data
+}
+
 export async function ocupacionHotel(): Promise<{ habitaciones: HabitacionTipo[]; reservas: ReservaHotel[] }> {
   const r = await apiFetch<{ ok: boolean; data: { habitaciones: HabitacionTipo[]; reservas: ReservaHotel[] } }>('/hoteles/mi-hotel/ocupacion')
   return r.data

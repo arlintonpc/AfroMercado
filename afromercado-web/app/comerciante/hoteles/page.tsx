@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import {
   obtenerMiHotel, actualizarMiHotel, agregarHabitacion, actualizarHabitacion, eliminarHabitacion,
-  reservasHotelero, cambiarEstadoReserva, ocupacionHotel,
+  reservasHotelero, cambiarEstadoReserva, ocupacionHotel, subirFotosHabitacion,
   type ConfigHotel, type HabitacionTipo, type ReservaHotel, type EstadoReservaHotel,
 } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
@@ -40,9 +40,29 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
     nombre: '', descripcion: '', capacidad: 2, precioPorNoche: 80000, cantidad: 1,
     fotos: [], serviciosExtra: [], ...inicial,
   })
-  const [fotoUrl, setFotoUrl] = useState('')
+  const [subiendoFotos, setSubiendoFotos] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
+  const inputFotoRef = useRef<HTMLInputElement>(null)
+
+  async function handleFotos(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
+    // Si ya tenemos id (edición), subir directo; si es nuevo, guardar locales para preview
+    if (inicial?.id) {
+      setSubiendoFotos(true)
+      try {
+        const hab = await subirFotosHabitacion(inicial.id, files)
+        setForm(p => ({ ...p, fotos: hab.fotos }))
+      } catch (err: any) { setError(err.message) }
+      setSubiendoFotos(false)
+    } else {
+      // Preview local antes de guardar
+      const urls = files.map(f => URL.createObjectURL(f))
+      setForm(p => ({ ...p, fotos: [...(p.fotos ?? []), ...urls] }))
+    }
+    if (inputFotoRef.current) inputFotoRef.current.value = ''
+  }
 
   async function handleGuardar() {
     if (!form.nombre?.trim() || !form.precioPorNoche) { setError('Nombre y precio son obligatorios'); return }
@@ -92,26 +112,22 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
 
             {/* Fotos */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">URLs de fotos</label>
-              <div className="flex gap-2">
-                <input value={fotoUrl} onChange={e => setFotoUrl(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && fotoUrl.trim()) { setForm(p => ({ ...p, fotos: [...(p.fotos ?? []), fotoUrl.trim()] })); setFotoUrl('') }}}
-                  placeholder="https://…"
-                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
-                <button onClick={() => { if (fotoUrl.trim()) { setForm(p => ({ ...p, fotos: [...(p.fotos ?? []), fotoUrl.trim()] })); setFotoUrl('') }}}
-                  className="px-3 bg-gray-100 rounded-xl text-sm">+</button>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Fotos de la habitación</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {(form.fotos ?? []).map((f, i) => (
+                  <div key={i} className="relative w-16 h-16">
+                    <img src={f} alt="" className="w-full h-full object-cover rounded-lg" />
+                    <button onClick={() => setForm(p => ({ ...p, fotos: (p.fotos ?? []).filter((_, j) => j !== i) }))}
+                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center leading-none">×</button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => inputFotoRef.current?.click()} disabled={subiendoFotos}
+                  className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 hover:border-[#2D6A4F] disabled:opacity-50 text-xl">
+                  {subiendoFotos ? <span className="w-4 h-4 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" /> : '+'}
+                </button>
               </div>
-              {(form.fotos ?? []).length > 0 && (
-                <div className="flex gap-2 mt-2 flex-wrap">
-                  {(form.fotos ?? []).map((f, i) => (
-                    <div key={i} className="relative">
-                      <img src={f} alt="" className="w-16 h-16 object-cover rounded-lg" />
-                      <button onClick={() => setForm(p => ({ ...p, fotos: (p.fotos ?? []).filter((_, j) => j !== i) }))}
-                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center">×</button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <input ref={inputFotoRef} type="file" accept="image/*" multiple onChange={handleFotos} className="hidden" />
+              <p className="text-[10px] text-gray-400">Formatos: JPG, PNG, WEBP. Máx 8MB por foto.</p>
             </div>
 
             {/* Servicios extra */}
@@ -158,6 +174,8 @@ export default function ComercianteHotelesPage() {
   const [filtroEstado, setFiltroEstado] = useState('')
   const primerasCarga               = useRef(true)
 
+  const reservasRef = useRef<ReservaHotel[]>([])
+
   const cargar = useCallback(async () => {
     try {
       const [hotelData, reservasData] = await Promise.all([
@@ -169,6 +187,26 @@ export default function ComercianteHotelesPage() {
         setEditConfig(hotelData)
         primerasCarga.current = false
       }
+
+      // Detectar nuevas reservas PENDIENTE → alerta sonora
+      const prevIds = new Set(reservasRef.current.map(r => r.id))
+      const nuevas  = reservasData.filter(r => r.estado === 'PENDIENTE' && !prevIds.has(r.id))
+      if (nuevas.length > 0 && reservasRef.current.length > 0) {
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+          ;[0, 200, 400].forEach(delay => {
+            const osc  = ctx.createOscillator()
+            const gain = ctx.createGain()
+            osc.connect(gain); gain.connect(ctx.destination)
+            osc.frequency.value = 660
+            gain.gain.setValueAtTime(0.3, ctx.currentTime + delay / 1000)
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay / 1000 + 0.35)
+            osc.start(ctx.currentTime + delay / 1000)
+            osc.stop(ctx.currentTime + delay / 1000 + 0.35)
+          })
+        } catch {}
+      }
+      reservasRef.current = reservasData
       setReservas(reservasData)
     } catch (e: any) {
       setError(e.message)

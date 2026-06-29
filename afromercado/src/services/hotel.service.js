@@ -303,6 +303,17 @@ const HotelService = {
   },
 
   // Ocupación: habitaciones y reservas activas para un hotel (para el panel calendario)
+  async agregarFotosHabitacion(comercioId, habitacionId, urls) {
+    const hab = await prisma.habitacionTipo.findFirst({
+      where: { id: habitacionId, configHotel: { comercioId } },
+    });
+    if (!hab) throw new ErrorNoEncontrado("Habitación no encontrada");
+    return prisma.habitacionTipo.update({
+      where: { id: habitacionId },
+      data:  { fotos: [...hab.fotos, ...urls] },
+    });
+  },
+
   async ocupacion(comercioId) {
     const cfg = await prisma.configHotel.findUnique({
       where: { comercioId },

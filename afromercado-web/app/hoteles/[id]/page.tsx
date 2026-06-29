@@ -3,9 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { obtenerHotel, verificarDisponibilidad, crearReserva, type ConfigHotel, type HabitacionTipo } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
+
+const MapaHoteles = dynamic(() => import('@/components/hoteles/MapaHoteles'), { ssr: false })
 
 const SERVICIOS_LABELS: Record<string, string> = {
   wifi: '📶 WiFi', desayuno: '🍳 Desayuno incluido', parking: '🅿️ Parqueadero',
@@ -266,6 +269,14 @@ export default function HotelDetallePage() {
             <div className="mt-4 bg-amber-50 rounded-xl p-3">
               <p className="text-xs font-semibold text-amber-700 mb-1">Política de cancelación</p>
               <p className="text-xs text-amber-800">{hotel.politicaCancelacion}</p>
+            </div>
+          )}
+
+          {/* Mapa de ubicación */}
+          {hotel.comercio.latitud && hotel.comercio.longitud && (
+            <div className="mt-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ubicación</p>
+              <MapaHoteles hoteles={[hotel]} userLat={null} userLon={null} />
             </div>
           )}
 

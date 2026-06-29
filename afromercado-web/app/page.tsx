@@ -16,6 +16,7 @@ import { mapearProductos, type ProductoCrudo } from '@/lib/mapearProducto'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { precioVigente } from '@/lib/precioProducto'
 import { registrarEventoPatrocinado } from '@/lib/publicidadTracking'
+import { listarHoteles, type ConfigHotel } from '@/lib/api/hotel'
 import type { Producto } from '@/types/producto'
 import type { Categoria } from '@/types/categoria'
 
@@ -49,6 +50,56 @@ function visibilidadConProducto(
   v: VisibilidadActiva,
 ): v is VisibilidadActiva & { producto: ProductoCrudo } {
   return Boolean(v.producto)
+}
+
+/* ─── Componente SeccionHoteles ──────────────────────────────────── */
+function SeccionHoteles({ hoteles }: { hoteles: ConfigHotel[] }) {
+  if (hoteles.length === 0) return null
+  return (
+    <section className="bg-white py-10">
+      <div className="max-w-7xl mx-auto px-4 md:px-6">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <p className="text-[#2D6A4F] text-xs font-semibold tracking-widest uppercase mb-1">Turismo</p>
+            <h2 className="text-2xl md:text-3xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif)' }}>
+              Hoteles & Hospedaje
+            </h2>
+          </div>
+          <Link href="/hoteles" className="text-sm font-semibold text-[#2D6A4F] hover:underline whitespace-nowrap">
+            Ver todos →
+          </Link>
+        </div>
+        <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+          {hoteles.slice(0, 6).map(h => {
+            const desde = h.habitaciones.length > 0
+              ? Math.min(...h.habitaciones.map(hab => Number(hab.precioPorNoche)))
+              : null
+            const foto = h.habitaciones[0]?.fotos[0]
+            return (
+              <Link key={h.id} href={`/hoteles/${h.id}`}
+                className="flex-shrink-0 w-52 bg-[#F8F5F0] rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
+                <div className="h-32 bg-gradient-to-br from-[#2D6A4F] to-[#40916C] flex items-center justify-center overflow-hidden">
+                  {foto
+                    ? <img src={foto} alt={h.comercio.nombre} className="w-full h-full object-cover" />
+                    : <span className="text-4xl">🏨</span>
+                  }
+                </div>
+                <div className="p-3">
+                  <p className="font-semibold text-[#1A1A1A] text-sm truncate">{h.comercio.nombre}</p>
+                  <p className="text-xs text-gray-500 truncate">📍 {h.comercio.municipio}</p>
+                  {desde !== null && (
+                    <p className="text-xs text-[#2D6A4F] font-bold mt-1">
+                      Desde {formatearPrecio(desde)}<span className="font-normal text-gray-400">/noche</span>
+                    </p>
+                  )}
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
 }
 
 /* ─── Componente SeccionCategorias ──────────────────────────────── */
@@ -300,6 +351,7 @@ export default function Home() {
   const [destHomeEtiquetas, setDestHomeEtiquetas] = useState<Map<string, string>>(new Map())
   // Map: productoId (string) -> etiqueta del sello publicitario.
   const [destCatalogo, setDestCatalogo] = useState<Map<string, string>>(new Map())
+  const [hoteles, setHoteles] = useState<ConfigHotel[]>([])
 
   /** Carga productos según el filtro de categoría activo. */
   const cargarProductos = useCallback(async (filtro: string) => {
@@ -336,6 +388,14 @@ export default function Home() {
         if (!cancelado) setDestacados(mapearProductos(items))
       } catch {
         if (!cancelado) setDestacados([])
+      }
+
+      // Hoteles activos para la sección de turismo
+      try {
+        const hotelesData = await listarHoteles()
+        if (!cancelado) setHoteles(hotelesData)
+      } catch {
+        if (!cancelado) setHoteles([])
       }
 
       // Visibilidades pagadas activas (HOME_DESTACADO y CATALOGO)
@@ -419,6 +479,9 @@ export default function Home() {
 
         {/* Categorías */}
         <SeccionCategorias />
+
+        {/* Hoteles & Turismo */}
+        <SeccionHoteles hoteles={hoteles} />
 
         {/* Mejores precios */}
         <SeccionOfertas productos={productos} />

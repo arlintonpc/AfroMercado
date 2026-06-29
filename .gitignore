@@ -33,3 +33,12 @@ Documentacion/~$*
 
 # Herramientas locales
 .claude/worktrees/
+
+# Archivos grandes / binarios locales
+*.tar
+*.tar.gz
+*.zip
+afromercado-web.tar
+neon_migration.sql
+Logo/
+Logo.png
