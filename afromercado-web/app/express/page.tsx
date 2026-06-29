@@ -94,15 +94,12 @@ export default function ExpressPage() {
             json.address?.village ||
             json.address?.municipality ||
             ''
-          // Nominatim a veces devuelve "Perímetro Urbano X" o "Municipio de X"
+          // Solo mostramos la ciudad en el botón, NO filtramos por ella
           const ciudad = raw.replace(/^(Perímetro Urbano|Municipio de|Corregimiento de)\s+/i, '').trim()
-          if (ciudad) {
-            setBusqueda(ciudad)
-            setGpsCiudad(ciudad)
-          }
+          setGpsCiudad(ciudad)
           setGpsEstado('ok')
         } catch {
-          setGpsEstado('ok') // tenemos coords aunque no el nombre
+          setGpsEstado('ok')
         }
       },
       () => setGpsEstado('error'),
