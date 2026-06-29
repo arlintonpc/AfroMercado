@@ -33,7 +33,7 @@ const TRANSICIONES: Record<string, { label: string; estado: EstadoReservaHotel; 
 
 function FormHabitacion({ inicial, onGuardar, onCancelar }: {
   inicial?: Partial<HabitacionTipo>
-  onGuardar: (datos: Partial<HabitacionTipo>) => Promise<void>
+  onGuardar: (datos: Partial<HabitacionTipo>, archivos?: File[]) => Promise<void>
   onCancelar: () => void
 }) {
   const [form, setForm] = useState<Partial<HabitacionTipo>>({
@@ -44,12 +44,13 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   const inputFotoRef = useRef<HTMLInputElement>(null)
+  const archivosRef = useRef<File[]>([])
 
   async function handleFotos(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     if (!files.length) return
-    // Si ya tenemos id (edición), subir directo; si es nuevo, guardar locales para preview
     if (inicial?.id) {
+      // Edición: subir directo a Cloudinary
       setSubiendoFotos(true)
       try {
         const hab = await subirFotosHabitacion(inicial.id, files)
@@ -57,7 +58,8 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
       } catch (err: any) { setError(err.message) }
       setSubiendoFotos(false)
     } else {
-      // Preview local antes de guardar
+      // Nueva habitación: guardar File para subir al crear, preview con blob URL
+      archivosRef.current = [...archivosRef.current, ...files]
       const urls = files.map(f => URL.createObjectURL(f))
       setForm(p => ({ ...p, fotos: [...(p.fotos ?? []), ...urls] }))
     }
@@ -67,7 +69,13 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
   async function handleGuardar() {
     if (!form.nombre?.trim() || !form.precioPorNoche) { setError('Nombre y precio son obligatorios'); return }
     setGuardando(true); setError('')
-    try { await onGuardar(form) } catch (e: any) { setError(e.message) }
+    try {
+      // Para habitación nueva: quitar blob URLs del form, los archivos reales van aparte
+      const datos = inicial?.id
+        ? form
+        : { ...form, fotos: (form.fotos ?? []).filter(f => !f.startsWith('blob:')) }
+      await onGuardar(datos, !inicial?.id ? archivosRef.current : undefined)
+    } catch (e: any) { setError(e.message) }
     setGuardando(false)
   }
 
@@ -598,11 +606,14 @@ export default function ComercianteHotelesPage() {
         <FormHabitacion
           inicial={formHab.inicial}
           onCancelar={() => setFormHab({ visible: false })}
-          onGuardar={async datos => {
+          onGuardar={async (datos, archivos) => {
             if (formHab.inicial?.id) {
               await actualizarHabitacion(formHab.inicial.id, datos)
             } else {
-              await agregarHabitacion(datos)
+              const nueva = await agregarHabitacion(datos)
+              if (archivos && archivos.length > 0) {
+                await subirFotosHabitacion(nueva.id, archivos)
+              }
             }
             setFormHab({ visible: false })
             cargar()
