@@ -35,11 +35,14 @@ function tiempoRestante(fin: string): string {
 
 /* ─── Datos estáticos de presentación de categorías (solo visual) ──── */
 const CATEGORIAS = [
-  { emoji: '🌿', nombre: 'Del Campo',    slug: 'del-campo',  fondo: 'bg-[#E8F5EE]', texto: 'text-[#2D6A4F]', proximamente: false },
-  { emoji: '🎨', nombre: 'Artesanías',   slug: 'artesanias', fondo: 'bg-[#FFF8E8]', texto: 'text-[#B8860B]', proximamente: false },
-  { emoji: '🍽️', nombre: 'Gastronomía', slug: 'gastronomia', fondo: 'bg-[#FFF3EE]', texto: 'text-[#B85A1A]', proximamente: false },
-  { emoji: '🏞️', nombre: 'Turismo',  slug: 'turismo',   fondo: 'bg-[#EEF3FF]', texto: 'text-[#2A4AB8]', proximamente: false },
-  { emoji: '🎭', nombre: 'Cultural', slug: 'cultural',  fondo: 'bg-[#F5EEF8]', texto: 'text-[#7A2AB8]', proximamente: false },
+  { emoji: '🌿', nombre: 'Del Campo',    slug: 'del-campo',  fondo: 'bg-[#E8F5EE]', texto: 'text-[#2D6A4F]', proximamente: false, href: null },
+  { emoji: '🎨', nombre: 'Artesanías',   slug: 'artesanias', fondo: 'bg-[#FFF8E8]', texto: 'text-[#B8860B]', proximamente: false, href: null },
+  { emoji: '🍽️', nombre: 'Gastronomía', slug: 'gastronomia', fondo: 'bg-[#FFF3EE]', texto: 'text-[#B85A1A]', proximamente: false, href: null },
+  { emoji: '🏞️', nombre: 'Turismo',  slug: 'turismo',   fondo: 'bg-[#EEF3FF]', texto: 'text-[#2A4AB8]', proximamente: false, href: null },
+  { emoji: '🎭', nombre: 'Cultural', slug: 'cultural',  fondo: 'bg-[#F5EEF8]', texto: 'text-[#7A2AB8]', proximamente: false, href: null },
+  { emoji: '🏨', nombre: 'Hotelería', slug: '', fondo: 'bg-[#E8F5EE]', texto: 'text-[#2D6A4F]', proximamente: false, href: '/hoteles' },
+  { emoji: '🗺️', nombre: 'Tours',     slug: '', fondo: 'bg-[#EEF3FF]', texto: 'text-[#2A4AB8]', proximamente: false, href: '/tours' },
+  { emoji: '🛥️', nombre: 'Transporte', slug: '', fondo: 'bg-[#E8F0FF]', texto: 'text-[#023E8A]', proximamente: false, href: '/transportes' },
 ]
 
 interface VisibilidadActiva {
@@ -214,11 +217,12 @@ function SeccionCategorias() {
                 <span className={`text-xs font-semibold ${cat.texto} whitespace-nowrap`}>{cat.nombre}</span>
               </>
             )
-            const activa = !cat.proximamente && !!cat.slug
+            const destino = cat.href ?? (cat.slug ? `/buscar?categoria=${cat.slug}` : null)
+            const activa = !cat.proximamente && !!destino
             return (
               <div key={cat.nombre} className="relative flex-shrink-0">
                 {activa ? (
-                  <Link href={`/buscar?categoria=${cat.slug}`} className={`${claseBase} hover:scale-105 hover:shadow-md`}>
+                  <Link href={destino!} className={`${claseBase} hover:scale-105 hover:shadow-md`}>
                     {contenido}
                   </Link>
                 ) : (
