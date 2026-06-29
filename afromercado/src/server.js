@@ -3,6 +3,23 @@ const app = require("./app");
 const config = require("./config");
 const { cerrarConexion } = require("./utils/whatsapp");
 const { iniciarCron } = require("./utils/cron");
+const prisma = require("./config/prisma");
+
+// Aplica migraciones DDL pendientes sin usar prisma migrate (Neon pooler)
+async function aplicarMigraciones() {
+  const migraciones = [
+    `ALTER TABLE "Usuario" ADD COLUMN IF NOT EXISTS "departamento" TEXT`,
+    `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "departamento" TEXT`,
+  ];
+  for (const sql of migraciones) {
+    try {
+      await prisma.$executeRawUnsafe(sql);
+    } catch (e) {
+      console.error("[MIGRACIÓN] Error en:", sql, e.message);
+    }
+  }
+  console.log("[MIGRACIÓN] Columnas verificadas.");
+}
 
 // Evitar que excepciones de Baileys/WhatsApp tumben el proceso
 process.on("uncaughtException", (err) => {
@@ -24,8 +41,10 @@ async function shutdown(signal) {
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT",  () => shutdown("SIGINT"));
 
-app.listen(config.puerto, () => {
-  console.log(`🌿 AfroMercado API corriendo en http://localhost:${config.puerto}`);
-  console.log(`   Entorno: ${config.entorno}`);
-  iniciarCron();
+aplicarMigraciones().then(() => {
+  app.listen(config.puerto, () => {
+    console.log(`🌿 AfroMercado API corriendo en http://localhost:${config.puerto}`);
+    console.log(`   Entorno: ${config.entorno}`);
+    iniciarCron();
+  });
 });
