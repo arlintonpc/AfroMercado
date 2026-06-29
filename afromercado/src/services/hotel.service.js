@@ -352,25 +352,29 @@ const HotelService = {
     });
   },
 
-  async subirVideoHabitacion(comercioId, habitacionId, videoUrl) {
+  async subirVideoHabitacion(comercioId, habitacionId, videoUrl, posterUrl = null, duracion = null) {
     const hab = await prisma.habitacionTipo.findFirst({
       where: { id: habitacionId, configHotel: { comercioId } },
     });
     if (!hab) throw new ErrorNoEncontrado("Habitación no encontrada");
     return prisma.habitacionTipo.update({
       where: { id: habitacionId },
-      data: { fotos: [...hab.fotos, videoUrl] },
+      data: {
+        videoUrl,
+        ...(posterUrl && { videoPosterUrl: posterUrl }),
+        ...(duracion   && { videoDuracionSeg: Math.round(duracion) }),
+      },
     });
   },
 
-  async quitarVideoHabitacion(comercioId, habitacionId, videoUrl) {
+  async quitarVideoHabitacion(comercioId, habitacionId) {
     const hab = await prisma.habitacionTipo.findFirst({
       where: { id: habitacionId, configHotel: { comercioId } },
     });
     if (!hab) throw new ErrorNoEncontrado("Habitación no encontrada");
     return prisma.habitacionTipo.update({
       where: { id: habitacionId },
-      data: { fotos: hab.fotos.filter(f => f !== videoUrl) },
+      data: { videoUrl: null, videoPosterUrl: null, videoDuracionSeg: null },
     });
   },
 

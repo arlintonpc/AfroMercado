@@ -14,6 +14,9 @@ export interface HabitacionTipo {
   serviciosExtra: string[]
   activo: boolean
   creadoAt: string
+  videoUrl?: string | null
+  videoPosterUrl?: string | null
+  videoDuracionSeg?: number | null
 }
 
 export interface ConfigHotel {
@@ -169,7 +172,7 @@ export async function subirFotosHabitacion(habitacionId: number, files: File[]):
   return j.data
 }
 
-export async function subirVideoHabitacion(habitacionId: number, file: File): Promise<{ videoUrl: string; fotos: string[] }> {
+export async function subirVideoHabitacion(habitacionId: number, file: File): Promise<{ videoUrl: string; videoPosterUrl?: string; videoDuracionSeg?: number }> {
   const fd = new FormData()
   fd.append('video', file)
   const { obtenerToken } = await import('./client')
@@ -185,12 +188,11 @@ export async function subirVideoHabitacion(habitacionId: number, file: File): Pr
   return j.data
 }
 
-export async function quitarVideoHabitacion(habitacionId: number, videoUrl: string): Promise<{ fotos: string[] }> {
-  const d = await apiFetch<{ ok: boolean; data: { fotos: string[] } }>(
+export async function quitarVideoHabitacion(habitacionId: number): Promise<void> {
+  await apiFetch<{ ok: boolean }>(
     `/hotel/habitaciones/${habitacionId}/video`,
-    { method: 'DELETE', body: { videoUrl }, auth: true }
+    { method: 'DELETE', auth: true }
   )
-  return d.data
 }
 
 export async function ocupacionHotel(): Promise<{ habitaciones: HabitacionTipo[]; reservas: ReservaHotel[] }> {

@@ -41,9 +41,9 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
   onGuardar: (datos: Partial<HabitacionTipo>, archivos?: File[], archivosVideo?: File[]) => Promise<void>
   onCancelar: () => void
 }) {
-  const [form, setForm] = useState<Partial<HabitacionTipo>>({
+  const [form, setForm] = useState<Partial<HabitacionTipo> & { videoUrl?: string }>({
     nombre: '', descripcion: '', capacidad: 2, precioPorNoche: 80000, cantidad: 1,
-    fotos: [], serviciosExtra: [], ...inicial,
+    fotos: [], serviciosExtra: [], videoUrl: inicial?.videoUrl ?? undefined, ...inicial,
   })
   const [subiendoFotos, setSubiendoFotos] = useState(false)
   const [guardando, setGuardando] = useState(false)
@@ -146,25 +146,24 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
               {/* Video de la habitación */}
               <div className="mt-4">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Video (opcional)</p>
-                {(form.fotos ?? []).filter(esVideo).map(videoUrl => (
-                  <div key={videoUrl} className="relative rounded-xl overflow-hidden mb-2 bg-black" style={{ aspectRatio: '16/9' }}>
-                    <video src={videoUrl} controls className="w-full h-full object-contain" />
+                {form.videoUrl && (
+                  <div className="relative rounded-xl overflow-hidden mb-2 bg-black" style={{ aspectRatio: '16/9' }}>
+                    <video src={form.videoUrl} controls className="w-full h-full object-contain" />
                     <button
                       type="button"
-                      onClick={() => setForm(p => ({ ...p, fotos: (p.fotos ?? []).filter(f => f !== videoUrl) }))}
+                      onClick={() => { archivosVideoRef.current = []; setForm(p => ({ ...p, videoUrl: undefined })) }}
                       className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold hover:bg-red-600 transition-colors">×</button>
                   </div>
-                ))}
-                {(form.fotos ?? []).filter(esVideo).length === 0 && (
+                )}
+                {!form.videoUrl && (
                   <label className="flex items-center gap-2 cursor-pointer border-2 border-dashed border-gray-200 rounded-xl p-4 hover:border-[#2D6A4F] transition-colors">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
                     <span className="text-sm text-gray-500">Agregar video de la habitación (máx. 100 MB)</span>
                     <input type="file" accept="video/*" className="hidden" onChange={e => {
                       const file = e.target.files?.[0]
                       if (!file) return
-                      const blobUrl = URL.createObjectURL(file)
-                      archivosVideoRef.current = [...archivosVideoRef.current, file]
-                      setForm(p => ({ ...p, fotos: [...(p.fotos ?? []), blobUrl] }))
+                      archivosVideoRef.current = [file]
+                      setForm(p => ({ ...p, videoUrl: URL.createObjectURL(file) }))
                       e.target.value = ''
                     }} />
                   </label>
@@ -868,12 +867,11 @@ export default function ComercianteHotelesPage() {
           inicial={formHab.inicial}
           onCancelar={() => setFormHab({ visible: false })}
           onGuardar={async (datos, archivos, archivosVideo) => {
-            if (formHab.inicial?.id) {
-              await actualizarHabitacion(formHab.inicial.id, datos)
+            const habId = formHab.inicial?.id
+            if (habId) {
+              await actualizarHabitacion(habId, datos)
               if (archivosVideo && archivosVideo.length > 0) {
-                for (const file of archivosVideo) {
-                  await subirVideoHabitacion(formHab.inicial.id, file)
-                }
+                await subirVideoHabitacion(habId, archivosVideo[0])
               }
             } else {
               const nueva = await agregarHabitacion(datos)
@@ -881,9 +879,7 @@ export default function ComercianteHotelesPage() {
                 await subirFotosHabitacion(nueva.id, archivos)
               }
               if (archivosVideo && archivosVideo.length > 0) {
-                for (const file of archivosVideo) {
-                  await subirVideoHabitacion(nueva.id, file)
-                }
+                await subirVideoHabitacion(nueva.id, archivosVideo[0])
               }
             }
             setFormHab({ visible: false })

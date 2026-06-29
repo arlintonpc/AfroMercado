@@ -214,8 +214,12 @@ const HotelController = {
         || `${req.protocol}://${req.get("host")}/uploads/videos/habitaciones/${req.file.filename}`;
       if (cloud) fs.unlink(rutaLocal, () => {});
       rutaLocal = cloud ? null : rutaLocal; // mantener local si no hubo cloud
-      const hab = await HotelService.subirVideoHabitacion(req.usuario.comercio.id, Number(req.params.id), videoUrl);
-      res.json({ ok: true, data: { videoUrl, fotos: hab.fotos } });
+      const posterUrl = cloud?.posterUrl || null;
+      const duracion  = cloud?.duration  || null;
+      const hab = await HotelService.subirVideoHabitacion(
+        req.usuario.comercio.id, Number(req.params.id), videoUrl, posterUrl, duracion
+      );
+      res.json({ ok: true, data: { videoUrl, videoPosterUrl: hab.videoPosterUrl, videoDuracionSeg: hab.videoDuracionSeg } });
     } catch (e) {
       if (rutaLocal) fs.unlink(rutaLocal, () => {});
       next(e);
@@ -226,8 +230,8 @@ const HotelController = {
     try {
       const { videoUrl } = req.body;
       if (!videoUrl) throw new ErrorValidacion("videoUrl requerida");
-      const hab = await HotelService.quitarVideoHabitacion(req.usuario.comercio.id, Number(req.params.id), videoUrl);
-      res.json({ ok: true, data: { fotos: hab.fotos } });
+      await HotelService.quitarVideoHabitacion(req.usuario.comercio.id, Number(req.params.id));
+      res.json({ ok: true });
     } catch (e) { next(e); }
   },
 

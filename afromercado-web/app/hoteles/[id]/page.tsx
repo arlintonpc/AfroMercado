@@ -142,38 +142,39 @@ function TarjetaHabitacion({ hab, onReservar, onVerFotos }: {
   onReservar: (h: HabitacionTipo) => void
   onVerFotos: (fotos: string[], idx: number) => void
 }) {
+  const media = [...hab.fotos, ...(hab.videoUrl ? [hab.videoUrl] : [])]
   const [fotoIdx, setFotoIdx] = useState(0)
   const startX = useRef<number | null>(null)
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200">
       <div className="relative h-52 lg:h-56 overflow-hidden cursor-pointer bg-gray-100"
-        onClick={() => hab.fotos.length > 0 && onVerFotos(hab.fotos, fotoIdx)}
+        onClick={() => media.length > 0 && onVerFotos(media, fotoIdx)}
         onTouchStart={e => { startX.current = e.touches[0].clientX }}
         onTouchEnd={e => {
-          if (!startX.current || hab.fotos.length < 2) return
+          if (!startX.current || media.length < 2) return
           const dx = e.changedTouches[0].clientX - startX.current
-          if (dx > 40) setFotoIdx(i => (i - 1 + hab.fotos.length) % hab.fotos.length)
-          else if (dx < -40) setFotoIdx(i => (i + 1) % hab.fotos.length)
+          if (dx > 40) setFotoIdx(i => (i - 1 + media.length) % media.length)
+          else if (dx < -40) setFotoIdx(i => (i + 1) % media.length)
           startX.current = null
         }}>
-        {hab.fotos.length > 0 ? (
-          esVideo(hab.fotos[fotoIdx])
-            ? <video src={hab.fotos[fotoIdx]} autoPlay muted loop playsInline className="w-full h-full object-cover" />
-            : <img src={hab.fotos[fotoIdx]} alt={hab.nombre} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+        {media.length > 0 ? (
+          esVideo(media[fotoIdx])
+            ? <video src={media[fotoIdx]} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+            : <img src={media[fotoIdx]} alt={hab.nombre} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-[#E8F4F0] to-[#B7E4C7] flex items-center justify-center">
             <span className="text-6xl opacity-30">🛏️</span>
           </div>
         )}
-        {hab.fotos.length > 1 && (
+        {media.length > 1 && (
           <>
-            <button onClick={e => { e.stopPropagation(); setFotoIdx(i => (i - 1 + hab.fotos.length) % hab.fotos.length) }}
+            <button onClick={e => { e.stopPropagation(); setFotoIdx(i => (i - 1 + media.length) % media.length) }}
               className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black/70 transition-colors font-bold">‹</button>
-            <button onClick={e => { e.stopPropagation(); setFotoIdx(i => (i + 1) % hab.fotos.length) }}
+            <button onClick={e => { e.stopPropagation(); setFotoIdx(i => (i + 1) % media.length) }}
               className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black/70 transition-colors font-bold">›</button>
             <div className="absolute bottom-2 right-3 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full">
-              {fotoIdx + 1}/{hab.fotos.length}
+              {fotoIdx + 1}/{media.length}
             </div>
           </>
         )}
