@@ -1,10 +1,21 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import Image from 'next/image'
 import { listarComerciosExpress, type ComercioExpress } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+
+// Leaflet no funciona en SSR — carga sólo en cliente
+const MapaExpress = dynamic(() => import('@/components/express/MapaExpress'), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center" style={{ height: 420 }}>
+      <div className="w-7 h-7 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  ),
+})
 
 // Fórmula Haversine: distancia en km entre dos coordenadas
 function distanciaKm(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -22,6 +33,7 @@ function formatearDistancia(km: number) {
 export default function ExpressPage() {
   const [todos, setTodos]               = useState<ComercioExpress[]>([])
   const [busqueda, setBusqueda]         = useState('')
+  const [vista, setVista]               = useState<'lista'|'mapa'>('lista')
   const [gpsEstado, setGpsEstado]       = useState<'idle'|'buscando'|'ok'|'error'>('idle')
   const [gpsCiudad, setGpsCiudad]       = useState('')
   const [userLat, setUserLat]           = useState<number | null>(null)
@@ -208,17 +220,49 @@ export default function ExpressPage() {
         )}
       </div>
 
+      {/* Toggle Lista / Mapa */}
+      <div className="flex rounded-xl border border-gray-200 overflow-hidden w-fit">
+        <button
+          onClick={() => setVista('lista')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors ${
+            vista === 'lista' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+          </svg>
+          Lista
+        </button>
+        <button
+          onClick={() => setVista('mapa')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors border-l border-gray-200 ${
+            vista === 'mapa' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+          </svg>
+          Mapa
+        </button>
+      </div>
+
       {error && (
         <div className="bg-red-50 text-red-700 border border-red-200 rounded-xl px-4 py-3 text-sm">{error}</div>
       )}
 
-      {cargando && (
+      {/* Vista Mapa */}
+      {vista === 'mapa' && !cargando && (
+        <MapaExpress comercios={comercios} userLat={userLat} userLon={userLon} />
+      )}
+
+      {/* Vista Lista */}
+      {cargando && vista === 'lista' && (
         <div className="flex justify-center py-16">
           <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
-      {!cargando && comercios.length === 0 && (
+      {!cargando && vista === 'lista' && comercios.length === 0 && (
         <div className="text-center py-16 text-gray-400">
           <div className="text-4xl mb-3">🍳</div>
           <p className="font-medium">
@@ -230,7 +274,7 @@ export default function ExpressPage() {
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className={`space-y-3 ${vista === 'mapa' ? 'hidden' : ''}`}>
         {comercios.map(cfg => (
           <Link
             key={cfg.id}

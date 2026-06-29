@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, DM_Serif_Display } from "next/font/google";
 import "./globals.css";
+import "leaflet/dist/leaflet.css";
 import Providers from "@/components/Providers";
 
 const inter = Inter({
