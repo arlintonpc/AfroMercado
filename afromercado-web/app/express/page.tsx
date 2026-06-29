@@ -88,12 +88,14 @@ export default function ExpressPage() {
             { headers: { 'User-Agent': 'AfroMercado/1.0' } }
           )
           const json = await res.json()
-          const ciudad =
+          const raw =
             json.address?.city ||
             json.address?.town ||
             json.address?.village ||
             json.address?.municipality ||
             ''
+          // Nominatim a veces devuelve "Perímetro Urbano X" o "Municipio de X"
+          const ciudad = raw.replace(/^(Perímetro Urbano|Municipio de|Corregimiento de)\s+/i, '').trim()
           if (ciudad) {
             setBusqueda(ciudad)
             setGpsCiudad(ciudad)
