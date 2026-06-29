@@ -13,6 +13,7 @@ const { eliminarArchivoLocalDesdeUrl } = require("../utils/video-media");
 const CAMPOS_EDITABLES = [
   "nombre",
   "descripcion",
+  "departamento",
   "municipio",
   "historia",
   "whatsapp",

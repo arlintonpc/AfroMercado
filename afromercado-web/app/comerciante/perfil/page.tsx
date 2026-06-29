@@ -222,6 +222,7 @@ export default function PerfilComerciantePage() {
   const [cargando, setCargando] = useState(true)
 
   const [nombre, setNombre] = useState('')
+  const [departamento, setDepartamento] = useState('Chocó')
   const [municipio, setMunicipio] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [historia, setHistoria] = useState('')
@@ -260,6 +261,7 @@ export default function PerfilComerciantePage() {
         if (!c) return
         setComercio(c)
         setNombre(c.nombre)
+        setDepartamento((c as any).departamento ?? 'Chocó')
         setMunicipio(c.municipio)
         setDescripcion(c.descripcion ?? '')
         setHistoria(c.historia ?? '')
@@ -331,6 +333,7 @@ export default function PerfilComerciantePage() {
     try {
       const actualizado = await actualizarComercio({
         nombre: nombre.trim(),
+        departamento: departamento || undefined,
         municipio,
         descripcion: descripcion.trim() || undefined,
         historia: historia.trim() || undefined,
@@ -598,13 +601,39 @@ export default function PerfilComerciantePage() {
         />
 
         <CampoSelect
-          label="Municipio"
-          name="municipio"
-          value={municipio}
-          onChange={setMunicipio}
-          opciones={MUNICIPIOS_CHOCO.map((m) => ({ valor: m, etiqueta: m }))}
-          error={errores.municipio}
+          label="Departamento"
+          name="departamento"
+          value={departamento}
+          onChange={(v) => { setDepartamento(v); setMunicipio('') }}
+          opciones={[
+            'Amazonas','Antioquia','Arauca','Atlántico','Bolívar','Boyacá','Caldas',
+            'Caquetá','Casanare','Cauca','Cesar','Chocó','Córdoba','Cundinamarca',
+            'Bogotá D.C.','Guainía','Guaviare','Huila','La Guajira','Magdalena','Meta',
+            'Nariño','Norte de Santander','Putumayo','Quindío','Risaralda','San Andrés',
+            'Santander','Sucre','Tolima','Valle del Cauca','Vaupés','Vichada',
+          ].map((d) => ({ valor: d, etiqueta: d }))}
+          error={errores.departamento}
         />
+
+        {departamento === 'Chocó' ? (
+          <CampoSelect
+            label="Municipio"
+            name="municipio"
+            value={municipio}
+            onChange={setMunicipio}
+            opciones={MUNICIPIOS_CHOCO.map((m) => ({ valor: m, etiqueta: m }))}
+            error={errores.municipio}
+          />
+        ) : (
+          <CampoTexto
+            label="Municipio / Ciudad"
+            name="municipio"
+            placeholder="Ej: Medellín, Bogotá, Cali…"
+            value={municipio}
+            onChange={setMunicipio}
+            error={errores.municipio}
+          />
+        )}
 
         <CampoTexto
           label="Vereda o barrio"

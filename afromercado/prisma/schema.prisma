@@ -170,6 +170,7 @@ model Usuario {
   deletedAt    DateTime?
 
   municipio          String?
+  departamento       String?
   tipoDocumento      TipoDocumento?
   numeroDocumento    String?
   autorizacionDatos  Boolean   @default(false)
@@ -210,6 +211,7 @@ model Comercio {
   usuarioId    Int       @unique
   nombre       String
   municipio    String
+  departamento String?
   descripcion  String?
   historia     String?
   whatsapp     String?

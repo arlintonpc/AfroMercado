@@ -21,6 +21,7 @@ export interface Comercio {
   id: number
   usuarioId: number
   nombre: string
+  departamento?: string | null
   municipio: string
   descripcion?: string | null
   historia?: string | null
@@ -143,6 +144,7 @@ export interface ResultadoGuardarCuentaDispersion {
 
 export interface DatosComercio {
   nombre: string
+  departamento?: string
   municipio: string
   tipoDocumento: TipoDocumento
   numeroDocumento: string

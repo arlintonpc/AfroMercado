@@ -15,7 +15,7 @@ const UsuarioService = {
   },
 
   async actualizarPerfil(id, datos) {
-    const permitidos = ["nombre", "telefono", "tipoDocumento", "numeroDocumento", "municipio"];
+    const permitidos = ["nombre", "telefono", "tipoDocumento", "numeroDocumento", "municipio", "departamento"];
     const actualizacion = {};
 
     for (const campo of permitidos) {

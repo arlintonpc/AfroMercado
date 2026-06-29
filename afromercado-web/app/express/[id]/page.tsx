@@ -43,6 +43,7 @@ export default function MenuExpressPage() {
   const [modalidad, setModalidad] = useState<ModalidadExpress>('RECOGER')
   const [metodoPago, setMetodoPago] = useState<MetodoPagoExpress>('EFECTIVO')
   const [direccion, setDireccion] = useState('')
+  const [telefonoEntrega, setTelefonoEntrega] = useState('')
   const [notaCliente, setNotaCliente] = useState('')
   const [mesa, setMesa] = useState('')
 
@@ -88,16 +89,24 @@ export default function MenuExpressPage() {
   async function confirmarPedido() {
     if (!autenticado) { router.push('/login'); return }
     if (carrito.length === 0) return
+    if (modalidad === 'DOMICILIO') {
+      if (!direccion.trim()) { setError('Ingresa la dirección de entrega.'); return }
+      if (!telefonoEntrega.trim()) { setError('Ingresa un teléfono de contacto para el domicilio.'); return }
+    }
+    if (modalidad === 'MESA' && !mesa.trim()) { setError('Ingresa el número de mesa.'); return }
     setEnviando(true)
     setError(null)
     try {
+      const direccionFinal = modalidad === 'DOMICILIO'
+        ? `${direccion.trim()} | Tel: ${telefonoEntrega.trim()}`
+        : modalidad === 'MESA' ? `Mesa ${mesa}` : undefined
       const pedido = await crearPedidoExpress({
         comercioId,
         modalidad,
         metodoPago,
         items: carrito.map(i => ({ productoId: i.productoId, cantidad: i.cantidad, nota: i.nota || undefined })),
         notaCliente: notaCliente || undefined,
-        direccionTexto: modalidad === 'DOMICILIO' ? direccion : modalidad === 'MESA' ? `Mesa ${mesa}` : undefined,
+        direccionTexto: direccionFinal,
         municipioEntrega: menu?.comercio.municipio,
       })
       setPedidoId(pedido.id)
@@ -207,12 +216,28 @@ export default function MenuExpressPage() {
                 ))}
               </div>
               {modalidad === 'DOMICILIO' && (
-                <input
-                  className="mt-3 w-full rounded-xl border border-[#E8DCC8] px-4 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F]"
-                  placeholder="Dirección de entrega"
-                  value={direccion}
-                  onChange={e => setDireccion(e.target.value)}
-                />
+                <div className="mt-3 space-y-2">
+                  <input
+                    className="w-full rounded-xl border border-[#E8DCC8] px-4 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F]"
+                    placeholder="Dirección de entrega (barrio, calle, referencia…) *"
+                    value={direccion}
+                    onChange={e => setDireccion(e.target.value)}
+                    required
+                  />
+                  <div className="flex items-center border border-[#E8DCC8] rounded-xl overflow-hidden focus-within:border-[#2D6A4F]">
+                    <span className="px-3 text-sm text-gray-400 bg-[#F8F5F0] border-r border-[#E8DCC8] h-10 flex items-center">+57</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      className="flex-1 h-10 px-3 text-sm focus:outline-none"
+                      placeholder="Teléfono de contacto *"
+                      value={telefonoEntrega}
+                      onChange={e => setTelefonoEntrega(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400">El repartidor usará este número si necesita ubicarte.</p>
+                </div>
               )}
               {modalidad === 'MESA' && (
                 <input

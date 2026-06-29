@@ -9,6 +9,14 @@ import { apiFetch } from '@/lib/api/client'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import type { Usuario, TipoDocumento } from '@/types/usuario'
 
+const DEPARTAMENTOS_COLOMBIA = [
+  'Amazonas','Antioquia','Arauca','Atlántico','Bolívar','Boyacá','Caldas',
+  'Caquetá','Casanare','Cauca','Cesar','Chocó','Córdoba','Cundinamarca',
+  'Bogotá D.C.','Guainía','Guaviare','Huila','La Guajira','Magdalena','Meta',
+  'Nariño','Norte de Santander','Putumayo','Quindío','Risaralda','San Andrés',
+  'Santander','Sucre','Tolima','Valle del Cauca','Vaupés','Vichada',
+]
+
 const ETIQUETA_ROL: Record<string, string> = {
   COMPRADOR: 'Comprador',
   COMERCIANTE: 'Comerciante',
@@ -46,6 +54,7 @@ export default function PerfilPage() {
   // Campos del formulario
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [departamento, setDepartamento] = useState('')
   const [municipio, setMunicipio] = useState('')
   const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento | ''>('')
   const [numeroDocumento, setNumeroDocumento] = useState('')
@@ -76,6 +85,7 @@ export default function PerfilPage() {
         setPerfil(p)
         setNombre(p.nombre)
         setTelefono(p.telefono ?? '')
+        setDepartamento((p as any).departamento ?? '')
         setMunicipio(p.municipio ?? '')
         setTipoDocumento((p.tipoDocumento as TipoDocumento) ?? '')
         setNumeroDocumento(p.numeroDocumento ?? '')
@@ -100,13 +110,19 @@ export default function PerfilPage() {
     setGuardando(true)
 
     try {
+      if ((tipoDocumento && !numeroDocumento.trim()) || (!tipoDocumento && numeroDocumento.trim())) {
+        setError('Debes completar tanto el tipo como el número de documento.')
+        setGuardando(false)
+        return
+      }
       const actualizado = await actualizarPerfil({
         nombre: nombre.trim(),
         telefono: telefono.replace(/\D/g, '') || undefined,
+        departamento: departamento.trim() || undefined,
         municipio: municipio.trim() || undefined,
         tipoDocumento: tipoDocumento || undefined,
         numeroDocumento: numeroDocumento.trim() || undefined,
-      })
+      } as any)
       setPerfil(actualizado)
       actualizarUsuario(actualizado)
       setExito(true)
@@ -123,6 +139,7 @@ export default function PerfilPage() {
     if (!perfil) return
     setNombre(perfil.nombre)
     setTelefono(perfil.telefono ?? '')
+    setDepartamento((perfil as any).departamento ?? '')
     setMunicipio(perfil.municipio ?? '')
     setTipoDocumento((perfil.tipoDocumento as TipoDocumento) ?? '')
     setNumeroDocumento(perfil.numeroDocumento ?? '')
@@ -327,9 +344,22 @@ export default function PerfilPage() {
                 </div>
               </div>
 
+              {/* Departamento */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-[#1A1A1A]">Departamento</label>
+                <select
+                  value={departamento}
+                  onChange={(e) => setDepartamento(e.target.value)}
+                  className="w-full h-11 px-4 rounded-xl border border-[#1A1A1A]/15 bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] transition-colors"
+                >
+                  <option value="">Selecciona tu departamento</option>
+                  {DEPARTAMENTOS_COLOMBIA.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+
               {/* Municipio */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-[#1A1A1A]">Municipio</label>
+                <label className="text-sm font-medium text-[#1A1A1A]">Municipio / Ciudad</label>
                 <input
                   type="text"
                   value={municipio}
@@ -409,7 +439,15 @@ export default function PerfilPage() {
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-[#1A1A1A]/45 uppercase tracking-wide font-medium mb-0.5">Municipio</dt>
+                <dt className="text-xs text-[#1A1A1A]/45 uppercase tracking-wide font-medium mb-0.5">Departamento</dt>
+                <dd className="text-sm font-medium text-[#1A1A1A]">
+                  {(perfil as any).departamento
+                    ? (perfil as any).departamento
+                    : <span className="text-[#1A1A1A]/30 italic">No registrado</span>}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[#1A1A1A]/45 uppercase tracking-wide font-medium mb-0.5">Municipio / Ciudad</dt>
                 <dd className="text-sm font-medium text-[#1A1A1A]">
                   {perfil.municipio
                     ? perfil.municipio
