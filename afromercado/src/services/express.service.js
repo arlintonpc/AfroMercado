@@ -26,6 +26,11 @@ function comercioAbiertoAhora(horarios) {
   return horaActualEnRango(horario.apertura, horario.cierre);
 }
 
+const PEDIDO_INCLUDE = {
+  items: { include: { producto: { select: { nombre: true, fotoUrl: true } } } },
+  cliente: { select: { nombre: true, telefono: true } },
+};
+
 const TASA_COMISION = 0.10;
 const TIMEOUT_ACEPTACION_MIN = 3;
 
@@ -183,7 +188,7 @@ const ExpressService = {
     return prisma.pedidoExpress.update({
       where: { id: pedidoId },
       data: { estado: "ACEPTADO", aceptadoAt: new Date(), tiempoAjustadoMin: tiempoAjustadoMin ?? null },
-      include: { items: true },
+      include: PEDIDO_INCLUDE,
     });
   },
 
@@ -195,13 +200,14 @@ const ExpressService = {
     return prisma.pedidoExpress.update({
       where: { id: pedidoId },
       data: { estado: "RECHAZADO", canceladoAt: new Date(), motivoCancelacion: motivo ?? "Rechazado por el comercio" },
+      include: PEDIDO_INCLUDE,
     });
   },
 
   async avanzarEstado(pedidoId, comercioId) {
     const pedido = await this._getPedidoComercio(pedidoId, comercioId);
     const FLUJO = {
-      ACEPTADO:      { siguiente: "EN_PREPARACION", campo: "preparandoAt" },
+      ACEPTADO:       { siguiente: "EN_PREPARACION", campo: "preparandoAt" },
       EN_PREPARACION: { siguiente: "LISTO",           campo: "listoAt" },
       LISTO:          { siguiente: "EN_CAMINO",        campo: "enCaminoAt" },
       EN_CAMINO:      { siguiente: "ENTREGADO",        campo: "entregadoAt" },
@@ -212,6 +218,7 @@ const ExpressService = {
     const actualizado = await prisma.pedidoExpress.update({
       where: { id: pedidoId },
       data:  { estado: paso.siguiente, [paso.campo]: new Date() },
+      include: PEDIDO_INCLUDE,
     });
 
     // Si se entrega en efectivo → acumular deuda de comisión
