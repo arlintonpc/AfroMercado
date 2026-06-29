@@ -322,8 +322,8 @@ export default function MenuExpressPage() {
               <p className="text-sm text-[#666] flex items-center gap-1">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
                 {menu.comercio.municipio}
-                {menu.comercio.calificacion > 0 && (
-                  <span className="ml-2">⭐ {menu.comercio.calificacion.toFixed(1)}</span>
+                {Number(menu.comercio.calificacion) > 0 && (
+                  <span className="ml-2">⭐ {Number(menu.comercio.calificacion).toFixed(1)}</span>
                 )}
               </p>
               <span className={`inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded-full ${
