@@ -6,12 +6,8 @@ import Image from 'next/image'
 import { listarComerciosExpress, type ComercioExpress } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
-const MUNICIPIOS_CHOCO = [
-  'Todos','Quibdó','Istmina','Tadó','Condoto','Bagadó','Nuquí','Bahía Solano',
-]
-
 export default function ExpressPage() {
-  const [comercios, setComercios] = useState<ComercioExpress[]>([])
+  const [todos, setTodos]         = useState<ComercioExpress[]>([])
   const [municipio, setMunicipio] = useState('Todos')
   const [cargando, setCargando]   = useState(true)
   const [error, setError]         = useState('')
@@ -20,8 +16,8 @@ export default function ExpressPage() {
     async function cargar() {
       setCargando(true)
       try {
-        const data = await listarComerciosExpress(municipio === 'Todos' ? undefined : municipio)
-        setComercios(data)
+        const data = await listarComerciosExpress()
+        setTodos(data)
       } catch (e: any) {
         setError(e.message)
       } finally {
@@ -31,7 +27,11 @@ export default function ExpressPage() {
     cargar()
     const interval = setInterval(cargar, 30_000)
     return () => clearInterval(interval)
-  }, [municipio])
+  }, [])
+
+  // Municipios con al menos un comercio, en orden de aparición
+  const municipios = ['Todos', ...Array.from(new Set(todos.map(c => c.comercio.municipio).filter(Boolean)))]
+  const comercios = municipio === 'Todos' ? todos : todos.filter(c => c.comercio.municipio === municipio)
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
@@ -50,7 +50,7 @@ export default function ExpressPage() {
 
       {/* Filtro municipio */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-        {MUNICIPIOS_CHOCO.map(m => (
+        {municipios.map(m => (
           <button
             key={m}
             onClick={() => setMunicipio(m)}
