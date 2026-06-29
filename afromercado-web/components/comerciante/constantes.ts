@@ -45,39 +45,8 @@ export const MUNICIPIOS_POR_DEPARTAMENTO: Record<string, string[]> = {
 /** Todos los departamentos de Colombia */
 export const DEPARTAMENTOS_COLOMBIA: string[] = Object.keys(MUNICIPIOS_POR_DEPARTAMENTO).sort()
 
-/** Municipios del Chocó (30 oficiales DIVIPOLA — DANE). */
+/** Municipios del Chocó — alias de MUNICIPIOS_POR_DEPARTAMENTO['Chocó'] */
 export const MUNICIPIOS_CHOCO: string[] = MUNICIPIOS_POR_DEPARTAMENTO['Chocó']
-  'Quibdó',
-  'Acandí',
-  'Alto Baudó',
-  'Atrato',
-  'Bagadó',
-  'Bahía Solano',
-  'Bajo Baudó',
-  'Bojayá',
-  'El Cantón del San Pablo',
-  'Carmen del Darién',
-  'Cértegui',
-  'Condoto',
-  'El Carmen de Atrato',
-  'El Litoral del San Juan',
-  'Istmina',
-  'Juradó',
-  'Lloró',
-  'Medio Atrato',
-  'Medio Baudó',
-  'Medio San Juan',
-  'Nóvita',
-  'Nuquí',
-  'Río Iró',
-  'Río Quito',
-  'Riosucio',
-  'San José del Palmar',
-  'Sipí',
-  'Tadó',
-  'Unión Panamericana',
-  'Ungía',
-]
 
 /** Unidad de venta válida en el backend. */
 export type Unidad = 'KG' | 'UNIDAD' | 'LITRO' | 'PAQUETE' | 'DOCENA' | 'MANOJO'
