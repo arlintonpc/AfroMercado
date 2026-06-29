@@ -40,9 +40,12 @@ const HotelService = {
   // ── PÚBLICO ──────────────────────────────────────────────────
 
   async listarHoteles({ municipio, departamento } = {}) {
+    const comercioWhere = {};
+    if (municipio)    comercioWhere.municipio    = { contains: municipio,    mode: "insensitive" };
+    if (departamento) comercioWhere.departamento = { contains: departamento, mode: "insensitive" };
+
     const where = { activo: true };
-    if (municipio) where.comercio = { municipio: { contains: municipio, mode: "insensitive" } };
-    else if (departamento) where.comercio = { departamento: { contains: departamento, mode: "insensitive" } };
+    if (Object.keys(comercioWhere).length > 0) where.comercio = comercioWhere;
 
     const hoteles = await prisma.configHotel.findMany({
       where,

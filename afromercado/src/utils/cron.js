@@ -4,6 +4,7 @@ const prisma = require("../config/prisma");
 const sseManager = require("./sse-manager");
 const { enviarMensajeWA } = require("./whatsapp");
 const ExpressService = require("../services/express.service");
+const HotelService = require("../services/hotel.service");
 
 async function cancelarPedidosExpressExpirados() {
   try {
@@ -11,6 +12,57 @@ async function cancelarPedidosExpressExpirados() {
     if (n > 0) console.log(`[CRON] Express: ${n} pedido(s) cancelado(s) por expiración`);
   } catch (err) {
     console.error("[CRON] Express cancelarExpirados:", err.message);
+  }
+}
+
+async function cancelarReservasHotelExpiradas() {
+  try {
+    // Buscar reservas PENDIENTE cuyo tiempo límite de confirmación ya venció
+    const reservas = await prisma.reservaHotel.findMany({
+      where: { estado: "PENDIENTE" },
+      include: {
+        configHotel: { select: { horasLimiteConfirm: true } },
+        cliente: { select: { id: true, nombre: true } },
+        habitacionTipo: { select: { nombre: true } },
+      },
+    });
+
+    let canceladas = 0;
+    for (const r of reservas) {
+      const horas = r.configHotel?.horasLimiteConfirm ?? 2;
+      const limite = new Date(r.creadoAt.getTime() + horas * 60 * 60 * 1000);
+      if (new Date() < limite) continue;
+
+      await prisma.reservaHotel.update({
+        where: { id: r.id },
+        data: { estado: "CANCELADA", updatedAt: new Date() },
+      });
+
+      // Notificar al cliente
+      try {
+        await prisma.notificacion.create({
+          data: {
+            usuarioId: r.clienteId,
+            tipo: "GENERAL",
+            titulo: "Reserva no confirmada",
+            mensaje: `Tu reserva ${r.codigo} (${r.habitacionTipo?.nombre}) fue cancelada automáticamente por falta de respuesta del hotel.`,
+            url: "/hoteles/mis-reservas",
+          },
+        });
+        sseManager.enviar(r.clienteId, "notificacion", {
+          tipo: "HOTEL",
+          titulo: "Reserva cancelada",
+          mensaje: `Tu reserva ${r.codigo} fue cancelada por falta de respuesta.`,
+          url: "/hoteles/mis-reservas",
+        });
+      } catch {}
+
+      canceladas++;
+    }
+
+    if (canceladas > 0) console.log(`[CRON] Hotel: ${canceladas} reserva(s) cancelada(s) por falta de respuesta`);
+  } catch (err) {
+    console.error("[CRON] Hotel cancelarReservasExpiradas:", err.message);
   }
 }
 
@@ -286,9 +338,12 @@ function iniciarCron() {
   setInterval(alertasSinRepartidor,      CADA_5_MIN);
   setInterval(recordatoriosRecogida,     CADA_10_MIN);
   setInterval(recordatoriosResena,       CADA_1_HORA);
-  setInterval(cancelarPedidosExpressExpirados, 60_000); // cada 1 min
+  setInterval(cancelarPedidosExpressExpirados,  60_000); // cada 1 min
+  setInterval(cancelarReservasHotelExpiradas,  5 * 60_000); // cada 5 min
 
-  console.log("[CRON] Jobs iniciados: expiración, recordatorios de pago, alertas de entrega, reseñas");
+  cancelarReservasHotelExpiradas(); // ejecutar al arrancar
+
+  console.log("[CRON] Jobs iniciados: expiración, recordatorios de pago, alertas de entrega, reseñas, hotel");
 }
 
 module.exports = { iniciarCron };
