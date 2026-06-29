@@ -1,16 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { listarComerciosExpress, type ComercioExpress } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
 export default function ExpressPage() {
-  const [todos, setTodos]         = useState<ComercioExpress[]>([])
-  const [municipio, setMunicipio] = useState('Todos')
-  const [cargando, setCargando]   = useState(true)
-  const [error, setError]         = useState('')
+  const [todos, setTodos]           = useState<ComercioExpress[]>([])
+  const [busqueda, setBusqueda]     = useState('')
+  const [gpsEstado, setGpsEstado]   = useState<'idle'|'buscando'|'ok'|'error'>('idle')
+  const [gpsCiudad, setGpsCiudad]   = useState('')
+  const [cargando, setCargando]     = useState(true)
+  const [error, setError]           = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     async function cargar() {
@@ -29,13 +32,65 @@ export default function ExpressPage() {
     return () => clearInterval(interval)
   }, [])
 
-  // Municipios con al menos un comercio, en orden de aparición
-  const municipios = ['Todos', ...Array.from(new Set(todos.map(c => c.comercio.municipio).filter(Boolean)))]
-  const comercios = municipio === 'Todos' ? todos : todos.filter(c => c.comercio.municipio === municipio)
+  // Municipios únicos de los comercios reales
+  const municipios = Array.from(new Set(todos.map(c => c.comercio.municipio).filter(Boolean)))
+
+  // Filtro: búsqueda de texto (nombre o municipio del comercio)
+  const termino = busqueda.trim().toLowerCase()
+  const comercios = termino
+    ? todos.filter(c =>
+        c.comercio.nombre.toLowerCase().includes(termino) ||
+        (c.comercio.municipio ?? '').toLowerCase().includes(termino)
+      )
+    : todos
+
+  async function usarUbicacion() {
+    if (!navigator.geolocation) {
+      setGpsEstado('error')
+      return
+    }
+    setGpsEstado('buscando')
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json&accept-language=es`,
+            { headers: { 'User-Agent': 'AfroMercado/1.0' } }
+          )
+          const json = await res.json()
+          const ciudad =
+            json.address?.city ||
+            json.address?.town ||
+            json.address?.village ||
+            json.address?.municipality ||
+            ''
+          if (ciudad) {
+            setBusqueda(ciudad)
+            setGpsCiudad(ciudad)
+            setGpsEstado('ok')
+          } else {
+            setGpsEstado('error')
+          }
+        } catch {
+          setGpsEstado('error')
+        }
+      },
+      () => setGpsEstado('error'),
+      { timeout: 8000 }
+    )
+  }
+
+  function limpiar() {
+    setBusqueda('')
+    setGpsCiudad('')
+    setGpsEstado('idle')
+    inputRef.current?.focus()
+  }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-2xl mx-auto px-4 py-8 space-y-5">
 
+      {/* Encabezado */}
       <div className="flex items-center gap-3">
         <Link href="/" className="text-gray-400 hover:text-[#2D6A4F] transition-colors p-1 -ml-1">
           <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
@@ -48,21 +103,82 @@ export default function ExpressPage() {
         </div>
       </div>
 
-      {/* Filtro municipio */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-        {municipios.map(m => (
+      {/* Buscador + GPS */}
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+            </svg>
+            <input
+              ref={inputRef}
+              type="text"
+              value={busqueda}
+              onChange={e => { setBusqueda(e.target.value); setGpsCiudad(''); setGpsEstado('idle') }}
+              placeholder="Busca por ciudad o restaurante..."
+              className="w-full pl-9 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-green-400 bg-white"
+            />
+            {busqueda && (
+              <button onClick={limpiar} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Botón GPS */}
           <button
-            key={m}
-            onClick={() => setMunicipio(m)}
-            className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-              municipio === m
+            onClick={usarUbicacion}
+            disabled={gpsEstado === 'buscando'}
+            title="Usar mi ubicación"
+            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap ${
+              gpsEstado === 'ok'
                 ? 'bg-green-600 text-white border-green-600'
+                : gpsEstado === 'error'
+                ? 'bg-red-50 text-red-600 border-red-200'
                 : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
             }`}
           >
-            {m}
+            {gpsEstado === 'buscando' ? (
+              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/>
+              </svg>
+            )}
+            <span className="hidden sm:inline">
+              {gpsEstado === 'ok' ? gpsCiudad : gpsEstado === 'error' ? 'Sin permiso' : 'Mi ubicación'}
+            </span>
           </button>
-        ))}
+        </div>
+
+        {/* Chips municipios con comercios reales */}
+        {municipios.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+            <button
+              onClick={limpiar}
+              className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                !busqueda ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              Todos
+            </button>
+            {municipios.map(m => (
+              <button
+                key={m}
+                onClick={() => setBusqueda(m)}
+                className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  busqueda.toLowerCase() === m.toLowerCase()
+                    ? 'bg-green-600 text-white border-green-600'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {error && (
@@ -78,8 +194,12 @@ export default function ExpressPage() {
       {!cargando && comercios.length === 0 && (
         <div className="text-center py-16 text-gray-400">
           <div className="text-4xl mb-3">🍳</div>
-          <p className="font-medium">Ningún comercio Express abierto ahora</p>
-          <p className="text-sm mt-1">Vuelve más tarde o prueba otro municipio</p>
+          <p className="font-medium">
+            {termino ? `Sin restaurantes en "${busqueda}"` : 'Ningún comercio Express disponible'}
+          </p>
+          <p className="text-sm mt-1">
+            {termino ? 'Prueba con otra ciudad o nombre' : 'Vuelve más tarde'}
+          </p>
         </div>
       )}
 
@@ -132,7 +252,6 @@ export default function ExpressPage() {
         ))}
       </div>
 
-      {/* Link mis pedidos */}
       <Link
         href="/express/mis-pedidos"
         className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
