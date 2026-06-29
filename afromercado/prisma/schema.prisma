@@ -204,6 +204,7 @@ model Usuario {
   liquidacionesPagadas      Liquidacion[]       @relation("LiquidacionPagador")
   pedidosExpressCliente     PedidoExpress[]     @relation("PedidosExpressCliente")
   pedidosExpressRepartidor  PedidoExpress[]     @relation("PedidosExpressRepartidor")
+  reservasHotel             ReservaHotel[]      @relation("ReservasHotelCliente")
 }
 
 model Comercio {
@@ -266,6 +267,7 @@ model Comercio {
   cambiosCriticos   CambioCriticoComercio[]
   solicitudesPublicidad SolicitudPublicidad[]
   configExpress         ConfigExpress?
+  configHotel           ConfigHotel?
 }
 
 model Categoria {
@@ -1252,4 +1254,81 @@ model ItemPedidoExpress {
   producto        Producto      @relation(fields: [productoId],      references: [id])
 
   @@index([pedidoExpressId])
+}
+
+// ─── MÓDULO HOTELERÍA ─────────────────────────────────────────
+
+enum EstadoReservaHotel {
+  PENDIENTE
+  CONFIRMADA
+  CHECKIN
+  CHECKOUT
+  CANCELADA
+  RECHAZADA
+}
+
+model ConfigHotel {
+  id                  Int       @id @default(autoincrement())
+  comercioId          Int       @unique
+  activo              Boolean   @default(false)
+  confirmacionAuto    Boolean   @default(false)
+  horasLimiteConfirm  Int       @default(2)
+  servicios           String[]
+  politicaCancelacion String?
+  checkInHora         String    @default("15:00")
+  checkOutHora        String    @default("12:00")
+  creadoAt            DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  comercio      Comercio         @relation(fields: [comercioId], references: [id])
+  habitaciones  HabitacionTipo[]
+  reservas      ReservaHotel[]
+
+  @@index([activo])
+}
+
+model HabitacionTipo {
+  id              Int         @id @default(autoincrement())
+  configHotelId   Int
+  nombre          String
+  descripcion     String?
+  capacidad       Int         @default(2)
+  precioPorNoche  Decimal     @db.Decimal(12, 2)
+  cantidad        Int         @default(1)
+  fotos           String[]
+  serviciosExtra  String[]
+  activo          Boolean     @default(true)
+  creadoAt        DateTime    @default(now())
+
+  configHotel ConfigHotel    @relation(fields: [configHotelId], references: [id], onDelete: Cascade)
+  reservas    ReservaHotel[]
+
+  @@index([configHotelId, activo])
+}
+
+model ReservaHotel {
+  id                Int                @id @default(autoincrement())
+  codigo            String             @unique
+  configHotelId     Int
+  habitacionTipoId  Int
+  clienteId         Int
+  fechaEntrada      DateTime
+  fechaSalida       DateTime
+  huespedes         Int                @default(1)
+  total             Decimal            @db.Decimal(12, 2)
+  estado            EstadoReservaHotel @default(PENDIENTE)
+  metodoPago        String             @default("EFECTIVO")
+  notasCliente      String?
+  nombreHuesped     String
+  telefonoHuesped   String
+  creadoAt          DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  configHotel    ConfigHotel    @relation(fields: [configHotelId],    references: [id])
+  habitacionTipo HabitacionTipo @relation(fields: [habitacionTipoId], references: [id])
+  cliente        Usuario        @relation("ReservasHotelCliente",     fields: [clienteId], references: [id])
+
+  @@index([configHotelId, estado])
+  @@index([clienteId])
+  @@index([fechaEntrada, fechaSalida])
 }
