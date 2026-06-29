@@ -169,6 +169,30 @@ export async function subirFotosHabitacion(habitacionId: number, files: File[]):
   return j.data
 }
 
+export async function subirVideoHabitacion(habitacionId: number, file: File): Promise<{ videoUrl: string; fotos: string[] }> {
+  const fd = new FormData()
+  fd.append('video', file)
+  const { obtenerToken } = await import('./client')
+  const token = obtenerToken()
+  const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
+  const res = await fetch(`${API}/hotel/habitaciones/${habitacionId}/video`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: fd,
+  })
+  const j = await res.json()
+  if (!res.ok) throw new Error(j?.error ?? 'Error al subir video')
+  return j.data
+}
+
+export async function quitarVideoHabitacion(habitacionId: number, videoUrl: string): Promise<{ fotos: string[] }> {
+  const d = await apiFetch<{ ok: boolean; data: { fotos: string[] } }>(
+    `/hotel/habitaciones/${habitacionId}/video`,
+    { method: 'DELETE', body: { videoUrl }, auth: true }
+  )
+  return d.data
+}
+
 export async function ocupacionHotel(): Promise<{ habitaciones: HabitacionTipo[]; reservas: ReservaHotel[] }> {
   const r = await apiFetch<{ ok: boolean; data: { habitaciones: HabitacionTipo[]; reservas: ReservaHotel[] } }>('/hoteles/mi-hotel/ocupacion')
   return r.data

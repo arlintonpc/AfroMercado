@@ -26,6 +26,10 @@ const SERVICIOS_ICONS: Record<string, { icon: string; label: string }> = {
   mascotas:    { icon: '🐾', label: 'Mascotas OK' },
 }
 
+function esVideo(url: string): boolean {
+  return url.includes('/video/upload/') || /\.(mp4|webm|mov|avi)$/i.test(url)
+}
+
 /* ── Lightbox ──────────────────────────────────────────── */
 function Lightbox({ fotos, inicial, onClose }: { fotos: string[]; inicial: number; onClose: () => void }) {
   const [idx, setIdx] = useState(inicial)
@@ -53,7 +57,10 @@ function Lightbox({ fotos, inicial, onClose }: { fotos: string[]; inicial: numbe
           className="absolute left-4 bg-white/10 hover:bg-white/20 text-white rounded-full w-12 h-12 flex items-center justify-center transition-colors">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <img src={fotos[idx]} alt="" className="max-h-[75vh] max-w-full object-contain rounded-xl" />
+        {esVideo(fotos[idx])
+          ? <video src={fotos[idx]} controls autoPlay className="max-h-[75vh] max-w-full rounded-xl" />
+          : <img src={fotos[idx]} alt="" className="max-h-[75vh] max-w-full object-contain rounded-xl" />
+        }
         <button onClick={() => setIdx(i => (i + 1) % fotos.length)}
           className="absolute right-4 bg-white/10 hover:bg-white/20 text-white rounded-full w-12 h-12 flex items-center justify-center transition-colors">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
@@ -63,7 +70,12 @@ function Lightbox({ fotos, inicial, onClose }: { fotos: string[]; inicial: numbe
         {fotos.map((f, i) => (
           <button key={i} onClick={() => setIdx(i)}
             className={`flex-shrink-0 w-16 h-12 rounded-lg overflow-hidden transition-all duration-200 ${i === idx ? 'ring-2 ring-white opacity-100' : 'opacity-35 hover:opacity-60'}`}>
-            <img src={f} alt="" className="w-full h-full object-cover" />
+            {esVideo(f)
+              ? <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" fill="none" stroke="white" strokeWidth="2"/></svg>
+                </div>
+              : <img src={f} alt="" className="w-full h-full object-cover" />
+            }
           </button>
         ))}
       </div>
@@ -146,7 +158,9 @@ function TarjetaHabitacion({ hab, onReservar, onVerFotos }: {
           startX.current = null
         }}>
         {hab.fotos.length > 0 ? (
-          <img src={hab.fotos[fotoIdx]} alt={hab.nombre} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+          esVideo(hab.fotos[fotoIdx])
+            ? <video src={hab.fotos[fotoIdx]} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+            : <img src={hab.fotos[fotoIdx]} alt={hab.nombre} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-[#E8F4F0] to-[#B7E4C7] flex items-center justify-center">
             <span className="text-6xl opacity-30">🛏️</span>

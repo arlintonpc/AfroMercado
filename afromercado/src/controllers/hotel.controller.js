@@ -1,6 +1,30 @@
 const fs = require("fs");
-const { subirACloudinary } = require("../utils/cloudinary");
+const path = require("path");
+const multer = require("multer");
+const { subirACloudinary, subirVideoACloudinary, construirUrlVideoOptimizada } = require("../utils/cloudinary");
 const HotelService = require("../services/hotel.service");
+const { ErrorValidacion } = require("../utils/errores");
+
+// Multer para videos de habitaciones
+const _storageVideo = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, "../../uploads/videos/habitaciones");
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || ".mp4";
+    cb(null, `hab-${req.params.id}-${Date.now()}${ext}`);
+  },
+});
+const _uploadVideo = multer({
+  storage: _storageVideo,
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith("video/")) return cb(new Error("Solo se permiten videos"));
+    cb(null, true);
+  },
+  limits: { fileSize: 100 * 1024 * 1024 },
+});
 
 const HotelController = {
   // ── PÚBLICO ──────────────────────────────────────────────────
@@ -174,6 +198,36 @@ const HotelController = {
     try {
       const data = await HotelService.adminReservasHotel(Number(req.params.id));
       res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // ── VIDEO HABITACIÓN ──────────────────────────────────────────
+  uploadVideoHabitacion: _uploadVideo.single("video"),
+
+  async subirVideoHabitacion(req, res, next) {
+    let rutaLocal = null;
+    try {
+      if (!req.file) throw new ErrorValidacion('Adjunta un video en el campo "video"');
+      rutaLocal = req.file.path;
+      const cloud = await subirVideoACloudinary(rutaLocal, "afromercado/videos/habitaciones");
+      const videoUrl = (cloud && (construirUrlVideoOptimizada(cloud.secureUrl) || cloud.optimizedUrl || cloud.secureUrl))
+        || `${req.protocol}://${req.get("host")}/uploads/videos/habitaciones/${req.file.filename}`;
+      if (cloud) fs.unlink(rutaLocal, () => {});
+      rutaLocal = cloud ? null : rutaLocal; // mantener local si no hubo cloud
+      const hab = await HotelService.subirVideoHabitacion(req.usuario.comercio.id, Number(req.params.id), videoUrl);
+      res.json({ ok: true, data: { videoUrl, fotos: hab.fotos } });
+    } catch (e) {
+      if (rutaLocal) fs.unlink(rutaLocal, () => {});
+      next(e);
+    }
+  },
+
+  async quitarVideoHabitacion(req, res, next) {
+    try {
+      const { videoUrl } = req.body;
+      if (!videoUrl) throw new ErrorValidacion("videoUrl requerida");
+      const hab = await HotelService.quitarVideoHabitacion(req.usuario.comercio.id, Number(req.params.id), videoUrl);
+      res.json({ ok: true, data: { fotos: hab.fotos } });
     } catch (e) { next(e); }
   },
 

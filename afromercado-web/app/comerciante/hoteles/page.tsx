@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import {
   obtenerMiHotel, actualizarMiHotel, agregarHabitacion, actualizarHabitacion, eliminarHabitacion,
-  reservasHotelero, cambiarEstadoReserva, ocupacionHotel, subirFotosHabitacion,
+  reservasHotelero, cambiarEstadoReserva, ocupacionHotel, subirFotosHabitacion, subirVideoHabitacion,
   listarBloqueos, crearBloqueo, eliminarBloqueo,
   type ConfigHotel, type HabitacionTipo, type ReservaHotel, type EstadoReservaHotel, type BloqueoFecha,
 } from '@/lib/api/hotel'
@@ -32,9 +32,13 @@ const TRANSICIONES: Record<string, { label: string; estado: EstadoReservaHotel; 
   CHECKIN:    [{ label: '👋 Check-out', estado: 'CHECKOUT',   color: 'bg-gray-600'  }],
 }
 
+function esVideo(url: string): boolean {
+  return url.includes('/video/upload/') || /\.(mp4|webm|mov|avi)$/i.test(url)
+}
+
 function FormHabitacion({ inicial, onGuardar, onCancelar }: {
   inicial?: Partial<HabitacionTipo>
-  onGuardar: (datos: Partial<HabitacionTipo>, archivos?: File[]) => Promise<void>
+  onGuardar: (datos: Partial<HabitacionTipo>, archivos?: File[], archivosVideo?: File[]) => Promise<void>
   onCancelar: () => void
 }) {
   const [form, setForm] = useState<Partial<HabitacionTipo>>({
@@ -46,6 +50,7 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
   const [error, setError] = useState('')
   const inputFotoRef = useRef<HTMLInputElement>(null)
   const archivosRef = useRef<File[]>([])
+  const archivosVideoRef = useRef<File[]>([])
 
   async function handleFotos(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -75,7 +80,7 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
       const datos = inicial?.id
         ? form
         : { ...form, fotos: (form.fotos ?? []).filter(f => !f.startsWith('blob:')) }
-      await onGuardar(datos, !inicial?.id ? archivosRef.current : undefined)
+      await onGuardar(datos, !inicial?.id ? archivosRef.current : undefined, archivosVideoRef.current)
     } catch (e: any) { setError(e.message) }
     setGuardando(false)
   }
@@ -123,10 +128,10 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Fotos de la habitación</label>
               <div className="flex flex-wrap gap-2 mb-2">
-                {(form.fotos ?? []).map((f, i) => (
+                {(form.fotos ?? []).filter(f => !esVideo(f)).map((f, i) => (
                   <div key={i} className="relative w-16 h-16">
                     <img src={f} alt="" className="w-full h-full object-cover rounded-lg" />
-                    <button onClick={() => setForm(p => ({ ...p, fotos: (p.fotos ?? []).filter((_, j) => j !== i) }))}
+                    <button onClick={() => setForm(p => ({ ...p, fotos: (p.fotos ?? []).filter(x => x !== f) }))}
                       className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center leading-none">×</button>
                   </div>
                 ))}
@@ -137,6 +142,34 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
               </div>
               <input ref={inputFotoRef} type="file" accept="image/*" multiple onChange={handleFotos} className="hidden" />
               <p className="text-[10px] text-gray-400">Formatos: JPG, PNG, WEBP. Máx 8MB por foto.</p>
+
+              {/* Video de la habitación */}
+              <div className="mt-4">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Video (opcional)</p>
+                {(form.fotos ?? []).filter(esVideo).map(videoUrl => (
+                  <div key={videoUrl} className="relative rounded-xl overflow-hidden mb-2 bg-black" style={{ aspectRatio: '16/9' }}>
+                    <video src={videoUrl} controls className="w-full h-full object-contain" />
+                    <button
+                      type="button"
+                      onClick={() => setForm(p => ({ ...p, fotos: (p.fotos ?? []).filter(f => f !== videoUrl) }))}
+                      className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold hover:bg-red-600 transition-colors">×</button>
+                  </div>
+                ))}
+                {(form.fotos ?? []).filter(esVideo).length === 0 && (
+                  <label className="flex items-center gap-2 cursor-pointer border-2 border-dashed border-gray-200 rounded-xl p-4 hover:border-[#2D6A4F] transition-colors">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                    <span className="text-sm text-gray-500">Agregar video de la habitación (máx. 100 MB)</span>
+                    <input type="file" accept="video/*" className="hidden" onChange={e => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const blobUrl = URL.createObjectURL(file)
+                      archivosVideoRef.current = [...archivosVideoRef.current, file]
+                      setForm(p => ({ ...p, fotos: [...(p.fotos ?? []), blobUrl] }))
+                      e.target.value = ''
+                    }} />
+                  </label>
+                )}
+              </div>
             </div>
 
             {/* Servicios extra */}
@@ -834,13 +867,23 @@ export default function ComercianteHotelesPage() {
         <FormHabitacion
           inicial={formHab.inicial}
           onCancelar={() => setFormHab({ visible: false })}
-          onGuardar={async (datos, archivos) => {
+          onGuardar={async (datos, archivos, archivosVideo) => {
             if (formHab.inicial?.id) {
               await actualizarHabitacion(formHab.inicial.id, datos)
+              if (archivosVideo && archivosVideo.length > 0) {
+                for (const file of archivosVideo) {
+                  await subirVideoHabitacion(formHab.inicial.id, file)
+                }
+              }
             } else {
               const nueva = await agregarHabitacion(datos)
               if (archivos && archivos.length > 0) {
                 await subirFotosHabitacion(nueva.id, archivos)
+              }
+              if (archivosVideo && archivosVideo.length > 0) {
+                for (const file of archivosVideo) {
+                  await subirVideoHabitacion(nueva.id, file)
+                }
               }
             }
             setFormHab({ visible: false })

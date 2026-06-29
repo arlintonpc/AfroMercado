@@ -352,6 +352,28 @@ const HotelService = {
     });
   },
 
+  async subirVideoHabitacion(comercioId, habitacionId, videoUrl) {
+    const hab = await prisma.habitacionTipo.findFirst({
+      where: { id: habitacionId, configHotel: { comercioId } },
+    });
+    if (!hab) throw new ErrorNoEncontrado("Habitación no encontrada");
+    return prisma.habitacionTipo.update({
+      where: { id: habitacionId },
+      data: { fotos: [...hab.fotos, videoUrl] },
+    });
+  },
+
+  async quitarVideoHabitacion(comercioId, habitacionId, videoUrl) {
+    const hab = await prisma.habitacionTipo.findFirst({
+      where: { id: habitacionId, configHotel: { comercioId } },
+    });
+    if (!hab) throw new ErrorNoEncontrado("Habitación no encontrada");
+    return prisma.habitacionTipo.update({
+      where: { id: habitacionId },
+      data: { fotos: hab.fotos.filter(f => f !== videoUrl) },
+    });
+  },
+
   async ocupacion(comercioId) {
     const cfg = await prisma.configHotel.findUnique({
       where: { comercioId },
