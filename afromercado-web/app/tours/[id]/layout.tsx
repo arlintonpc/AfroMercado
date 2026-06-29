@@ -12,8 +12,9 @@ async function fetchTour(id: string) {
   } catch { return null }
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const data = await fetchTour(params.id)
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params
+  const data = await fetchTour(id)
   if (!data) return { title: 'Tour | AfroMercado' }
   const foto = data.fotos?.[0]
   return {

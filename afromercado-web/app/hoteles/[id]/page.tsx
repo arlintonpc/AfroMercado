@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, type ConfigHotel, type HabitacionTipo } from '@/lib/api/hotel'
+import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, type ConfigHotel, type HabitacionTipo } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
@@ -420,6 +420,7 @@ export default function HotelDetallePage() {
   const [reservaOk, setReservaOk] = useState(false)
   const [reservaElegibleId, setReservaElegibleId] = useState<number | undefined>()
   const [lightbox, setLightbox]   = useState<{ fotos: string[]; idx: number } | null>(null)
+  const [similares, setSimilares] = useState<ConfigHotel[]>([])
   const { mostrar: mostrarToast, toastProps } = useToast()
 
   useEffect(() => {
@@ -427,6 +428,13 @@ export default function HotelDetallePage() {
       .then(d => { setHotel(d); setCargando(false) })
       .catch(() => setCargando(false))
   }, [id])
+
+  useEffect(() => {
+    if (!hotel) return
+    listarHoteles({ municipio: hotel.comercio.municipio })
+      .then(lista => setSimilares(lista.filter(h => h.id !== hotel.id).slice(0, 3)))
+      .catch(() => {})
+  }, [hotel])
 
   useEffect(() => {
     if (!autenticado || !hotel) return
@@ -604,6 +612,38 @@ export default function HotelDetallePage() {
             <div className="py-6">
               <SeccionReviewsHotel configHotelId={hotel.id} reservaElegibleId={reservaElegibleId} />
             </div>
+
+            {/* HOTELES SIMILARES */}
+            {similares.length > 0 && (
+              <div className="py-6 border-t border-gray-100">
+                <h2 className="text-xl font-bold text-gray-900 mb-5">
+                  Más alojamientos en {hotel.comercio.municipio}
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {similares.map(h => {
+                    const desde = h.habitaciones.length > 0
+                      ? Math.min(...h.habitaciones.map(hab => Number(hab.precioPorNoche)))
+                      : null
+                    const foto = h.habitaciones[0]?.fotos[0]
+                    return (
+                      <Link key={h.id} href={`/hoteles/${h.id}`}
+                        className="block rounded-2xl overflow-hidden border border-gray-100 hover:shadow-md transition-all">
+                        <div className="h-36 bg-gradient-to-br from-[#1B4332] to-[#40916C] relative">
+                          {foto
+                            ? <img src={foto} alt={h.comercio.nombre} className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center text-4xl opacity-30">🏨</div>}
+                        </div>
+                        <div className="p-3">
+                          <p className="font-bold text-sm text-gray-900 truncate">{h.comercio.nombre}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{h.comercio.municipio}</p>
+                          {desde && <p className="text-sm font-black text-[#1B4332] mt-2">{formatearPrecio(desde)}<span className="text-xs font-normal text-gray-400">/noche</span></p>}
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* WHATSAPP mobile */}
             {hotel.comercio.whatsapp && (
