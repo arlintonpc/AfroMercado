@@ -33,8 +33,6 @@ router.get("/disponibilidad",           HotelController.disponibilidad);
 // Validación de cupón — auth opcional (clienteId puede ser null)
 router.post("/cupones/validar", HotelController.validarCupon);
 
-router.get("/:id",                      HotelController.obtener);
-
 // ── CLIENTE ──────────────────────────────────────────────────
 router.post(  "/reservas",                   ...soloAuth, HotelController.reservar);
 router.get(   "/reservas/mis",               ...soloAuth, HotelController.misReservas);
@@ -83,6 +81,9 @@ router.post("/reservas/:id/checkin-token", ...soloAuth, HotelController.solicita
 // Formulario público de check-in (el token actúa como credencial)
 router.get( "/checkin/:token", HotelController.verCheckinPublico);
 router.post("/checkin/:token", HotelController.realizarCheckin);
+
+// ── DETALLE PÚBLICO — va al final para no capturar rutas específicas ──
+router.get("/:id",                      HotelController.obtener);
 
 // ── REVIEWS ──────────────────────────────────────────────────
 router.get( "/:id/reviews",        ReviewController.reviewsHotel);

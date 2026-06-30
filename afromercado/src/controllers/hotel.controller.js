@@ -29,7 +29,9 @@ const HotelController = {
 
   async obtener(req, res, next) {
     try {
-      const data = await HotelService.obtenerHotel(Number(req.params.id));
+      const id = Number(req.params.id);
+      if (!id || isNaN(id)) return res.status(404).json({ ok: false, error: "Hotel no encontrado" });
+      const data = await HotelService.obtenerHotel(id);
       res.json({ ok: true, data });
     } catch (e) { next(e); }
   },
