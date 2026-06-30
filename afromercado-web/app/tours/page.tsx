@@ -84,6 +84,11 @@ function TarjetaTour({ tour, userLat, userLon }: { tour: ConfigTour; userLat: nu
             ✓ Confirmación inmediata
           </span>
         )}
+        {tour.maxParticipantes > 0 && tour.maxParticipantes <= 5 && (
+          <span className="absolute bottom-2 right-2 bg-[#1B4332]/90 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+            ✨ Grupo exclusivo · {tour.maxParticipantes} personas
+          </span>
+        )}
       </div>
 
       <div className="p-4">

@@ -75,6 +75,13 @@ function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat
             ))}
           </div>
         )}
+
+        {/* Badge urgencia: última habitación disponible */}
+        {hotel.habitaciones.length === 1 && (
+          <span className="absolute bottom-3 right-3 bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+            🔥 Última habitación
+          </span>
+        )}
       </div>
 
       {/* Info */}

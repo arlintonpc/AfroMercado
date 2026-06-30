@@ -63,7 +63,7 @@ function TarjetaTransporte({ t, userLat, userLon }: { t: ConfigTransporte; userL
 
   return (
     <Link href={`/transportes/${t.id}`} className="block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all hover:-translate-y-0.5">
-      <div className="h-40 bg-gradient-to-br from-[#023E8A] to-[#0077B6] relative flex items-center justify-center">
+      <div className="h-40 bg-gradient-to-br from-[#1B4332] to-[#40916C] relative flex items-center justify-center">
         {t.fotos[0] ? (
           <img src={optimizarImagenPequena(t.fotos[0])} alt={t.nombre} className="w-full h-full object-cover" />
         ) : (
@@ -93,12 +93,12 @@ function TarjetaTransporte({ t, userLat, userLon }: { t: ConfigTransporte; userL
         {rutas.length > 0 && (
           <div className="mt-3 space-y-1.5">
             {rutas.slice(0, 2).map(r => (
-              <div key={r.id} className="flex items-center justify-between text-xs bg-[#023E8A]/5 rounded-lg px-2 py-1.5">
+              <div key={r.id} className="flex items-center justify-between text-xs bg-[#2D6A4F]/8 rounded-lg px-2 py-1.5">
                 <span className="text-gray-700 font-medium">{r.origen} → {r.destino}</span>
                 <span className="text-gray-400 flex-shrink-0 ml-2">🕐 {r.horario}</span>
               </div>
             ))}
-            {rutas.length > 2 && <p className="text-xs text-[#023E8A]">+{rutas.length - 2} rutas más</p>}
+            {rutas.length > 2 && <p className="text-xs text-[#2D6A4F]">+{rutas.length - 2} rutas más</p>}
           </div>
         )}
 
@@ -107,7 +107,7 @@ function TarjetaTransporte({ t, userLat, userLon }: { t: ConfigTransporte; userL
             <span className="text-xs text-gray-400">Precio por asiento</span>
             <div>
               <span className="text-xs text-gray-400">Desde </span>
-              <span className="font-bold text-[#023E8A]">{formatearPrecio(precioMin)}</span>
+              <span className="font-bold text-[#2D6A4F]">{formatearPrecio(precioMin)}</span>
             </div>
           </div>
         )}
@@ -178,7 +178,7 @@ export default function TransportesPage() {
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
                 placeholder="Buscar por ruta, origen, destino…"
-                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#023E8A]" />
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#1B4332]" />
             </div>
             <button onClick={activarGPS}
               className={`px-3 py-2 rounded-xl text-sm font-medium border transition-colors flex items-center ${
@@ -187,10 +187,10 @@ export default function TransportesPage() {
               {gpsCargando ? <span className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /> : '📍'}
             </button>
             <div className="flex border border-gray-200 rounded-xl overflow-hidden">
-              <button onClick={() => setVista('lista')} className={`px-2.5 py-2 text-sm transition-colors ${vista === 'lista' ? 'bg-[#023E8A] text-white' : 'bg-white text-gray-500'}`} title="Lista">
+              <button onClick={() => setVista('lista')} className={`px-2.5 py-2 text-sm transition-colors ${vista === 'lista' ? 'bg-[#1B4332] text-white' : 'bg-white text-gray-500'}`} title="Lista">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
               </button>
-              <button onClick={() => setVista('mapa')} className={`px-2.5 py-2 text-sm transition-colors ${vista === 'mapa' ? 'bg-[#023E8A] text-white' : 'bg-white text-gray-500'}`} title="Mapa">
+              <button onClick={() => setVista('mapa')} className={`px-2.5 py-2 text-sm transition-colors ${vista === 'mapa' ? 'bg-[#1B4332] text-white' : 'bg-white text-gray-500'}`} title="Mapa">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
               </button>
             </div>
@@ -200,12 +200,12 @@ export default function TransportesPage() {
             <div className="flex gap-2 mt-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
               <button onClick={() => setTipoFiltro('')}
                 className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  !tipoFiltro ? 'bg-[#023E8A] text-white border-[#023E8A]' : 'bg-white text-gray-600 border-gray-200'
+                  !tipoFiltro ? 'bg-[#1B4332] text-white border-[#1B4332]' : 'bg-white text-gray-600 border-gray-200'
                 }`}>Todos</button>
               {tiposDisponibles.map(tp => (
                 <button key={tp} onClick={() => setTipoFiltro(tp === tipoFiltro ? '' : tp)}
                   className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    tipoFiltro === tp ? 'bg-[#023E8A] text-white border-[#023E8A]' : 'bg-white text-gray-600 border-gray-200'
+                    tipoFiltro === tp ? 'bg-[#1B4332] text-white border-[#1B4332]' : 'bg-white text-gray-600 border-gray-200'
                   }`}>{TIPO_ICONO[tp]} {tp}</button>
               ))}
             </div>

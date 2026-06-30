@@ -605,6 +605,39 @@ export default function Home() {
         {/* Hero */}
         <HeroBanner productos={destacados} />
 
+        {/* Propuesta de valor */}
+        <section className="bg-white border-y border-[#E8DCC8] py-8">
+          <div className="max-w-7xl mx-auto px-4 md:px-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                {
+                  icono: '🌿',
+                  titulo: 'Directo del productor',
+                  desc: 'Sin intermediarios. Tu compra llega directamente a familias del Chocó.',
+                },
+                {
+                  icono: '🤝',
+                  titulo: 'Comercio justo',
+                  desc: 'Precios justos para los productores. Tu compra transforma vidas.',
+                },
+                {
+                  icono: '📍',
+                  titulo: '100% Chocó',
+                  desc: 'Productos, tours y servicios auténticos de las comunidades afrocolombianas.',
+                },
+              ].map((item) => (
+                <div key={item.titulo} className="flex items-start gap-4">
+                  <span className="text-3xl flex-shrink-0">{item.icono}</span>
+                  <div>
+                    <h3 className="font-semibold text-[#1A1A1A] text-sm">{item.titulo}</h3>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Categorías */}
         <SeccionCategorias />
 
