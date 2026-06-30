@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, iniciarPagoReserva, validarCuponHotel, type ConfigHotel, type HabitacionTipo, type ReservaHotel, type ValidacionCupon, type TemporadaHotel } from '@/lib/api/hotel'
+import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, iniciarPagoReserva, validarCuponHotel, esFavoritoHotel, toggleFavoritoHotel, type ConfigHotel, type HabitacionTipo, type ReservaHotel, type ValidacionCupon, type TemporadaHotel } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
@@ -632,9 +632,11 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
 export default function HotelDetallePage() {
   const { id } = useParams()
   const router = useRouter()
-  const { autenticado } = useAuth()
+  const { autenticado, usuario } = useAuth()
 
   const [hotel, setHotel]         = useState<ConfigHotel | null>(null)
+  const [esFav, setEsFav]         = useState(false)
+  const [toggling, setToggling]   = useState(false)
   const [cargando, setCargando]   = useState(true)
   const [habSelec, setHabSelec]   = useState<HabitacionTipo | null>(null)
   const [reservaOk, setReservaOk] = useState<ReservaHotel | null>(null)
@@ -671,9 +673,25 @@ export default function HotelDetallePage() {
 
   useEffect(() => {
     obtenerHotel(Number(id))
-      .then(d => { setHotel(d); setCargando(false) })
+      .then(d => {
+        setHotel(d)
+        setCargando(false)
+        if (usuario) {
+          esFavoritoHotel(d.id).then(r => setEsFav(r.favorito)).catch(() => {})
+        }
+      })
       .catch(() => setCargando(false))
-  }, [id])
+  }, [id, usuario])
+
+  async function toggleFav() {
+    if (!usuario) { router.push('/ingresar'); return }
+    setToggling(true)
+    try {
+      const r = await toggleFavoritoHotel(hotel!.id)
+      setEsFav(r.favorito)
+    } catch {}
+    setToggling(false)
+  }
 
   useEffect(() => {
     if (!hotel) return
@@ -773,7 +791,24 @@ export default function HotelDetallePage() {
 
             {/* Título */}
             <div className="pb-6 border-b border-gray-100">
-              <h1 className="text-3xl lg:text-4xl font-black text-gray-900 mb-3">{hotel.comercio.nombre}</h1>
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-3xl lg:text-4xl font-black text-gray-900">{hotel.comercio.nombre}</h1>
+                  {hotel.rntVerificado && (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full mt-2">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
+                      RNT verificado
+                    </span>
+                  )}
+                </div>
+                <button onClick={toggleFav} disabled={toggling}
+                  className={`flex-shrink-0 p-2 rounded-full transition-colors ${esFav ? 'bg-red-50 text-red-500' : 'bg-white/80 text-gray-400 hover:text-red-400'}`}
+                  title={esFav ? 'Quitar de favoritos' : 'Guardar en favoritos'}>
+                  <svg className="w-5 h-5" fill={esFav ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                </button>
+              </div>
               <div className="flex items-center gap-5 flex-wrap text-sm text-gray-600">
                 <span className="flex items-center gap-1.5">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>

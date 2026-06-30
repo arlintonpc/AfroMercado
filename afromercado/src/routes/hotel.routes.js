@@ -68,6 +68,14 @@ router.get(   "/mi-hotel/temporadas",     ...soloComercio, HotelController.lista
 router.post(  "/mi-hotel/temporadas",     ...soloComercio, HotelController.crearTemporada);
 router.delete("/mi-hotel/temporadas/:id", ...soloComercio, HotelController.eliminarTemporada);
 
+// Estadísticas del hotelero
+router.get("/mi-hotel/estadisticas", ...soloComercio, HotelController.estadisticas);
+
+// Favoritos — auth cliente (mis debe ir ANTES de :id para evitar ambigüedad)
+router.get ("/favoritos/mis",         ...soloAuth, HotelController.misFavoritos);
+router.post("/favoritos/:id/toggle",  ...soloAuth, HotelController.toggleFavorito);
+router.get ("/favoritos/:id",         ...soloAuth, HotelController.esFavorito);
+
 // ── CHECK-IN ONLINE ───────────────────────────────────────────
 // Cliente genera su token (requiere auth)
 router.post("/reservas/:id/checkin-token", ...soloAuth, HotelController.solicitarTokenCheckin);
@@ -84,5 +92,6 @@ router.post("/reservas/:id/review",...soloAuth, ReviewController.crearReviewHote
 router.get(   "/admin/todos",         ...soloAdmin, HotelController.adminListar);
 router.patch( "/admin/:id/estado",    ...soloAdmin, HotelController.adminCambiarEstado);
 router.get(   "/admin/:id/reservas",  ...soloAdmin, HotelController.adminReservas);
+router.patch( "/admin/:id/rnt",       ...soloAdmin, HotelController.adminVerificarRnt);
 
 module.exports = router;

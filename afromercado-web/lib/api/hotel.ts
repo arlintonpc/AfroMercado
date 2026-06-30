@@ -33,6 +33,16 @@ export interface HabitacionTipo {
   temporadas?: TemporadaHotel[]
 }
 
+export interface EstadisticasHotel {
+  ingresosPorMes: { mes: string; ingreso: number }[]
+  ingresoTotal6m: number
+  reservasMesActual: number
+  totalReservas6m: number
+  cancelaciones6m: number
+  ocupacionPorHab: { id: number; nombre: string; tasaOcupacion: number; diasOcupados: number }[]
+  tasaOcupacionPromedio: number
+}
+
 export interface ConfigHotel {
   id: number
   comercioId: number
@@ -45,6 +55,8 @@ export interface ConfigHotel {
   checkOutHora: string
   creadoAt: string
   updatedAt: string
+  rnt?: string | null
+  rntVerificado?: boolean
   // Política de pagos
   permitePagarAlLlegar: boolean
   permiteDeposito30: boolean
@@ -405,4 +417,24 @@ export async function crearTemporadaHotel(datos: {
 
 export async function eliminarTemporadaHotel(id: number): Promise<void> {
   await apiFetch(`/hoteles/mi-hotel/temporadas/${id}`, { method: 'DELETE' })
+}
+
+export async function obtenerEstadisticasHotel(): Promise<EstadisticasHotel> {
+  const r = await apiFetch<{ ok: boolean; data: EstadisticasHotel }>('/hoteles/mi-hotel/estadisticas')
+  return r.data
+}
+
+export async function toggleFavoritoHotel(configHotelId: number): Promise<{ favorito: boolean }> {
+  const r = await apiFetch<{ ok: boolean; data: { favorito: boolean } }>(`/hoteles/favoritos/${configHotelId}/toggle`, { method: 'POST' })
+  return r.data
+}
+
+export async function misFavoritosHoteles(): Promise<ConfigHotel[]> {
+  const r = await apiFetch<{ ok: boolean; data: ConfigHotel[] }>('/hoteles/favoritos/mis')
+  return r.data
+}
+
+export async function esFavoritoHotel(configHotelId: number): Promise<{ favorito: boolean }> {
+  const r = await apiFetch<{ ok: boolean; data: { favorito: boolean } }>(`/hoteles/favoritos/${configHotelId}`)
+  return r.data
 }

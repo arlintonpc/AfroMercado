@@ -9,7 +9,8 @@ import {
   listarBloqueos, crearBloqueo, eliminarBloqueo,
   listarCuponesHotel, crearCuponHotel, eliminarCuponHotel,
   listarTemporadasHotel, crearTemporadaHotel, eliminarTemporadaHotel,
-  type ConfigHotel, type HabitacionTipo, type ReservaHotel, type EstadoReservaHotel, type BloqueoFecha, type CuponHotel, type TemporadaHotel,
+  obtenerEstadisticasHotel,
+  type ConfigHotel, type HabitacionTipo, type ReservaHotel, type EstadoReservaHotel, type BloqueoFecha, type CuponHotel, type TemporadaHotel, type EstadisticasHotel,
 } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
@@ -548,6 +549,95 @@ function CalendarioOcupacion({
   )
 }
 
+function DashboardEstadisticas() {
+  const [stats, setStats] = useState<EstadisticasHotel | null>(null)
+  const [cargando, setCargando] = useState(true)
+
+  useEffect(() => {
+    obtenerEstadisticasHotel()
+      .then(setStats)
+      .catch(() => {})
+      .finally(() => setCargando(false))
+  }, [])
+
+  if (cargando) return (
+    <div className="flex items-center justify-center py-8">
+      <div className="w-6 h-6 border-2 border-[#1B4332] border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
+  if (!stats) return null
+
+  const mesActual = new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })
+
+  return (
+    <div className="space-y-6">
+      {/* KPIs */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: 'Ingresos 6 meses', valor: formatearPrecio(stats.ingresoTotal6m), color: 'text-[#1B4332]' },
+          { label: `Reservas ${mesActual}`, valor: String(stats.reservasMesActual), color: 'text-blue-600' },
+          { label: 'Reservas 6 meses', valor: String(stats.totalReservas6m), color: 'text-gray-800' },
+          { label: 'Ocupación promedio', valor: `${stats.tasaOcupacionPromedio}%`, color: 'text-amber-600' },
+        ].map(k => (
+          <div key={k.label} className="bg-gray-50 rounded-xl p-3">
+            <p className="text-xs text-gray-500">{k.label}</p>
+            <p className={`text-xl font-bold mt-1 ${k.color}`}>{k.valor}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Ingresos por mes — barras simples */}
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Ingresos por mes</p>
+        {(() => {
+          const max = Math.max(...stats.ingresosPorMes.map(m => m.ingreso), 1)
+          return (
+            <div className="space-y-2">
+              {stats.ingresosPorMes.map(({ mes, ingreso }) => {
+                const [anio, mesNum] = mes.split('-')
+                const label = new Date(Number(anio), Number(mesNum) - 1).toLocaleDateString('es-CO', { month: 'short', year: '2-digit' })
+                const pct = Math.round((ingreso / max) * 100)
+                return (
+                  <div key={mes} className="flex items-center gap-3">
+                    <span className="text-xs text-gray-400 w-12 text-right capitalize">{label}</span>
+                    <div className="flex-1 h-6 bg-gray-100 rounded-lg overflow-hidden">
+                      <div className="h-full bg-[#2D6A4F] rounded-lg transition-all duration-500 flex items-center justify-end pr-2"
+                        style={{ width: `${Math.max(pct, ingreso > 0 ? 4 : 0)}%` }}>
+                        {ingreso > 0 && <span className="text-[10px] text-white font-medium">{formatearPrecio(ingreso)}</span>}
+                      </div>
+                    </div>
+                    {ingreso === 0 && <span className="text-xs text-gray-300">$0</span>}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
+      </div>
+
+      {/* Ocupación por habitación */}
+      {stats.ocupacionPorHab.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Ocupación este mes por habitación</p>
+          <div className="space-y-2">
+            {stats.ocupacionPorHab.map(h => (
+              <div key={h.id} className="flex items-center gap-3">
+                <span className="text-xs text-gray-600 w-32 truncate">{h.nombre}</span>
+                <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-500 ${h.tasaOcupacion >= 80 ? 'bg-[#1B4332]' : h.tasaOcupacion >= 50 ? 'bg-[#2D6A4F]' : 'bg-emerald-300'}`}
+                    style={{ width: `${h.tasaOcupacion}%` }} />
+                </div>
+                <span className="text-xs font-semibold text-gray-700 w-8 text-right">{h.tasaOcupacion}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ComercianteHotelesPage() {
   const [cfg, setCfg]               = useState<ConfigHotel | null>(null)
   const [reservas, setReservas]     = useState<ReservaHotel[]>([])
@@ -772,6 +862,12 @@ export default function ComercianteHotelesPage() {
       <main className="max-w-2xl mx-auto px-4 py-4 pb-16">
         {error && <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>}
         {exito && <div className="mb-4 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">{exito}</div>}
+
+        {/* ── DASHBOARD ESTADÍSTICAS (backend) ── */}
+        <section className="bg-white rounded-2xl shadow-sm p-6 mb-5">
+          <h2 className="font-bold text-gray-900 mb-4">Estadísticas</h2>
+          <DashboardEstadisticas />
+        </section>
 
         {/* ── ESTADÍSTICAS ── */}
         {(() => {
@@ -1280,6 +1376,26 @@ export default function ComercianteHotelesPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* RNT */}
+            <div>
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                RNT — Registro Nacional de Turismo
+              </label>
+              <input
+                value={(editConfig as any).rnt ?? ''}
+                onChange={e => setEditConfig(c => ({ ...c, rnt: e.target.value }))}
+                placeholder="Ej: 123456"
+                className="w-full mt-1.5 px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+              />
+              {cfg?.rntVerificado ? (
+                <p className="text-xs text-blue-600 mt-1">✓ RNT verificado por AfroMercado</p>
+              ) : cfg?.rnt ? (
+                <p className="text-xs text-amber-600 mt-1">Pendiente de verificación</p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">Ingresar el número mejora la visibilidad de tu hotel</p>
+              )}
             </div>
 
             {/* Política de cancelación */}

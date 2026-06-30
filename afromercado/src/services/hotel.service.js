@@ -390,6 +390,8 @@ const HotelService = {
       permitePagarAlLlegar, permiteDeposito30, permiteTotal,
       // Política de cancelación con penalización
       horasLibresCancelacion, pctPenalidadCancelacion,
+      // RNT (solo el hotelero puede actualizar su número, no el estado de verificación)
+      rnt,
     } = datos;
     return prisma.configHotel.upsert({
       where:  { comercioId },
@@ -398,6 +400,7 @@ const HotelService = {
         checkInHora, checkOutHora,
         permitePagarAlLlegar, permiteDeposito30, permiteTotal,
         horasLibresCancelacion, pctPenalidadCancelacion,
+        rnt,
         updatedAt: new Date(),
       },
       create: {
@@ -414,6 +417,7 @@ const HotelService = {
         permiteTotal:            permiteTotal            ?? true,
         horasLibresCancelacion:  horasLibresCancelacion  ?? 48,
         pctPenalidadCancelacion: pctPenalidadCancelacion ?? 0,
+        rnt:                     rnt                     ?? null,
       },
       include: { habitaciones: true },
     });
@@ -900,6 +904,134 @@ const HotelService = {
     const t = await prisma.temporadaHotel.findFirst({ where: { id: temporadaId, configHotelId: hotel.id } });
     if (!t) throw new ErrorNoEncontrado("Temporada no encontrada");
     await prisma.temporadaHotel.update({ where: { id: temporadaId }, data: { activo: false } });
+  },
+
+  // ── FAVORITOS ─────────────────────────────────────────────────
+
+  async toggleFavorito(usuarioId, configHotelId) {
+    const existe = await prisma.favoritoHotel.findUnique({
+      where: { usuarioId_configHotelId: { usuarioId, configHotelId } },
+    });
+    if (existe) {
+      await prisma.favoritoHotel.delete({ where: { id: existe.id } });
+      return { favorito: false };
+    } else {
+      await prisma.favoritoHotel.create({ data: { usuarioId, configHotelId } });
+      return { favorito: true };
+    }
+  },
+
+  async misFavoritosHotel(usuarioId) {
+    const favs = await prisma.favoritoHotel.findMany({
+      where: { usuarioId },
+      include: { configHotel: { include: HOTEL_INCLUDE } },
+      orderBy: { createdAt: "desc" },
+    });
+    return favs.map(f => f.configHotel);
+  },
+
+  async esFavoritoHotel(usuarioId, configHotelId) {
+    const existe = await prisma.favoritoHotel.findUnique({
+      where: { usuarioId_configHotelId: { usuarioId, configHotelId } },
+    });
+    return { favorito: !!existe };
+  },
+
+  // ── ESTADÍSTICAS DEL HOTELERO ─────────────────────────────────
+
+  async estadisticasHotelero(comercioId) {
+    const hotel = await prisma.configHotel.findUnique({ where: { comercioId } });
+    if (!hotel) throw new ErrorNoEncontrado("Hotel no encontrado");
+
+    const ahora     = new Date();
+    const hace6m    = new Date(ahora.getFullYear(), ahora.getMonth() - 5, 1);
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    const finMes    = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+
+    // Reservas de los últimos 6 meses
+    const reservas = await prisma.reservaHotel.findMany({
+      where: {
+        configHotelId: hotel.id,
+        creadoAt: { gte: hace6m },
+        estado: { notIn: ["CANCELADA", "RECHAZADA"] },
+      },
+      select: {
+        id: true, total: true, estado: true, creadoAt: true,
+        fechaEntrada: true, fechaSalida: true, habitacionTipoId: true,
+        montoDescuento: true, comision: true,
+      },
+    });
+
+    // Agrupar ingresos por mes (últimos 6 meses)
+    const ingresosPorMes = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      ingresosPorMes[key] = 0;
+    }
+    for (const r of reservas) {
+      const d = new Date(r.creadoAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (key in ingresosPorMes) {
+        ingresosPorMes[key] += Number(r.total) - Number(r.montoDescuento || 0);
+      }
+    }
+
+    // Reservas activas este mes
+    const reservasMesActual = await prisma.reservaHotel.count({
+      where: {
+        configHotelId: hotel.id,
+        creadoAt: { gte: inicioMes, lte: finMes },
+        estado: { notIn: ["CANCELADA", "RECHAZADA"] },
+      },
+    });
+
+    // Tasa de ocupación por habitación (días ocupados / días en el mes)
+    const habitaciones = await prisma.habitacionTipo.findMany({
+      where: { configHotelId: hotel.id, activo: true },
+      select: { id: true, nombre: true, cantidad: true },
+    });
+
+    const diasEnMes = finMes.getDate();
+    const ocupacionPorHab = await Promise.all(habitaciones.map(async (h) => {
+      const reservasHab = await prisma.reservaHotel.findMany({
+        where: {
+          habitacionTipoId: h.id,
+          estado: { notIn: ["CANCELADA", "RECHAZADA"] },
+          fechaEntrada: { lt: finMes },
+          fechaSalida:  { gt: inicioMes },
+        },
+        select: { fechaEntrada: true, fechaSalida: true },
+      });
+      let diasOcupados = 0;
+      for (const r of reservasHab) {
+        const entrada = new Date(Math.max(new Date(r.fechaEntrada).getTime(), inicioMes.getTime()));
+        const salida  = new Date(Math.min(new Date(r.fechaSalida).getTime(),  finMes.getTime()));
+        const dias = Math.ceil((salida.getTime() - entrada.getTime()) / 86400000);
+        if (dias > 0) diasOcupados += dias;
+      }
+      const tasaOcupacion = Math.min(100, Math.round((diasOcupados / (diasEnMes * h.cantidad)) * 100));
+      return { id: h.id, nombre: h.nombre, tasaOcupacion, diasOcupados };
+    }));
+
+    // Totales
+    const ingresoTotal6m = Object.values(ingresosPorMes).reduce((a, b) => a + b, 0);
+    const totalReservas  = reservas.length;
+    const cancelaciones  = await prisma.reservaHotel.count({
+      where: { configHotelId: hotel.id, estado: "CANCELADA", creadoAt: { gte: hace6m } },
+    });
+
+    return {
+      ingresosPorMes: Object.entries(ingresosPorMes).map(([mes, ingreso]) => ({ mes, ingreso })),
+      ingresoTotal6m,
+      reservasMesActual,
+      totalReservas6m: totalReservas,
+      cancelaciones6m: cancelaciones,
+      ocupacionPorHab,
+      tasaOcupacionPromedio: ocupacionPorHab.length
+        ? Math.round(ocupacionPorHab.reduce((a, b) => a + b.tasaOcupacion, 0) / ocupacionPorHab.length)
+        : 0,
+    };
   },
 
   // ── CHECK-IN ONLINE ───────────────────────────────────────────

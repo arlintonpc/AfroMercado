@@ -195,6 +195,7 @@ model Usuario {
   vistasProducto       VistaProducto[]
   cuponUsos            CuponUso[]
   cuponAsignaciones    CuponAsignacion[]
+  favoritosHotel       FavoritoHotel[]
   conversaciones            Conversacion[]      @relation("ConversacionComprador")
   mensajes                  Mensaje[]
   entregas                  Entrega[]           @relation("EntregaRepartidor")
@@ -1291,6 +1292,8 @@ model ConfigHotel {
   // Política de cancelación con penalización
   horasLibresCancelacion  Int       @default(48)
   pctPenalidadCancelacion Int       @default(0)
+  rnt                     String?
+  rntVerificado           Boolean   @default(false)
   creadoAt                DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
@@ -1300,6 +1303,7 @@ model ConfigHotel {
   reviews       ReviewHotel[]
   cupones       CuponHotel[]
   temporadas    TemporadaHotel[]
+  favoritos     FavoritoHotel[]
 
   @@index([activo])
 }
@@ -1589,4 +1593,18 @@ model TemporadaHotel {
   @@index([configHotelId, activo])
   @@index([habitacionTipoId, activo])
   @@index([inicio, fin])
+}
+
+model FavoritoHotel {
+  id            Int      @id @default(autoincrement())
+  usuarioId     Int
+  configHotelId Int
+  createdAt     DateTime @default(now())
+
+  usuario     Usuario     @relation(fields: [usuarioId],     references: [id], onDelete: Cascade)
+  configHotel ConfigHotel @relation(fields: [configHotelId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, configHotelId])
+  @@index([usuarioId])
+  @@index([configHotelId])
 }

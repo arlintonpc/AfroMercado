@@ -176,6 +176,36 @@ const HotelController = {
     } catch (e) { next(e); }
   },
 
+  // ── FAVORITOS ─────────────────────────────────────────────────
+  async toggleFavorito(req, res, next) {
+    try {
+      const data = await HotelService.toggleFavorito(req.usuario.id, Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async misFavoritos(req, res, next) {
+    try {
+      const data = await HotelService.misFavoritosHotel(req.usuario.id);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async esFavorito(req, res, next) {
+    try {
+      const data = await HotelService.esFavoritoHotel(req.usuario.id, Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // ── ESTADÍSTICAS ──────────────────────────────────────────────
+  async estadisticas(req, res, next) {
+    try {
+      const data = await HotelService.estadisticasHotelero(req.usuario.comercio.id);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
   // ── ADMIN ──────────────────────────────────────────────────────
   async adminListar(req, res, next) {
     try {
@@ -195,6 +225,17 @@ const HotelController = {
   async adminReservas(req, res, next) {
     try {
       const data = await HotelService.adminReservasHotel(Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async adminVerificarRnt(req, res, next) {
+    try {
+      const { verificado } = req.body;
+      const data = await prisma.configHotel.update({
+        where: { id: Number(req.params.id) },
+        data: { rntVerificado: !!verificado },
+      });
       res.json({ ok: true, data });
     } catch (e) { next(e); }
   },
