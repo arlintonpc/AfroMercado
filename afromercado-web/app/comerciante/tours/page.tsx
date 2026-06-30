@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { obtenerMiTour, actualizarMiTour, reservasOperadorTour, cambiarEstadoReservaTour, subirFotosTour, type ConfigTour, type ReservaTour, type EstadoReservaTour } from '@/lib/api/tour'
+import { obtenerMiTour, actualizarMiTour, reservasOperadorTour, cambiarEstadoReservaTour, subirFotosTour, listarCuponesTour, crearCuponTour, eliminarCuponTour, obtenerEstadisticasTour, type ConfigTour, type ReservaTour, type EstadoReservaTour, type CuponTour, type EstadisticasTour } from '@/lib/api/tour'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
 const SERVICIOS_OPCIONES = [
@@ -31,7 +31,7 @@ const ACCIONES: Record<string, { label: string; estado: EstadoReservaTour }[]> =
 }
 
 export default function ComercianteTourPage() {
-  const [tab, setTab] = useState<'reservas' | 'config'>('reservas')
+  const [tab, setTab] = useState<'reservas' | 'config' | 'cupones' | 'estadisticas'>('reservas')
   const [tour, setTour] = useState<ConfigTour | null>(null)
   const [reservas, setReservas] = useState<ReservaTour[]>([])
   const [cargando, setCargando] = useState(true)
@@ -40,6 +40,17 @@ export default function ComercianteTourPage() {
   const [editConfig, setEditConfig] = useState<Partial<ConfigTour>>({})
   const reservasRef = useRef<ReservaTour[]>([])
   const inputFotoRef = useRef<HTMLInputElement>(null)
+  const [cupones, setCupones]             = useState<CuponTour[]>([])
+  const [estadisticas, setEstadisticas]   = useState<EstadisticasTour | null>(null)
+  const [cargandoStats, setCargandoStats] = useState(false)
+  const [nuevoCupon, setNuevoCupon]       = useState({
+    codigo: '', tipo: 'PORCENTAJE' as 'PORCENTAJE' | 'VALOR_FIJO',
+    valor: '', minimoPersonas: '', usosMaximos: '',
+    inicio: new Date().toISOString().split('T')[0],
+    fin: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+  })
+  const [guardandoCupon, setGuardandoCupon] = useState(false)
+  const [errorCupon, setErrorCupon]         = useState('')
 
   const pendientes = reservas.filter(r => r.estado === 'PENDIENTE')
 
@@ -118,11 +129,6 @@ export default function ComercianteTourPage() {
     </div>
   )
 
-  const TABS = [
-    { key: 'reservas', label: `Reservas${pendientes.length > 0 ? ` (${pendientes.length})` : ''}` },
-    { key: 'config',   label: 'Configuración' },
-  ] as const
-
   return (
     <div className="max-w-2xl mx-auto px-4 py-5 pb-12">
       <div className="mb-5">
@@ -134,13 +140,28 @@ export default function ComercianteTourPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-2xl p-1 mb-5">
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`flex-1 py-2 rounded-xl text-xs font-medium transition-colors ${
-              tab === t.key ? 'bg-white text-[#1A1A1A] shadow-sm' : 'text-gray-500'
-            }`}>
-            {t.label}
+      <div className="flex border-b border-gray-200 gap-1 overflow-x-auto mb-5">
+        {([
+          ['reservas', `Reservas (${reservas.length})`],
+          ['estadisticas', '📊 Stats'],
+          ['cupones', '🎟️ Cupones'],
+          ['config', 'Configuración'],
+        ] as [typeof tab, string][]).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => {
+              setTab(id)
+              if (id === 'cupones') listarCuponesTour().then(setCupones).catch(() => {})
+              if (id === 'estadisticas') {
+                setCargandoStats(true)
+                obtenerEstadisticasTour().then(setEstadisticas).catch(() => {}).finally(() => setCargandoStats(false))
+              }
+            }}
+            className={`px-4 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              tab === id ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {label}
           </button>
         ))}
       </div>
@@ -188,6 +209,205 @@ export default function ComercianteTourPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* ── Estadísticas ── */}
+      {tab === 'estadisticas' && (
+        <div className="space-y-5">
+          {cargandoStats || !estadisticas ? (
+            <div className="flex justify-center py-16">
+              <div className="w-8 h-8 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-green-50 border border-green-100 rounded-2xl p-4">
+                  <p className="text-xs font-medium text-gray-500 mb-1">Este mes</p>
+                  <p className="text-2xl font-bold text-gray-800">{estadisticas.mes.reservas}</p>
+                  <p className="text-xs text-gray-500">reservas</p>
+                  <p className="text-base font-semibold text-gray-700 mt-2">${estadisticas.mes.ingresos.toLocaleString('es-CO')}</p>
+                  <p className="text-xs text-gray-400">ingresos</p>
+                  <p className="text-sm font-medium text-gray-600 mt-1">{estadisticas.mes.participantes} participantes</p>
+                </div>
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+                  <p className="text-xs font-medium text-gray-500 mb-1">Mes anterior</p>
+                  <p className="text-2xl font-bold text-gray-800">{estadisticas.mesAnterior.reservas}</p>
+                  <p className="text-xs text-gray-500">reservas</p>
+                  <p className="text-base font-semibold text-gray-700 mt-2">${estadisticas.mesAnterior.ingresos.toLocaleString('es-CO')}</p>
+                  <p className="text-xs text-gray-400">ingresos</p>
+                  <p className="text-sm font-medium text-[#2D6A4F] mt-1 font-semibold">Total histórico: {estadisticas.totalHistorico}</p>
+                </div>
+              </div>
+
+              {estadisticas.porMes.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                  <h3 className="font-semibold text-gray-800 mb-4">Ingresos por mes</h3>
+                  <div className="flex items-end gap-2 h-20">
+                    {estadisticas.porMes.map(m => {
+                      const max = Math.max(...estadisticas.porMes.map(x => x.ingresos), 1)
+                      const [anio, mes] = m.mes.split('-')
+                      const label = new Date(Number(anio), Number(mes) - 1).toLocaleDateString('es-CO', { month: 'short' })
+                      return (
+                        <div key={m.mes} className="flex-1 flex flex-col items-center gap-1">
+                          <div
+                            className="w-full bg-[#2D6A4F] rounded-t"
+                            style={{ height: `${(m.ingresos / max) * 64}px`, minHeight: m.ingresos > 0 ? 4 : 0 }}
+                            title={`${label}: $${m.ingresos.toLocaleString('es-CO')}`}
+                          />
+                          <span className="text-[9px] text-gray-400">{label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {estadisticas.proximasReservas.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                  <h3 className="font-semibold text-gray-800 mb-4">Próximas reservas confirmadas</h3>
+                  <div className="space-y-3">
+                    {estadisticas.proximasReservas.map(r => (
+                      <div key={r.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">{r.nombreContacto}</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(r.fechaTour).toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })} · {r.participantes} persona{r.participantes !== 1 ? 's' : ''}
+                          </p>
+                          <p className="text-xs font-mono text-gray-400">{r.codigo}</p>
+                        </div>
+                        <p className="text-sm font-bold text-[#1B4332]">${Number(r.total).toLocaleString('es-CO')}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {estadisticas.mes.reservas === 0 && estadisticas.totalHistorico === 0 && (
+                <div className="text-center py-12 text-gray-400">
+                  <p className="text-3xl mb-2">🗺️</p>
+                  <p>Aún no hay reservas confirmadas.</p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Cupones ── */}
+      {tab === 'cupones' && (
+        <div className="space-y-5">
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-gray-800">Cupones de descuento</h2>
+              <span className="text-xs text-gray-400">{cupones.filter(c => c.activo).length} activos</span>
+            </div>
+            {cupones.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">Sin cupones. Crea uno abajo.</p>
+            ) : (
+              <div className="space-y-3">
+                {cupones.map(c => {
+                  const vencido = new Date(c.fin) < new Date()
+                  return (
+                    <div key={c.id} className={`flex items-start gap-3 p-3 rounded-xl border ${!c.activo || vencido ? 'opacity-60 bg-gray-50 border-gray-100' : 'bg-green-50 border-green-100'}`}>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold text-sm text-[#1B4332]">{c.codigo}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.tipo === 'PORCENTAJE' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                            {c.tipo === 'PORCENTAJE' ? `${Number(c.valor)}% OFF` : `-$${Number(c.valor).toLocaleString('es-CO')}`}
+                          </span>
+                          {vencido && <span className="text-xs text-red-500 font-medium">Vencido</span>}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1 space-y-0.5">
+                          {c.minimoPersonas && <p>Mínimo: {c.minimoPersonas} persona{c.minimoPersonas !== 1 ? 's' : ''}</p>}
+                          <p>{new Date(c.inicio).toLocaleDateString('es-CO')} → {new Date(c.fin).toLocaleDateString('es-CO')}</p>
+                          <p>Usos: {c.usosActuales}{c.usosMaximos ? ` / ${c.usosMaximos}` : ''}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`¿Desactivar ${c.codigo}?`)) return
+                          await eliminarCuponTour(c.id)
+                          setCupones(prev => prev.map(x => x.id === c.id ? { ...x, activo: false } : x))
+                        }}
+                        className="text-xs text-red-500 border border-red-200 px-2 py-1 rounded-lg flex-shrink-0"
+                      >Desactivar</button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+            <h2 className="font-semibold text-gray-800">Crear cupón</h2>
+            {errorCupon && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{errorCupon}</p>}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Código *</label>
+                <input value={nuevoCupon.codigo} onChange={e => setNuevoCupon(p => ({ ...p, codigo: e.target.value.toUpperCase().replace(/\s/g,'') }))}
+                  placeholder="Ej: TOUR20, CHOCOTRIP…"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono uppercase" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
+                <select value={nuevoCupon.tipo} onChange={e => setNuevoCupon(p => ({ ...p, tipo: e.target.value as any }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+                  <option value="PORCENTAJE">% Porcentaje</option>
+                  <option value="VALOR_FIJO">$ Valor fijo</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Valor * {nuevoCupon.tipo === 'PORCENTAJE' ? '(%)' : '($)'}</label>
+                <input type="number" min={1} value={nuevoCupon.valor} onChange={e => setNuevoCupon(p => ({ ...p, valor: e.target.value }))}
+                  placeholder={nuevoCupon.tipo === 'PORCENTAJE' ? '20' : '50000'}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Mínimo personas</label>
+                <input type="number" min={1} value={nuevoCupon.minimoPersonas} onChange={e => setNuevoCupon(p => ({ ...p, minimoPersonas: e.target.value }))}
+                  placeholder="Opcional" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Límite de usos</label>
+                <input type="number" min={1} value={nuevoCupon.usosMaximos} onChange={e => setNuevoCupon(p => ({ ...p, usosMaximos: e.target.value }))}
+                  placeholder="Sin límite" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Inicio *</label>
+                <input type="date" value={nuevoCupon.inicio} onChange={e => setNuevoCupon(p => ({ ...p, inicio: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Fin *</label>
+                <input type="date" value={nuevoCupon.fin} onChange={e => setNuevoCupon(p => ({ ...p, fin: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <button
+              disabled={guardandoCupon || !nuevoCupon.codigo.trim() || !nuevoCupon.valor}
+              onClick={async () => {
+                if (!nuevoCupon.codigo.trim() || !nuevoCupon.valor) return
+                setGuardandoCupon(true); setErrorCupon('')
+                try {
+                  await crearCuponTour({
+                    codigo: nuevoCupon.codigo.trim(), tipo: nuevoCupon.tipo, valor: Number(nuevoCupon.valor),
+                    minimoPersonas: nuevoCupon.minimoPersonas ? Number(nuevoCupon.minimoPersonas) : undefined,
+                    usosMaximos: nuevoCupon.usosMaximos ? Number(nuevoCupon.usosMaximos) : undefined,
+                    inicio: nuevoCupon.inicio, fin: nuevoCupon.fin,
+                  })
+                  setCupones(await listarCuponesTour())
+                  setNuevoCupon({ codigo: '', tipo: 'PORCENTAJE', valor: '', minimoPersonas: '', usosMaximos: '',
+                    inicio: new Date().toISOString().split('T')[0],
+                    fin: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0] })
+                } catch (e: any) { setErrorCupon(e?.message ?? 'Error al crear el cupón') }
+                finally { setGuardandoCupon(false) }
+              }}
+              className="w-full bg-[#2D6A4F] text-white py-3 rounded-xl font-semibold disabled:opacity-50"
+            >
+              {guardandoCupon ? 'Creando...' : '🎟️ Crear cupón'}
+            </button>
+          </div>
         </div>
       )}
 

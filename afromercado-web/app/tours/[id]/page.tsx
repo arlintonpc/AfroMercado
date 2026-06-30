@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { obtenerTour, verificarDisponibilidadTour, crearReservaTour, misReservasTour, type ConfigTour } from '@/lib/api/tour'
+import { obtenerTour, verificarDisponibilidadTour, crearReservaTour, misReservasTour, validarCuponTour, toggleFavoritoTour, esFavoritoTour, type ConfigTour, type ValidacionCuponTour } from '@/lib/api/tour'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import SeccionReviewsTour from '@/components/tours/SeccionReviewsTour'
@@ -213,8 +213,26 @@ function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClo
   const [disponibilidad, setD]      = useState<{ disponibles: number; maxParticipantes: number } | null>(null)
   const [cargando, setCargando]     = useState(false)
   const [error, setError]           = useState('')
+  const [codigoCupon, setCodigoCupon]       = useState('')
+  const [cuponAplicado, setCuponAplicado]   = useState<ValidacionCuponTour | null>(null)
+  const [validandoCupon, setValidandoCupon] = useState(false)
+  const [errorCupon, setErrorCupon]         = useState<string | null>(null)
 
-  const total = Number(tour.precioPersona) * participantes
+  const subtotal = Number(tour.precioPersona) * participantes
+  const total = cuponAplicado ? cuponAplicado.subtotalConDescuento : subtotal
+
+  async function aplicarCupon() {
+    if (!codigoCupon.trim()) return
+    setValidandoCupon(true)
+    setErrorCupon(null)
+    try {
+      const v = await validarCuponTour(codigoCupon.trim(), tour.id, participantes)
+      setCuponAplicado(v)
+    } catch (e: any) {
+      setErrorCupon(e?.message ?? 'Cupón inválido')
+      setCuponAplicado(null)
+    } finally { setValidandoCupon(false) }
+  }
 
   useEffect(() => {
     if (!fecha) return
@@ -225,7 +243,7 @@ function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClo
     if (!nombre.trim() || !telefono.trim()) { setError('Completa nombre y teléfono'); return }
     setError(''); setCargando(true)
     try {
-      await crearReservaTour({ configTourId: tour.id, fechaTour: fecha, participantes, metodoPago, notasCliente: notas || undefined, nombreContacto: nombre.trim(), telefonoContacto: telefono.trim() })
+      await crearReservaTour({ configTourId: tour.id, fechaTour: fecha, participantes, metodoPago, notasCliente: notas || undefined, nombreContacto: nombre.trim(), telefonoContacto: telefono.trim(), codigoCupon: cuponAplicado ? codigoCupon.trim() : undefined })
       onSuccess()
     } catch (e: any) { setError(e.message) } finally { setCargando(false) }
   }
@@ -300,6 +318,61 @@ function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClo
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#1B4332] resize-none" />
           </div>
 
+          {/* Cupón */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">¿Tienes un cupón?</label>
+            {cuponAplicado ? (
+              <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-bold text-green-700">✅ {cuponAplicado.cupon.codigo}</p>
+                  <p className="text-xs text-green-600">
+                    -{formatearPrecio(cuponAplicado.descuento)}
+                    {cuponAplicado.cupon.tipo === 'PORCENTAJE' ? ` (${Number(cuponAplicado.cupon.valor)}%)` : ''}
+                  </p>
+                </div>
+                <button onClick={() => { setCuponAplicado(null); setCodigoCupon('') }} className="text-xs text-red-500">Quitar</button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  value={codigoCupon}
+                  onChange={e => setCodigoCupon(e.target.value.toUpperCase())}
+                  onKeyDown={e => e.key === 'Enter' && aplicarCupon()}
+                  placeholder="Código de descuento"
+                  className="flex-1 border border-[#E8DCC8] rounded-xl px-3 py-2.5 text-sm font-mono uppercase focus:outline-none focus:border-[#2D6A4F]"
+                />
+                <button
+                  onClick={aplicarCupon}
+                  disabled={validandoCupon || !codigoCupon.trim()}
+                  className="px-3 py-2.5 rounded-xl bg-[#2D6A4F] text-white text-sm font-semibold disabled:opacity-50"
+                >
+                  {validandoCupon ? '...' : 'Aplicar'}
+                </button>
+              </div>
+            )}
+            {errorCupon && <p className="text-xs text-red-600 mt-1">{errorCupon}</p>}
+          </div>
+
+          {/* Resumen de precio */}
+          <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-700">
+            <div className="flex justify-between">
+              <span>{formatearPrecio(Number(tour.precioPersona))} × {participantes} pers.</span>
+              <span>{formatearPrecio(subtotal)}</span>
+            </div>
+            {cuponAplicado && (
+              <>
+                <div className="flex justify-between text-green-700 mt-1">
+                  <span>Descuento ({cuponAplicado.cupon.codigo})</span>
+                  <span>-{formatearPrecio(cuponAplicado.descuento)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-[#1A1A1A] mt-1 pt-1 border-t border-gray-200">
+                  <span>Total</span>
+                  <span>{formatearPrecio(cuponAplicado.subtotalConDescuento)}</span>
+                </div>
+              </>
+            )}
+          </div>
+
           {error && <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>}
 
           <button onClick={handleReservar}
@@ -329,11 +402,15 @@ export default function TourDetallePage() {
   const [reservado, setReservado]     = useState(false)
   const [reservaElegibleId, setReservaElegibleId] = useState<number | undefined>()
   const [lightbox, setLightbox]       = useState<{ fotos: string[]; idx: number } | null>(null)
+  const [esFavorito, setEsFavorito]   = useState(false)
   const { mostrar: mostrarToast, toastProps } = useToast()
 
   useEffect(() => {
     obtenerTour(Number(id)).then(d => { setTour(d); setCargando(false) }).catch(() => setCargando(false))
-  }, [id])
+    if (autenticado) {
+      esFavoritoTour(Number(id)).then(setEsFavorito).catch(() => {})
+    }
+  }, [id, autenticado])
 
   useEffect(() => {
     if (!usuario || !tour) return
@@ -380,6 +457,22 @@ export default function TourDetallePage() {
           <div className="flex items-center gap-3">
             {autenticado && (
               <Link href="/tours/mis-reservas" className="hidden sm:block text-sm text-gray-500 hover:text-gray-800 transition-colors">Mis reservas</Link>
+            )}
+            {autenticado && (
+              <button
+                onClick={async () => {
+                  try {
+                    const r = await toggleFavoritoTour(Number(id))
+                    setEsFavorito(r.esFavorito)
+                  } catch {}
+                }}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                title={esFavorito ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill={esFavorito ? '#E53E3E' : 'none'} stroke={esFavorito ? '#E53E3E' : '#666'} strokeWidth="2" strokeLinecap="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+              </button>
             )}
             <button onClick={handleShare}
               className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-full px-3 py-1.5 hover:border-gray-300 transition-all">

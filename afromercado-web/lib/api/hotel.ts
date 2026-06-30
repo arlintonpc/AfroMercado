@@ -1,6 +1,7 @@
 import { apiFetch } from './client'
 
 export type EstadoReservaHotel = 'PENDIENTE' | 'CONFIRMADA' | 'CHECKIN' | 'CHECKOUT' | 'CANCELADA' | 'RECHAZADA'
+export type EstadoHabitacionFisica = 'LIBRE' | 'OCUPADA' | 'LIMPIEZA' | 'MANTENIMIENTO' | 'BLOQUEADA'
 
 export interface TemporadaHotel {
   id: number
@@ -13,6 +14,21 @@ export interface TemporadaHotel {
   activo: boolean
   createdAt: string
   habitacionTipo?: { nombre: string } | null
+}
+
+export interface HabitacionFisica {
+  id: number
+  configHotelId: number
+  habitacionTipoId: number
+  nombre: string
+  piso?: string | null
+  zona?: string | null
+  estado: EstadoHabitacionFisica | string
+  notas?: string | null
+  activo: boolean
+  creadoAt: string
+  updatedAt: string
+  habitacionTipo?: { id: number; nombre: string; capacidad?: number }
 }
 
 export interface HabitacionTipo {
@@ -31,6 +47,7 @@ export interface HabitacionTipo {
   videoPosterUrl?: string | null
   videoDuracionSeg?: number | null
   temporadas?: TemporadaHotel[]
+  unidadesFisicas?: HabitacionFisica[]
 }
 
 export interface EstadisticasHotel {
@@ -65,6 +82,7 @@ export interface ConfigHotel {
   horasLibresCancelacion: number
   pctPenalidadCancelacion: number
   habitaciones: HabitacionTipo[]
+  habitacionesFisicas?: HabitacionFisica[]
   comercio: {
     id: number
     nombre: string
@@ -93,6 +111,7 @@ export interface ReservaHotel {
   codigo: string
   configHotelId: number
   habitacionTipoId: number
+  habitacionFisicaId?: number | null
   clienteId: number
   fechaEntrada: string
   fechaSalida: string
@@ -115,6 +134,7 @@ export interface ReservaHotel {
   solicitudesEspeciales?: string | null
   tokenCheckin?: string | null
   habitacionTipo?: { nombre: string; fotos: string[]; precioPorNoche: number | string }
+  habitacionFisica?: { id: number; nombre: string; piso?: string | null; zona?: string | null; estado?: string | null } | null
   configHotel?: {
     id: number
     checkInHora: string
@@ -261,8 +281,40 @@ export async function reservasHotelero(params?: { estado?: string }): Promise<Re
   return r.data
 }
 
-export async function cambiarEstadoReserva(id: number, estado: EstadoReservaHotel): Promise<ReservaHotel> {
-  const r = await apiFetch<{ ok: boolean; data: ReservaHotel }>(`/hoteles/mi-hotel/reservas/${id}/estado`, { method: 'PATCH', body: { estado } })
+export async function cambiarEstadoReserva(id: number, estado: EstadoReservaHotel, datos?: { habitacionFisicaId?: number }): Promise<ReservaHotel> {
+  const r = await apiFetch<{ ok: boolean; data: ReservaHotel }>(`/hoteles/mi-hotel/reservas/${id}/estado`, { method: 'PATCH', body: { estado, ...(datos ?? {}) } })
+  return r.data
+}
+
+export async function listarHabitacionesFisicas(): Promise<HabitacionFisica[]> {
+  const r = await apiFetch<{ ok: boolean; data: HabitacionFisica[] }>('/hoteles/mi-hotel/habitaciones-fisicas')
+  return r.data
+}
+
+export async function crearHabitacionFisica(datos: Partial<HabitacionFisica>): Promise<HabitacionFisica> {
+  const r = await apiFetch<{ ok: boolean; data: HabitacionFisica }>('/hoteles/mi-hotel/habitaciones-fisicas', { method: 'POST', body: datos })
+  return r.data
+}
+
+export async function actualizarHabitacionFisica(id: number, datos: Partial<HabitacionFisica>): Promise<HabitacionFisica> {
+  const r = await apiFetch<{ ok: boolean; data: HabitacionFisica }>(`/hoteles/mi-hotel/habitaciones-fisicas/${id}`, { method: 'PUT', body: datos })
+  return r.data
+}
+
+export async function cambiarEstadoHabitacionFisica(id: number, estado: EstadoHabitacionFisica): Promise<HabitacionFisica> {
+  const r = await apiFetch<{ ok: boolean; data: HabitacionFisica }>(`/hoteles/mi-hotel/habitaciones-fisicas/${id}/estado`, { method: 'PATCH', body: { estado } })
+  return r.data
+}
+
+export async function eliminarHabitacionFisica(id: number): Promise<void> {
+  await apiFetch(`/hoteles/mi-hotel/habitaciones-fisicas/${id}`, { method: 'DELETE' })
+}
+
+export async function asignarHabitacionFisicaReserva(reservaId: number, habitacionFisicaId: number): Promise<ReservaHotel> {
+  const r = await apiFetch<{ ok: boolean; data: ReservaHotel }>(`/hoteles/mi-hotel/reservas/${reservaId}/habitacion-fisica`, {
+    method: 'PATCH',
+    body: { habitacionFisicaId },
+  })
   return r.data
 }
 
@@ -319,8 +371,8 @@ export async function quitarVideoHabitacion(habitacionId: number): Promise<void>
   )
 }
 
-export async function ocupacionHotel(): Promise<{ habitaciones: HabitacionTipo[]; reservas: ReservaHotel[] }> {
-  const r = await apiFetch<{ ok: boolean; data: { habitaciones: HabitacionTipo[]; reservas: ReservaHotel[] } }>('/hoteles/mi-hotel/ocupacion')
+export async function ocupacionHotel(): Promise<{ habitaciones: HabitacionTipo[]; habitacionesFisicas: HabitacionFisica[]; reservas: ReservaHotel[] }> {
+  const r = await apiFetch<{ ok: boolean; data: { habitaciones: HabitacionTipo[]; habitacionesFisicas: HabitacionFisica[]; reservas: ReservaHotel[] } }>('/hoteles/mi-hotel/ocupacion')
   return r.data
 }
 
@@ -354,21 +406,21 @@ export interface BloqueoFecha {
 }
 
 export async function listarBloqueos(): Promise<BloqueoFecha[]> {
-  const d = await apiFetch<{ ok: boolean; data: BloqueoFecha[] }>('/hotel/bloqueos', { auth: true })
+  const d = await apiFetch<{ ok: boolean; data: BloqueoFecha[] }>('/hoteles/mi-hotel/bloqueos', { auth: true })
   return d.data
 }
 
 export async function crearBloqueo(datos: { habitacionId?: number | null; fechaInicio: string; fechaFin: string; motivo?: string }): Promise<BloqueoFecha> {
-  const d = await apiFetch<{ ok: boolean; data: BloqueoFecha }>('/hotel/bloqueos', { method: 'POST', body: datos, auth: true })
+  const d = await apiFetch<{ ok: boolean; data: BloqueoFecha }>('/hoteles/mi-hotel/bloqueos', { method: 'POST', body: datos, auth: true })
   return d.data
 }
 
 export async function eliminarBloqueo(bloqueoId: string): Promise<void> {
-  await apiFetch(`/hotel/bloqueos/${bloqueoId}`, { method: 'DELETE', auth: true })
+  await apiFetch(`/hoteles/mi-hotel/bloqueos/${bloqueoId}`, { method: 'DELETE', auth: true })
 }
 
 export async function iniciarPagoReserva(reservaId: number): Promise<{ checkoutUrl: string; referencia: string; montoDeposito: number; pct: number }> {
-  const d = await apiFetch<{ ok: boolean; data: any }>(`/hotel/reservas/${reservaId}/checkout`, { method: 'POST', auth: true })
+  const d = await apiFetch<{ ok: boolean; data: any }>(`/hoteles/reservas/${reservaId}/checkout`, { method: 'POST', auth: true })
   return d.data
 }
 

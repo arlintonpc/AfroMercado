@@ -49,6 +49,9 @@ export interface ReservaTour {
   nombreContacto: string
   telefonoContacto: string
   creadoAt: string
+  comision?: number | null
+  montoDescuento?: number | null
+  codigoCupon?: string | null
   configTour?: ConfigTour
   cliente?: { id: number; nombre: string; email: string; telefono?: string | null }
   review?: { id: number } | null
@@ -82,6 +85,7 @@ export async function crearReservaTour(datos: {
   notasCliente?: string
   nombreContacto: string
   telefonoContacto: string
+  codigoCupon?: string
 }): Promise<ReservaTour> {
   const r = await apiFetch<{ ok: boolean; data: ReservaTour }>('/tours/reservas', { method: 'POST', body: datos })
   return r.data
@@ -131,6 +135,89 @@ export async function adminListarTours(): Promise<TourAdmin[]> {
 
 export async function adminCambiarEstadoTour(id: number, activo: boolean): Promise<ConfigTour> {
   const r = await apiFetch<{ ok: boolean; data: ConfigTour }>(`/tours/admin/${id}/estado`, { method: 'PATCH', body: { activo } })
+  return r.data
+}
+
+// ── CUPONES TOUR ──────────────────────────────────────────────
+
+export interface CuponTour {
+  id: number
+  codigo: string
+  tipo: 'PORCENTAJE' | 'VALOR_FIJO'
+  valor: number
+  minimoPersonas: number | null
+  usosMaximos: number | null
+  usosActuales: number
+  activo: boolean
+  inicio: string
+  fin: string
+  configTourId: number | null
+  createdAt: string
+  _count?: { usos: number }
+}
+
+export interface ValidacionCuponTour {
+  cupon: CuponTour
+  descuento: number
+  subtotalConDescuento: number
+}
+
+export async function validarCuponTour(codigo: string, configTourId: number, participantes: number): Promise<ValidacionCuponTour> {
+  const r = await apiFetch<{ ok: boolean; data: ValidacionCuponTour }>('/tours/cupones/validar', {
+    method: 'POST',
+    body: { codigo, configTourId, participantes },
+  })
+  return r.data
+}
+
+export async function listarCuponesTour(): Promise<CuponTour[]> {
+  const r = await apiFetch<{ ok: boolean; data: CuponTour[] }>('/tours/mi-tour/cupones')
+  return r.data ?? []
+}
+
+export async function crearCuponTour(datos: {
+  codigo: string; tipo: 'PORCENTAJE' | 'VALOR_FIJO'; valor: number
+  minimoPersonas?: number; usosMaximos?: number; inicio: string; fin: string
+}): Promise<CuponTour> {
+  const r = await apiFetch<{ ok: boolean; data: CuponTour }>('/tours/mi-tour/cupones', { method: 'POST', body: datos })
+  return r.data
+}
+
+export async function eliminarCuponTour(id: number): Promise<void> {
+  await apiFetch(`/tours/mi-tour/cupones/${id}`, { method: 'DELETE' })
+}
+
+// ── FAVORITOS TOUR ────────────────────────────────────────────
+
+export async function toggleFavoritoTour(id: number): Promise<{ esFavorito: boolean }> {
+  const r = await apiFetch<{ ok: boolean; data: { esFavorito: boolean } }>(`/tours/favoritos/${id}/toggle`, { method: 'POST', body: {} })
+  return r.data
+}
+
+export async function misFavoritosTour(): Promise<ConfigTour[]> {
+  const r = await apiFetch<{ ok: boolean; data: ConfigTour[] }>('/tours/favoritos/mis')
+  return r.data ?? []
+}
+
+export async function esFavoritoTour(id: number): Promise<boolean> {
+  try {
+    const r = await apiFetch<{ ok: boolean; data: { esFavorito: boolean } }>(`/tours/favoritos/${id}`)
+    return r.data?.esFavorito ?? false
+  } catch { return false }
+}
+
+// ── ESTADÍSTICAS TOUR ─────────────────────────────────────────
+
+export interface EstadisticasTour {
+  mes: { reservas: number; ingresos: number; comision: number; participantes: number }
+  mesAnterior: { reservas: number; ingresos: number }
+  totalHistorico: number
+  proximasReservas: Array<{ id: number; codigo: string; fechaTour: string; participantes: number; total: number; nombreContacto: string }>
+  porMes: Array<{ mes: string; reservas: number; ingresos: number }>
+}
+
+export async function obtenerEstadisticasTour(): Promise<EstadisticasTour> {
+  const r = await apiFetch<{ ok: boolean; data: EstadisticasTour }>('/tours/mi-tour/estadisticas')
   return r.data
 }
 

@@ -49,8 +49,14 @@ router.post( "/mi-hotel/habitaciones/:id/video",  ...soloComercio, HotelControll
 router.delete("/mi-hotel/habitaciones/:id/video", ...soloComercio, HotelController.quitarVideoHabitacion);
 router.put(  "/mi-hotel/habitaciones/:id",      ...soloComercio, HotelController.actualizarHabitacion);
 router.delete("/mi-hotel/habitaciones/:id",     ...soloComercio, HotelController.eliminarHabitacion);
+router.get(  "/mi-hotel/habitaciones-fisicas",  ...soloComercio, HotelController.habitacionesFisicas);
+router.post( "/mi-hotel/habitaciones-fisicas",  ...soloComercio, HotelController.crearHabitacionFisica);
+router.put(  "/mi-hotel/habitaciones-fisicas/:id", ...soloComercio, HotelController.actualizarHabitacionFisica);
+router.patch("/mi-hotel/habitaciones-fisicas/:id/estado", ...soloComercio, HotelController.cambiarEstadoHabitacionFisica);
+router.delete("/mi-hotel/habitaciones-fisicas/:id", ...soloComercio, HotelController.eliminarHabitacionFisica);
 router.get(  "/mi-hotel/reservas",              ...soloComercio, HotelController.reservasHotelero);
 router.patch("/mi-hotel/reservas/:id/estado",   ...soloComercio, HotelController.cambiarEstado);
+router.patch("/mi-hotel/reservas/:id/habitacion-fisica", ...soloComercio, HotelController.asignarHabitacionFisicaReserva);
 router.get(  "/mi-hotel/ocupacion",             ...soloComercio, HotelController.ocupacion);
 router.get(   "/mi-hotel/bloqueos",             ...soloComercio, HotelController.listarBloqueos);
 router.post(  "/mi-hotel/bloqueos",             ...soloComercio, HotelController.crearBloqueo);

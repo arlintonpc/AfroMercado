@@ -212,6 +212,8 @@ model Usuario {
   reviewsTour               ReviewTour[]        @relation("ReviewsTourCliente")
   cuponesHotelUsos          CuponHotelUso[]
   cuponesExpressUsos        CuponExpressUso[]
+  favoritosTour             FavoritoTour[]
+  cuponesTourUsos           CuponTourUso[]
 }
 
 model Comercio {
@@ -1446,6 +1448,8 @@ model ConfigTour {
   maxParticipantes    Int      @default(10)
   puntoEncuentro      String?
   fotos               String[]
+  videoUrl            String?
+  videoPosterUrl      String?
   servicios           String[]
   idiomas             String[]
   confirmacionAuto    Boolean  @default(false)
@@ -1454,9 +1458,11 @@ model ConfigTour {
   creadoAt            DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  comercio Comercio      @relation(fields: [comercioId], references: [id])
-  reservas ReservaTour[]
-  reviews  ReviewTour[]
+  comercio  Comercio       @relation(fields: [comercioId], references: [id])
+  reservas  ReservaTour[]
+  reviews   ReviewTour[]
+  cupones   CuponTour[]
+  favoritos FavoritoTour[]
 
   @@index([activo])
 }
@@ -1474,12 +1480,17 @@ model ReservaTour {
   notasCliente     String?
   nombreContacto   String
   telefonoContacto String
+  comision         Decimal?           @db.Decimal(10, 2)
+  tasaComision     Decimal?           @db.Decimal(5, 4)
+  montoDescuento   Decimal?           @db.Decimal(10, 2)
+  codigoCupon      String?
   creadoAt         DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
-  configTour ConfigTour @relation(fields: [configTourId], references: [id])
-  cliente    Usuario    @relation("ReservasTourCliente", fields: [clienteId], references: [id])
-  review     ReviewTour?
+  configTour   ConfigTour    @relation(fields: [configTourId], references: [id])
+  cliente      Usuario       @relation("ReservasTourCliente", fields: [clienteId], references: [id])
+  review       ReviewTour?
+  cuponTourUso CuponTourUso?
 
   @@index([configTourId, estado])
   @@index([clienteId])
@@ -1696,4 +1707,55 @@ model FavoritoHotel {
   @@unique([usuarioId, configHotelId])
   @@index([usuarioId])
   @@index([configHotelId])
+}
+
+// ─── CUPONES TOUR ─────────────────────────────────────────────
+
+model CuponTour {
+  id              Int       @id @default(autoincrement())
+  codigo          String    @unique
+  tipo            String    @default("PORCENTAJE")
+  valor           Decimal   @db.Decimal(10, 2)
+  minimoPersonas  Int?
+  usosMaximos     Int?
+  usosActuales    Int       @default(0)
+  activo          Boolean   @default(true)
+  inicio          DateTime
+  fin             DateTime
+  configTourId    Int?
+  createdAt       DateTime  @default(now())
+
+  configTour  ConfigTour?    @relation(fields: [configTourId], references: [id], onDelete: SetNull)
+  usos        CuponTourUso[]
+
+  @@index([codigo, activo])
+  @@index([activo, fin])
+  @@index([configTourId])
+}
+
+model CuponTourUso {
+  id            Int      @id @default(autoincrement())
+  cuponTourId   Int
+  clienteId     Int
+  reservaTourId Int      @unique
+  createdAt     DateTime @default(now())
+
+  cupon       CuponTour   @relation(fields: [cuponTourId],   references: [id])
+  cliente     Usuario     @relation(fields: [clienteId],     references: [id])
+  reservaTour ReservaTour @relation(fields: [reservaTourId], references: [id])
+
+  @@index([cuponTourId, clienteId])
+}
+
+model FavoritoTour {
+  id           Int      @id @default(autoincrement())
+  usuarioId    Int
+  configTourId Int
+  createdAt    DateTime @default(now())
+
+  usuario    Usuario    @relation(fields: [usuarioId],    references: [id])
+  configTour ConfigTour @relation(fields: [configTourId], references: [id])
+
+  @@unique([usuarioId, configTourId])
+  @@index([usuarioId])
 }

@@ -92,6 +92,76 @@ const TourController = {
       res.json({ ok: true, data: tour });
     } catch (e) { next(e); }
   },
+
+  // ── CUPONES TOUR ──────────────────────────────────────────────
+
+  async validarCupon(req, res, next) {
+    try {
+      const { codigo, participantes, configTourId } = req.body;
+      if (!codigo || !participantes || !configTourId) {
+        return res.status(400).json({ ok: false, error: "codigo, participantes y configTourId requeridos" });
+      }
+      const data = await TourService.validarCuponTour(codigo, Number(configTourId), Number(participantes), req.usuario?.id ?? null);
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async listarCupones(req, res, next) {
+    try {
+      const comercioId = req.usuario.comercio.id;
+      const data = await TourService.listarCuponesTour(comercioId);
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async crearCupon(req, res, next) {
+    try {
+      const comercioId = req.usuario.comercio.id;
+      const data = await TourService.crearCuponTour(comercioId, req.body);
+      res.status(201).json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async eliminarCupon(req, res, next) {
+    try {
+      const comercioId = req.usuario.comercio.id;
+      await TourService.eliminarCuponTour(comercioId, Number(req.params.id));
+      res.json({ ok: true });
+    } catch (err) { next(err); }
+  },
+
+  // ── FAVORITOS TOUR ────────────────────────────────────────────
+
+  async toggleFavorito(req, res, next) {
+    try {
+      const data = await TourService.toggleFavoritoTour(req.usuario.id, Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async misFavoritos(req, res, next) {
+    try {
+      const data = await TourService.misFavoritosTour(req.usuario.id);
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async esFavorito(req, res, next) {
+    try {
+      const data = await TourService.esFavoritoTour(req.usuario.id, Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  // ── ESTADÍSTICAS TOUR ─────────────────────────────────────────
+
+  async estadisticas(req, res, next) {
+    try {
+      const comercioId = req.usuario.comercio.id;
+      const data = await TourService.estadisticasTour(comercioId);
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
 };
 
 module.exports = TourController;

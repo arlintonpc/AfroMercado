@@ -47,6 +47,165 @@ const HOTEL_INCLUDE = {
   },
 };
 
+const ESTADOS_HABITACION_FISICA = new Set(["LIBRE", "OCUPADA", "LIMPIEZA", "MANTENIMIENTO", "BLOQUEADA"]);
+const ESTADOS_RESERVA_OCUPAN_HABITACION = ["PENDIENTE", "CONFIRMADA", "CHECKIN"];
+
+function normalizarEstadoHabitacionFisica(estado) {
+  const normalizado = String(estado || "LIBRE").trim().toUpperCase();
+  if (!ESTADOS_HABITACION_FISICA.has(normalizado)) {
+    throw new ErrorValidacion("Estado de habitacion fisica no valido");
+  }
+  return normalizado;
+}
+
+async function verificarDisponibilidadInterna(db, habitacionTipoId, fechaEntrada, fechaSalida, { bloquearTipo = false } = {}) {
+  if (bloquearTipo) {
+    await db.$queryRaw`SELECT id FROM "HabitacionTipo" WHERE id = ${Number(habitacionTipoId)} FOR UPDATE`;
+  }
+
+  const tipo = await db.habitacionTipo.findUnique({
+    where: { id: Number(habitacionTipoId) },
+    include: { configHotel: true },
+  });
+  if (!tipo || !tipo.activo) throw new ErrorNoEncontrado("Tipo de habitacion no disponible");
+
+  const reservasSolapadas = await db.reservaHotel.count({
+    where: {
+      habitacionTipoId: Number(habitacionTipoId),
+      estado: { in: ["PENDIENTE", "CONFIRMADA", "CHECKIN"] },
+      fechaEntrada: { lt: fechaSalida },
+      fechaSalida:  { gt: fechaEntrada },
+    },
+  });
+
+  let bloqueado = false;
+  const rawBloqueos = await ConfigRepository.obtener(`HOTEL_BLOQUEOS_${tipo.configHotelId}`);
+  const bloqueos = rawBloqueos ? JSON.parse(rawBloqueos) : [];
+  bloqueado = bloqueos.some(b =>
+    (b.habitacionId === null || b.habitacionId === Number(habitacionTipoId)) &&
+    b.fechaInicio < fechaSalida.toISOString().slice(0, 10) &&
+    b.fechaFin > fechaEntrada.toISOString().slice(0, 10)
+  );
+
+  const disponibles = bloqueado ? 0 : tipo.cantidad - reservasSolapadas;
+  return { disponibles, total: tipo.cantidad, tipo };
+}
+
+async function validarHabitacionFisicaDisponible(db, {
+  configHotelId,
+  habitacionTipoId,
+  habitacionFisicaId,
+  fechaEntrada,
+  fechaSalida,
+  reservaId = null,
+}) {
+  const fisica = await db.habitacionFisica.findFirst({
+    where: {
+      id: Number(habitacionFisicaId),
+      configHotelId: Number(configHotelId),
+      habitacionTipoId: Number(habitacionTipoId),
+      activo: true,
+    },
+  });
+  if (!fisica) throw new ErrorNoEncontrado("Habitacion fisica no encontrada");
+  if (["MANTENIMIENTO", "BLOQUEADA"].includes(fisica.estado)) {
+    throw new ErrorValidacion(`La habitacion ${fisica.nombre} no esta disponible (${fisica.estado.toLowerCase()})`);
+  }
+
+  const reservaSolapada = await db.reservaHotel.findFirst({
+    where: {
+      habitacionFisicaId: fisica.id,
+      estado: { in: ESTADOS_RESERVA_OCUPAN_HABITACION },
+      fechaEntrada: { lt: fechaSalida },
+      fechaSalida:  { gt: fechaEntrada },
+      ...(reservaId ? { NOT: { id: Number(reservaId) } } : {}),
+    },
+    select: { id: true, codigo: true },
+  });
+  if (reservaSolapada) {
+    throw new ErrorValidacion(`La habitacion ${fisica.nombre} ya tiene una reserva en ese rango`);
+  }
+  return fisica;
+}
+
+async function buscarHabitacionFisicaDisponible(db, reserva) {
+  const habitaciones = await db.habitacionFisica.findMany({
+    where: {
+      configHotelId: reserva.configHotelId,
+      habitacionTipoId: reserva.habitacionTipoId,
+      activo: true,
+      estado: { notIn: ["MANTENIMIENTO", "BLOQUEADA"] },
+    },
+    orderBy: [{ piso: "asc" }, { nombre: "asc" }],
+  });
+
+  for (const fisica of habitaciones) {
+    const solapada = await db.reservaHotel.findFirst({
+      where: {
+        habitacionFisicaId: fisica.id,
+        estado: { in: ESTADOS_RESERVA_OCUPAN_HABITACION },
+        fechaEntrada: { lt: reserva.fechaSalida },
+        fechaSalida:  { gt: reserva.fechaEntrada },
+        NOT: { id: reserva.id },
+      },
+      select: { id: true },
+    });
+    if (!solapada) return fisica;
+  }
+  return null;
+}
+
+async function validarCuponHotelInterno(db, codigo, configHotelId, noches, clienteId, totalOriginal, { bloquear = false } = {}) {
+  const ahora = new Date();
+  const codigoNormalizado = String(codigo || "").trim().toUpperCase();
+  let cupon = await db.cuponHotel.findFirst({
+    where: {
+      codigo: codigoNormalizado,
+      activo: true,
+      inicio: { lte: ahora },
+      fin:    { gte: ahora },
+      OR: [
+        { configHotelId: null },
+        { configHotelId },
+      ],
+    },
+  });
+
+  if (!cupon) throw new ErrorValidacion("Cupon no valido o expirado");
+  if (bloquear) {
+    await db.$queryRaw`SELECT id FROM "CuponHotel" WHERE id = ${cupon.id} FOR UPDATE`;
+    cupon = await db.cuponHotel.findUnique({ where: { id: cupon.id } });
+    if (!cupon || !cupon.activo || cupon.inicio > ahora || cupon.fin < ahora) {
+      throw new ErrorValidacion("Cupon no valido o expirado");
+    }
+  }
+
+  if (cupon.minimoNoches && noches < cupon.minimoNoches) {
+    throw new ErrorValidacion(`Este cupon requiere minimo ${cupon.minimoNoches} noche(s)`);
+  }
+
+  if (cupon.usosMaximos && cupon.usosActuales >= cupon.usosMaximos) {
+    throw new ErrorValidacion("El cupon ha alcanzado el limite de usos");
+  }
+
+  if (clienteId) {
+    const usoExistente = await db.cuponHotelUso.findFirst({
+      where: { cuponHotelId: cupon.id, clienteId },
+    });
+    if (usoExistente) throw new ErrorValidacion("Ya usaste este cupon");
+  }
+
+  let descuento;
+  if (cupon.tipo === "PORCENTAJE") {
+    descuento = Math.round(totalOriginal * Number(cupon.valor) / 100 * 100) / 100;
+  } else {
+    descuento = Math.min(Number(cupon.valor), totalOriginal);
+  }
+
+  const totalConDescuento = totalOriginal - descuento;
+  return { cupon, descuento, totalConDescuento };
+}
+
 const HotelService = {
   // ── PÚBLICO ──────────────────────────────────────────────────
 
@@ -86,191 +245,180 @@ const HotelService = {
 
   // Verifica disponibilidad de un tipo de habitación en un rango de fechas
   async verificarDisponibilidad(habitacionTipoId, fechaEntrada, fechaSalida) {
-    const tipo = await prisma.habitacionTipo.findUnique({
-      where: { id: habitacionTipoId },
-    });
-    if (!tipo || !tipo.activo) throw new ErrorNoEncontrado("Tipo de habitación no disponible");
-
-    // Contar reservas activas que se solapan con el rango pedido
-    const reservasSolapadas = await prisma.reservaHotel.count({
-      where: {
-        habitacionTipoId,
-        estado: { in: ["PENDIENTE", "CONFIRMADA", "CHECKIN"] },
-        fechaEntrada: { lt: fechaSalida },
-        fechaSalida:  { gt: fechaEntrada },
-      },
-    });
-
-    // Verificar bloqueos manuales
-    const cfg = await prisma.configHotel.findUnique({ where: { id: tipo.configHotelId } });
-    let bloqueado = false;
-    if (cfg) {
-      const rawBloqueos = await ConfigRepository.obtener(`HOTEL_BLOQUEOS_${cfg.id}`);
-      const bloqueos = rawBloqueos ? JSON.parse(rawBloqueos) : [];
-      bloqueado = bloqueos.some(b =>
-        (b.habitacionId === null || b.habitacionId === habitacionTipoId) &&
-        b.fechaInicio < fechaSalida.toISOString().slice(0, 10) &&
-        b.fechaFin > fechaEntrada.toISOString().slice(0, 10)
-      );
-    }
-
-    const disponibles = bloqueado ? 0 : tipo.cantidad - reservasSolapadas;
-    return { disponibles, total: tipo.cantidad, tipo };
+    return verificarDisponibilidadInterna(prisma, habitacionTipoId, fechaEntrada, fechaSalida);
   },
 
   // ── CLIENTE ──────────────────────────────────────────────────
 
   async crearReserva(clienteId, datos) {
-    const { habitacionTipoId, fechaEntrada, fechaSalida, huespedes, metodoPago, notasCliente, nombreHuesped, telefonoHuesped, codigoCupon } = datos;
+    {
+      const { habitacionTipoId, fechaEntrada, fechaSalida, huespedes, metodoPago, notasCliente, nombreHuesped, telefonoHuesped, codigoCupon } = datos;
 
-    const entrada = new Date(fechaEntrada);
-    const salida  = new Date(fechaSalida);
-    if (isNaN(entrada) || isNaN(salida)) throw new ErrorValidacion("Fechas inválidas");
-    if (entrada < new Date(new Date().toDateString())) throw new ErrorValidacion("La fecha de entrada no puede ser en el pasado");
-    if (salida <= entrada) throw new ErrorValidacion("La fecha de salida debe ser posterior a la de entrada");
-    const noches = Math.ceil((salida - entrada) / (1000 * 60 * 60 * 24));
-
-    const { disponibles, tipo } = await this.verificarDisponibilidad(habitacionTipoId, entrada, salida);
-    if (disponibles <= 0) throw new ErrorValidacion("No hay disponibilidad para esas fechas");
-
-    // Precio por temporada (la más específica por habitación tiene prioridad sobre la del hotel)
-    const temporadaHab = await prisma.temporadaHotel.findFirst({
-      where: {
-        activo: true,
-        habitacionTipoId: habitacionTipoId,
-        inicio: { lte: salida },
-        fin:   { gte: entrada },
-      },
-    });
-    const temporadaHotel = !temporadaHab ? await prisma.temporadaHotel.findFirst({
-      where: {
-        activo: true,
-        habitacionTipoId: null,
-        configHotelId: tipo.configHotelId,
-        inicio: { lte: salida },
-        fin:   { gte: entrada },
-      },
-    }) : null;
-    const temporada = temporadaHab || temporadaHotel;
-    const precioPorNoche = temporada ? Number(temporada.precioPorNoche) : Number(tipo.precioPorNoche);
-
-    const totalOriginal = precioPorNoche * noches;
-
-    // Validar cupón si viene
-    let montoDescuento = 0;
-    let cuponValidado = null;
-    if (codigoCupon) {
-      try {
-        const resultado = await this.validarCuponHotel(codigoCupon, tipo.configHotelId, noches, clienteId, totalOriginal);
-        montoDescuento = resultado.descuento;
-        cuponValidado  = resultado.cupon;
-      } catch (e) {
-        throw e; // re-lanzar para que el controller lo maneje
+      const entrada = new Date(fechaEntrada);
+      const salida  = new Date(fechaSalida);
+      if (Number.isNaN(entrada.getTime()) || Number.isNaN(salida.getTime())) {
+        throw new ErrorValidacion("Fechas invalidas");
       }
-    }
+      if (entrada < new Date(new Date().toDateString())) {
+        throw new ErrorValidacion("La fecha de entrada no puede ser en el pasado");
+      }
+      if (salida <= entrada) {
+        throw new ErrorValidacion("La fecha de salida debe ser posterior a la de entrada");
+      }
 
-    const totalFinal = totalOriginal - montoDescuento;
-    const tasaComision = 0.1;
-    const comision = Math.round(totalFinal * tasaComision * 100) / 100;
+      const noches = Math.ceil((salida - entrada) / (1000 * 60 * 60 * 24));
+      const metodoPagoFinal = metodoPago || "EFECTIVO";
+      const pagoOnline = String(metodoPagoFinal).startsWith("WOMPI");
 
-    const hotel = await prisma.configHotel.findUnique({ where: { id: tipo.configHotelId } });
-    const estadoInicial = hotel?.confirmacionAuto ? "CONFIRMADA" : "PENDIENTE";
+      const resultado = await prisma.$transaction(async (tx) => {
+        const { disponibles, tipo } = await verificarDisponibilidadInterna(tx, habitacionTipoId, entrada, salida, { bloquearTipo: true });
+        if (disponibles <= 0) throw new ErrorValidacion("No hay disponibilidad para esas fechas");
+        if (!tipo.configHotel?.activo) throw new ErrorValidacion("Este hotel no esta activo para recibir reservas");
 
-    const reserva = await prisma.reservaHotel.create({
-      data: {
-        codigo: generarCodigo(),
-        configHotelId: tipo.configHotelId,
-        habitacionTipoId,
-        clienteId,
-        fechaEntrada: entrada,
-        fechaSalida:  salida,
-        huespedes:    Number(huespedes) || 1,
-        total:        totalFinal,
-        estado:       estadoInicial,
-        metodoPago:   metodoPago || "EFECTIVO",
-        notasCliente: notasCliente || null,
-        nombreHuesped,
-        telefonoHuesped,
-        montoDescuento: montoDescuento || null,
-        codigoCupon:    codigoCupon || null,
-        comision,
-        tasaComision,
-      },
-      include: {
-        habitacionTipo: true,
-        configHotel: { include: { comercio: { include: { usuario: { select: { email: true, nombre: true } } } } } },
-      },
-    });
+        if (metodoPagoFinal === "EFECTIVO" && tipo.configHotel.permitePagarAlLlegar === false) {
+          throw new ErrorValidacion("Este hotel no acepta pago al llegar");
+        }
+        if (pagoOnline && tipo.configHotel.permiteDeposito30 === false) {
+          throw new ErrorValidacion("Este hotel no acepta deposito online por ahora");
+        }
 
-    // Registrar uso del cupón (no bloquea la reserva si falla)
-    if (cuponValidado) {
-      try {
-        await prisma.cuponHotelUso.create({
-          data: {
-            cuponHotelId:   cuponValidado.id,
-            clienteId,
-            reservaHotelId: reserva.id,
+        const temporadaHab = await tx.temporadaHotel.findFirst({
+          where: {
+            activo: true,
+            habitacionTipoId: Number(habitacionTipoId),
+            inicio: { lte: salida },
+            fin:   { gte: entrada },
           },
         });
-        await prisma.cuponHotel.update({
-          where: { id: cuponValidado.id },
-          data:  { usosActuales: { increment: 1 } },
-        });
-      } catch (e) {
-        console.error("[CUPON-HOTEL-USO]", e.message);
-      }
-    }
+        const temporadaHotel = !temporadaHab ? await tx.temporadaHotel.findFirst({
+          where: {
+            activo: true,
+            habitacionTipoId: null,
+            configHotelId: tipo.configHotelId,
+            inicio: { lte: salida },
+            fin:   { gte: entrada },
+          },
+        }) : null;
+        const temporada = temporadaHab || temporadaHotel;
+        const precioPorNoche = temporada ? Number(temporada.precioPorNoche) : Number(tipo.precioPorNoche);
+        const totalOriginal = precioPorNoche * noches;
 
-    // Notificar al hotelero
-    const hoteleroId = reserva.configHotel.comercio.usuarioId;
-    await notifHotel(
-      hoteleroId,
-      estadoInicial === "CONFIRMADA" ? "✅ Nueva reserva confirmada" : "🏨 Nueva solicitud de reserva",
-      `${nombreHuesped} · ${tipo.nombre} · ${noches} noche(s)`,
-      "/comerciante/hoteles"
-    );
+        let montoDescuento = 0;
+        let cuponValidado = null;
+        if (codigoCupon) {
+          const cuponResultado = await validarCuponHotelInterno(
+            tx,
+            codigoCupon,
+            tipo.configHotelId,
+            noches,
+            clienteId,
+            totalOriginal,
+            { bloquear: true }
+          );
+          montoDescuento = cuponResultado.descuento;
+          cuponValidado = cuponResultado.cupon;
+        }
 
-    // Email al hotelero (fire and forget)
-    const emailHotelero = reserva.configHotel.comercio.usuario?.email;
-    if (emailHotelero) {
-      setImmediate(() => {
-        enviarEmail({
-          to: emailHotelero,
-          subject: `Nueva reserva — ${nombreHuesped} · ${tipo.nombre} — AfroMercado`,
-          html: emailHotel.reservaNueva({
-            nombreHotelero: reserva.configHotel.comercio.usuario.nombre || "Hotelero",
-            nombreHuesped,
-            habitacion: tipo.nombre,
+        const totalFinal = totalOriginal - montoDescuento;
+        const tasaComision = 0.1;
+        const comision = Math.round(totalFinal * tasaComision * 100) / 100;
+        const estadoInicial = pagoOnline ? "PENDIENTE" : (tipo.configHotel.confirmacionAuto ? "CONFIRMADA" : "PENDIENTE");
+
+        const reserva = await tx.reservaHotel.create({
+          data: {
+            codigo: generarCodigo(),
+            configHotelId: tipo.configHotelId,
+            habitacionTipoId: Number(habitacionTipoId),
+            clienteId,
             fechaEntrada: entrada,
             fechaSalida:  salida,
-            noches,
-            total: totalFinal,
-          }),
-        }).catch((err) => console.error("[EMAIL-HOTEL]", err.message));
+            huespedes:    Number(huespedes) || 1,
+            total:        totalFinal,
+            estado:       estadoInicial,
+            metodoPago:   metodoPagoFinal,
+            notasCliente: notasCliente || null,
+            nombreHuesped,
+            telefonoHuesped,
+            montoDescuento: montoDescuento || null,
+            codigoCupon:    codigoCupon || null,
+            comision,
+            tasaComision,
+          },
+          include: {
+            habitacionTipo: true,
+            configHotel: { include: { comercio: { include: { usuario: { select: { email: true, nombre: true } } } } } },
+          },
+        });
+
+        if (cuponValidado) {
+          await tx.cuponHotelUso.create({
+            data: {
+              cuponHotelId:   cuponValidado.id,
+              clienteId,
+              reservaHotelId: reserva.id,
+            },
+          });
+          await tx.cuponHotel.update({
+            where: { id: cuponValidado.id },
+            data:  { usosActuales: { increment: 1 } },
+          });
+        }
+
+        return { reserva, tipo, totalFinal, estadoInicial };
       });
+
+      const { reserva, tipo, totalFinal, estadoInicial } = resultado;
+
+      // Notificar al hotelero
+      const hoteleroId = reserva.configHotel.comercio.usuarioId;
+      await notifHotel(
+        hoteleroId,
+        estadoInicial === "CONFIRMADA" ? "Nueva reserva confirmada" : "Nueva solicitud de reserva",
+        `${nombreHuesped} - ${tipo.nombre} - ${noches} noche(s)`,
+        "/comerciante/hoteles"
+      );
+
+      // Email al hotelero (fire and forget)
+      const emailHotelero = reserva.configHotel.comercio.usuario?.email;
+      if (emailHotelero) {
+        setImmediate(() => {
+          enviarEmail({
+            to: emailHotelero,
+            subject: `Nueva reserva - ${nombreHuesped} - ${tipo.nombre} - AfroMercado`,
+            html: emailHotel.reservaNueva({
+              nombreHotelero: reserva.configHotel.comercio.usuario.nombre || "Hotelero",
+              nombreHuesped,
+              habitacion: tipo.nombre,
+              fechaEntrada: entrada,
+              fechaSalida:  salida,
+              noches,
+              total: totalFinal,
+            }),
+          }).catch((err) => console.error("[EMAIL-HOTEL]", err.message));
+        });
+      }
+
+      setImmediate(() => {
+        notificarReservaHotel({
+          hotelWhatsapp: reserva.configHotel.comercio.whatsapp,
+          reserva,
+          habitacion: tipo,
+          comercioNombre: reserva.configHotel.comercio.nombre,
+        }).catch(() => {});
+      });
+
+      setImmediate(() => {
+        notificarClienteReserva({
+          telefonoCliente: telefonoHuesped,
+          reserva,
+          habitacion: tipo,
+          comercioNombre: reserva.configHotel.comercio.nombre,
+        }).catch(() => {});
+      });
+
+      return reserva;
     }
 
-    // WhatsApp al hotelero (fire and forget — nunca bloquea la reserva)
-    setImmediate(() => {
-      notificarReservaHotel({
-        hotelWhatsapp: reserva.configHotel.comercio.whatsapp,
-        reserva,
-        habitacion: tipo,
-        comercioNombre: reserva.configHotel.comercio.nombre,
-      }).catch(() => {}); // ya está manejado internamente, double-safety
-    });
-
-    // WhatsApp al cliente con su código (fire and forget)
-    setImmediate(() => {
-      notificarClienteReserva({
-        telefonoCliente: telefonoHuesped,
-        reserva,
-        habitacion: tipo,
-        comercioNombre: reserva.configHotel.comercio.nombre,
-      }).catch(() => {});
-    });
-
-    return reserva;
   },
 
   async misReservas(clienteId) {
@@ -371,12 +519,22 @@ const HotelService = {
   async obtenerOCrearConfig(comercioId) {
     let cfg = await prisma.configHotel.findUnique({
       where: { comercioId },
-      include: { habitaciones: { orderBy: { creadoAt: "asc" } } },
+      include: {
+        habitaciones: {
+          orderBy: { creadoAt: "asc" },
+          include: { unidadesFisicas: { where: { activo: true }, orderBy: [{ piso: "asc" }, { nombre: "asc" }] } },
+        },
+        habitacionesFisicas: {
+          where: { activo: true },
+          include: { habitacionTipo: { select: { id: true, nombre: true } } },
+          orderBy: [{ piso: "asc" }, { nombre: "asc" }],
+        },
+      },
     });
     if (!cfg) {
       cfg = await prisma.configHotel.create({
         data: { comercioId },
-        include: { habitaciones: true },
+        include: { habitaciones: true, habitacionesFisicas: true },
       });
     }
     return cfg;
@@ -419,7 +577,16 @@ const HotelService = {
         pctPenalidadCancelacion: pctPenalidadCancelacion ?? 0,
         rnt:                     rnt                     ?? null,
       },
-      include: { habitaciones: true },
+      include: {
+        habitaciones: {
+          include: { unidadesFisicas: { where: { activo: true }, orderBy: [{ piso: "asc" }, { nombre: "asc" }] } },
+        },
+        habitacionesFisicas: {
+          where: { activo: true },
+          include: { habitacionTipo: { select: { id: true, nombre: true } } },
+          orderBy: [{ piso: "asc" }, { nombre: "asc" }],
+        },
+      },
     });
   },
 
@@ -464,6 +631,147 @@ const HotelService = {
     return prisma.habitacionTipo.update({ where: { id: habitacionId }, data: { activo: false } });
   },
 
+  async habitacionesFisicas(comercioId) {
+    const cfg = await prisma.configHotel.findUnique({ where: { comercioId } });
+    if (!cfg) return [];
+    return prisma.habitacionFisica.findMany({
+      where: { configHotelId: cfg.id, activo: true },
+      include: { habitacionTipo: { select: { id: true, nombre: true, capacidad: true } } },
+      orderBy: [{ piso: "asc" }, { zona: "asc" }, { nombre: "asc" }],
+    });
+  },
+
+  async crearHabitacionFisica(comercioId, datos) {
+    const { habitacionTipoId, nombre, piso, zona, estado, notas } = datos;
+    if (!habitacionTipoId || !nombre) {
+      throw new ErrorValidacion("Tipo de habitacion y nombre/numero son obligatorios");
+    }
+    const tipo = await prisma.habitacionTipo.findFirst({
+      where: { id: Number(habitacionTipoId), configHotel: { comercioId }, activo: true },
+      include: { configHotel: true },
+    });
+    if (!tipo) throw new ErrorNoEncontrado("Tipo de habitacion no encontrado");
+
+    try {
+      return await prisma.habitacionFisica.create({
+        data: {
+          configHotelId: tipo.configHotelId,
+          habitacionTipoId: tipo.id,
+          nombre: String(nombre).trim(),
+          piso: piso ? String(piso).trim() : null,
+          zona: zona ? String(zona).trim() : null,
+          estado: normalizarEstadoHabitacionFisica(estado || "LIBRE"),
+          notas: notas || null,
+        },
+        include: { habitacionTipo: { select: { id: true, nombre: true, capacidad: true } } },
+      });
+    } catch (e) {
+      if (e.code === "P2002") throw new ErrorValidacion("Ya existe una habitacion fisica con ese nombre para este tipo");
+      throw e;
+    }
+  },
+
+  async actualizarHabitacionFisica(comercioId, habitacionFisicaId, datos) {
+    const actual = await prisma.habitacionFisica.findFirst({
+      where: { id: Number(habitacionFisicaId), configHotel: { comercioId } },
+    });
+    if (!actual) throw new ErrorNoEncontrado("Habitacion fisica no encontrada");
+
+    let habitacionTipoId = actual.habitacionTipoId;
+    if (datos.habitacionTipoId && Number(datos.habitacionTipoId) !== actual.habitacionTipoId) {
+      const tipo = await prisma.habitacionTipo.findFirst({
+        where: { id: Number(datos.habitacionTipoId), configHotel: { comercioId }, activo: true },
+      });
+      if (!tipo) throw new ErrorNoEncontrado("Tipo de habitacion no encontrado");
+      habitacionTipoId = tipo.id;
+    }
+
+    try {
+      return await prisma.habitacionFisica.update({
+        where: { id: actual.id },
+        data: {
+          habitacionTipoId,
+          nombre: datos.nombre !== undefined ? String(datos.nombre).trim() : undefined,
+          piso: datos.piso !== undefined ? (datos.piso ? String(datos.piso).trim() : null) : undefined,
+          zona: datos.zona !== undefined ? (datos.zona ? String(datos.zona).trim() : null) : undefined,
+          estado: datos.estado !== undefined ? normalizarEstadoHabitacionFisica(datos.estado) : undefined,
+          notas: datos.notas !== undefined ? (datos.notas || null) : undefined,
+          activo: datos.activo !== undefined ? !!datos.activo : undefined,
+          updatedAt: new Date(),
+        },
+        include: { habitacionTipo: { select: { id: true, nombre: true, capacidad: true } } },
+      });
+    } catch (e) {
+      if (e.code === "P2002") throw new ErrorValidacion("Ya existe una habitacion fisica con ese nombre para este tipo");
+      throw e;
+    }
+  },
+
+  async cambiarEstadoHabitacionFisica(comercioId, habitacionFisicaId, estado) {
+    return this.actualizarHabitacionFisica(comercioId, habitacionFisicaId, { estado });
+  },
+
+  async eliminarHabitacionFisica(comercioId, habitacionFisicaId) {
+    return this.actualizarHabitacionFisica(comercioId, habitacionFisicaId, { activo: false });
+  },
+
+  async asignarHabitacionFisicaReserva(comercioId, reservaId, habitacionFisicaId) {
+    const cfg = await prisma.configHotel.findUnique({ where: { comercioId } });
+    if (!cfg) throw new ErrorNoEncontrado("Hotel no encontrado");
+
+    return prisma.$transaction(async (tx) => {
+      const reserva = await tx.reservaHotel.findFirst({
+        where: { id: Number(reservaId), configHotelId: cfg.id },
+      });
+      if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
+      if (["CANCELADA", "RECHAZADA", "CHECKOUT"].includes(reserva.estado)) {
+        throw new ErrorValidacion("No se puede asignar habitacion a una reserva cerrada");
+      }
+      const fisica = await validarHabitacionFisicaDisponible(tx, {
+        configHotelId: reserva.configHotelId,
+        habitacionTipoId: reserva.habitacionTipoId,
+        habitacionFisicaId,
+        fechaEntrada: reserva.fechaEntrada,
+        fechaSalida: reserva.fechaSalida,
+        reservaId: reserva.id,
+      });
+      const actualizada = await tx.reservaHotel.update({
+        where: { id: reserva.id },
+        data: { habitacionFisicaId: fisica.id, updatedAt: new Date() },
+        include: {
+          habitacionTipo: { select: { nombre: true } },
+          habitacionFisica: { select: { id: true, nombre: true, piso: true, zona: true, estado: true } },
+          cliente: { select: { nombre: true, email: true, telefono: true } },
+        },
+      });
+      if (reserva.estado === "CHECKIN") {
+        await tx.habitacionFisica.update({ where: { id: fisica.id }, data: { estado: "OCUPADA" } });
+        if (reserva.habitacionFisicaId && reserva.habitacionFisicaId !== fisica.id) {
+          await tx.habitacionFisica.update({
+            where: { id: reserva.habitacionFisicaId },
+            data: { estado: "LIMPIEZA", updatedAt: new Date() },
+          });
+        }
+      } else if (reserva.habitacionFisicaId && reserva.habitacionFisicaId !== fisica.id) {
+        const activaAnterior = await tx.reservaHotel.findFirst({
+          where: {
+            habitacionFisicaId: reserva.habitacionFisicaId,
+            estado: { in: ["CONFIRMADA", "CHECKIN"] },
+            NOT: { id: reserva.id },
+          },
+          select: { id: true },
+        });
+        if (!activaAnterior) {
+          await tx.habitacionFisica.update({
+            where: { id: reserva.habitacionFisicaId },
+            data: { estado: "LIBRE", updatedAt: new Date() },
+          });
+        }
+      }
+      return actualizada;
+    });
+  },
+
   async reservasHotelero(comercioId, { estado, page = 1 } = {}) {
     const cfg = await prisma.configHotel.findUnique({ where: { comercioId } });
     if (!cfg) return [];
@@ -473,6 +781,7 @@ const HotelService = {
       where,
       include: {
         habitacionTipo: { select: { nombre: true } },
+        habitacionFisica: { select: { id: true, nombre: true, piso: true, zona: true, estado: true } },
         cliente: { select: { nombre: true, email: true, telefono: true } },
       },
       orderBy: { creadoAt: "desc" },
@@ -481,7 +790,7 @@ const HotelService = {
     });
   },
 
-  async cambiarEstadoReserva(comercioId, reservaId, nuevoEstado) {
+  async cambiarEstadoReserva(comercioId, reservaId, nuevoEstado, opciones = {}) {
     const TRANSICIONES = {
       PENDIENTE:  ["CONFIRMADA", "RECHAZADA"],
       CONFIRMADA: ["CHECKIN", "CANCELADA"],
@@ -492,7 +801,11 @@ const HotelService = {
 
     const reserva = await prisma.reservaHotel.findFirst({
       where: { id: reservaId, configHotelId: cfg.id },
-      include: { cliente: { select: { id: true, nombre: true } }, habitacionTipo: { select: { nombre: true } } },
+      include: {
+        cliente: { select: { id: true, nombre: true } },
+        habitacionTipo: { select: { nombre: true } },
+        habitacionFisica: { select: { id: true, nombre: true, estado: true } },
+      },
     });
     if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
 
@@ -501,9 +814,71 @@ const HotelService = {
       throw new ErrorValidacion(`No se puede pasar de ${reserva.estado} a ${nuevoEstado}`);
     }
 
-    const actualizada = await prisma.reservaHotel.update({
-      where: { id: reservaId },
-      data:  { estado: nuevoEstado, updatedAt: new Date() },
+    const actualizada = await prisma.$transaction(async (tx) => {
+      let habitacionFisicaId = reserva.habitacionFisicaId || null;
+
+      if (nuevoEstado === "CHECKIN") {
+        if (opciones.habitacionFisicaId) {
+          const fisica = await validarHabitacionFisicaDisponible(tx, {
+            configHotelId: reserva.configHotelId,
+            habitacionTipoId: reserva.habitacionTipoId,
+            habitacionFisicaId: opciones.habitacionFisicaId,
+            fechaEntrada: reserva.fechaEntrada,
+            fechaSalida: reserva.fechaSalida,
+            reservaId: reserva.id,
+          });
+          habitacionFisicaId = fisica.id;
+        } else if (!habitacionFisicaId) {
+          const fisica = await buscarHabitacionFisicaDisponible(tx, reserva);
+          if (fisica) habitacionFisicaId = fisica.id;
+        }
+
+        if (habitacionFisicaId) {
+          await tx.habitacionFisica.update({
+            where: { id: habitacionFisicaId },
+            data: { estado: "OCUPADA", updatedAt: new Date() },
+          });
+        }
+      }
+
+      const data = { estado: nuevoEstado, updatedAt: new Date() };
+      if (habitacionFisicaId) data.habitacionFisicaId = habitacionFisicaId;
+
+      const updated = await tx.reservaHotel.update({
+        where: { id: reservaId },
+        data,
+        include: {
+          habitacionTipo: { select: { nombre: true } },
+          habitacionFisica: { select: { id: true, nombre: true, piso: true, zona: true, estado: true } },
+          cliente: { select: { nombre: true, email: true, telefono: true } },
+        },
+      });
+
+      if (nuevoEstado === "CHECKOUT" && reserva.habitacionFisicaId) {
+        await tx.habitacionFisica.update({
+          where: { id: reserva.habitacionFisicaId },
+          data: { estado: "LIMPIEZA", updatedAt: new Date() },
+        });
+      }
+
+      if (["CANCELADA", "RECHAZADA"].includes(nuevoEstado) && reserva.habitacionFisicaId) {
+        const activa = await tx.reservaHotel.findFirst({
+          where: {
+            habitacionFisicaId: reserva.habitacionFisicaId,
+            estado: { in: ["CONFIRMADA", "CHECKIN"] },
+            NOT: { id: reserva.id },
+          },
+          select: { id: true },
+        });
+        if (!activa) {
+          await tx.habitacionFisica.update({
+            where: { id: reserva.habitacionFisicaId },
+            data: { estado: "LIBRE", updatedAt: new Date() },
+          });
+        }
+      }
+
+      return updated;
     });
 
     // Notificar al cliente
@@ -563,6 +938,11 @@ const HotelService = {
       where: { comercioId },
       include: {
         habitaciones: { where: { activo: true } },
+        habitacionesFisicas: {
+          where: { activo: true },
+          include: { habitacionTipo: { select: { id: true, nombre: true, capacidad: true } } },
+          orderBy: [{ piso: "asc" }, { zona: "asc" }, { nombre: "asc" }],
+        },
       },
     });
     if (!cfg) throw new ErrorNoEncontrado("Hotel no encontrado");
@@ -572,11 +952,15 @@ const HotelService = {
         configHotelId: cfg.id,
         estado: { in: ["PENDIENTE", "CONFIRMADA", "CHECKIN"] },
       },
-      include: { habitacionTipo: { select: { nombre: true } }, cliente: { select: { nombre: true } } },
+      include: {
+        habitacionTipo: { select: { nombre: true } },
+        habitacionFisica: { select: { id: true, nombre: true, piso: true, zona: true, estado: true } },
+        cliente: { select: { nombre: true } },
+      },
       orderBy: { fechaEntrada: "asc" },
     });
 
-    return { habitaciones: cfg.habitaciones, reservas: reservasActivas };
+    return { habitaciones: cfg.habitaciones, habitacionesFisicas: cfg.habitacionesFisicas, reservas: reservasActivas };
   },
 
   // ── BLOQUEOS MANUALES ─────────────────────────────────────────
@@ -672,6 +1056,12 @@ const HotelService = {
     if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
     if (["CANCELADA", "RECHAZADA"].includes(reserva.estado)) {
       throw new ErrorValidacion("No se puede pagar esta reserva");
+    }
+    if (!String(reserva.metodoPago || "").startsWith("WOMPI")) {
+      throw new ErrorValidacion("Esta reserva no requiere pago online");
+    }
+    if (reserva.configHotel.permiteDeposito30 === false) {
+      throw new ErrorValidacion("Este hotel no acepta deposito online por ahora");
     }
 
     // Porcentaje de depósito configurable (default 30%)
@@ -776,46 +1166,7 @@ const HotelService = {
   // ── CUPONES DE HOTEL ──────────────────────────────────────────
 
   async validarCuponHotel(codigo, configHotelId, noches, clienteId, totalOriginal) {
-    const ahora = new Date();
-    const cupon = await prisma.cuponHotel.findFirst({
-      where: {
-        codigo: codigo.trim().toUpperCase(),
-        activo: true,
-        inicio: { lte: ahora },
-        fin:    { gte: ahora },
-        OR: [
-          { configHotelId: null },
-          { configHotelId },
-        ],
-      },
-    });
-
-    if (!cupon) throw new ErrorValidacion("Cupón no válido o expirado");
-
-    if (cupon.minimoNoches && noches < cupon.minimoNoches) {
-      throw new ErrorValidacion(`Este cupón requiere mínimo ${cupon.minimoNoches} noche(s)`);
-    }
-
-    if (cupon.usosMaximos && cupon.usosActuales >= cupon.usosMaximos) {
-      throw new ErrorValidacion("El cupón ha alcanzado el límite de usos");
-    }
-
-    if (clienteId) {
-      const usoExistente = await prisma.cuponHotelUso.findFirst({
-        where: { cuponHotelId: cupon.id, clienteId },
-      });
-      if (usoExistente) throw new ErrorValidacion("Ya usaste este cupón");
-    }
-
-    let descuento;
-    if (cupon.tipo === "PORCENTAJE") {
-      descuento = Math.round(totalOriginal * Number(cupon.valor) / 100 * 100) / 100;
-    } else {
-      descuento = Math.min(Number(cupon.valor), totalOriginal);
-    }
-
-    const totalConDescuento = totalOriginal - descuento;
-    return { cupon, descuento, totalConDescuento };
+    return validarCuponHotelInterno(prisma, codigo, configHotelId, noches, clienteId, totalOriginal);
   },
 
   async crearCuponHotel(comercioId, datos) {

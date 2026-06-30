@@ -28,6 +28,21 @@ const soloAdmin    = [autenticar, autorizar("ADMIN")];
 // ── PÚBLICO ──────────────────────────────────────────────────
 router.get("/",               TourController.listar);
 router.get("/disponibilidad", TourController.disponibilidad);
+
+// Cupones (validar es público)
+router.post(   "/cupones/validar",      TourController.validarCupon);
+router.get(    "/mi-tour/cupones",      ...soloComercio, TourController.listarCupones);
+router.post(   "/mi-tour/cupones",      ...soloComercio, TourController.crearCupon);
+router.delete( "/mi-tour/cupones/:id",  ...soloComercio, TourController.eliminarCupon);
+
+// Favoritos
+router.get(  "/favoritos/mis",          ...soloAuth, TourController.misFavoritos);
+router.post( "/favoritos/:id/toggle",   ...soloAuth, TourController.toggleFavorito);
+router.get(  "/favoritos/:id",          ...soloAuth, TourController.esFavorito);
+
+// Estadísticas
+router.get(  "/mi-tour/estadisticas",   ...soloComercio, TourController.estadisticas);
+
 router.get("/:id",            TourController.obtener);
 
 // ── CLIENTE ──────────────────────────────────────────────────

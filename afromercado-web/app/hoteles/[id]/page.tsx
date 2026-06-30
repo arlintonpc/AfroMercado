@@ -42,6 +42,60 @@ function waUrl(numero: string): string {
   return `https://wa.me/${normalizado}`
 }
 
+function resumenPagosHotel(hotel: ConfigHotel): string {
+  const metodos: string[] = []
+  if (hotel.permitePagarAlLlegar !== false) metodos.push('pagar al llegar')
+  if (hotel.permiteDeposito30 !== false) metodos.push('deposito online')
+  if (metodos.length === 0) return 'metodos de pago en revision'
+  return metodos.join(' y ')
+}
+
+function resumenCancelacionHotel(hotel: ConfigHotel): string {
+  const horas = hotel.horasLibresCancelacion ?? 48
+  const penalidad = hotel.pctPenalidadCancelacion ?? 0
+  if (penalidad > 0) return `Cancelacion libre ${horas} h antes; luego penalidad del ${penalidad}%.`
+  return `Cancelacion libre hasta ${horas} h antes de la llegada.`
+}
+
+function PanelConfianzaHotel({ hotel }: { hotel: ConfigHotel }) {
+  const senales = [
+    {
+      titulo: hotel.rntVerificado ? 'RNT verificado' : hotel.rnt ? 'RNT en revision' : 'RNT no visible',
+      detalle: hotel.rntVerificado && hotel.rnt
+        ? `Registro ${hotel.rnt}`
+        : hotel.rnt
+          ? 'AfroMercado revisa el registro del alojamiento.'
+          : 'Pide soporte si necesitas validar el registro turistico.',
+    },
+    {
+      titulo: 'Pagos claros',
+      detalle: resumenPagosHotel(hotel),
+    },
+    {
+      titulo: 'Reglas de reserva',
+      detalle: resumenCancelacionHotel(hotel),
+    },
+  ]
+
+  return (
+    <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+      {senales.map((item, idx) => (
+        <div key={item.titulo} className="rounded-2xl border border-[#E6D8BE] bg-[#FFFBF3] px-4 py-3">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1B4332] text-xs font-black text-white">
+              {idx + 1}
+            </span>
+            <div>
+              <p className="text-sm font-black text-gray-900">{item.titulo}</p>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600">{item.detalle}</p>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /* ── Lightbox ──────────────────────────────────────────── */
 function Lightbox({ fotos, inicial, onClose }: { fotos: string[]; inicial: number; onClose: () => void }) {
   const [idx, setIdx] = useState(inicial)
@@ -390,7 +444,7 @@ function WidgetReserva({ hotel, habitaciones, habIdx, fechaEntrada, fechaSalida,
 }
 
 /* ── Form reserva modal ─────────────────────────────────── */
-type ModoPago = 'efectivo' | 'deposito' | 'total'
+type ModoPago = 'efectivo' | 'deposito'
 
 function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicial, onClose, onSuccess }: {
   hotel: ConfigHotel; habitacion: HabitacionTipo
@@ -404,7 +458,7 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
   const [notas,        setNotas]        = useState('')
   const [nombre,       setNombre]       = useState(usuario?.nombre ?? '')
   const [telefono,     setTelefono]     = useState(usuario?.telefono?.replace(/\D/g, '').replace(/^57/, '') ?? '')
-  const [modoPago,     setModoPago]     = useState<ModoPago>('efectivo')
+  const [modoPago,     setModoPago]     = useState<ModoPago>(hotel.permitePagarAlLlegar !== false ? 'efectivo' : 'deposito')
   const [disponibilidad, setDisponibilidad] = useState<{ disponibles: number } | null>(null)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
@@ -442,6 +496,7 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
   }, [fechaEntrada, fechaSalida, habitacion.id])
 
   async function reservar() {
+    if (opcionesPago.length === 0) { setError('Este hotel aun no tiene metodos de pago activos'); return }
     if (!nombre.trim() || !telefono.trim()) { setError('Completa nombre y teléfono'); return }
     if (fechaSalida <= fechaEntrada) { setError('La fecha de salida debe ser posterior'); return }
     setError(''); setCargando(true)
@@ -468,12 +523,10 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
   const opcionesPago: { id: ModoPago; icon: string; titulo: string; desc: string }[] = [
     ...(hotel.permitePagarAlLlegar !== false ? [{ id: 'efectivo' as ModoPago, icon: '💵', titulo: 'Pagar al llegar', desc: 'Sin cargo ahora. Efectivo, Nequi o transferencia al check-in.' }] : []),
     ...(hotel.permiteDeposito30    !== false ? [{ id: 'deposito' as ModoPago, icon: '💳', titulo: `Depósito 30% — ${formatearPrecio(Math.round(total * 0.30))}`, desc: 'Confirma inmediatamente. El resto lo pagas al llegar.' }] : []),
-    ...(hotel.permiteTotal         !== false ? [{ id: 'total'    as ModoPago, icon: '🔒', titulo: `Pagar total — ${formatearPrecio(total)}`, desc: 'Pago completo ahora. Reserva garantizada al 100%.' }] : []),
   ]
 
   const textoBoton = cargando ? 'Procesando…'
     : modoPago === 'deposito' ? `Pagar depósito ${formatearPrecio(Math.round(total * 0.30))} →`
-    : modoPago === 'total'    ? `Pagar total ${formatearPrecio(total)} →`
     : hotel.confirmacionAuto  ? 'Confirmar reserva' : 'Solicitar reserva'
 
   return (
@@ -554,6 +607,11 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
                 </div>
               </button>
             ))}
+            {opcionesPago.length === 0 && (
+              <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
+                Este hotel aun debe activar un metodo de pago para recibir reservas.
+              </div>
+            )}
           </div>
 
           {/* Política de cancelación */}
@@ -825,6 +883,7 @@ export default function HotelDetallePage() {
               {hotel.comercio.descripcion && (
                 <p className="text-gray-600 leading-relaxed mt-4 text-base max-w-2xl">{hotel.comercio.descripcion}</p>
               )}
+              <PanelConfianzaHotel hotel={hotel} />
             </div>
 
             {/* HORARIOS */}

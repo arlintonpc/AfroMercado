@@ -6,11 +6,15 @@ import {
   obtenerMiHotel, actualizarMiHotel, agregarHabitacion, actualizarHabitacion, eliminarHabitacion,
   reservasHotelero, cambiarEstadoReserva, ocupacionHotel, subirFotosHabitacion, subirVideoHabitacion,
   quitarVideoHabitacion,
+  listarHabitacionesFisicas, crearHabitacionFisica,
+  cambiarEstadoHabitacionFisica, eliminarHabitacionFisica, asignarHabitacionFisicaReserva,
   listarBloqueos, crearBloqueo, eliminarBloqueo,
   listarCuponesHotel, crearCuponHotel, eliminarCuponHotel,
   listarTemporadasHotel, crearTemporadaHotel, eliminarTemporadaHotel,
   obtenerEstadisticasHotel,
-  type ConfigHotel, type HabitacionTipo, type ReservaHotel, type EstadoReservaHotel, type BloqueoFecha, type CuponHotel, type TemporadaHotel, type EstadisticasHotel,
+  type ConfigHotel, type HabitacionTipo, type HabitacionFisica, type ReservaHotel,
+  type EstadoReservaHotel, type EstadoHabitacionFisica, type BloqueoFecha, type CuponHotel,
+  type TemporadaHotel, type EstadisticasHotel,
 } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
@@ -38,6 +42,20 @@ const TRANSICIONES: Record<string, { label: string; estado: EstadoReservaHotel; 
   CONFIRMADA: [{ label: '🏨 Check-in',  estado: 'CHECKIN',    color: 'bg-blue-600'  }, { label: '❌ Cancelar', estado: 'CANCELADA',  color: 'bg-red-500' }],
   CHECKIN:    [{ label: '👋 Check-out', estado: 'CHECKOUT',   color: 'bg-gray-600'  }],
 }
+
+const ESTADO_HABITACION_FISICA: Record<string, { label: string; chip: string; card: string }> = {
+  LIBRE: { label: 'Libre', chip: 'bg-emerald-50 text-emerald-700 border-emerald-100', card: 'border-emerald-100 bg-emerald-50/45' },
+  OCUPADA: { label: 'Ocupada', chip: 'bg-[#1B4332] text-white border-[#1B4332]', card: 'border-[#1B4332]/20 bg-[#F4FBF7]' },
+  RESERVADA: { label: 'Reservada', chip: 'bg-blue-50 text-blue-700 border-blue-100', card: 'border-blue-100 bg-blue-50/45' },
+  ENTRA_HOY: { label: 'Entra hoy', chip: 'bg-amber-50 text-amber-800 border-amber-100', card: 'border-amber-100 bg-amber-50/50' },
+  SALE_HOY: { label: 'Sale hoy', chip: 'bg-orange-50 text-orange-700 border-orange-100', card: 'border-orange-100 bg-orange-50/50' },
+  LIMPIEZA: { label: 'Limpieza', chip: 'bg-cyan-50 text-cyan-700 border-cyan-100', card: 'border-cyan-100 bg-cyan-50/45' },
+  MANTENIMIENTO: { label: 'Mantenimiento', chip: 'bg-gray-100 text-gray-700 border-gray-200', card: 'border-gray-200 bg-gray-50' },
+  BLOQUEADA: { label: 'Bloqueada', chip: 'bg-red-50 text-red-700 border-red-100', card: 'border-red-100 bg-red-50/45' },
+}
+
+const ESTADOS_HABITACION_EDITABLES: EstadoHabitacionFisica[] = ['LIBRE', 'LIMPIEZA', 'MANTENIMIENTO', 'BLOQUEADA']
+type TabHotel = 'reservas' | 'recepcion' | 'habitaciones' | 'config' | 'ocupacion' | 'bloqueos'
 
 function esVideo(url: string): boolean {
   return url.includes('/video/upload/') || /\.(mp4|webm|mov|avi)$/i.test(url)
@@ -482,7 +500,7 @@ function CalendarioOcupacion({
   onMesSiguiente,
 }: {
   mes: Date
-  habitaciones: HabitacionTipo[]
+  habitaciones: { id: number; nombre: string; habitacionTipoId?: number; fisicaId?: number }[]
   reservas: ReservaHotel[]
   onMesAnterior: () => void
   onMesSiguiente: () => void
@@ -492,10 +510,10 @@ function CalendarioOcupacion({
 
   const mesNombre = mes.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })
 
-  function getReservaInfo(habId: number, dia: number): ReservaHotel | null {
+  function getReservaInfo(hab: { id: number; habitacionTipoId?: number; fisicaId?: number }, dia: number): ReservaHotel | null {
     const fecha = new Date(mes.getFullYear(), mes.getMonth(), dia)
     return reservas.find(r =>
-      r.habitacionTipoId === habId &&
+      (hab.fisicaId ? r.habitacionFisicaId === hab.fisicaId : r.habitacionTipoId === hab.id) &&
       ['PENDIENTE', 'CONFIRMADA', 'CHECKIN'].includes(r.estado) &&
       new Date(r.fechaEntrada) <= fecha &&
       new Date(r.fechaSalida) > fecha
@@ -546,7 +564,7 @@ function CalendarioOcupacion({
                   {dia}{esHoy(dia) ? ' ·hoy' : ''}
                 </td>
                 {habitaciones.map(h => {
-                  const r = getReservaInfo(h.id, dia)
+                  const r = getReservaInfo(h, dia)
                   const ocupado = !!r
                   const pendiente = r?.estado === 'PENDIENTE'
                   return (
@@ -596,16 +614,16 @@ function DashboardEstadisticas() {
   return (
     <div className="space-y-6">
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           { label: 'Ingresos 6 meses', valor: formatearPrecio(stats.ingresoTotal6m), color: 'text-[#1B4332]' },
           { label: `Reservas ${mesActual}`, valor: String(stats.reservasMesActual), color: 'text-blue-600' },
           { label: 'Reservas 6 meses', valor: String(stats.totalReservas6m), color: 'text-gray-800' },
           { label: 'Ocupación promedio', valor: `${stats.tasaOcupacionPromedio}%`, color: 'text-amber-600' },
         ].map(k => (
-          <div key={k.label} className="bg-gray-50 rounded-xl p-3">
-            <p className="text-xs text-gray-500">{k.label}</p>
-            <p className={`text-xl font-bold mt-1 ${k.color}`}>{k.valor}</p>
+          <div key={k.label} className="min-w-0 bg-gray-50 rounded-xl p-3 lg:p-4">
+            <p className="text-xs text-gray-500 leading-tight">{k.label}</p>
+            <p className={`mt-1 text-[clamp(1.05rem,1.7vw,1.5rem)] font-black leading-tight tracking-tight tabular-nums break-words ${k.color}`}>{k.valor}</p>
           </div>
         ))}
       </div>
@@ -622,15 +640,15 @@ function DashboardEstadisticas() {
                 const label = new Date(Number(anio), Number(mesNum) - 1).toLocaleDateString('es-CO', { month: 'short', year: '2-digit' })
                 const pct = Math.round((ingreso / max) * 100)
                 return (
-                  <div key={mes} className="flex items-center gap-3">
-                    <span className="text-xs text-gray-400 w-12 text-right capitalize">{label}</span>
+                  <div key={mes} className="grid grid-cols-[3.25rem_minmax(0,1fr)_88px] items-center gap-3 sm:grid-cols-[3.5rem_minmax(0,1fr)_104px]">
+                    <span className="text-xs text-gray-400 text-right capitalize leading-tight">{label}</span>
                     <div className="flex-1 h-6 bg-gray-100 rounded-lg overflow-hidden">
                       <div className="h-full bg-[#2D6A4F] rounded-lg transition-all duration-500 flex items-center justify-end pr-2"
                         style={{ width: `${Math.max(pct, ingreso > 0 ? 4 : 0)}%` }}>
-                        {ingreso > 0 && <span className="text-[10px] text-white font-medium">{formatearPrecio(ingreso)}</span>}
+                        {ingreso > 0 && pct >= 28 && <span className="text-[10px] text-white font-medium tabular-nums">{formatearPrecio(ingreso)}</span>}
                       </div>
                     </div>
-                    {ingreso === 0 && <span className="text-xs text-gray-300">$0</span>}
+                    <span className={`text-xs text-right tabular-nums ${ingreso === 0 ? 'text-gray-300' : 'text-gray-500'}`}>{formatearPrecio(ingreso)}</span>
                   </div>
                 )
               })}
@@ -664,8 +682,9 @@ function DashboardEstadisticas() {
 export default function ComercianteHotelesPage() {
   const [cfg, setCfg]               = useState<ConfigHotel | null>(null)
   const [reservas, setReservas]     = useState<ReservaHotel[]>([])
-  const [ocupacion, setOcupacion]   = useState<{ habitaciones: HabitacionTipo[]; reservas: ReservaHotel[] } | null>(null)
-  const [tab, setTab]               = useState<'reservas' | 'habitaciones' | 'config' | 'ocupacion' | 'bloqueos'>('reservas')
+  const [habitacionesFisicas, setHabitacionesFisicas] = useState<HabitacionFisica[]>([])
+  const [ocupacion, setOcupacion]   = useState<{ habitaciones: HabitacionTipo[]; habitacionesFisicas: HabitacionFisica[]; reservas: ReservaHotel[] } | null>(null)
+  const [tab, setTab]               = useState<TabHotel>('reservas')
   const [mesCalendario, setMesCalendario] = useState(() => {
     const hoy = new Date()
     return new Date(hoy.getFullYear(), hoy.getMonth(), 1)
@@ -686,6 +705,16 @@ export default function ComercianteHotelesPage() {
   const [exito, setExito]           = useState('')
   const [editConfig, setEditConfig] = useState<Partial<ConfigHotel>>({})
   const [formHab, setFormHab]       = useState<{ visible: boolean; inicial?: Partial<HabitacionTipo> }>({ visible: false })
+  const [formFisica, setFormFisica] = useState<{ habitacionTipoId: string; nombre: string; piso: string; zona: string; estado: EstadoHabitacionFisica; notas: string }>({
+    habitacionTipoId: '',
+    nombre: '',
+    piso: '',
+    zona: '',
+    estado: 'LIBRE',
+    notas: '',
+  })
+  const [guardandoFisica, setGuardandoFisica] = useState(false)
+  const [errorFisica, setErrorFisica] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const primerasCarga               = useRef(true)
 
@@ -693,11 +722,13 @@ export default function ComercianteHotelesPage() {
 
   const cargar = useCallback(async () => {
     try {
-      const [hotelData, reservasData] = await Promise.all([
+      const [hotelData, reservasData, fisicasData] = await Promise.all([
         obtenerMiHotel(),
         reservasHotelero(),
+        listarHabitacionesFisicas().catch(() => [] as HabitacionFisica[]),
       ])
       setCfg(hotelData)
+      setHabitacionesFisicas(fisicasData)
       if (primerasCarga.current) {
         setEditConfig(hotelData)
         primerasCarga.current = false
@@ -737,6 +768,12 @@ export default function ComercianteHotelesPage() {
     return () => clearInterval(t)
   }, [cargar])
 
+  useEffect(() => {
+    if (!formFisica.habitacionTipoId && cfg?.habitaciones?.[0]?.id) {
+      setFormFisica(p => ({ ...p, habitacionTipoId: String(cfg.habitaciones[0].id) }))
+    }
+  }, [cfg, formFisica.habitacionTipoId])
+
   // SSE para nuevas reservas
   useEffect(() => {
     const token = obtenerToken()
@@ -756,11 +793,12 @@ export default function ComercianteHotelesPage() {
     try {
       const data = await ocupacionHotel()
       setOcupacion(data)
+      if (data.habitacionesFisicas) setHabitacionesFisicas(data.habitacionesFisicas)
     } catch {}
   }
 
   useEffect(() => {
-    if (tab === 'ocupacion') cargarOcupacion()
+    if (tab === 'ocupacion' || tab === 'recepcion') cargarOcupacion()
   }, [tab])
 
   async function cargarBloqueos() {
@@ -816,6 +854,70 @@ export default function ComercianteHotelesPage() {
     } catch (e: any) { setErrorBloqueo(e.message) }
   }
 
+  async function cargarHabitacionesFisicas() {
+    try {
+      setHabitacionesFisicas(await listarHabitacionesFisicas())
+    } catch (e: any) {
+      setErrorFisica(e.message)
+    }
+  }
+
+  async function handleCrearHabitacionFisica() {
+    if (!formFisica.habitacionTipoId || !formFisica.nombre.trim()) {
+      setErrorFisica('Selecciona el tipo y escribe el numero o nombre de la habitacion.')
+      return
+    }
+    setGuardandoFisica(true)
+    setErrorFisica('')
+    try {
+      const nueva = await crearHabitacionFisica({
+        habitacionTipoId: Number(formFisica.habitacionTipoId),
+        nombre: formFisica.nombre.trim(),
+        piso: formFisica.piso.trim() || null,
+        zona: formFisica.zona.trim() || null,
+        estado: formFisica.estado,
+        notas: formFisica.notas.trim() || null,
+      })
+      setHabitacionesFisicas(prev => [...prev, nueva])
+      setFormFisica(p => ({ ...p, nombre: '', piso: '', zona: '', estado: 'LIBRE', notas: '' }))
+    } catch (e: any) {
+      setErrorFisica(e.message)
+    } finally {
+      setGuardandoFisica(false)
+    }
+  }
+
+  async function handleCambiarEstadoFisica(id: number, estado: EstadoHabitacionFisica) {
+    try {
+      const actualizada = await cambiarEstadoHabitacionFisica(id, estado)
+      setHabitacionesFisicas(prev => prev.map(h => h.id === id ? { ...h, ...actualizada } : h))
+      if (tab === 'ocupacion' || tab === 'recepcion') cargarOcupacion()
+    } catch (e: any) {
+      setErrorFisica(e.message)
+    }
+  }
+
+  async function handleEliminarHabitacionFisica(id: number) {
+    if (!window.confirm('Eliminar esta habitacion real del inventario operativo?')) return
+    try {
+      await eliminarHabitacionFisica(id)
+      setHabitacionesFisicas(prev => prev.filter(h => h.id !== id))
+    } catch (e: any) {
+      setErrorFisica(e.message)
+    }
+  }
+
+  async function handleAsignarHabitacionFisica(reservaId: number, habitacionFisicaId: number) {
+    try {
+      const actualizada = await asignarHabitacionFisicaReserva(reservaId, habitacionFisicaId)
+      setReservas(prev => prev.map(r => r.id === reservaId ? { ...r, ...actualizada } : r))
+      setReservasCalendario(prev => prev.map(r => r.id === reservaId ? { ...r, ...actualizada } : r))
+      await cargarHabitacionesFisicas()
+    } catch (e: any) {
+      setError(e.message)
+    }
+  }
+
   async function guardarConfig() {
     setGuardando(true); setError(''); setExito('')
     try {
@@ -831,11 +933,57 @@ export default function ComercianteHotelesPage() {
     try {
       const actualizada = await cambiarEstadoReserva(reservaId, estado)
       setReservas(prev => prev.map(r => r.id === reservaId ? { ...r, ...actualizada } : r))
+      setReservasCalendario(prev => prev.map(r => r.id === reservaId ? { ...r, ...actualizada } : r))
+      await cargarHabitacionesFisicas()
     } catch (e: any) { setError(e.message) }
   }
 
   const reservasFiltradas = filtroEstado ? reservas.filter(r => r.estado === filtroEstado) : reservas
   const pendientes = reservas.filter(r => r.estado === 'PENDIENTE').length
+  const hoy = new Date()
+  const esMismaFecha = (fecha: string | Date) => {
+    const f = new Date(fecha)
+    return f.getFullYear() === hoy.getFullYear() && f.getMonth() === hoy.getMonth() && f.getDate() === hoy.getDate()
+  }
+  const llegadasHoy = reservas
+    .filter(r => ['PENDIENTE', 'CONFIRMADA'].includes(r.estado) && esMismaFecha(r.fechaEntrada))
+    .sort((a, b) => new Date(a.fechaEntrada).getTime() - new Date(b.fechaEntrada).getTime())
+  const salidasHoy = reservas
+    .filter(r => r.estado === 'CHECKIN' && esMismaFecha(r.fechaSalida))
+    .sort((a, b) => new Date(a.fechaSalida).getTime() - new Date(b.fechaSalida).getTime())
+  const calendarioHabitaciones = habitacionesFisicas.length > 0
+    ? habitacionesFisicas.map(h => ({
+        id: h.id,
+        nombre: `${h.nombre}${h.habitacionTipo?.nombre ? ` - ${h.habitacionTipo.nombre}` : ''}`,
+        habitacionTipoId: h.habitacionTipoId,
+        fisicaId: h.id,
+      }))
+    : (cfg?.habitaciones ?? []).map(h => ({ id: h.id, nombre: h.nombre }))
+
+  const reservaActualPorHabitacion = (habitacionId: number) =>
+    reservas.find(r => r.habitacionFisicaId === habitacionId && r.estado === 'CHECKIN') ?? null
+
+  const proximaReservaPorHabitacion = (habitacionId: number) =>
+    reservas
+      .filter(r => r.habitacionFisicaId === habitacionId && ['PENDIENTE', 'CONFIRMADA'].includes(r.estado))
+      .sort((a, b) => new Date(a.fechaEntrada).getTime() - new Date(b.fechaEntrada).getTime())[0] ?? null
+
+  const estadoVisualHabitacion = (habitacion: HabitacionFisica) => {
+    if (habitacion.estado === 'MANTENIMIENTO' || habitacion.estado === 'BLOQUEADA' || habitacion.estado === 'LIMPIEZA') return habitacion.estado
+    const actual = reservaActualPorHabitacion(habitacion.id)
+    if (actual && esMismaFecha(actual.fechaSalida)) return 'SALE_HOY'
+    if (actual) return 'OCUPADA'
+    const proxima = proximaReservaPorHabitacion(habitacion.id)
+    if (proxima && esMismaFecha(proxima.fechaEntrada)) return 'ENTRA_HOY'
+    if (proxima) return 'RESERVADA'
+    return habitacion.estado || 'LIBRE'
+  }
+
+  const resumenHabitaciones = habitacionesFisicas.reduce((acc, h) => {
+    const estado = estadoVisualHabitacion(h)
+    acc[estado] = (acc[estado] ?? 0) + 1
+    return acc
+  }, {} as Record<string, number>)
 
   if (cargando) return (
     <div className="min-h-screen bg-[#FAF8F5] flex items-center justify-center">
@@ -846,7 +994,7 @@ export default function ComercianteHotelesPage() {
   return (
     <div className="min-h-screen bg-[#FAF8F5]">
       <header className="bg-white border-b border-[#E8DCC8] sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3">
+        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-3">
             <Link href="/comerciante" className="text-[#2D6A4F] p-1">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
@@ -861,6 +1009,7 @@ export default function ComercianteHotelesPage() {
           <div className="flex gap-1 overflow-x-auto pb-0.5 no-scrollbar">
             {([
               { key: 'reservas',     label: 'Reservas',     badge: pendientes },
+              { key: 'recepcion',    label: 'Recepcion',    badge: llegadasHoy.length + salidasHoy.length },
               { key: 'ocupacion',    label: 'Ocupación',    badge: 0 },
               { key: 'habitaciones', label: 'Habitaciones', badge: 0 },
               { key: 'bloqueos',     label: '🔒 Bloqueos',  badge: 0 },
@@ -882,17 +1031,11 @@ export default function ComercianteHotelesPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-4 pb-16">
+      <main className="mx-auto max-w-7xl px-4 py-4 pb-16 sm:px-6 lg:px-8">
         {error && <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>}
         {exito && <div className="mb-4 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">{exito}</div>}
 
-        {/* ── DASHBOARD ESTADÍSTICAS (backend) ── */}
-        <section className="bg-white rounded-2xl shadow-sm p-6 mb-5">
-          <h2 className="font-bold text-gray-900 mb-4">Estadísticas</h2>
-          <DashboardEstadisticas />
-        </section>
-
-        {/* ── ESTADÍSTICAS ── */}
+        {/* ── DASHBOARD EJECUTIVO ── */}
         {(() => {
           const ahora = new Date()
           const mesActual = ahora.getMonth()
@@ -907,31 +1050,29 @@ export default function ComercianteHotelesPage() {
             .filter(r => r.estado === 'CONFIRMADA' || r.estado === 'CHECKIN' || r.estado === 'CHECKOUT')
             .reduce((acc, r) => acc + Number(r.total), 0)
 
-          const reservasActivas = reservas.filter(r =>
-            r.estado === 'PENDIENTE' || r.estado === 'CONFIRMADA' || r.estado === 'CHECKIN'
-          ).length
-
-          const capacidadTotal = (cfg?.habitaciones ?? []).reduce((acc, h) => acc + h.cantidad, 0) * 30
+          const unidadesOperativas = habitacionesFisicas.filter(h => h.estado !== 'MANTENIMIENTO' && h.estado !== 'BLOQUEADA').length
+          const habitacionesOcupadas = habitacionesFisicas.length > 0
+            ? habitacionesFisicas.filter(h => ['OCUPADA', 'SALE_HOY'].includes(estadoVisualHabitacion(h))).length
+            : reservas.filter(r => r.estado === 'CHECKIN').length
+          const capacidadTotal = habitacionesFisicas.length > 0
+            ? unidadesOperativas
+            : (cfg?.habitaciones ?? []).reduce((acc, h) => acc + h.cantidad, 0)
           const tasaOcupacion = capacidadTotal > 0
-            ? Math.round((reservasActivas / capacidadTotal) * 100)
+            ? Math.round((habitacionesOcupadas / capacidadTotal) * 100)
             : 0
 
           const reseñasPendientes = reservas.filter(r => r.estado === 'CHECKOUT' && !r.review).length
+          const reservasConfirmadas = reservas.filter(r => r.estado === 'CONFIRMADA').length
+          const huespedesEnCasa = reservas.filter(r => r.estado === 'CHECKIN').length
+          const proximaReserva = reservas
+            .filter(r => r.estado === 'PENDIENTE' || r.estado === 'CONFIRMADA')
+            .sort((a, b) => new Date(a.fechaEntrada).getTime() - new Date(b.fechaEntrada).getTime())[0]
 
           const tarjetas = [
             {
               icono: '📅',
               valor: reservasMes.length,
               etiqueta: 'Reservas este mes',
-            },
-            {
-              icono: '💰',
-              valor: ingresosMes >= 1_000_000
-                ? `$${(ingresosMes / 1_000_000).toFixed(1)}M`
-                : ingresosMes >= 1_000
-                ? `$${Math.round(ingresosMes / 1_000)}K`
-                : `$${ingresosMes}`,
-              etiqueta: 'Ingresos este mes',
             },
             {
               icono: '📊',
@@ -943,22 +1084,308 @@ export default function ComercianteHotelesPage() {
               valor: reseñasPendientes,
               etiqueta: 'Reseñas pendientes',
             },
+            {
+              icono: '✅',
+              valor: reservasConfirmadas,
+              etiqueta: 'Confirmadas',
+            },
           ]
 
           return (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-              {tarjetas.map((t, i) => (
-                <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col gap-1">
-                  <span className="text-xl" style={{ color: '#1B4332' }}>{t.icono}</span>
-                  <span className="text-3xl font-black text-gray-900 leading-none">{t.valor}</span>
-                  <span className="text-xs text-gray-400 font-medium">{t.etiqueta}</span>
+            <section className="mb-5 overflow-hidden rounded-[1.75rem] border border-[#E9DFC9] bg-white shadow-sm">
+              <div className="border-b border-[#F0E7D7] px-4 py-5 sm:px-6 lg:px-7">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-[#B7791F]">Panel hotelero</p>
+                    <h2 className="mt-1 text-2xl font-black tracking-tight text-[#101828]">Gestiona reservas, ingresos y ocupación</h2>
+                    <p className="mt-1 max-w-2xl text-sm leading-relaxed text-gray-500">
+                      Vista ejecutiva para decidir rápido: qué falta confirmar, cuánto va el mes y cómo se está usando la capacidad.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setTab('reservas'); setFiltroEstado('PENDIENTE') }}
+                    className={`w-fit rounded-full px-4 py-2 text-sm font-bold transition-colors ${
+                      pendientes > 0
+                        ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                        : 'bg-emerald-50 text-[#1B4332] hover:bg-emerald-100'
+                    }`}
+                  >
+                    {pendientes > 0 ? `${pendientes} reserva${pendientes !== 1 ? 's' : ''} pendiente${pendientes !== 1 ? 's' : ''}` : 'Sin pendientes'}
+                  </button>
                 </div>
-              ))}
-            </div>
+              </div>
+
+              <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-7 xl:grid-cols-[minmax(0,1fr)_400px]">
+                <div className="min-w-0">
+                  <DashboardEstadisticas />
+                </div>
+
+                <aside className="space-y-3">
+                  <div className="relative overflow-hidden rounded-3xl bg-[#1B4332] p-5 text-white">
+                    <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10" />
+                    <div className="absolute -bottom-12 right-10 h-24 w-24 rounded-full bg-[#D8A31A]/25" />
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/65">Este mes</p>
+                    <p className="mt-3 text-[clamp(1.65rem,3vw,2.35rem)] font-black leading-none tracking-tight tabular-nums">
+                      {formatearPrecio(ingresosMes)}
+                    </p>
+                    <p className="mt-2 text-sm text-white/75">
+                      {reservasMes.length} reserva{reservasMes.length !== 1 ? 's' : ''} registrada{reservasMes.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {tarjetas.map((t, i) => (
+                      <div key={i} className="min-w-0 rounded-2xl border border-gray-100 bg-[#FAFAF8] p-4">
+                        <span className="text-lg">{t.icono}</span>
+                        <p className="mt-2 text-[clamp(1.25rem,2.1vw,1.75rem)] font-black leading-none tracking-tight text-gray-900 tabular-nums break-words">{t.valor}</p>
+                        <p className="mt-1 text-xs font-medium leading-tight text-gray-400">{t.etiqueta}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded-2xl border border-gray-100 bg-white p-4">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-gray-400">Operación rápida</p>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-xl bg-amber-50 px-2 py-3">
+                        <p className="text-lg font-black text-amber-700">{pendientes}</p>
+                        <p className="text-[11px] font-medium text-amber-700/70">Pendientes</p>
+                      </div>
+                      <div className="rounded-xl bg-emerald-50 px-2 py-3">
+                        <p className="text-lg font-black text-[#1B4332]">{reservasConfirmadas}</p>
+                        <p className="text-[11px] font-medium text-[#1B4332]/70">Confirmadas</p>
+                      </div>
+                      <div className="rounded-xl bg-blue-50 px-2 py-3">
+                        <p className="text-lg font-black text-blue-700">{huespedesEnCasa}</p>
+                        <p className="text-[11px] font-medium text-blue-700/70">En casa</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-xl bg-gray-50 p-3">
+                      <p className="text-xs font-bold text-gray-500">Próxima llegada</p>
+                      {proximaReserva ? (
+                        <>
+                          <p className="mt-1 truncate text-sm font-black text-gray-900">{proximaReserva.nombreHuesped}</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(proximaReserva.fechaEntrada).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} · {proximaReserva.habitacionTipo?.nombre ?? 'Habitación'}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="mt-1 text-sm text-gray-400">No hay llegadas pendientes.</p>
+                      )}
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => { setTab('reservas'); setFiltroEstado('PENDIENTE') }}
+                        className="rounded-xl bg-[#1B4332] px-3 py-2 text-xs font-bold text-white hover:bg-[#15362A]">
+                        Ver pendientes
+                      </button>
+                      <button type="button" onClick={() => setTab('recepcion')}
+                        className="rounded-xl border border-[#1B4332]/15 bg-white px-3 py-2 text-xs font-bold text-[#1B4332] hover:bg-[#F0FDF4]">
+                        Ver ocupación
+                      </button>
+                    </div>
+                  </div>
+                </aside>
+              </div>
+            </section>
           )
         })()}
 
         {/* ── RESERVAS ── */}
+        {tab === 'recepcion' && (
+          <div className="space-y-5">
+            <section className="overflow-hidden rounded-[1.75rem] border border-[#E9DFC9] bg-white shadow-sm">
+              <div className="border-b border-[#F0E7D7] px-5 py-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-[#B7791F]">Recepcion operativa</p>
+                    <h2 className="mt-1 text-2xl font-black tracking-tight text-[#101828]">Mapa vivo de habitaciones</h2>
+                    <p className="mt-1 max-w-2xl text-sm leading-relaxed text-gray-500">
+                      Controla habitaciones reales, llegadas, salidas, limpieza y mantenimiento sin mezclarlo con los tipos comerciales.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTab('habitaciones')}
+                    className="w-fit rounded-full border border-[#2D6A4F]/20 bg-[#F7FCF9] px-4 py-2 text-sm font-bold text-[#1B4332] hover:bg-[#EAF7EF]"
+                  >
+                    Administrar habitaciones reales
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-5">
+                {[
+                  ['LIBRE', 'Libres'],
+                  ['OCUPADA', 'Ocupadas'],
+                  ['ENTRA_HOY', 'Llegan hoy'],
+                  ['SALE_HOY', 'Salen hoy'],
+                  ['LIMPIEZA', 'En limpieza'],
+                ].map(([estado, label]) => (
+                  <div key={estado} className="rounded-2xl bg-[#FAFAF8] p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-gray-400">{label}</p>
+                    <p className="mt-2 text-3xl font-black tabular-nums text-gray-950">{resumenHabitaciones[estado] ?? 0}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]">
+              <section className="rounded-[1.5rem] border border-gray-100 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-black text-gray-950">Habitaciones reales</h3>
+                    <p className="text-sm text-gray-400">{habitacionesFisicas.length} unidad{habitacionesFisicas.length !== 1 ? 'es' : ''} operativa{habitacionesFisicas.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  {errorFisica && <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600">{errorFisica}</span>}
+                </div>
+
+                {habitacionesFisicas.length === 0 ? (
+                  <div className="rounded-3xl border border-dashed border-[#D8C7A3] bg-[#FFFCF4] p-8 text-center">
+                    <p className="text-3xl">🏨</p>
+                    <h4 className="mt-3 font-black text-gray-900">Crea habitaciones reales para activar recepcion</h4>
+                    <p className="mx-auto mt-1 max-w-md text-sm text-gray-500">
+                      Ejemplo: 101, 102, Suite Rio o Cabana 3. Esto permite asignar reservas y ver ocupacion real.
+                    </p>
+                    <button type="button" onClick={() => setTab('habitaciones')}
+                      className="mt-4 rounded-full bg-[#1B4332] px-5 py-2 text-sm font-bold text-white hover:bg-[#2D6A4F]">
+                      Crear habitaciones reales
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {habitacionesFisicas.map(h => {
+                      const estado = estadoVisualHabitacion(h)
+                      const meta = ESTADO_HABITACION_FISICA[estado] ?? ESTADO_HABITACION_FISICA.LIBRE
+                      const actual = reservaActualPorHabitacion(h.id)
+                      const proxima = proximaReservaPorHabitacion(h.id)
+                      return (
+                        <article key={h.id} className={`rounded-3xl border p-4 transition-all ${meta.card}`}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-xl font-black text-gray-950">{h.nombre}</p>
+                              <p className="mt-0.5 truncate text-xs font-medium text-gray-500">
+                                {h.habitacionTipo?.nombre ?? 'Habitacion'}{h.piso ? ` - Piso ${h.piso}` : ''}{h.zona ? ` - ${h.zona}` : ''}
+                              </p>
+                            </div>
+                            <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-black ${meta.chip}`}>
+                              {meta.label}
+                            </span>
+                          </div>
+
+                          <div className="mt-4 rounded-2xl bg-white/70 p-3">
+                            {actual ? (
+                              <>
+                                <p className="text-xs font-bold uppercase tracking-wide text-[#1B4332]">Huesped en casa</p>
+                                <p className="mt-1 truncate text-sm font-black text-gray-900">{actual.nombreHuesped}</p>
+                                <p className="text-xs text-gray-500">
+                                  Sale {new Date(actual.fechaSalida).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
+                                </p>
+                              </>
+                            ) : proxima ? (
+                              <>
+                                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Proxima reserva</p>
+                                <p className="mt-1 truncate text-sm font-black text-gray-900">{proxima.nombreHuesped}</p>
+                                <p className="text-xs text-gray-500">
+                                  Entra {new Date(proxima.fechaEntrada).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Disponible</p>
+                                <p className="mt-1 text-sm text-gray-500">Sin reserva asignada en curso.</p>
+                              </>
+                            )}
+                          </div>
+
+                          {h.notas && <p className="mt-3 text-xs italic text-gray-500">{h.notas}</p>}
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {h.estado === 'LIMPIEZA' && !actual && (
+                              <button type="button" onClick={() => handleCambiarEstadoFisica(h.id, 'LIBRE')}
+                                className="rounded-full bg-[#1B4332] px-3 py-1.5 text-xs font-bold text-white">
+                                Marcar lista
+                              </button>
+                            )}
+                            {!actual && h.estado !== 'LIMPIEZA' && h.estado !== 'MANTENIMIENTO' && h.estado !== 'BLOQUEADA' && (
+                              <button type="button" onClick={() => handleCambiarEstadoFisica(h.id, 'LIMPIEZA')}
+                                className="rounded-full border border-cyan-200 bg-white px-3 py-1.5 text-xs font-bold text-cyan-700">
+                                Limpieza
+                              </button>
+                            )}
+                            {!actual && h.estado !== 'MANTENIMIENTO' && (
+                              <button type="button" onClick={() => handleCambiarEstadoFisica(h.id, 'MANTENIMIENTO')}
+                                className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-600">
+                                Mantenimiento
+                              </button>
+                            )}
+                            {!actual && (h.estado === 'MANTENIMIENTO' || h.estado === 'BLOQUEADA') && (
+                              <button type="button" onClick={() => handleCambiarEstadoFisica(h.id, 'LIBRE')}
+                                className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">
+                                Liberar
+                              </button>
+                            )}
+                            {actual && (
+                              <span className="rounded-full bg-white/70 px-3 py-1.5 text-xs font-bold text-gray-500">
+                                Check-out desde la reserva
+                              </span>
+                            )}
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                )}
+              </section>
+
+              <aside className="space-y-4">
+                <section className="rounded-[1.5rem] border border-amber-100 bg-amber-50/60 p-5">
+                  <h3 className="font-black text-amber-950">Llegadas de hoy</h3>
+                  <div className="mt-3 space-y-2">
+                    {llegadasHoy.length === 0 ? (
+                      <p className="text-sm text-amber-800/60">No hay entradas programadas para hoy.</p>
+                    ) : llegadasHoy.map(r => (
+                      <div key={r.id} className="rounded-2xl bg-white p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black text-gray-900">{r.nombreHuesped}</p>
+                            <p className="text-xs text-gray-500">{r.habitacionTipo?.nombre ?? 'Habitacion'} - {r.codigo}</p>
+                          </div>
+                          <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${ESTADO_RESERVA[r.estado]?.color ?? 'bg-gray-100 text-gray-500'}`}>
+                            {r.estado}
+                          </span>
+                        </div>
+                        {r.habitacionFisica ? (
+                          <p className="mt-2 text-xs font-bold text-[#1B4332]">Asignada: {r.habitacionFisica.nombre}</p>
+                        ) : (
+                          <p className="mt-2 text-xs font-bold text-amber-700">Sin habitacion real asignada</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="rounded-[1.5rem] border border-orange-100 bg-orange-50/60 p-5">
+                  <h3 className="font-black text-orange-950">Salidas de hoy</h3>
+                  <div className="mt-3 space-y-2">
+                    {salidasHoy.length === 0 ? (
+                      <p className="text-sm text-orange-800/60">No hay salidas para hoy.</p>
+                    ) : salidasHoy.map(r => (
+                      <div key={r.id} className="rounded-2xl bg-white p-3">
+                        <p className="truncate text-sm font-black text-gray-900">{r.nombreHuesped}</p>
+                        <p className="text-xs text-gray-500">
+                          {r.habitacionFisica?.nombre ?? r.habitacionTipo?.nombre ?? 'Habitacion'} - {formatearPrecio(Number(r.total))}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </aside>
+            </div>
+          </div>
+        )}
+
         {tab === 'reservas' && (
           <div className="space-y-4">
             {/* Filtros */}
@@ -979,12 +1406,15 @@ export default function ComercianteHotelesPage() {
                 <p>No hay reservas{filtroEstado ? ` con estado "${ESTADO_RESERVA[filtroEstado]?.label}"` : ''}</p>
               </div>
             ) : (
-              reservasFiltradas.map(res => {
+              <div className="grid gap-4 xl:grid-cols-2">
+                {reservasFiltradas.map(res => {
                 const info = ESTADO_RESERVA[res.estado]
                 const trans = TRANSICIONES[res.estado] ?? []
                 const entrada = new Date(res.fechaEntrada)
                 const salida  = new Date(res.fechaSalida)
                 const noches  = Math.ceil((salida.getTime() - entrada.getTime()) / 86400000)
+                const fisicasTipo = habitacionesFisicas.filter(h => h.habitacionTipoId === res.habitacionTipoId)
+                const reservaCerrada = ['CHECKOUT', 'CANCELADA', 'RECHAZADA'].includes(res.estado)
 
                 return (
                   <div key={res.id} className="bg-white rounded-2xl shadow-sm p-4">
@@ -1015,6 +1445,40 @@ export default function ComercianteHotelesPage() {
                       {res.notasCliente && <p className="text-gray-400 italic text-xs">"{res.notasCliente}"</p>}
                     </div>
 
+                    <div className="mb-3 rounded-2xl border border-gray-100 bg-[#FAFAF8] p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-black uppercase tracking-wide text-gray-400">Habitacion real</p>
+                          <p className="mt-0.5 truncate text-sm font-bold text-gray-900">
+                            {res.habitacionFisica?.nombre ?? 'Sin asignar'}
+                          </p>
+                        </div>
+                        {fisicasTipo.length > 0 ? (
+                          <select
+                            value={res.habitacionFisicaId ? String(res.habitacionFisicaId) : ''}
+                            disabled={reservaCerrada}
+                            onChange={e => {
+                              if (!e.target.value) return
+                              handleAsignarHabitacionFisica(res.id, Number(e.target.value))
+                            }}
+                            className="max-w-[190px] rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 disabled:opacity-50"
+                          >
+                            <option value="">Asignar</option>
+                            {fisicasTipo.map(h => (
+                              <option key={h.id} value={h.id}>
+                                {h.nombre} - {ESTADO_HABITACION_FISICA[estadoVisualHabitacion(h)]?.label ?? h.estado}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <button type="button" onClick={() => setTab('habitaciones')}
+                            className="rounded-xl bg-[#1B4332] px-3 py-2 text-xs font-bold text-white">
+                            Crear
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="flex justify-between items-center mb-3 pt-2 border-t border-gray-100">
                       <span className="text-xs text-gray-400">{res.metodoPago}</span>
                       <span className="font-bold">{formatearPrecio(Number(res.total))}</span>
@@ -1032,7 +1496,8 @@ export default function ComercianteHotelesPage() {
                     )}
                   </div>
                 )
-              })
+                })}
+              </div>
             )}
           </div>
         )}
@@ -1093,6 +1558,125 @@ export default function ComercianteHotelesPage() {
               className="w-full bg-[#2D6A4F] text-white font-bold py-3 rounded-xl text-sm hover:bg-[#40916C] transition-colors">
               + Agregar tipo de habitación
             </button>
+
+            <section className="rounded-[1.5rem] border border-[#E9DFC9] bg-white p-5 shadow-sm">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[#B7791F]">Inventario operativo</p>
+                  <h2 className="mt-1 text-xl font-black text-gray-950">Habitaciones reales</h2>
+                  <p className="mt-1 text-sm text-gray-500">Crea las unidades que recepcion usa en el dia a dia: 101, 102, Cabana 3, Suite Rio.</p>
+                </div>
+                <button type="button" onClick={cargarHabitacionesFisicas}
+                  className="w-fit rounded-full border border-gray-200 px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50">
+                  Actualizar
+                </button>
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-[1.1fr_0.8fr_0.7fr_0.8fr_0.8fr_auto]">
+                <select
+                  value={formFisica.habitacionTipoId}
+                  onChange={e => setFormFisica(p => ({ ...p, habitacionTipoId: e.target.value }))}
+                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/20"
+                >
+                  <option value="">Tipo de habitacion</option>
+                  {(cfg?.habitaciones ?? []).filter(h => h.activo).map(h => (
+                    <option key={h.id} value={h.id}>{h.nombre}</option>
+                  ))}
+                </select>
+                <input
+                  value={formFisica.nombre}
+                  onChange={e => setFormFisica(p => ({ ...p, nombre: e.target.value }))}
+                  placeholder="Numero o nombre"
+                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/20"
+                />
+                <input
+                  value={formFisica.piso}
+                  onChange={e => setFormFisica(p => ({ ...p, piso: e.target.value }))}
+                  placeholder="Piso"
+                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/20"
+                />
+                <input
+                  value={formFisica.zona}
+                  onChange={e => setFormFisica(p => ({ ...p, zona: e.target.value }))}
+                  placeholder="Zona"
+                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/20"
+                />
+                <select
+                  value={formFisica.estado}
+                  onChange={e => setFormFisica(p => ({ ...p, estado: e.target.value as EstadoHabitacionFisica }))}
+                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/20"
+                >
+                  {ESTADOS_HABITACION_EDITABLES.map(e => (
+                    <option key={e} value={e}>{ESTADO_HABITACION_FISICA[e]?.label ?? e}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleCrearHabitacionFisica}
+                  disabled={guardandoFisica || !cfg?.habitaciones?.length}
+                  className="rounded-xl bg-[#1B4332] px-4 py-2 text-sm font-bold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+                >
+                  {guardandoFisica ? 'Guardando...' : '+ Crear'}
+                </button>
+              </div>
+
+              <input
+                value={formFisica.notas}
+                onChange={e => setFormFisica(p => ({ ...p, notas: e.target.value }))}
+                placeholder="Notas internas opcionales: vista al rio, requiere revisar aire, cama adicional..."
+                className="mt-3 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/20"
+              />
+
+              {errorFisica && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600">{errorFisica}</p>}
+
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {habitacionesFisicas.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-200 p-5 text-sm text-gray-400 md:col-span-2 xl:col-span-3">
+                    Aun no hay habitaciones reales. Crea al menos una para activar el mapa de recepcion.
+                  </div>
+                ) : habitacionesFisicas.map(h => {
+                  const estado = estadoVisualHabitacion(h)
+                  const meta = ESTADO_HABITACION_FISICA[estado] ?? ESTADO_HABITACION_FISICA.LIBRE
+                  const actual = reservaActualPorHabitacion(h.id)
+                  return (
+                    <div key={h.id} className="rounded-2xl border border-gray-100 bg-[#FAFAF8] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-black text-gray-950">{h.nombre}</p>
+                          <p className="truncate text-xs text-gray-500">
+                            {h.habitacionTipo?.nombre ?? 'Tipo sin nombre'}{h.piso ? ` - Piso ${h.piso}` : ''}{h.zona ? ` - ${h.zona}` : ''}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-black ${meta.chip}`}>{meta.label}</span>
+                      </div>
+                      {h.notas && <p className="mt-2 text-xs italic text-gray-500">{h.notas}</p>}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {actual ? (
+                          <span className="rounded-full bg-[#1B4332]/10 px-3 py-1.5 text-[11px] font-bold text-[#1B4332]">
+                            En uso por {actual.nombreHuesped}
+                          </span>
+                        ) : (
+                          <>
+                            {ESTADOS_HABITACION_EDITABLES.map(e => (
+                              <button key={e} type="button" onClick={() => handleCambiarEstadoFisica(h.id, e)}
+                                className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${
+                                  h.estado === e ? 'bg-[#1B4332] text-white' : 'border border-gray-200 bg-white text-gray-600'
+                                }`}>
+                                {ESTADO_HABITACION_FISICA[e]?.label ?? e}
+                              </button>
+                            ))}
+                            <button type="button" onClick={() => handleEliminarHabitacionFisica(h.id)}
+                              className="rounded-full border border-red-100 bg-white px-3 py-1.5 text-[11px] font-bold text-red-500">
+                              Eliminar
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
 
             {cfg?.habitaciones.length === 0 && (
               <div className="text-center py-12 text-gray-400">
@@ -1384,7 +1968,7 @@ export default function ComercianteHotelesPage() {
                 {[
                   { key: 'permitePagarAlLlegar', label: 'Pagar al llegar', desc: 'Efectivo, Nequi o transferencia al check-in' },
                   { key: 'permiteDeposito30',    label: 'Depósito 30% online', desc: 'El cliente paga el 30% ahora y el resto al llegar' },
-                  { key: 'permiteTotal',         label: 'Pago total online', desc: 'El cliente paga el 100% al reservar' },
+                  { key: 'permiteTotal',         label: 'Pago total online (proximo)', desc: 'Preparado para la siguiente fase; hoy el comprador usa deposito online si esta activo' },
                 ].map(op => {
                   const key = op.key as MetodoPagoHotelKey
                   const activo = editConfig[key] !== false
@@ -1471,12 +2055,12 @@ export default function ComercianteHotelesPage() {
           </div>
         )}
         {/* ── CALENDARIO DE OCUPACIÓN ── */}
-        {cfg?.activo && (cfg.habitaciones?.length ?? 0) > 0 && (
+        {cfg?.activo && calendarioHabitaciones.length > 0 && (
           <section className="bg-white rounded-2xl shadow-sm p-6 mt-4">
             <h2 className="font-bold text-gray-900 mb-4">Calendario de ocupación</h2>
             <CalendarioOcupacion
               mes={mesCalendario}
-              habitaciones={cfg.habitaciones}
+              habitaciones={calendarioHabitaciones}
               reservas={reservasCalendario}
               onMesAnterior={() => setMesCalendario(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
               onMesSiguiente={() => setMesCalendario(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}

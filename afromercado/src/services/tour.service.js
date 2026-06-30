@@ -2,6 +2,9 @@ const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const sseManager = require("../utils/sse-manager");
 const { enviarPushAUsuario } = require("../utils/push");
+const { notificarWhatsApp } = require("../utils/notificaciones");
+
+const TASA_COMISION_TOUR = 0.10;
 
 function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -74,7 +77,7 @@ const TourService = {
     return { disponibles: Math.max(0, tour.maxParticipantes - ocupados), maxParticipantes: tour.maxParticipantes };
   },
 
-  async crearReserva(clienteId, { configTourId, fechaTour, participantes, metodoPago, notasCliente, nombreContacto, telefonoContacto }) {
+  async crearReserva(clienteId, { configTourId, fechaTour, participantes, metodoPago, notasCliente, nombreContacto, telefonoContacto, codigoCupon }) {
     const tour = await prisma.configTour.findUnique({ where: { id: configTourId }, include: TOUR_INCLUDE });
     if (!tour || !tour.activo) throw new ErrorValidacion("Tour no disponible");
 
@@ -82,6 +85,19 @@ const TourService = {
     if (disp.disponibles < participantes) throw new ErrorValidacion("No hay suficientes cupos disponibles");
 
     const total = Number(tour.precioPersona) * participantes;
+
+    let montoDescuento = 0;
+    let cuponAplicado = null;
+    if (codigoCupon) {
+      try {
+        const validacion = await TourService.validarCuponTour(codigoCupon, tour.id, participantes, clienteId);
+        montoDescuento = validacion.descuento;
+        cuponAplicado = validacion.cupon;
+      } catch (e) { /* cupón inválido, ignorar */ }
+    }
+    const totalFinal = Number(total) - montoDescuento;
+    const comision = Math.round(totalFinal * TASA_COMISION_TOUR);
+
     const estado = tour.confirmacionAuto ? "CONFIRMADA" : "PENDIENTE";
 
     const reserva = await prisma.reservaTour.create({
@@ -91,7 +107,11 @@ const TourService = {
         clienteId,
         fechaTour: new Date(fechaTour),
         participantes,
-        total,
+        total: totalFinal,
+        comision,
+        tasaComision: TASA_COMISION_TOUR,
+        montoDescuento: montoDescuento > 0 ? montoDescuento : null,
+        codigoCupon: cuponAplicado?.codigo ?? null,
         estado,
         metodoPago,
         notasCliente: notasCliente || null,
@@ -100,6 +120,16 @@ const TourService = {
       },
       include: { configTour: { include: TOUR_INCLUDE } },
     });
+
+    if (cuponAplicado) {
+      await prisma.cuponTourUso.create({
+        data: { cuponTourId: cuponAplicado.id, clienteId, reservaTourId: reserva.id },
+      });
+      await prisma.cuponTour.update({
+        where: { id: cuponAplicado.id },
+        data: { usosActuales: { increment: 1 } },
+      });
+    }
 
     // Notificar al operador del tour
     const operadorId = await prisma.comercio.findUnique({
@@ -112,6 +142,25 @@ const TourService = {
     if (estado === "CONFIRMADA") {
       await notifTour(clienteId, "✅ Tour confirmado", `Tu reserva para ${tour.nombre} está confirmada`, "/tours/mis-reservas");
     }
+
+    // WhatsApp fire-and-forget
+    setImmediate(async () => {
+      try {
+        const operadorWA = tour.comercio?.whatsapp;
+        if (operadorWA) {
+          await notificarWhatsApp(operadorWA,
+            `🗺️ *Nueva reserva de tour*\n` +
+            `Código: *${reserva.codigo}*\n` +
+            `Tour: ${tour.nombre}\n` +
+            `Fecha: ${new Date(fechaTour).toLocaleDateString('es-CO')}\n` +
+            `Participantes: ${participantes}\n` +
+            `Total: $${Number(totalFinal).toLocaleString('es-CO')}\n` +
+            `Contacto: ${nombreContacto} · ${telefonoContacto}`
+          );
+        }
+      } catch (e) { console.error('[WHATSAPP-TOUR]', e.message); }
+    });
+
     return reserva;
   },
 
@@ -217,6 +266,176 @@ const TourService = {
 
   async adminCambiarEstado(id, activo) {
     return prisma.configTour.update({ where: { id }, data: { activo } });
+  },
+
+  // ── CUPONES TOUR ─────────────────────────────────────────────
+
+  async validarCuponTour(codigo, configTourId, participantes, clienteId) {
+    const cupon = await prisma.cuponTour.findFirst({
+      where: {
+        codigo: codigo.trim().toUpperCase(),
+        activo: true,
+        fin:    { gte: new Date() },
+        inicio: { lte: new Date() },
+        OR: [{ configTourId: null }, { configTourId }],
+      },
+    });
+    if (!cupon) throw new ErrorValidacion("Cupón inválido o expirado");
+    if (cupon.usosMaximos && cupon.usosActuales >= cupon.usosMaximos) {
+      throw new ErrorValidacion("Este cupón ya alcanzó su límite de usos");
+    }
+    if (cupon.minimoPersonas && participantes < cupon.minimoPersonas) {
+      throw new ErrorValidacion(`Mínimo ${cupon.minimoPersonas} personas para usar este cupón`);
+    }
+    if (clienteId) {
+      const yaUso = await prisma.cuponTourUso.findFirst({ where: { cuponTourId: cupon.id, clienteId } });
+      if (yaUso) throw new ErrorValidacion("Ya usaste este cupón anteriormente");
+    }
+    const tour = await prisma.configTour.findUnique({ where: { id: configTourId } });
+    const subtotal = Number(tour.precioPersona) * participantes;
+    const descuento = cupon.tipo === "PORCENTAJE"
+      ? Math.round(subtotal * Number(cupon.valor) / 100)
+      : Math.min(Number(cupon.valor), subtotal);
+    return { cupon, descuento, subtotalConDescuento: subtotal - descuento };
+  },
+
+  async listarCuponesTour(comercioId) {
+    const tour = await prisma.configTour.findUnique({ where: { comercioId } });
+    if (!tour) return [];
+    return prisma.cuponTour.findMany({
+      where: { configTourId: tour.id },
+      orderBy: { createdAt: "desc" },
+      include: { _count: { select: { usos: true } } },
+    });
+  },
+
+  async crearCuponTour(comercioId, datos) {
+    const tour = await prisma.configTour.findUnique({ where: { comercioId } });
+    if (!tour) throw new ErrorValidacion("No tienes un tour configurado");
+    const { codigo, tipo, valor, minimoPersonas, usosMaximos, inicio, fin } = datos;
+    if (!codigo?.trim()) throw new ErrorValidacion("El código es requerido");
+    if (!valor || Number(valor) <= 0) throw new ErrorValidacion("El valor debe ser positivo");
+    if (tipo === "PORCENTAJE" && Number(valor) > 100) throw new ErrorValidacion("El porcentaje no puede superar 100");
+    return prisma.cuponTour.create({
+      data: {
+        codigo: codigo.trim().toUpperCase(),
+        tipo: tipo ?? "PORCENTAJE",
+        valor: Number(valor),
+        minimoPersonas: minimoPersonas ? Number(minimoPersonas) : null,
+        usosMaximos: usosMaximos ? Number(usosMaximos) : null,
+        activo: true,
+        inicio: new Date(inicio),
+        fin:    new Date(fin),
+        configTourId: tour.id,
+      },
+    });
+  },
+
+  async eliminarCuponTour(comercioId, cuponId) {
+    const tour = await prisma.configTour.findUnique({ where: { comercioId } });
+    if (!tour) throw new ErrorNoEncontrado("Tour no encontrado");
+    const cupon = await prisma.cuponTour.findFirst({ where: { id: cuponId, configTourId: tour.id } });
+    if (!cupon) throw new ErrorNoEncontrado("Cupón no encontrado");
+    return prisma.cuponTour.update({ where: { id: cuponId }, data: { activo: false } });
+  },
+
+  // ── FAVORITOS TOUR ────────────────────────────────────────────
+
+  async toggleFavoritoTour(usuarioId, configTourId) {
+    const existe = await prisma.favoritoTour.findUnique({
+      where: { usuarioId_configTourId: { usuarioId, configTourId } },
+    });
+    if (existe) {
+      await prisma.favoritoTour.delete({ where: { id: existe.id } });
+      return { esFavorito: false };
+    }
+    await prisma.favoritoTour.create({ data: { usuarioId, configTourId } });
+    return { esFavorito: true };
+  },
+
+  async misFavoritosTour(usuarioId) {
+    const favs = await prisma.favoritoTour.findMany({
+      where: { usuarioId },
+      include: {
+        configTour: {
+          include: {
+            comercio: { select: { id: true, nombre: true, municipio: true, logoUrl: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return favs.map(f => f.configTour);
+  },
+
+  async esFavoritoTour(usuarioId, configTourId) {
+    const existe = await prisma.favoritoTour.findUnique({
+      where: { usuarioId_configTourId: { usuarioId, configTourId } },
+    });
+    return { esFavorito: !!existe };
+  },
+
+  // ── ESTADÍSTICAS TOUR ─────────────────────────────────────────
+
+  async estadisticasTour(comercioId) {
+    const tour = await prisma.configTour.findUnique({ where: { comercioId } });
+    if (!tour) return null;
+
+    const hoy = new Date();
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const inicioMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+    const finMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+
+    const [mesCurrent, mesAnterior, proximas, totalReservas, ultimas6m] = await Promise.all([
+      prisma.reservaTour.aggregate({
+        where: { configTourId: tour.id, estado: { in: ["CONFIRMADA", "COMPLETADA"] }, creadoAt: { gte: inicioMes } },
+        _count: { id: true },
+        _sum: { total: true, comision: true, participantes: true },
+      }),
+      prisma.reservaTour.aggregate({
+        where: { configTourId: tour.id, estado: { in: ["CONFIRMADA", "COMPLETADA"] }, creadoAt: { gte: inicioMesAnterior, lte: finMesAnterior } },
+        _count: { id: true },
+        _sum: { total: true },
+      }),
+      prisma.reservaTour.findMany({
+        where: { configTourId: tour.id, estado: "CONFIRMADA", fechaTour: { gte: hoy } },
+        orderBy: { fechaTour: "asc" },
+        take: 5,
+        select: { id: true, codigo: true, fechaTour: true, participantes: true, total: true, nombreContacto: true },
+      }),
+      prisma.reservaTour.count({
+        where: { configTourId: tour.id, estado: { in: ["CONFIRMADA", "COMPLETADA"] } },
+      }),
+      prisma.reservaTour.findMany({
+        where: { configTourId: tour.id, estado: { in: ["CONFIRMADA", "COMPLETADA"] },
+                 creadoAt: { gte: new Date(Date.now() - 180 * 86400000) } },
+        select: { creadoAt: true, total: true },
+      }),
+    ]);
+
+    const porMes = {};
+    for (const r of ultimas6m) {
+      const key = `${r.creadoAt.getFullYear()}-${String(r.creadoAt.getMonth() + 1).padStart(2, '0')}`;
+      if (!porMes[key]) porMes[key] = { reservas: 0, ingresos: 0 };
+      porMes[key].reservas++;
+      porMes[key].ingresos += Number(r.total);
+    }
+
+    return {
+      mes: {
+        reservas: mesCurrent._count.id,
+        ingresos: Number(mesCurrent._sum.total ?? 0),
+        comision: Number(mesCurrent._sum.comision ?? 0),
+        participantes: mesCurrent._sum.participantes ?? 0,
+      },
+      mesAnterior: {
+        reservas: mesAnterior._count.id,
+        ingresos: Number(mesAnterior._sum.total ?? 0),
+      },
+      totalHistorico: totalReservas,
+      proximasReservas: proximas,
+      porMes: Object.entries(porMes).sort(([a], [b]) => a.localeCompare(b)).map(([mes, data]) => ({ mes, ...data })),
+    };
   },
 };
 

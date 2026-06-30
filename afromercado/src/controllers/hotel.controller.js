@@ -111,6 +111,60 @@ const HotelController = {
     } catch (e) { next(e); }
   },
 
+  async habitacionesFisicas(req, res, next) {
+    try {
+      const data = await HotelService.habitacionesFisicas(req.usuario.comercio.id);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async crearHabitacionFisica(req, res, next) {
+    try {
+      const data = await HotelService.crearHabitacionFisica(req.usuario.comercio.id, req.body);
+      res.status(201).json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async actualizarHabitacionFisica(req, res, next) {
+    try {
+      const data = await HotelService.actualizarHabitacionFisica(
+        req.usuario.comercio.id,
+        Number(req.params.id),
+        req.body
+      );
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async cambiarEstadoHabitacionFisica(req, res, next) {
+    try {
+      const data = await HotelService.cambiarEstadoHabitacionFisica(
+        req.usuario.comercio.id,
+        Number(req.params.id),
+        req.body.estado
+      );
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async eliminarHabitacionFisica(req, res, next) {
+    try {
+      await HotelService.eliminarHabitacionFisica(req.usuario.comercio.id, Number(req.params.id));
+      res.json({ ok: true });
+    } catch (e) { next(e); }
+  },
+
+  async asignarHabitacionFisicaReserva(req, res, next) {
+    try {
+      const data = await HotelService.asignarHabitacionFisicaReserva(
+        req.usuario.comercio.id,
+        Number(req.params.id),
+        Number(req.body.habitacionFisicaId)
+      );
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
   async reservasHotelero(req, res, next) {
     try {
       const data = await HotelService.reservasHotelero(req.usuario.comercio.id, req.query);
@@ -121,7 +175,7 @@ const HotelController = {
   async cambiarEstado(req, res, next) {
     try {
       const data = await HotelService.cambiarEstadoReserva(
-        req.usuario.comercio.id, Number(req.params.id), req.body.estado
+        req.usuario.comercio.id, Number(req.params.id), req.body.estado, req.body
       );
       res.json({ ok: true, data });
     } catch (e) { next(e); }
