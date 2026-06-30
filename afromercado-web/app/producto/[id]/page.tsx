@@ -19,6 +19,7 @@ import { formatearPrecio } from '@/lib/formatearPrecio'
 import { precioVigente } from '@/lib/precioProducto'
 import { useCarrito } from '@/context/CarritoContext'
 import { useFavoritos } from '@/context/FavoritoContext'
+import BadgeProductorCertificado from '@/components/ui/BadgeProductorCertificado'
 import { useAuth } from '@/context/AuthContext'
 import { apiFetch } from '@/lib/api/client'
 import { obtenerMenuComercioExpress, type MenuComercioExpress } from '@/lib/api/express'
@@ -598,12 +599,7 @@ export default function PaginaProducto({
 
             {/* Badge verificado */}
             {producto.comercio.verificado && (
-              <span className="self-start flex items-center gap-1.5 bg-[#52B788]/15 text-[#2D6A4F] text-xs font-semibold px-3 py-1.5 rounded-full border border-[#52B788]/30">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                Verificado por AfroMercado
-              </span>
+              <BadgeProductorCertificado size="md" />
             )}
 
             {/* Nombre y municipio */}

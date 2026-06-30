@@ -42,6 +42,7 @@ export default function Footer() {
               <Link href="/terminos" className="hover:text-white transition-colors">Términos de uso</Link>
               <Link href="/privacidad" className="hover:text-white transition-colors">Privacidad</Link>
               <Link href="/contacto" className="hover:text-white transition-colors">Contacto</Link>
+              <Link href="/certificacion" className="hover:text-[#A7F3D0] transition-colors">✅ Productor Certificado</Link>
             </div>
           </div>
         </div>

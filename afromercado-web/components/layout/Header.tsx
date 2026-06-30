@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { apiFetch } from '@/lib/api/client'
 import { obtenerReglasPublicas } from '@/lib/api/config'
 import CampanaNotificaciones from './CampanaNotificaciones'
+import BuscadorGlobal from './BuscadorGlobal'
 
 interface HeaderProps {
   itemsCarrito?: number
@@ -159,10 +160,11 @@ export default function Header({ itemsCarrito }: HeaderProps) {
           </Link>
           <Link
             href="/transportes"
-            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#023E8A] hover:bg-[#023E8A]/10 flex items-center gap-1"
+            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1"
           >
             🛥️ Transporte
           </Link>
+          <BuscadorGlobal />
           <Link
             href="/temporada"
             className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#D4A017] hover:bg-[#D4A017]/10 flex items-center"
