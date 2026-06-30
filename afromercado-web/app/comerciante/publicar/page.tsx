@@ -12,12 +12,13 @@ import {
   obtenerCuentaDispersion,
   subirVideoProducto,
   quitarVideoProducto,
+  guardarVideoLinkProducto,
   type CategoriaComerciante,
   type Comercio,
   type CuentaDispersion,
 } from '@/components/comerciante/api'
 import SubidorImagenes from '@/components/comerciante/SubidorImagenes'
-import SubidorVideo from '@/components/comerciante/SubidorVideo'
+import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import { UNIDADES, ALCANCES, type Alcance } from '@/components/comerciante/constantes'
 import Toggle from '@/components/ui/Toggle'
 import { formatearPrecio } from '@/lib/formatearPrecio'
@@ -214,9 +215,8 @@ export default function PublicarProductoPage() {
 
         {/* Subidor de imágenes */}
         <div className="rounded-2xl border border-[#1A1A1A]/8 bg-white p-5 shadow-sm mb-4">
-          <SubidorVideo
+          <SubidorVideoOLink
             titulo="Video del producto"
-            descripcion="Comparte un video del producto. Si dura mas de 45 segundos, podras escoger el fragmento que quieres publicar."
             estadoInicial={{
               videoUrl: null,
               videoPosterUrl: null,
@@ -225,6 +225,7 @@ export default function PublicarProductoPage() {
             }}
             onSubir={(file, meta) => subirVideoProducto(nuevoId, file, meta)}
             onEliminar={() => quitarVideoProducto(nuevoId)}
+            onGuardarLink={async (url) => guardarVideoLinkProducto(nuevoId, url)}
           />
           <div className="h-px bg-[#1A1A1A]/10 my-5" />
           <SubidorImagenes

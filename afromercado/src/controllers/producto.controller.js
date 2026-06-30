@@ -439,6 +439,17 @@ const ProductoController = {
     }
   },
 
+  async guardarVideoLink(req, res, next) {
+    try {
+      const { videoUrl } = req.body;
+      if (!videoUrl || typeof videoUrl !== 'string') return res.status(400).json({ ok: false, error: "videoUrl requerido" });
+      const producto = await ProductoService.guardarVideoLink(req.usuario.id, req.params.id, videoUrl.trim());
+      res.json({ ok: true, producto });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   // PATCH /productos/:id/foto-principal  (body: { url })
   async fotoPrincipal(req, res, next) {
     try {

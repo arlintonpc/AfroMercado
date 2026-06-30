@@ -213,6 +213,24 @@ const ProductoService = {
       videoMimeType: null,
     });
   },
+
+  async guardarVideoLink(usuarioId, productoId, videoUrl) {
+    await this._verificarPropiedad(usuarioId, productoId);
+    return ProductoRepository.actualizar(productoId, {
+      videoUrl,
+      videoPosterUrl: null,
+      videoPublicId: null,
+      videoDuracionSegundos: null,
+      videoDuracionOriginalSegundos: null,
+      videoRecorteInicioSegundos: null,
+      videoRecorteFinSegundos: null,
+      videoAncho: null,
+      videoAlto: null,
+      videoBytes: null,
+      videoFormato: null,
+      videoMimeType: null,
+    });
+  },
 };
 
 module.exports = ProductoService;

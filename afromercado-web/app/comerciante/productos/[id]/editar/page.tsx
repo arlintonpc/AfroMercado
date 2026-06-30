@@ -10,11 +10,12 @@ import {
   listarCategorias,
   subirVideoProducto,
   quitarVideoProducto,
+  guardarVideoLinkProducto,
   type ProductoComerciante,
   type CategoriaComerciante,
 } from '@/components/comerciante/api'
 import SubidorImagenes from '@/components/comerciante/SubidorImagenes'
-import SubidorVideo from '@/components/comerciante/SubidorVideo'
+import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import Toggle from '@/components/ui/Toggle'
 import { ALCANCES, etiquetaUnidad, type Alcance } from '@/components/comerciante/constantes'
 import { formatearPrecio } from '@/lib/formatearPrecio'
@@ -187,9 +188,8 @@ export default function EditarProductoPage() {
       >
         {producto && (
           <>
-            <SubidorVideo
+            <SubidorVideoOLink
               titulo="Video del producto"
-              descripcion="Muestra el producto en movimiento o en contexto. Si el video es largo, selecciona el fragmento mas importante."
               estadoInicial={{
                 videoUrl: producto.videoUrl ?? null,
                 videoPosterUrl: producto.videoPosterUrl ?? null,
@@ -198,6 +198,7 @@ export default function EditarProductoPage() {
               }}
               onSubir={(file, meta) => subirVideoProducto(producto.id, file, meta)}
               onEliminar={() => quitarVideoProducto(producto.id)}
+              onGuardarLink={async (url) => guardarVideoLinkProducto(producto.id, url)}
             />
             <SubidorImagenes
               productoId={producto.id}

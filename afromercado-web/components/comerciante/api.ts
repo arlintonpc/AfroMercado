@@ -451,6 +451,14 @@ export async function quitarVideoProducto(id: number): Promise<VideoEstado> {
   return normalizarVideoEstado(resp.producto)
 }
 
+export async function guardarVideoLinkProducto(id: number, videoUrl: string): Promise<VideoEstado> {
+  const resp = await apiFetch<{ ok: boolean; producto: ProductoComerciante }>(
+    `/productos/${id}/video-link`,
+    { method: 'PATCH', body: { videoUrl } as any },
+  )
+  return normalizarVideoEstado(resp.producto)
+}
+
 export async function subirVideoComercio(
   file: File,
   meta: VideoMetaCaptura,

@@ -1,3 +1,5 @@
+import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
+
 interface VideoDestacadoProps {
   titulo: string
   descripcion?: string
@@ -16,6 +18,13 @@ function formatearDuracion(segundos: number | null | undefined): string {
   return `${min}:${seg}`
 }
 
+function esLinkExterno(url: string): boolean {
+  try {
+    const h = new URL(url).hostname.replace('www.', '')
+    return ['youtube.com','youtu.be','vimeo.com','facebook.com','fb.watch','tiktok.com','instagram.com'].includes(h)
+  } catch { return false }
+}
+
 export default function VideoDestacado({
   titulo,
   descripcion,
@@ -25,6 +34,8 @@ export default function VideoDestacado({
   mimeType,
   className = '',
 }: VideoDestacadoProps) {
+  const externo = esLinkExterno(src)
+
   return (
     <section className={['rounded-3xl border border-[#1A1A1A]/8 bg-white p-4 shadow-sm', className].join(' ')}>
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -33,32 +44,36 @@ export default function VideoDestacado({
             <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M8 5v14l11-7z" />
             </svg>
-            Video corto
+            Video
           </p>
           <h3 className="mt-2 text-base font-bold text-[#1A1A1A]">{titulo}</h3>
           {descripcion && (
             <p className="mt-1 text-sm text-[#1A1A1A]/60 leading-relaxed">{descripcion}</p>
           )}
         </div>
-        {duracionSegundos !== null && duracionSegundos !== undefined && (
+        {!externo && duracionSegundos != null && (
           <span className="flex-shrink-0 rounded-full bg-[#1A1A1A]/5 px-3 py-1 text-xs font-semibold text-[#1A1A1A]/70">
             {formatearDuracion(duracionSegundos)}
           </span>
         )}
       </div>
 
-      <div className="overflow-hidden rounded-2xl bg-black">
-        <video
-          className="block w-full max-h-[520px] aspect-video object-contain bg-black"
-          controls
-          playsInline
-          preload="metadata"
-          poster={poster ?? undefined}
-        >
-          <source src={src} type={mimeType ?? undefined} />
-          Tu navegador no soporta el reproductor de video.
-        </video>
-      </div>
+      {externo ? (
+        <ReproductorVideo url={src} />
+      ) : (
+        <div className="overflow-hidden rounded-2xl bg-black">
+          <video
+            className="block w-full max-h-[520px] aspect-video object-contain bg-black"
+            controls
+            playsInline
+            preload="metadata"
+            poster={poster ?? undefined}
+          >
+            <source src={src} type={mimeType ?? undefined} />
+            Tu navegador no soporta el reproductor de video.
+          </video>
+        </div>
+      )}
     </section>
   )
 }

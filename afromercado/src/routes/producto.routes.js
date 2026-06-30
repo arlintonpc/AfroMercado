@@ -46,6 +46,7 @@ router.post(
 );
 router.delete("/:id/imagenes", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.quitarImagen);
 router.delete("/:id/video", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.quitarVideo);
+router.patch("/:id/video-link", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.guardarVideoLink);
 router.patch("/:id/foto-principal", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.fotoPrincipal);
 
 module.exports = router;
