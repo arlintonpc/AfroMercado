@@ -142,10 +142,22 @@ function Resultados() {
       .finally(() => setCargandoTurismo(false))
   }, [])
 
+  function tabParaCategoria(cat: Categoria): Tab | null {
+    const s = cat.slug.toLowerCase()
+    const n = cat.nombre.toLowerCase()
+    if (s.includes('hotel') || n.includes('hotel') || n.includes('hosped') || n.includes('alojam')) return 'hoteles'
+    if (s === 'turismo' || s.includes('tour') || n.includes('turismo') || n.includes('tour') || n.includes('excurs')) return 'tours'
+    if (s.includes('transport') || n.includes('transport') || n.includes('lancha') || n.includes('fluvial')) return 'transportes'
+    return null
+  }
+
   useEffect(() => {
     if (!categoriaSlug || categorias.length === 0) return
     const cat = categorias.find(c => c.slug === categoriaSlug)
-    if (cat) setFiltros(f => ({ ...f, categoriaId: cat.id }))
+    if (!cat) return
+    const moduloTab = tabParaCategoria(cat)
+    if (moduloTab) { cambiarTab(moduloTab); return }
+    setFiltros(f => ({ ...f, categoriaId: cat.id }))
   }, [categoriaSlug, categorias])
 
   useEffect(() => { setTermino(q) }, [q])
@@ -258,10 +270,8 @@ function Resultados() {
           onChange={e => {
             const cat = categorias.find(c => c.id === e.target.value)
             if (cat) {
-              const n = cat.nombre.toLowerCase()
-              if (n.includes('hotel') || n.includes('hosped') || n.includes('alojam')) { cambiarTab('hoteles'); return }
-              if (n.includes('tour') || n.includes('turismo') || n.includes('excurs')) { cambiarTab('tours'); return }
-              if (n.includes('transport') || n.includes('lancha') || n.includes('fluvial')) { cambiarTab('transportes'); return }
+              const moduloTab = tabParaCategoria(cat)
+              if (moduloTab) { cambiarTab(moduloTab); return }
             }
             actualizarFiltro('categoriaId', e.target.value)
           }}
