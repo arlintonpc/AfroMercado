@@ -130,7 +130,15 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
 
       <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
         <span className="text-xs text-gray-400">{reserva.metodoPago}</span>
-        <span className="font-bold text-[#1A1A1A]">{formatearPrecio(Number(reserva.total))}</span>
+        <div className="text-right">
+          {reserva.codigoCupon && (
+            <p className="text-xs text-emerald-600 font-medium">Cupón: {reserva.codigoCupon}</p>
+          )}
+          {reserva.montoDescuento != null && reserva.montoDescuento > 0 && (
+            <p className="text-xs text-emerald-600">Ahorraste {formatearPrecio(Number(reserva.montoDescuento))}</p>
+          )}
+          <span className="font-bold text-[#1A1A1A]">{formatearPrecio(Number(reserva.total))}</span>
+        </div>
       </div>
 
       {['PENDIENTE', 'CONFIRMADA'].includes(reserva.estado) && (

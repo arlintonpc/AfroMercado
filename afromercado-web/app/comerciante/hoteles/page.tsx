@@ -7,7 +7,8 @@ import {
   reservasHotelero, cambiarEstadoReserva, ocupacionHotel, subirFotosHabitacion, subirVideoHabitacion,
   quitarVideoHabitacion,
   listarBloqueos, crearBloqueo, eliminarBloqueo,
-  type ConfigHotel, type HabitacionTipo, type ReservaHotel, type EstadoReservaHotel, type BloqueoFecha,
+  listarCuponesHotel, crearCuponHotel, eliminarCuponHotel,
+  type ConfigHotel, type HabitacionTipo, type ReservaHotel, type EstadoReservaHotel, type BloqueoFecha, type CuponHotel,
 } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
@@ -256,6 +257,115 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
   )
 }
 
+function FormNuevoCupon({ onCreado, onCancelar }: { onCreado: () => void; onCancelar: () => void }) {
+  const [form, setForm] = useState({
+    codigo: '',
+    tipo: 'PORCENTAJE' as 'PORCENTAJE' | 'VALOR_FIJO',
+    valor: '',
+    minimoNoches: '',
+    usosMaximos: '',
+    inicio: '',
+    fin: '',
+  })
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+
+  async function guardar() {
+    if (!form.codigo.trim() || !form.valor || !form.inicio || !form.fin) {
+      setError('Completa código, valor, fecha inicio y fecha fin')
+      return
+    }
+    setGuardando(true)
+    setError('')
+    try {
+      await crearCuponHotel({
+        codigo: form.codigo.trim().toUpperCase(),
+        tipo: form.tipo,
+        valor: Number(form.valor),
+        minimoNoches: form.minimoNoches ? Number(form.minimoNoches) : undefined,
+        usosMaximos: form.usosMaximos ? Number(form.usosMaximos) : undefined,
+        inicio: form.inicio,
+        fin: form.fin,
+      })
+      onCreado()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al crear cupón')
+    }
+    setGuardando(false)
+  }
+
+  return (
+    <div className="mt-4 border-t border-gray-100 pt-4 space-y-3">
+      <h3 className="font-semibold text-sm text-gray-700">Nuevo cupón</h3>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Código *</label>
+          <input type="text" value={form.codigo}
+            onChange={e => setForm(p => ({ ...p, codigo: e.target.value.toUpperCase() }))}
+            placeholder="Ej: AFRO20"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F] uppercase" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Tipo *</label>
+          <select value={form.tipo} onChange={e => setForm(p => ({ ...p, tipo: e.target.value as 'PORCENTAJE' | 'VALOR_FIJO' }))}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]">
+            <option value="PORCENTAJE">Porcentaje (%)</option>
+            <option value="VALOR_FIJO">Valor fijo ($)</option>
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Valor *</label>
+          <input type="number" min={0} value={form.valor}
+            onChange={e => setForm(p => ({ ...p, valor: e.target.value }))}
+            placeholder={form.tipo === 'PORCENTAJE' ? '20' : '50000'}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Mín. noches</label>
+          <input type="number" min={1} value={form.minimoNoches}
+            onChange={e => setForm(p => ({ ...p, minimoNoches: e.target.value }))}
+            placeholder="Opcional"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Usos máx.</label>
+          <input type="number" min={1} value={form.usosMaximos}
+            onChange={e => setForm(p => ({ ...p, usosMaximos: e.target.value }))}
+            placeholder="Opcional"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Fecha inicio *</label>
+          <input type="date" value={form.inicio}
+            onChange={e => setForm(p => ({ ...p, inicio: e.target.value }))}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Fecha fin *</label>
+          <input type="date" value={form.fin}
+            onChange={e => setForm(p => ({ ...p, fin: e.target.value }))}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+        </div>
+      </div>
+      {error && <p className="text-xs text-red-600 bg-red-50 rounded-xl px-3 py-2">{error}</p>}
+      <div className="flex gap-2">
+        <button onClick={onCancelar}
+          className="flex-1 border border-gray-200 rounded-xl py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
+          Cancelar
+        </button>
+        <button onClick={guardar} disabled={guardando}
+          className="flex-1 bg-[#1B4332] text-white font-bold py-2 rounded-xl text-sm hover:bg-[#2D6A4F] transition-colors disabled:opacity-50">
+          {guardando ? 'Guardando…' : 'Crear cupón'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function ComercianteHotelesPage() {
   const [cfg, setCfg]               = useState<ConfigHotel | null>(null)
   const [reservas, setReservas]     = useState<ReservaHotel[]>([])
@@ -266,6 +376,8 @@ export default function ComercianteHotelesPage() {
   const [formBloqueo, setFormBloqueo] = useState<{ habitacionId: string; fechaInicio: string; fechaFin: string; motivo: string }>({ habitacionId: '', fechaInicio: '', fechaFin: '', motivo: '' })
   const [guardandoBloqueo, setGuardandoBloqueo] = useState(false)
   const [errorBloqueo, setErrorBloqueo] = useState('')
+  const [cupones, setCupones]       = useState<CuponHotel[]>([])
+  const [mostrarFormCupon, setMostrarFormCupon] = useState(false)
   const [cargando, setCargando]     = useState(true)
   const [guardando, setGuardando]   = useState(false)
   const [error, setError]           = useState('')
@@ -360,6 +472,17 @@ export default function ComercianteHotelesPage() {
   useEffect(() => {
     if (tab === 'bloqueos') cargarBloqueos()
   }, [tab])
+
+  async function cargarCupones() {
+    try {
+      const data = await listarCuponesHotel()
+      setCupones(data)
+    } catch {}
+  }
+
+  useEffect(() => {
+    if (cfg) cargarCupones()
+  }, [cfg])
 
   async function handleCrearBloqueo() {
     if (!formBloqueo.fechaInicio || !formBloqueo.fechaFin) { setErrorBloqueo('Selecciona fecha inicio y fecha fin'); return }
@@ -1000,6 +1123,44 @@ export default function ComercianteHotelesPage() {
               {guardando ? 'Guardando…' : 'Guardar configuración'}
             </button>
           </div>
+        )}
+        {/* ── CUPONES ── */}
+        {cfg?.activo && (
+          <section className="bg-white rounded-2xl shadow-sm p-6 mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-gray-900">Cupones de descuento</h2>
+              <button onClick={() => setMostrarFormCupon(true)}
+                className="text-sm font-medium bg-[#1B4332] text-white px-4 py-2 rounded-xl hover:bg-[#2D6A4F] transition-colors">
+                + Nuevo cupón
+              </button>
+            </div>
+
+            {cupones.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">Sin cupones activos. Crea uno para ofrecer descuentos a tus huéspedes.</p>
+            ) : (
+              <div className="space-y-2">
+                {cupones.map(c => (
+                  <div key={c.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div>
+                      <p className="font-mono font-semibold text-sm text-[#1B4332]">{c.codigo}</p>
+                      <p className="text-xs text-gray-500">
+                        {c.tipo === 'PORCENTAJE' ? `${c.valor}% descuento` : `$${Number(c.valor).toLocaleString('es-CO')} fijo`}
+                        {c.minimoNoches ? ` · mín. ${c.minimoNoches} noches` : ''}
+                        {' · '}{c.usosActuales}{c.usosMaximos ? `/${c.usosMaximos}` : ''} usos
+                        {' · '}{new Date(c.fin) > new Date() ? <span className="text-emerald-600">Activo</span> : <span className="text-red-500">Vencido</span>}
+                      </p>
+                    </div>
+                    <button onClick={() => eliminarCuponHotel(c.id).then(cargarCupones)}
+                      className="text-xs text-red-400 hover:text-red-600">Desactivar</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {mostrarFormCupon && (
+              <FormNuevoCupon onCreado={() => { setMostrarFormCupon(false); cargarCupones() }} onCancelar={() => setMostrarFormCupon(false)} />
+            )}
+          </section>
         )}
       </main>
 

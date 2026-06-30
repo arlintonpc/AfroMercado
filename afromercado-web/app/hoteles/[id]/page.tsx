@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, iniciarPagoReserva, type ConfigHotel, type HabitacionTipo, type ReservaHotel } from '@/lib/api/hotel'
+import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, iniciarPagoReserva, validarCuponHotel, type ConfigHotel, type HabitacionTipo, type ReservaHotel, type ValidacionCupon } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
@@ -393,9 +393,33 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
   const [disponibilidad, setDisponibilidad] = useState<{ disponibles: number } | null>(null)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
+  const [codigoCupon, setCodigoCupon] = useState('')
+  const [cuponAplicado, setCuponAplicado] = useState<ValidacionCupon | null>(null)
+  const [cuponError, setCuponError] = useState('')
+  const [aplicandoCupon, setAplicandoCupon] = useState(false)
 
   const noches = Math.max(1, Math.ceil((new Date(fechaSalida).getTime() - new Date(fechaEntrada).getTime()) / 86400000))
   const total  = Number(habitacion.precioPorNoche) * noches
+
+  async function aplicarCupon() {
+    if (!codigoCupon.trim()) return
+    setAplicandoCupon(true)
+    setCuponError('')
+    setCuponAplicado(null)
+    try {
+      const resultado = await validarCuponHotel({
+        codigo: codigoCupon.trim().toUpperCase(),
+        habitacionTipoId: habitacion.id,
+        fechaEntrada: fechaEntrada || '',
+        fechaSalida: fechaSalida || '',
+      })
+      setCuponAplicado(resultado)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Cupón inválido o expirado'
+      setCuponError(msg)
+    }
+    setAplicandoCupon(false)
+  }
 
   useEffect(() => {
     if (!fechaEntrada || !fechaSalida || fechaSalida <= fechaEntrada) { setDisponibilidad(null); return }
@@ -415,6 +439,7 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
         notasCliente: notas || undefined,
         nombreHuesped: nombre.trim(),
         telefonoHuesped: telefono.trim(),
+        codigoCupon: cuponAplicado?.cupon?.codigo || undefined,
       })
       if (modoPago !== 'efectivo') {
         const { checkoutUrl } = await iniciarPagoReserva(reservaCreada.id)
@@ -464,7 +489,15 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
                 </p>
               )}
             </div>
-            <p className="font-black text-2xl text-gray-900">{formatearPrecio(total)}</p>
+            {cuponAplicado ? (
+              <div className="text-right">
+                <p className="text-xs text-gray-400 line-through">{formatearPrecio(total)}</p>
+                <p className="font-black text-2xl text-[#1B4332]">{formatearPrecio(cuponAplicado.totalConDescuento)}</p>
+                <p className="text-xs text-emerald-600">Ahorras {formatearPrecio(cuponAplicado.descuento)}</p>
+              </div>
+            ) : (
+              <p className="font-black text-2xl text-gray-900">{formatearPrecio(total)}</p>
+            )}
           </div>
 
           <div>
@@ -527,6 +560,40 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
             <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2}
               placeholder="Llegada tarde, cama adicional, necesidades especiales…"
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#1B4332] resize-none" />
+          </div>
+
+          {/* Cupón de descuento */}
+          <div className="mt-4">
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cupón de descuento</label>
+            <div className="flex gap-2 mt-1.5">
+              <input
+                type="text"
+                value={codigoCupon}
+                onChange={e => { setCodigoCupon(e.target.value.toUpperCase()); setCuponAplicado(null); setCuponError('') }}
+                placeholder="Ej: AFRO20"
+                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 uppercase"
+                disabled={!!cuponAplicado}
+              />
+              {cuponAplicado ? (
+                <button type="button" onClick={() => { setCuponAplicado(null); setCodigoCupon('') }}
+                  className="px-3 py-2 text-xs font-medium text-red-500 border border-red-200 rounded-xl hover:bg-red-50">
+                  Quitar
+                </button>
+              ) : (
+                <button type="button" onClick={aplicarCupon} disabled={!codigoCupon.trim() || aplicandoCupon}
+                  className="px-3 py-2 text-xs font-medium bg-[#2D6A4F] text-white rounded-xl disabled:opacity-50 hover:bg-[#1B4332] transition-colors">
+                  {aplicandoCupon ? '...' : 'Aplicar'}
+                </button>
+              )}
+            </div>
+            {cuponError && <p className="text-xs text-red-500 mt-1">{cuponError}</p>}
+            {cuponAplicado && (
+              <div className="mt-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                <p className="text-xs font-semibold text-emerald-700">
+                  ✓ Cupón {cuponAplicado.cupon.codigo} aplicado — descuento {formatearPrecio(cuponAplicado.descuento)}
+                </p>
+              </div>
+            )}
           </div>
 
           {error && <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>}

@@ -209,6 +209,7 @@ model Usuario {
   reservasTransporte        ReservaTransporte[] @relation("ReservasTransporteCliente")
   reviewsHotel              ReviewHotel[]       @relation("ReviewsHotelCliente")
   reviewsTour               ReviewTour[]        @relation("ReviewsTourCliente")
+  cuponesHotelUsos          CuponHotelUso[]
 }
 
 model Comercio {
@@ -1297,6 +1298,7 @@ model ConfigHotel {
   habitaciones  HabitacionTipo[]
   reservas      ReservaHotel[]
   reviews       ReviewHotel[]
+  cupones       CuponHotel[]
 
   @@index([activo])
 }
@@ -1343,6 +1345,8 @@ model ReservaHotel {
   montoPenalidad    Decimal?           @db.Decimal(10, 2)
   montoReembolso    Decimal?           @db.Decimal(10, 2)
   codigoCupon       String?
+  comision          Decimal?           @db.Decimal(10, 2)
+  tasaComision      Decimal?           @db.Decimal(5, 4)
   creadoAt          DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -1350,6 +1354,7 @@ model ReservaHotel {
   habitacionTipo HabitacionTipo @relation(fields: [habitacionTipoId], references: [id])
   cliente        Usuario        @relation("ReservasHotelCliente",     fields: [clienteId], references: [id])
   review         ReviewHotel?
+  cuponHotelUso  CuponHotelUso?
 
   @@index([configHotelId, estado])
   @@index([clienteId])
@@ -1519,4 +1524,42 @@ model ReviewTour {
   reservaTour ReservaTour @relation(fields: [reservaTourId], references: [id], onDelete: Cascade)
 
   @@index([configTourId])
+}
+
+// ─── CUPONES HOTEL ────────────────────────────────────────────
+
+model CuponHotel {
+  id            Int       @id @default(autoincrement())
+  codigo        String    @unique
+  tipo          String    @default("PORCENTAJE")
+  valor         Decimal   @db.Decimal(10, 2)
+  minimoNoches  Int?
+  usosMaximos   Int?
+  usosActuales  Int       @default(0)
+  activo        Boolean   @default(true)
+  inicio        DateTime
+  fin           DateTime
+  configHotelId Int?
+  createdAt     DateTime  @default(now())
+
+  configHotel ConfigHotel?    @relation(fields: [configHotelId], references: [id], onDelete: SetNull)
+  usos        CuponHotelUso[]
+
+  @@index([codigo, activo])
+  @@index([activo, fin])
+  @@index([configHotelId])
+}
+
+model CuponHotelUso {
+  id             Int      @id @default(autoincrement())
+  cuponHotelId   Int
+  clienteId      Int
+  reservaHotelId Int      @unique
+  createdAt      DateTime @default(now())
+
+  cupon        CuponHotel   @relation(fields: [cuponHotelId], references: [id])
+  cliente      Usuario      @relation(fields: [clienteId], references: [id])
+  reservaHotel ReservaHotel @relation(fields: [reservaHotelId], references: [id])
+
+  @@index([cuponHotelId, clienteId])
 }

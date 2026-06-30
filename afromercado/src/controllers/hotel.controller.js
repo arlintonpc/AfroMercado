@@ -3,6 +3,7 @@ const path = require("path");
 const { subirACloudinary, subirVideoACloudinary, construirUrlVideoOptimizada, construirPosterVideo } = require("../utils/cloudinary");
 const HotelService = require("../services/hotel.service");
 const { ErrorValidacion } = require("../utils/errores");
+const prisma = require("../config/prisma");
 const {
   crearUploadVideo,
   extraerVideoMeta,
@@ -242,6 +243,42 @@ const HotelController = {
   async quitarVideoHabitacion(req, res, next) {
     try {
       await HotelService.quitarVideoHabitacion(req.usuario.comercio.id, Number(req.params.id));
+      res.json({ ok: true });
+    } catch (e) { next(e); }
+  },
+
+  // ── CUPONES ───────────────────────────────────────────────────
+  async validarCupon(req, res, next) {
+    try {
+      const { codigo, habitacionTipoId, fechaEntrada, fechaSalida } = req.body;
+      const entrada = new Date(fechaEntrada);
+      const salida  = new Date(fechaSalida);
+      const noches  = Math.ceil((salida - entrada) / 86400000);
+      const tipo    = await prisma.habitacionTipo.findUnique({ where: { id: Number(habitacionTipoId) } });
+      if (!tipo) return res.status(404).json({ ok: false, error: "Habitación no encontrada" });
+      const totalOriginal = Number(tipo.precioPorNoche) * noches;
+      const data = await HotelService.validarCuponHotel(codigo, tipo.configHotelId, noches, req.usuario?.id, totalOriginal);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async listarCupones(req, res, next) {
+    try {
+      const data = await HotelService.listarCuponesHotel(req.usuario.comercio.id);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async crearCupon(req, res, next) {
+    try {
+      const data = await HotelService.crearCuponHotel(req.usuario.comercio.id, req.body);
+      res.status(201).json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async eliminarCupon(req, res, next) {
+    try {
+      await HotelService.eliminarCuponHotel(req.usuario.comercio.id, Number(req.params.id));
       res.json({ ok: true });
     } catch (e) { next(e); }
   },

@@ -29,6 +29,10 @@ const uploadFotos = _uploadFotos.array("fotos", 10);
 // ── PÚBLICO ──────────────────────────────────────────────────
 router.get("/",                         HotelController.listar);
 router.get("/disponibilidad",           HotelController.disponibilidad);
+
+// Validación de cupón — auth opcional (clienteId puede ser null)
+router.post("/cupones/validar", HotelController.validarCupon);
+
 router.get("/:id",                      HotelController.obtener);
 
 // ── CLIENTE ──────────────────────────────────────────────────
@@ -53,6 +57,11 @@ router.get(  "/mi-hotel/ocupacion",             ...soloComercio, HotelController
 router.get(   "/mi-hotel/bloqueos",             ...soloComercio, HotelController.listarBloqueos);
 router.post(  "/mi-hotel/bloqueos",             ...soloComercio, HotelController.crearBloqueo);
 router.delete("/mi-hotel/bloqueos/:bloqueoId",  ...soloComercio, HotelController.eliminarBloqueo);
+
+// Cupones del hotel
+router.get(   "/mi-hotel/cupones",      ...soloComercio, HotelController.listarCupones);
+router.post(  "/mi-hotel/cupones",      ...soloComercio, HotelController.crearCupon);
+router.delete("/mi-hotel/cupones/:id",  ...soloComercio, HotelController.eliminarCupon);
 
 // ── REVIEWS ──────────────────────────────────────────────────
 router.get( "/:id/reviews",        ReviewController.reviewsHotel);

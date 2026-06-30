@@ -115,6 +115,59 @@ export async function verificarDisponibilidad(habitacionTipoId: number, fechaEnt
 }
 
 // ── CLIENTE ──────────────────────────────────────────────────
+export interface CuponHotel {
+  id: number
+  codigo: string
+  tipo: 'PORCENTAJE' | 'VALOR_FIJO'
+  valor: number | string
+  minimoNoches?: number | null
+  usosMaximos?: number | null
+  usosActuales: number
+  activo: boolean
+  inicio: string
+  fin: string
+  configHotelId?: number | null
+  createdAt: string
+}
+
+export interface ValidacionCupon {
+  cupon: CuponHotel
+  descuento: number
+  totalConDescuento: number
+}
+
+export async function validarCuponHotel(datos: {
+  codigo: string
+  habitacionTipoId: number
+  fechaEntrada: string
+  fechaSalida: string
+}): Promise<ValidacionCupon> {
+  const r = await apiFetch<{ ok: boolean; data: ValidacionCupon }>('/hoteles/cupones/validar', { method: 'POST', body: datos, auth: false })
+  return r.data
+}
+
+export async function listarCuponesHotel(): Promise<CuponHotel[]> {
+  const r = await apiFetch<{ ok: boolean; data: CuponHotel[] }>('/hoteles/mi-hotel/cupones')
+  return r.data
+}
+
+export async function crearCuponHotel(datos: {
+  codigo: string
+  tipo: 'PORCENTAJE' | 'VALOR_FIJO'
+  valor: number
+  minimoNoches?: number
+  usosMaximos?: number
+  inicio: string
+  fin: string
+}): Promise<CuponHotel> {
+  const r = await apiFetch<{ ok: boolean; data: CuponHotel }>('/hoteles/mi-hotel/cupones', { method: 'POST', body: datos })
+  return r.data
+}
+
+export async function eliminarCuponHotel(id: number): Promise<void> {
+  await apiFetch(`/hoteles/mi-hotel/cupones/${id}`, { method: 'DELETE' })
+}
+
 export async function crearReserva(datos: {
   habitacionTipoId: number
   fechaEntrada: string
@@ -124,6 +177,7 @@ export async function crearReserva(datos: {
   notasCliente?: string
   nombreHuesped: string
   telefonoHuesped: string
+  codigoCupon?: string
 }): Promise<ReservaHotel> {
   const r = await apiFetch<{ ok: boolean; data: ReservaHotel }>('/hoteles/reservas', { method: 'POST', body: datos })
   return r.data

@@ -114,7 +114,7 @@ const HotelService = {
   // ── CLIENTE ──────────────────────────────────────────────────
 
   async crearReserva(clienteId, datos) {
-    const { habitacionTipoId, fechaEntrada, fechaSalida, huespedes, metodoPago, notasCliente, nombreHuesped, telefonoHuesped } = datos;
+    const { habitacionTipoId, fechaEntrada, fechaSalida, huespedes, metodoPago, notasCliente, nombreHuesped, telefonoHuesped, codigoCupon } = datos;
 
     const entrada = new Date(fechaEntrada);
     const salida  = new Date(fechaSalida);
@@ -126,7 +126,24 @@ const HotelService = {
     const { disponibles, tipo } = await this.verificarDisponibilidad(habitacionTipoId, entrada, salida);
     if (disponibles <= 0) throw new ErrorValidacion("No hay disponibilidad para esas fechas");
 
-    const total = Number(tipo.precioPorNoche) * noches;
+    const totalOriginal = Number(tipo.precioPorNoche) * noches;
+
+    // Validar cupón si viene
+    let montoDescuento = 0;
+    let cuponValidado = null;
+    if (codigoCupon) {
+      try {
+        const resultado = await this.validarCuponHotel(codigoCupon, tipo.configHotelId, noches, clienteId, totalOriginal);
+        montoDescuento = resultado.descuento;
+        cuponValidado  = resultado.cupon;
+      } catch (e) {
+        throw e; // re-lanzar para que el controller lo maneje
+      }
+    }
+
+    const totalFinal = totalOriginal - montoDescuento;
+    const tasaComision = 0.1;
+    const comision = Math.round(totalFinal * tasaComision * 100) / 100;
 
     const hotel = await prisma.configHotel.findUnique({ where: { id: tipo.configHotelId } });
     const estadoInicial = hotel?.confirmacionAuto ? "CONFIRMADA" : "PENDIENTE";
@@ -140,18 +157,41 @@ const HotelService = {
         fechaEntrada: entrada,
         fechaSalida:  salida,
         huespedes:    Number(huespedes) || 1,
-        total,
+        total:        totalFinal,
         estado:       estadoInicial,
         metodoPago:   metodoPago || "EFECTIVO",
         notasCliente: notasCliente || null,
         nombreHuesped,
         telefonoHuesped,
+        montoDescuento: montoDescuento || null,
+        codigoCupon:    codigoCupon || null,
+        comision,
+        tasaComision,
       },
       include: {
         habitacionTipo: true,
         configHotel: { include: { comercio: { include: { usuario: { select: { email: true, nombre: true } } } } } },
       },
     });
+
+    // Registrar uso del cupón (no bloquea la reserva si falla)
+    if (cuponValidado) {
+      try {
+        await prisma.cuponHotelUso.create({
+          data: {
+            cuponHotelId:   cuponValidado.id,
+            clienteId,
+            reservaHotelId: reserva.id,
+          },
+        });
+        await prisma.cuponHotel.update({
+          where: { id: cuponValidado.id },
+          data:  { usosActuales: { increment: 1 } },
+        });
+      } catch (e) {
+        console.error("[CUPON-HOTEL-USO]", e.message);
+      }
+    }
 
     // Notificar al hotelero
     const hoteleroId = reserva.configHotel.comercio.usuarioId;
@@ -176,7 +216,7 @@ const HotelService = {
             fechaEntrada: entrada,
             fechaSalida:  salida,
             noches,
-            total,
+            total: totalFinal,
           }),
         }).catch((err) => console.error("[EMAIL-HOTEL]", err.message));
       });
@@ -699,6 +739,97 @@ const HotelService = {
     }
 
     return null;
+  },
+
+  // ── CUPONES DE HOTEL ──────────────────────────────────────────
+
+  async validarCuponHotel(codigo, configHotelId, noches, clienteId, totalOriginal) {
+    const ahora = new Date();
+    const cupon = await prisma.cuponHotel.findFirst({
+      where: {
+        codigo: codigo.trim().toUpperCase(),
+        activo: true,
+        inicio: { lte: ahora },
+        fin:    { gte: ahora },
+        OR: [
+          { configHotelId: null },
+          { configHotelId },
+        ],
+      },
+    });
+
+    if (!cupon) throw new ErrorValidacion("Cupón no válido o expirado");
+
+    if (cupon.minimoNoches && noches < cupon.minimoNoches) {
+      throw new ErrorValidacion(`Este cupón requiere mínimo ${cupon.minimoNoches} noche(s)`);
+    }
+
+    if (cupon.usosMaximos && cupon.usosActuales >= cupon.usosMaximos) {
+      throw new ErrorValidacion("El cupón ha alcanzado el límite de usos");
+    }
+
+    if (clienteId) {
+      const usoExistente = await prisma.cuponHotelUso.findFirst({
+        where: { cuponHotelId: cupon.id, clienteId },
+      });
+      if (usoExistente) throw new ErrorValidacion("Ya usaste este cupón");
+    }
+
+    let descuento;
+    if (cupon.tipo === "PORCENTAJE") {
+      descuento = Math.round(totalOriginal * Number(cupon.valor) / 100 * 100) / 100;
+    } else {
+      descuento = Math.min(Number(cupon.valor), totalOriginal);
+    }
+
+    const totalConDescuento = totalOriginal - descuento;
+    return { cupon, descuento, totalConDescuento };
+  },
+
+  async crearCuponHotel(comercioId, datos) {
+    const hotel = await prisma.configHotel.findUnique({ where: { comercioId } });
+    if (!hotel || !hotel.activo) throw new ErrorValidacion("No tienes un hotel activo");
+
+    const { codigo, tipo = "PORCENTAJE", valor, minimoNoches, usosMaximos, inicio, fin } = datos;
+    if (!codigo || !valor || !inicio || !fin) throw new ErrorValidacion("Faltan campos requeridos: codigo, valor, inicio, fin");
+
+    return prisma.cuponHotel.create({
+      data: {
+        codigo:       codigo.trim().toUpperCase(),
+        tipo,
+        valor:        Number(valor),
+        minimoNoches: minimoNoches ? Number(minimoNoches) : null,
+        usosMaximos:  usosMaximos  ? Number(usosMaximos)  : null,
+        inicio:       new Date(inicio),
+        fin:          new Date(fin),
+        configHotelId: hotel.id,
+      },
+    });
+  },
+
+  async listarCuponesHotel(comercioId) {
+    const hotel = await prisma.configHotel.findUnique({ where: { comercioId } });
+    if (!hotel) throw new ErrorNoEncontrado("Hotel no encontrado");
+
+    return prisma.cuponHotel.findMany({
+      where:   { configHotelId: hotel.id },
+      orderBy: { createdAt: "desc" },
+    });
+  },
+
+  async eliminarCuponHotel(comercioId, cuponId) {
+    const hotel = await prisma.configHotel.findUnique({ where: { comercioId } });
+    if (!hotel) throw new ErrorNoEncontrado("Hotel no encontrado");
+
+    const cupon = await prisma.cuponHotel.findFirst({
+      where: { id: cuponId, configHotelId: hotel.id },
+    });
+    if (!cupon) throw new ErrorNoEncontrado("Cupón no encontrado");
+
+    return prisma.cuponHotel.update({
+      where: { id: cuponId },
+      data:  { activo: false },
+    });
   },
 };
 
