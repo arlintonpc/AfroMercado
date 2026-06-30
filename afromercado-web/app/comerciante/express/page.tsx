@@ -4,8 +4,11 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   obtenerConfigExpress, actualizarConfigExpress, toggleAbiertoExpress,
   pedidosComercioExpress, aceptarPedidoExpress, rechazarPedidoExpress, avanzarEstadoExpress,
-  festivosColombia,
+  festivosColombia, obtenerMenuComercioExpress,
+  listarSeccionesExpress, crearSeccionExpress, actualizarSeccionExpress,
+  eliminarSeccionExpress, asignarSeccionProducto,
   type ConfigExpress, type PedidoExpress, type ModalidadExpress, type DiaSemana, type HorarioExpress,
+  type MenuSeccion, type MenuComercioExpress,
 } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
@@ -65,7 +68,7 @@ const ACCION_AVANZAR: Record<string, string> = {
   EN_CAMINO:      'Marcar entregado',
 }
 
-type Pestana = 'activos' | 'config' | 'historial'
+type Pestana = 'activos' | 'config' | 'historial' | 'menu'
 
 export default function ExpressComerciante() {
   const [pestana, setPestana]   = useState<Pestana>('activos')
@@ -84,6 +87,15 @@ export default function ExpressComerciante() {
   const [horarios, setHorarios]   = useState<HorarioExpress[]>(HORARIO_DEFAULT)
   const [festivos, setFestivos]   = useState<string[]>([])
   const [error, setError]         = useState('')
+  const [secciones, setSecciones]         = useState<MenuSeccion[]>([])
+  const [productosExpress, setProductosExpress] = useState<MenuComercioExpress['productos']>([])
+  const [miComercioId, setMiComercioId]   = useState<number | null>(null)
+  const miComercioIdRef = useRef<number | null>(null)
+  const [nuevaSeccion, setNuevaSeccion]   = useState({ nombre: '', icono: '🍽️' })
+  const [cargandoMenu, setCargandoMenu]   = useState(false)
+  const [editandoSeccion, setEditandoSeccion] = useState<number | null>(null)
+  const [editSeccionNombre, setEditSeccionNombre] = useState('')
+  const [editSeccionIcono, setEditSeccionIcono]   = useState('')
 
   const cargar = useCallback(async () => {
     try {
@@ -97,7 +109,11 @@ export default function ExpressComerciante() {
         const dep = (comercio as any).departamento ?? 'Chocó'
         setComercioDep(dep)
         setComercioMun(comercio.municipio ?? '')
+        const cid = (comercio as any).id ?? null
+        setMiComercioId(cid)
+        miComercioIdRef.current = cid
       }
+      listarSeccionesExpress().then(setSecciones).catch(() => {})
       setConfig(cfg)
       // Solo inicializar editConfig en la primera carga — no pisar cambios no guardados
       if (primerasCarga.current) {
@@ -164,6 +180,17 @@ export default function ExpressComerciante() {
     })
     return () => es.close()
   }, [])
+
+  async function cargarMenuExpressPropio() {
+    const id = miComercioIdRef.current ?? miComercioId
+    if (!id) return
+    setCargandoMenu(true)
+    try {
+      const menu = await obtenerMenuComercioExpress(id)
+      if (menu) setProductosExpress(menu.productos)
+    } catch {}
+    finally { setCargandoMenu(false) }
+  }
 
   async function toggleAbierto() {
     if (!config) return
@@ -268,10 +295,22 @@ export default function ExpressComerciante() {
 
       {/* Pestañas */}
       <div className="flex border-b border-gray-200 gap-1">
-        {([['activos', `Activos (${activos.length})`], ['historial', 'Historial'], ['config', 'Configuración']] as [Pestana, string][]).map(([id, label]) => (
+        {([
+          ['activos', `Activos (${activos.length})`],
+          ['historial', 'Historial'],
+          ['menu', '🗂️ Menú'],
+          ['config', 'Configuración'],
+        ] as [Pestana, string][]).map(([id, label]) => (
           <button
             key={id}
-            onClick={() => { setPestana(id); if (id === 'activos') setPedidosNuevos(0) }}
+            onClick={() => {
+              setPestana(id)
+              if (id === 'activos') setPedidosNuevos(0)
+              if (id === 'menu') {
+                listarSeccionesExpress().then(setSecciones).catch(() => {})
+                cargarMenuExpressPropio()
+              }
+            }}
             className={`relative px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               pestana === id ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
@@ -308,6 +347,200 @@ export default function ExpressComerciante() {
             </div>
           )}
           {historial.map(p => <TarjetaPedido key={p.id} pedido={p} onAceptar={aceptar} onRechazar={rechazar} onAvanzar={avanzar} />)}
+        </div>
+      )}
+
+      {/* ── MENÚ ── */}
+      {pestana === 'menu' && (
+        <div className="space-y-6">
+
+          {/* Secciones existentes */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-gray-800">Secciones del menú</h2>
+              <span className="text-xs text-gray-400">{secciones.length} sección{secciones.length !== 1 ? 'es' : ''}</span>
+            </div>
+
+            {secciones.length === 0 && (
+              <p className="text-sm text-gray-400 py-4 text-center">
+                Aún no has creado secciones. Las secciones organizan tu menú para los clientes.
+              </p>
+            )}
+
+            <div className="space-y-2">
+              {secciones.map((s, idx) => (
+                <div key={s.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                  {editandoSeccion === s.id ? (
+                    <>
+                      <input
+                        value={editSeccionIcono}
+                        onChange={e => setEditSeccionIcono(e.target.value)}
+                        className="w-12 border border-gray-200 rounded-lg px-2 py-1.5 text-center text-lg"
+                      />
+                      <input
+                        value={editSeccionNombre}
+                        onChange={e => setEditSeccionNombre(e.target.value)}
+                        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+                      />
+                      <button
+                        onClick={async () => {
+                          await actualizarSeccionExpress(s.id, { nombre: editSeccionNombre, icono: editSeccionIcono })
+                          const updated = await listarSeccionesExpress()
+                          setSecciones(updated)
+                          setEditandoSeccion(null)
+                        }}
+                        className="text-xs bg-[#2D6A4F] text-white px-3 py-1.5 rounded-lg font-medium"
+                      >
+                        Guardar
+                      </button>
+                      <button onClick={() => setEditandoSeccion(null)} className="text-xs text-gray-400 px-2 py-1.5">
+                        Cancelar
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xl">{s.icono}</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-800">{s.nombre}</p>
+                        <p className="text-xs text-gray-400">
+                          {productosExpress.filter(p => p.menuSeccionId === s.id).length} productos
+                        </p>
+                      </div>
+                      {/* Reordenar */}
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          disabled={idx === 0}
+                          onClick={async () => {
+                            const prev = secciones[idx - 1]
+                            await actualizarSeccionExpress(s.id, { orden: prev.orden })
+                            await actualizarSeccionExpress(prev.id, { orden: s.orden })
+                            setSecciones(await listarSeccionesExpress())
+                          }}
+                          className="text-gray-400 hover:text-gray-600 disabled:opacity-20 text-xs leading-none"
+                        >▲</button>
+                        <button
+                          disabled={idx === secciones.length - 1}
+                          onClick={async () => {
+                            const next = secciones[idx + 1]
+                            await actualizarSeccionExpress(s.id, { orden: next.orden })
+                            await actualizarSeccionExpress(next.id, { orden: s.orden })
+                            setSecciones(await listarSeccionesExpress())
+                          }}
+                          className="text-gray-400 hover:text-gray-600 disabled:opacity-20 text-xs leading-none"
+                        >▼</button>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setEditandoSeccion(s.id)
+                          setEditSeccionNombre(s.nombre)
+                          setEditSeccionIcono(s.icono)
+                        }}
+                        className="text-xs text-[#2D6A4F] border border-[#2D6A4F] px-2 py-1 rounded-lg"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`¿Eliminar la sección "${s.nombre}"? Los productos quedarán sin sección.`)) return
+                          await eliminarSeccionExpress(s.id)
+                          setSecciones(await listarSeccionesExpress())
+                          setProductosExpress(prev => prev.map(p => p.menuSeccionId === s.id ? { ...p, menuSeccionId: null } : p))
+                        }}
+                        className="text-xs text-red-500 border border-red-200 px-2 py-1 rounded-lg"
+                      >
+                        Eliminar
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Crear nueva sección */}
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-xs font-medium text-gray-500 mb-2">Nueva sección</p>
+              <div className="flex gap-2">
+                <input
+                  value={nuevaSeccion.icono}
+                  onChange={e => setNuevaSeccion(p => ({ ...p, icono: e.target.value }))}
+                  placeholder="🥤"
+                  className="w-14 border border-gray-200 rounded-xl px-2 py-2 text-center text-lg"
+                />
+                <input
+                  value={nuevaSeccion.nombre}
+                  onChange={e => setNuevaSeccion(p => ({ ...p, nombre: e.target.value }))}
+                  placeholder="Ej: Bebidas, Postres, Platos fuertes…"
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm"
+                />
+                <button
+                  disabled={!nuevaSeccion.nombre.trim()}
+                  onClick={async () => {
+                    if (!nuevaSeccion.nombre.trim()) return
+                    await crearSeccionExpress(nuevaSeccion)
+                    setSecciones(await listarSeccionesExpress())
+                    setNuevaSeccion({ nombre: '', icono: '🍽️' })
+                  }}
+                  className="bg-[#2D6A4F] text-white text-sm font-medium px-4 py-2 rounded-xl disabled:opacity-50"
+                >
+                  + Crear
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">El ícono puede ser un emoji. Ej: 🥤 Bebidas, 🍮 Postres, 🥗 Ensaladas</p>
+            </div>
+          </div>
+
+          {/* Asignar secciones a productos */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-gray-800">Organizar productos por sección</h2>
+              <button
+                onClick={cargarMenuExpressPropio}
+                className="text-xs text-[#2D6A4F] border border-[#2D6A4F] px-3 py-1 rounded-lg"
+              >
+                Recargar
+              </button>
+            </div>
+
+            {cargandoMenu ? (
+              <div className="flex justify-center py-8">
+                <div className="w-6 h-6 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : productosExpress.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 text-sm">
+                <p className="text-2xl mb-2">🥘</p>
+                <p>No tienes productos Express activos.</p>
+                <p className="mt-1">Ve a <a href="/comerciante/mis-productos" className="text-[#2D6A4F] underline">Mis productos</a> y activa &quot;Express&quot; en los que quieras mostrar aquí.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {productosExpress.map(p => (
+                  <div key={p.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                    {p.fotoUrl ? (
+                      <img src={p.fotoUrl} alt={p.nombre} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-[#F0EBE3] flex items-center justify-center text-sm flex-shrink-0">🥘</div>
+                    )}
+                    <p className="flex-1 text-sm font-medium text-gray-800 truncate">{p.nombre}</p>
+                    <select
+                      value={p.menuSeccionId ?? ''}
+                      onChange={async e => {
+                        const val = e.target.value === '' ? null : Number(e.target.value)
+                        await asignarSeccionProducto(p.id, val)
+                        setProductosExpress(prev => prev.map(x => x.id === p.id ? { ...x, menuSeccionId: val } : x))
+                      }}
+                      className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
+                    >
+                      <option value="">Sin sección</option>
+                      {secciones.map(s => (
+                        <option key={s.id} value={s.id}>{s.icono} {s.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 

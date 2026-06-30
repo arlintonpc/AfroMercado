@@ -311,6 +311,10 @@ const ExpressService = {
       where: { comercioId },
       include: {
         horarios: true,
+        secciones: {
+          where: { activo: true },
+          orderBy: { orden: 'asc' },
+        },
         comercio: {
           select: { id: true, nombre: true, logoUrl: true, municipio: true,
                     calificacion: true, totalReviews: true, whatsapp: true },
@@ -321,7 +325,7 @@ const ExpressService = {
     const productos = await prisma.producto.findMany({
       where: { comercioId, esExpress: true, activo: true, deletedAt: null },
       include: { categoria: { select: { id: true, nombre: true } } },
-      orderBy: [{ categoriaId: "asc" }, { nombre: "asc" }],
+      orderBy: [{ menuSeccionId: 'asc' }, { nombre: 'asc' }],
     });
     return {
       ...cfg,
@@ -412,6 +416,83 @@ const ExpressService = {
     const pedido = await prisma.pedidoExpress.findFirst({ where: { id: pedidoId, comercioId } });
     if (!pedido) throw new ErrorNoEncontrado("Pedido Express no encontrado");
     return pedido;
+  },
+
+  // ── SECCIONES DE MENÚ ────────────────────────────────────────
+
+  async listarSecciones(comercioId) {
+    const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
+    if (!cfg) return [];
+    return prisma.menuSeccion.findMany({
+      where: { configExpressId: cfg.id },
+      orderBy: { orden: 'asc' },
+    });
+  },
+
+  async crearSeccion(comercioId, { nombre, icono, orden }) {
+    const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
+    if (!cfg) throw new ErrorValidacion("Activa primero el módulo Express");
+    if (!nombre?.trim()) throw new ErrorValidacion("El nombre es requerido");
+    const maxOrden = await prisma.menuSeccion.aggregate({
+      where: { configExpressId: cfg.id },
+      _max: { orden: true },
+    });
+    return prisma.menuSeccion.create({
+      data: {
+        configExpressId: cfg.id,
+        nombre: nombre.trim(),
+        icono: icono ?? '🍽️',
+        orden: orden ?? (maxOrden._max.orden ?? -1) + 1,
+      },
+    });
+  },
+
+  async actualizarSeccion(comercioId, seccionId, { nombre, icono, orden, activo }) {
+    const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
+    if (!cfg) throw new ErrorNoEncontrado("Config no encontrada");
+    const seccion = await prisma.menuSeccion.findFirst({
+      where: { id: seccionId, configExpressId: cfg.id },
+    });
+    if (!seccion) throw new ErrorNoEncontrado("Sección no encontrada");
+    return prisma.menuSeccion.update({
+      where: { id: seccionId },
+      data: {
+        ...(nombre !== undefined && { nombre: nombre.trim() }),
+        ...(icono  !== undefined && { icono }),
+        ...(orden  !== undefined && { orden }),
+        ...(activo !== undefined && { activo }),
+      },
+    });
+  },
+
+  async eliminarSeccion(comercioId, seccionId) {
+    const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
+    if (!cfg) throw new ErrorNoEncontrado("Config no encontrada");
+    const seccion = await prisma.menuSeccion.findFirst({
+      where: { id: seccionId, configExpressId: cfg.id },
+    });
+    if (!seccion) throw new ErrorNoEncontrado("Sección no encontrada");
+    await prisma.producto.updateMany({
+      where: { menuSeccionId: seccionId },
+      data: { menuSeccionId: null },
+    });
+    await prisma.menuSeccion.delete({ where: { id: seccionId } });
+  },
+
+  async asignarSeccionProducto(comercioId, productoId, menuSeccionId) {
+    const prod = await prisma.producto.findFirst({
+      where: { id: productoId, comercioId },
+    });
+    if (!prod) throw new ErrorNoEncontrado("Producto no encontrado");
+    if (menuSeccionId === null) {
+      return prisma.producto.update({ where: { id: productoId }, data: { menuSeccionId: null } });
+    }
+    const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
+    const sec = cfg && await prisma.menuSeccion.findFirst({
+      where: { id: menuSeccionId, configExpressId: cfg.id },
+    });
+    if (!sec) throw new ErrorNoEncontrado("Sección no encontrada");
+    return prisma.producto.update({ where: { id: productoId }, data: { menuSeccionId } });
   },
 };
 

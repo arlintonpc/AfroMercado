@@ -79,9 +79,20 @@ export interface ComercioExpress {
 
 // ── CLIENTE ──────────────────────────────────────────────────
 
+export interface MenuSeccion {
+  id: number
+  configExpressId: number
+  nombre: string
+  icono: string
+  orden: number
+  activo: boolean
+  createdAt: string
+}
+
 export interface MenuComercioExpress extends ComercioExpress {
   abiertoAhora: boolean
   horarios?: HorarioExpress[]
+  secciones?: MenuSeccion[]
   productos: Array<{
     id: number
     nombre: string
@@ -93,6 +104,8 @@ export interface MenuComercioExpress extends ComercioExpress {
     stockReservado: number
     tiempoEntregaMin: number | null
     categoria: { id: number; nombre: string } | null
+    menuSeccionId: number | null
+    menuSeccion?: { id: number; nombre: string; icono: string } | null
   }>
 }
 
@@ -186,4 +199,29 @@ export async function deudasExpressAdmin(): Promise<(ConfigExpress & { comercio:
 export async function saldarDeudaAdmin(comercioId: number, monto: number): Promise<ConfigExpress> {
   const r = await apiFetch<{ ok: boolean; data: ConfigExpress }>(`/express/admin/deudas/${comercioId}/saldar`, { method: 'POST', body: { monto } })
   return r.data
+}
+
+// ── SECCIONES DE MENÚ ────────────────────────────────────────
+
+export async function listarSeccionesExpress(): Promise<MenuSeccion[]> {
+  const r = await apiFetch<{ ok: boolean; data: MenuSeccion[] }>('/express/config/secciones')
+  return r.data ?? []
+}
+
+export async function crearSeccionExpress(datos: { nombre: string; icono?: string }): Promise<MenuSeccion> {
+  const r = await apiFetch<{ ok: boolean; data: MenuSeccion }>('/express/config/secciones', { method: 'POST', body: datos })
+  return r.data
+}
+
+export async function actualizarSeccionExpress(id: number, datos: Partial<MenuSeccion>): Promise<MenuSeccion> {
+  const r = await apiFetch<{ ok: boolean; data: MenuSeccion }>(`/express/config/secciones/${id}`, { method: 'PATCH', body: datos })
+  return r.data
+}
+
+export async function eliminarSeccionExpress(id: number): Promise<void> {
+  await apiFetch(`/express/config/secciones/${id}`, { method: 'DELETE' })
+}
+
+export async function asignarSeccionProducto(productoId: number, menuSeccionId: number | null): Promise<void> {
+  await apiFetch(`/express/config/secciones/productos/${productoId}`, { method: 'PATCH', body: { menuSeccionId } })
 }

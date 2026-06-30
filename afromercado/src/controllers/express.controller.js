@@ -153,6 +153,52 @@ const ExpressController = {
       res.json({ ok: true, data });
     } catch (err) { next(err); }
   },
+
+  // ── SECCIONES DE MENÚ ────────────────────────────────────────
+
+  async listarSecciones(req, res, next) {
+    try {
+      const comercioId = await getComercioId(req.usuario.id);
+      const data = await ExpressService.listarSecciones(comercioId);
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async crearSeccion(req, res, next) {
+    try {
+      const comercioId = await getComercioId(req.usuario.id);
+      const data = await ExpressService.crearSeccion(comercioId, req.body);
+      res.status(201).json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async actualizarSeccion(req, res, next) {
+    try {
+      const comercioId = await getComercioId(req.usuario.id);
+      const data = await ExpressService.actualizarSeccion(comercioId, Number(req.params.id), req.body);
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async eliminarSeccion(req, res, next) {
+    try {
+      const comercioId = await getComercioId(req.usuario.id);
+      await ExpressService.eliminarSeccion(comercioId, Number(req.params.id));
+      res.json({ ok: true });
+    } catch (err) { next(err); }
+  },
+
+  async asignarSeccionProducto(req, res, next) {
+    try {
+      const comercioId = await getComercioId(req.usuario.id);
+      const { menuSeccionId } = req.body;
+      const data = await ExpressService.asignarSeccionProducto(
+        comercioId, Number(req.params.productoId),
+        menuSeccionId === null ? null : Number(menuSeccionId)
+      );
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
 };
 
 module.exports = ExpressController;

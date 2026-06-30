@@ -319,6 +319,7 @@ model Producto {
   diasAlistamientoMax Int          @default(3)
   alcance             AlcanceVenta @default(LOCAL)
   pesoKg              Decimal?     @db.Decimal(6, 2)
+  menuSeccionId       Int?
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
   deletedAt           DateTime?
@@ -335,10 +336,12 @@ model Producto {
   favoritos        Favorito[]
   solicitudesPublicidad SolicitudPublicidad[]
   itemsExpress          ItemPedidoExpress[]
+  menuSeccion      MenuSeccion?       @relation("ProductoMenuSeccion", fields: [menuSeccionId], references: [id], onDelete: SetNull)
 
   @@index([comercioId, activo])
   @@index([categoriaId, activo])
   @@index([alcance, activo])
+  @@index([menuSeccionId])
 }
 
 model PrecioHistorial {
@@ -1175,8 +1178,24 @@ model ConfigExpress {
   comercio        Comercio         @relation(fields: [comercioId], references: [id])
   pedidosExpress  PedidoExpress[]
   horarios        HorarioExpress[]
+  secciones       MenuSeccion[]
 
   @@index([activo, abierto])
+}
+
+model MenuSeccion {
+  id              Int           @id @default(autoincrement())
+  configExpressId Int
+  nombre          String
+  icono           String        @default("🍽️")
+  orden           Int           @default(0)
+  activo          Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+
+  configExpress   ConfigExpress @relation(fields: [configExpressId], references: [id], onDelete: Cascade)
+  productos       Producto[]    @relation("ProductoMenuSeccion")
+
+  @@index([configExpressId, activo])
 }
 
 enum DiaSemana {

@@ -19,9 +19,17 @@ router.get(   "/pedidos/mis", ...soloAuth, ExpressController.misPedidos);
 router.get(   "/pedidos/:id", ...soloAuth, ExpressController.obtenerPedido);
 
 // ── COMERCIO ─────────────────────────────────────────────────
-router.get(   "/config",                    ...soloComercio, ExpressController.obtenerConfig);
-router.put(   "/config",                    ...soloComercio, ExpressController.actualizarConfig);
-router.patch( "/config/abierto",            ...soloComercio, ExpressController.toggleAbierto);
+router.get(   "/config",                                    ...soloComercio, ExpressController.obtenerConfig);
+router.put(   "/config",                                    ...soloComercio, ExpressController.actualizarConfig);
+
+// Secciones del menú
+router.get(    "/config/secciones",                         ...soloComercio, ExpressController.listarSecciones);
+router.post(   "/config/secciones",                         ...soloComercio, ExpressController.crearSeccion);
+router.patch(  "/config/secciones/productos/:productoId",   ...soloComercio, ExpressController.asignarSeccionProducto);
+router.patch(  "/config/secciones/:id",                     ...soloComercio, ExpressController.actualizarSeccion);
+router.delete( "/config/secciones/:id",                     ...soloComercio, ExpressController.eliminarSeccion);
+
+router.patch( "/config/abierto",                            ...soloComercio, ExpressController.toggleAbierto);
 router.get(   "/mis-pedidos",               ...soloComercio, ExpressController.pedidosComercio);
 router.post(  "/mis-pedidos/:id/aceptar",   ...soloComercio, ExpressController.aceptarPedido);
 router.post(  "/mis-pedidos/:id/rechazar",  ...soloComercio, ExpressController.rechazarPedido);

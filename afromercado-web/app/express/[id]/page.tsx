@@ -8,6 +8,7 @@ import {
   obtenerMenuComercioExpress,
   crearPedidoExpress,
   type MenuComercioExpress,
+  type MenuSeccion,
   type ModalidadExpress,
   type MetodoPagoExpress,
 } from '@/lib/api/express'
@@ -25,6 +26,61 @@ interface ItemCarrito {
 
 type Paso = 'menu' | 'checkout' | 'confirmado'
 
+function TarjetaProducto({
+  p, cantidadItem, agregar, quitar
+}: {
+  p: MenuComercioExpress['productos'][0]
+  cantidadItem: (id: number) => number
+  agregar: (p: any) => void
+  quitar: (id: number) => void
+}) {
+  const disponible = Math.max(0, p.stock - (p.stockReservado ?? 0))
+  const agotado = disponible === 0
+  const cant = cantidadItem(p.id)
+  return (
+    <div className={`bg-white rounded-2xl shadow-sm flex gap-3 p-3 ${agotado ? 'opacity-50' : ''}`}>
+      {p.fotoUrl ? (
+        <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
+          <Image src={p.fotoUrl} alt={p.nombre} fill className="object-cover" />
+        </div>
+      ) : (
+        <div className="w-20 h-20 rounded-xl bg-[#F0EBE3] flex items-center justify-center text-2xl flex-shrink-0">🥘</div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-[#1A1A1A] text-sm leading-tight">{p.nombre}</p>
+        {p.descripcion && <p className="text-xs text-[#999] mt-0.5 line-clamp-2">{p.descripcion}</p>}
+        <div className="flex items-center justify-between mt-2">
+          <div>
+            <span className="font-bold text-[#1A1A1A]">{formatearPrecio(Number(p.precio))}</span>
+            <span className="text-xs text-[#999] ml-1">/ {p.unidad.toLowerCase()}</span>
+          </div>
+          {agotado ? (
+            <span className="text-xs text-[#999]">Agotado</span>
+          ) : cant === 0 ? (
+            <button
+              onClick={() => agregar(p)}
+              className="flex items-center gap-1 bg-[#2D6A4F] text-white text-sm font-semibold px-3 py-1.5 rounded-xl"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              Agregar
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button onClick={() => quitar(p.id)} className="w-7 h-7 rounded-full bg-[#F0EBE3] flex items-center justify-center">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M5 12h14"/></svg>
+              </button>
+              <span className="font-bold text-[#1A1A1A] w-4 text-center">{cant}</span>
+              <button onClick={() => agregar(p)} className="w-7 h-7 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function MenuExpressPage() {
   const params = useParams()
   const router = useRouter()
@@ -35,6 +91,7 @@ export default function MenuExpressPage() {
   const [cargando, setCargando] = useState(true)
   const [carrito, setCarrito] = useState<ItemCarrito[]>([])
   const [paso, setPaso] = useState<Paso>('menu')
+  const [tabActiva, setTabActiva] = useState<number | 'todos'>('todos')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pedidoId, setPedidoId] = useState<number | null>(null)
@@ -165,13 +222,17 @@ export default function MenuExpressPage() {
     )
   }
 
-  // Agrupar productos por categoría
-  const porCategoria: Record<string, MenuComercioExpress['productos']> = {}
-  for (const p of menu.productos) {
-    const cat = p.categoria?.nombre ?? 'Otros'
-    if (!porCategoria[cat]) porCategoria[cat] = []
-    porCategoria[cat].push(p)
-  }
+  // Agrupar productos por sección
+  const secciones = menu.secciones ?? []
+  const sinSeccion = menu.productos.filter(p => !p.menuSeccionId)
+  const conSeccion = secciones.map(s => ({
+    seccion: s,
+    productos: menu.productos.filter(p => p.menuSeccionId === s.id),
+  })).filter(g => g.productos.length > 0)
+  const hayTabs = secciones.length > 0
+  const productosFiltrados = tabActiva === 'todos'
+    ? menu.productos
+    : menu.productos.filter(p => p.menuSeccionId === tabActiva)
 
   // ── CHECKOUT ───────────────────────────────────────────────
   if (paso === 'checkout') {
@@ -346,71 +407,106 @@ export default function MenuExpressPage() {
               Este restaurante está cerrado ahora. Puedes ver el menú pero no hacer pedidos.
             </p>
           )}
+
+          {hayTabs && (
+            <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
+              <div className="flex gap-2 py-2 min-w-max">
+                <button
+                  onClick={() => setTabActiva('todos')}
+                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    tabActiva === 'todos'
+                      ? 'bg-[#2D6A4F] text-white'
+                      : 'bg-[#F0EBE3] text-[#555]'
+                  }`}
+                >
+                  🍽️ Todo el menú
+                </button>
+                {secciones.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      setTabActiva(s.id)
+                      setTimeout(() => {
+                        document.getElementById(`seccion-${s.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }, 50)
+                    }}
+                    className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      tabActiva === s.id
+                        ? 'bg-[#2D6A4F] text-white'
+                        : 'bg-[#F0EBE3] text-[#555]'
+                    }`}
+                  >
+                    {s.icono} {s.nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
-      {/* Menú por categorías */}
+      {/* Menú */}
       <main className="max-w-2xl mx-auto px-4 py-5 pb-40 space-y-6">
         {menu.productos.length === 0 ? (
           <div className="text-center py-12 text-[#999]">
             <p className="text-3xl mb-2">🥘</p>
             <p>Este restaurante aún no tiene productos en Express</p>
           </div>
+        ) : tabActiva !== 'todos' ? (
+          // Vista filtrada por una sección
+          <section>
+            {(() => {
+              const sec = secciones.find(s => s.id === tabActiva)
+              return sec ? (
+                <h2 className="font-bold text-[#1A1A1A] text-base mb-3 pb-1 border-b border-[#E8DCC8]">
+                  {sec.icono} {sec.nombre}
+                </h2>
+              ) : null
+            })()}
+            <div className="space-y-3">
+              {productosFiltrados.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} />)}
+            </div>
+          </section>
+        ) : hayTabs ? (
+          // Vista "Todos" con secciones
+          <>
+            {conSeccion.map(({ seccion, productos: prods }) => (
+              <section key={seccion.id} id={`seccion-${seccion.id}`} className="scroll-mt-32">
+                <h2 className="font-bold text-[#1A1A1A] text-base mb-3 pb-1 border-b border-[#E8DCC8]">
+                  {seccion.icono} {seccion.nombre}
+                </h2>
+                <div className="space-y-3">
+                  {prods.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} />)}
+                </div>
+              </section>
+            ))}
+            {sinSeccion.length > 0 && (
+              <section>
+                <h2 className="font-bold text-[#1A1A1A] text-base mb-3 pb-1 border-b border-[#E8DCC8]">Otros</h2>
+                <div className="space-y-3">
+                  {sinSeccion.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} />)}
+                </div>
+              </section>
+            )}
+          </>
         ) : (
-          Object.entries(porCategoria).map(([cat, prods]) => (
-            <section key={cat}>
-              <h2 className="font-bold text-[#1A1A1A] text-base mb-3 pb-1 border-b border-[#E8DCC8]">{cat}</h2>
-              <div className="space-y-3">
-                {prods.map(p => {
-                  const disponible = Math.max(0, p.stock - (p.stockReservado ?? 0))
-                  const agotado = disponible === 0
-                  const cant = cantidadItem(p.id)
-                  return (
-                    <div key={p.id} className={`bg-white rounded-2xl shadow-sm flex gap-3 p-3 ${agotado ? 'opacity-50' : ''}`}>
-                      {p.fotoUrl ? (
-                        <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
-                          <Image src={p.fotoUrl} alt={p.nombre} fill className="object-cover" />
-                        </div>
-                      ) : (
-                        <div className="w-20 h-20 rounded-xl bg-[#F0EBE3] flex items-center justify-center text-2xl flex-shrink-0">🥘</div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-[#1A1A1A] text-sm leading-tight">{p.nombre}</p>
-                        {p.descripcion && <p className="text-xs text-[#999] mt-0.5 line-clamp-2">{p.descripcion}</p>}
-                        <div className="flex items-center justify-between mt-2">
-                          <div>
-                            <span className="font-bold text-[#1A1A1A]">{formatearPrecio(Number(p.precio))}</span>
-                            <span className="text-xs text-[#999] ml-1">/ {p.unidad.toLowerCase()}</span>
-                          </div>
-                          {agotado ? (
-                            <span className="text-xs text-[#999]">Agotado</span>
-                          ) : cant === 0 ? (
-                            <button
-                              onClick={() => agregar(p)}
-                              className="flex items-center gap-1 bg-[#2D6A4F] text-white text-sm font-semibold px-3 py-1.5 rounded-xl"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-                              Agregar
-                            </button>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <button onClick={() => quitar(p.id)} className="w-7 h-7 rounded-full bg-[#F0EBE3] flex items-center justify-center">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M5 12h14"/></svg>
-                              </button>
-                              <span className="font-bold text-[#1A1A1A] w-4 text-center">{cant}</span>
-                              <button onClick={() => agregar(p)} className="w-7 h-7 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          ))
+          // Sin secciones — lista plana agrupada por categoría
+          (() => {
+            const porCategoria: Record<string, typeof menu.productos> = {}
+            for (const p of menu.productos) {
+              const cat = (p as any).categoria?.nombre ?? 'Otros'
+              if (!porCategoria[cat]) porCategoria[cat] = []
+              porCategoria[cat].push(p)
+            }
+            return Object.entries(porCategoria).map(([cat, prods]) => (
+              <section key={cat}>
+                <h2 className="font-bold text-[#1A1A1A] text-base mb-3 pb-1 border-b border-[#E8DCC8]">{cat}</h2>
+                <div className="space-y-3">
+                  {prods.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} />)}
+                </div>
+              </section>
+            ))
+          })()
         )}
       </main>
 
