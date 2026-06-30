@@ -34,7 +34,11 @@ const SERVICIOS_ICONS: Record<string, { icon: string; label: string }> = {
 }
 
 function esVideo(url: string): boolean {
-  return url.includes('/video/upload/') || /\.(mp4|webm|mov|avi)$/i.test(url)
+  if (url.includes('/video/upload/') || /\.(mp4|webm|mov|avi)$/i.test(url)) return true
+  try {
+    const h = new URL(url).hostname.replace('www.', '')
+    return ['youtube.com','youtu.be','vimeo.com','facebook.com','fb.watch','tiktok.com','instagram.com'].includes(h)
+  } catch { return false }
 }
 
 function waUrl(numero: string): string {
