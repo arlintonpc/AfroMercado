@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { Suspense, useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { misReservasHotel, cancelarReservaHotel, consultarPoliticaCancelacion, solicitarTokenCheckin, type ReservaHotel, type PoliticaCancelacionInfo } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
@@ -228,36 +228,8 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
   )
 }
 
-export default function MisReservasHotelPage() {
-  const { autenticado, cargando: cargandoAuth } = useAuth()
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const pagoOk = searchParams.get('pago') === 'ok'
-  const reservaIdPago = searchParams.get('reserva')
-  const { mostrar: mostrarToast, toastProps } = useToast()
-  const [reservas, setReservas] = useState<ReservaHotel[]>([])
-  const [cargando, setCargando] = useState(true)
-
-  useEffect(() => {
-    if (pagoOk) mostrarToast('¡Pago recibido! Tu reserva está siendo confirmada.')
-  }, [pagoOk])
-
-  async function cargar() {
-    const data = await misReservasHotel()
-    setReservas(data)
-    setCargando(false)
-  }
-
-  useEffect(() => {
-    if (cargandoAuth) return
-    if (!autenticado) { router.push('/login'); return }
-    cargar()
-  }, [autenticado, cargandoAuth])
-
-  const activas   = reservas.filter(r => !['CHECKOUT', 'CANCELADA', 'RECHAZADA'].includes(r.estado))
-  const anteriores = reservas.filter(r => ['CHECKOUT', 'CANCELADA', 'RECHAZADA'].includes(r.estado))
-
-  if (cargando) return (
+function ReservasLoading() {
+  return (
     <div className="min-h-screen bg-[#FAF8F5]">
       <header className="bg-white border-b border-[#E8DCC8] px-4 py-4 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center gap-3">
@@ -293,6 +265,37 @@ export default function MisReservasHotelPage() {
       </main>
     </div>
   )
+}
+
+function MisReservasHotelContent() {
+  const { autenticado, cargando: cargandoAuth } = useAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pagoOk = searchParams.get('pago') === 'ok'
+  const { mostrar: mostrarToast, toastProps } = useToast()
+  const [reservas, setReservas] = useState<ReservaHotel[]>([])
+  const [cargando, setCargando] = useState(true)
+
+  useEffect(() => {
+    if (pagoOk) mostrarToast('¡Pago recibido! Tu reserva está siendo confirmada.')
+  }, [pagoOk])
+
+  async function cargar() {
+    const data = await misReservasHotel()
+    setReservas(data)
+    setCargando(false)
+  }
+
+  useEffect(() => {
+    if (cargandoAuth) return
+    if (!autenticado) { router.push('/login'); return }
+    cargar()
+  }, [autenticado, cargandoAuth])
+
+  const activas   = reservas.filter(r => !['CHECKOUT', 'CANCELADA', 'RECHAZADA'].includes(r.estado))
+  const anteriores = reservas.filter(r => ['CHECKOUT', 'CANCELADA', 'RECHAZADA'].includes(r.estado))
+
+  if (cargando) return <ReservasLoading />
 
   return (
     <div className="min-h-screen bg-[#FAF8F5]">
@@ -336,5 +339,13 @@ export default function MisReservasHotelPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function MisReservasHotelPage() {
+  return (
+    <Suspense fallback={<ReservasLoading />}>
+      <MisReservasHotelContent />
+    </Suspense>
   )
 }
