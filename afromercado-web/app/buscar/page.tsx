@@ -42,6 +42,7 @@ function contarFiltrosActivos(f: typeof FILTROS_VACIOS): number {
 function TarjetaHotelBuscar({ h }: { h: ConfigHotel }) {
   const desde = h.habitaciones.length > 0 ? Math.min(...h.habitaciones.map(x => Number(x.precioPorNoche))) : null
   const foto = h.habitaciones[0]?.fotos[0]
+  const calificacion = Number(h.comercio.calificacion)
   return (
     <Link href={`/hoteles/${h.id}`} className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md hover:border-[#2D6A4F]/30 transition-all flex flex-col">
       <div className="h-40 bg-gradient-to-br from-[#2D6A4F] to-[#40916C] flex items-center justify-center overflow-hidden relative">
@@ -50,7 +51,7 @@ function TarjetaHotelBuscar({ h }: { h: ConfigHotel }) {
       <div className="p-3 flex flex-col gap-1">
         <p className="font-bold text-sm text-[#1A1A1A] truncate">{h.comercio.nombre}</p>
         <p className="text-xs text-gray-500">📍 {h.comercio.municipio}</p>
-        {h.comercio.calificacion > 0 && <p className="text-xs text-amber-500">{'★'.repeat(Math.round(Number(h.comercio.calificacion)))} <span className="text-gray-400">{Number(h.comercio.calificacion).toFixed(1)}</span></p>}
+        {calificacion > 0 && <p className="text-xs text-amber-500">{'★'.repeat(Math.round(calificacion))} <span className="text-gray-400">{calificacion.toFixed(1)}</span></p>}
         {desde !== null && <p className="text-sm text-[#2D6A4F] font-semibold mt-1">Desde {formatearPrecio(desde)}<span className="text-xs font-normal text-gray-400">/noche</span></p>}
       </div>
     </Link>
@@ -58,6 +59,7 @@ function TarjetaHotelBuscar({ h }: { h: ConfigHotel }) {
 }
 
 function TarjetaTourBuscar({ t }: { t: ConfigTour }) {
+  const calificacion = Number(t.comercio.calificacion)
   return (
     <Link href={`/tours/${t.id}`} className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md hover:border-[#2D6A4F]/30 transition-all flex flex-col">
       <div className="h-40 bg-gradient-to-br from-[#40916C] to-[#74C69D] flex items-center justify-center overflow-hidden">
@@ -66,7 +68,7 @@ function TarjetaTourBuscar({ t }: { t: ConfigTour }) {
       <div className="p-3 flex flex-col gap-1">
         <p className="font-bold text-sm text-[#1A1A1A] truncate">{t.nombre}</p>
         <p className="text-xs text-gray-500">📍 {t.comercio.municipio} · ⏱️ {t.duracionHoras}h · 👥 máx {t.maxParticipantes}</p>
-        {t.comercio.calificacion > 0 && <p className="text-xs text-amber-500">{'★'.repeat(Math.round(Number(t.comercio.calificacion)))} <span className="text-gray-400">{Number(t.comercio.calificacion).toFixed(1)}</span></p>}
+        {calificacion > 0 && <p className="text-xs text-amber-500">{'★'.repeat(Math.round(calificacion))} <span className="text-gray-400">{calificacion.toFixed(1)}</span></p>}
         <p className="text-sm text-[#2D6A4F] font-semibold mt-1">{formatearPrecio(Number(t.precioPersona))}<span className="text-xs font-normal text-gray-400">/persona</span></p>
       </div>
     </Link>

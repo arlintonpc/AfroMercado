@@ -1,32 +1,76 @@
-// Service Worker — AfroMercado Web Push
-self.addEventListener("push", (event) => {
-  if (!event.data) return;
-  const { title, body, icon, badge, url } = event.data.json();
+const CACHE_VERSION = 'afromercado-pwa-v1';
+const STATIC_CACHE = `${CACHE_VERSION}-static`;
+const CORE_ASSETS = [
+  '/',
+  '/manifest.webmanifest',
+  '/icon-192.svg',
+  '/icon-512.svg',
+  '/og-logo.png',
+];
+
+function isSameOrigin(url) {
+  return url.origin === self.location.origin;
+}
+
+function isStaticAsset(url) {
+  return (
+    url.pathname.startsWith('/_next/static/') ||
+    /\.(?:css|js|mjs|woff2?|png|jpg|jpeg|gif|svg|webp|avif|ico)$/i.test(url.pathname)
+  );
+}
+
+self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
-    self.registration.showNotification(title || "AfroMercado", {
-      body:              body  || "",
-      icon:              icon  || "/icon-192.svg",
-      badge:             badge || "/badge-72.svg",
-      data:              { url: url || "/" },
-      requireInteraction: false,
-    })
+    caches.open(STATIC_CACHE).then(cache =>
+      Promise.allSettled(
+        CORE_ASSETS.map(asset => cache.add(new Request(asset, { cache: 'reload' })))
+      )
+    )
   );
 });
 
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  const url = event.notification.data?.url || "/";
+self.addEventListener('activate', event => {
   event.waitUntil(
-    clients
-      .matchAll({ type: "window", includeUncontrolled: true })
-      .then((wins) => {
-        for (const w of wins) {
-          if (w.url.startsWith(self.location.origin) && "focus" in w) {
-            w.navigate(url);
-            return w.focus();
+    caches
+      .keys()
+      .then(keys => Promise.all(keys.filter(key => !key.startsWith(CACHE_VERSION)).map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  if (!isSameOrigin(url)) return;
+  if (url.pathname.startsWith('/api/')) return;
+
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then(response => response)
+        .catch(() => caches.match('/'))
+    );
+    return;
+  }
+
+  if (!isStaticAsset(url)) return;
+
+  event.respondWith(
+    caches.match(request).then(cached => {
+      const refresh = fetch(request)
+        .then(response => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(STATIC_CACHE).then(cache => cache.put(request, copy));
           }
-        }
-        if (clients.openWindow) return clients.openWindow(url);
-      })
+          return response;
+        })
+        .catch(() => cached);
+
+      return cached || refresh;
+    })
   );
 });
