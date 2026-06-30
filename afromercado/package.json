@@ -1,6 +1,6 @@
 {
   "name": "afromercado-api",
-  "version": "1.0.3-mvp",
+  "version": "1.1.0",
   "description": "API de AfroMercado - Marketplace cultural del Choco",
   "main": "src/server.js",
   "scripts": {
