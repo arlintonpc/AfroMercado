@@ -20,14 +20,26 @@ const SERVICIOS_ICONS: Record<string, { icon: string; label: string }> = {
   piscina:     { icon: '🏊', label: 'Piscina' },
   restaurante: { icon: '🍽️', label: 'Restaurante' },
   aire:        { icon: '❄️', label: 'Aire acondicionado' },
+  ventilador:  { icon: '🌀', label: 'Ventilador' },
   gym:         { icon: '💪', label: 'Gimnasio' },
   spa:         { icon: '💆', label: 'Spa' },
   bar:         { icon: '🍸', label: 'Bar' },
   mascotas:    { icon: '🐾', label: 'Mascotas OK' },
+  tv:            { icon: '📺', label: 'TV' },
+  cocina:        { icon: '🍳', label: 'Cocina equipada' },
+  lavadora:      { icon: '🧺', label: 'Lavadora' },
+  agua_caliente: { icon: '🚿', label: 'Agua caliente' },
+  balcon:        { icon: '🌇', label: 'Balcón' },
 }
 
 function esVideo(url: string): boolean {
   return url.includes('/video/upload/') || /\.(mp4|webm|mov|avi)$/i.test(url)
+}
+
+function waUrl(numero: string): string {
+  const digitos = numero.replace(/\D/g, '')
+  const normalizado = digitos.startsWith('57') ? digitos : `57${digitos}`
+  return `https://wa.me/${normalizado}`
 }
 
 /* ── Lightbox ──────────────────────────────────────────── */
@@ -143,96 +155,160 @@ function TarjetaHabitacion({ hab, onReservar, onVerFotos }: {
   onVerFotos: (fotos: string[], idx: number) => void
 }) {
   const media = [...hab.fotos, ...(hab.videoUrl ? [hab.videoUrl] : [])]
-  const [fotoIdx, setFotoIdx] = useState(0)
+  const [idx, setIdx] = useState(0)
   const startX = useRef<number | null>(null)
+  const cur = media[idx]
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200">
-      <div className="relative h-52 lg:h-56 overflow-hidden cursor-pointer bg-gray-100"
-        onClick={() => media.length > 0 && onVerFotos(media, fotoIdx)}
-        onTouchStart={e => { startX.current = e.touches[0].clientX }}
-        onTouchEnd={e => {
-          if (!startX.current || media.length < 2) return
-          const dx = e.changedTouches[0].clientX - startX.current
-          if (dx > 40) setFotoIdx(i => (i - 1 + media.length) % media.length)
-          else if (dx < -40) setFotoIdx(i => (i + 1) % media.length)
-          startX.current = null
-        }}>
-        {media.length > 0 ? (
-          esVideo(media[fotoIdx])
-            ? <video src={media[fotoIdx]} autoPlay muted loop playsInline className="w-full h-full object-cover" />
-            : <img src={media[fotoIdx]} alt={hab.nombre} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-[#E8F4F0] to-[#B7E4C7] flex items-center justify-center">
-            <span className="text-6xl opacity-30">🛏️</span>
-          </div>
-        )}
-        {media.length > 1 && (
-          <>
-            <button onClick={e => { e.stopPropagation(); setFotoIdx(i => (i - 1 + media.length) % media.length) }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black/70 transition-colors font-bold">‹</button>
-            <button onClick={e => { e.stopPropagation(); setFotoIdx(i => (i + 1) % media.length) }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black/70 transition-colors font-bold">›</button>
-            <div className="absolute bottom-2 right-3 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full">
-              {fotoIdx + 1}/{media.length}
-            </div>
-          </>
-        )}
-      </div>
+    <div className="bg-white rounded-2xl border border-gray-100 hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+      <div className="flex flex-col md:flex-row">
 
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-4 mb-3">
-          <div className="flex-1">
-            <h3 className="font-bold text-gray-900 text-lg leading-tight">{hab.nombre}</h3>
-            <div className="flex items-center gap-4 mt-1.5 text-sm text-gray-500">
-              <span className="flex items-center gap-1.5">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                Hasta {hab.capacidad} huéspedes
+        {/* ── Galería izquierda ── */}
+        <div className="relative md:w-72 lg:w-80 flex-shrink-0">
+          {/* Imagen / video principal */}
+          <div
+            className="relative aspect-[4/3] md:aspect-auto md:h-full min-h-[220px] cursor-pointer overflow-hidden bg-gray-100"
+            onClick={() => media.length > 0 && onVerFotos(media, idx)}
+            onTouchStart={e => { startX.current = e.touches[0].clientX }}
+            onTouchEnd={e => {
+              if (!startX.current || media.length < 2) return
+              const dx = e.changedTouches[0].clientX - startX.current
+              if (dx > 40)  setIdx(i => (i - 1 + media.length) % media.length)
+              if (dx < -40) setIdx(i => (i + 1) % media.length)
+              startX.current = null
+            }}>
+            {cur ? (
+              esVideo(cur)
+                ? <video src={cur} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+                : <img src={cur} alt={hab.nombre} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-[#E8F4F0] to-[#B7E4C7] flex items-center justify-center">
+                <span className="text-5xl opacity-20">🛏️</span>
+              </div>
+            )}
+
+            {/* Badge video */}
+            {cur && esVideo(cur) && (
+              <span className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                VIDEO
               </span>
-              <span className="flex items-center gap-1.5">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                {hab.cantidad} disponibles
-              </span>
+            )}
+
+            {/* Flechas nav */}
+            {media.length > 1 && (
+              <>
+                <button onClick={e => { e.stopPropagation(); setIdx(i => (i - 1 + media.length) % media.length) }}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full w-8 h-8 flex items-center justify-center shadow transition-colors text-lg font-bold">‹</button>
+                <button onClick={e => { e.stopPropagation(); setIdx(i => (i + 1) % media.length) }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full w-8 h-8 flex items-center justify-center shadow transition-colors text-lg font-bold">›</button>
+              </>
+            )}
+
+            {/* Expandir */}
+            <button onClick={e => { e.stopPropagation(); onVerFotos(media, idx) }}
+              className="absolute bottom-3 right-3 bg-white/90 hover:bg-white text-gray-700 rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow flex items-center gap-1.5 transition-colors">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+              {media.length > 1 ? `${media.length} fotos` : 'Ver'}
+            </button>
+          </div>
+
+          {/* Miniaturas */}
+          {media.length > 1 && (
+            <div className="flex gap-1.5 px-3 pb-3 pt-2 bg-white overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+              {media.map((m, i) => (
+                <button key={i} onClick={() => setIdx(i)}
+                  className={`flex-shrink-0 w-12 h-9 rounded-lg overflow-hidden border-2 transition-all ${i === idx ? 'border-[#1B4332] opacity-100' : 'border-transparent opacity-50 hover:opacity-80'}`}>
+                  {esVideo(m)
+                    ? <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" fill="none" stroke="white" strokeWidth="2"/></svg>
+                      </div>
+                    : <img src={m} alt="" className="w-full h-full object-cover" />
+                  }
+                </button>
+              ))}
             </div>
-          </div>
-          <div className="text-right flex-shrink-0">
-            <div className="text-2xl font-black text-[#1B4332]">{formatearPrecio(Number(hab.precioPorNoche))}</div>
-            <div className="text-xs text-gray-400 mt-0.5">por noche</div>
-          </div>
+          )}
         </div>
 
-        {hab.descripcion && (
-          <p className="text-sm text-gray-600 leading-relaxed mb-3 line-clamp-2">{hab.descripcion}</p>
-        )}
-
-        {hab.serviciosExtra.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {hab.serviciosExtra.map(s => (
-              <span key={s} className="text-xs bg-[#F0FDF4] text-[#16A34A] border border-[#BBF7D0] px-2.5 py-1 rounded-full font-medium">{s}</span>
-            ))}
+        {/* ── Info derecha ── */}
+        <div className="flex-1 flex flex-col p-5 lg:p-6">
+          {/* Nombre + precio */}
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-gray-900 text-xl leading-tight">{hab.nombre}</h3>
+                {hab.videoUrl && (
+                  <span className="inline-flex items-center gap-1 bg-black text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Video
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-gray-500">
+                <span className="flex items-center gap-1.5">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  Hasta {hab.capacidad} huéspedes
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                  {hab.cantidad} {hab.cantidad === 1 ? 'habitación' : 'habitaciones'} disponibles
+                </span>
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <div className="text-2xl font-black text-[#1B4332] leading-none">{formatearPrecio(Number(hab.precioPorNoche))}</div>
+              <div className="text-xs text-gray-400 mt-1">por noche</div>
+            </div>
           </div>
-        )}
 
-        <button onClick={() => onReservar(hab)}
-          className="w-full bg-[#1B4332] hover:bg-[#15362A] text-white font-bold py-3.5 rounded-xl text-sm transition-all active:scale-[0.98] shadow-sm">
-          Reservar habitación
-        </button>
+          {/* Descripción */}
+          {hab.descripcion && (
+            <p className="text-sm text-gray-500 leading-relaxed mb-4 line-clamp-3">{hab.descripcion}</p>
+          )}
+
+          {/* Amenidades */}
+          {hab.serviciosExtra.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {hab.serviciosExtra.map(s => (
+                <span key={s} className="inline-flex items-center gap-1 text-xs bg-gray-50 text-gray-600 border border-gray-200 px-3 py-1.5 rounded-full font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#1B4332] flex-shrink-0" />
+                  {s}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Spacer + botón */}
+          <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between gap-4">
+            <p className="text-xs text-gray-400">Sin cobros ocultos · Cancelación flexible</p>
+            <button onClick={() => onReservar(hab)}
+              className="flex-shrink-0 bg-[#1B4332] hover:bg-[#15362A] active:scale-[0.98] text-white font-bold px-7 py-3 rounded-xl text-sm transition-all shadow-sm whitespace-nowrap">
+              Reservar ahora
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
 }
 
 /* ── Widget reserva lateral (desktop) ──────────────────── */
-function WidgetReserva({ hotel, habitaciones, onReservar, autenticado, router }: {
+function WidgetReserva({ hotel, habitaciones, habIdx, fechaEntrada, fechaSalida, onFechaEntrada, onFechaSalida, onHabIdx, onReservar, autenticado, router }: {
   hotel: ConfigHotel; habitaciones: HabitacionTipo[]
+  habIdx: number; fechaEntrada: string; fechaSalida: string
+  onFechaEntrada: (v: string) => void; onFechaSalida: (v: string) => void; onHabIdx: (i: number) => void
   onReservar: (h: HabitacionTipo) => void
   autenticado: boolean; router: any
 }) {
-  const [habSelec, setHabSelec] = useState(0)
-  const [fechaEntrada, setFechaEntrada] = useState(new Date().toISOString().split('T')[0])
-  const [fechaSalida,  setFechaSalida]  = useState(new Date(Date.now() + 86400000).toISOString().split('T')[0])
-  const hab = habitaciones[habSelec]
+  const hab = habitaciones[habIdx]
   const noches = Math.max(1, Math.ceil((new Date(fechaSalida).getTime() - new Date(fechaEntrada).getTime()) / 86400000))
+
+  async function compartir() {
+    const url = window.location.href
+    if (navigator.share) { try { await navigator.share({ title: `${hotel.comercio.nombre} — ${hab?.nombre ?? ''}`, url }) } catch {} }
+    else { navigator.clipboard.writeText(url).catch(() => {}) }
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-xl p-6 sticky top-20">
@@ -244,7 +320,7 @@ function WidgetReserva({ hotel, habitaciones, onReservar, autenticado, router }:
       {habitaciones.length > 1 && (
         <div className="mb-4">
           <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Habitación</label>
-          <select value={habSelec} onChange={e => setHabSelec(Number(e.target.value))}
+          <select value={habIdx} onChange={e => onHabIdx(Number(e.target.value))}
             className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#1B4332] bg-white">
             {habitaciones.map((h, i) => (
               <option key={h.id} value={i}>{h.nombre} — {formatearPrecio(Number(h.precioPorNoche))}/noche</option>
@@ -257,25 +333,25 @@ function WidgetReserva({ hotel, habitaciones, onReservar, autenticado, router }:
         <div className="grid grid-cols-2 divide-x divide-gray-200">
           <div className="px-3 py-3">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Llegada</p>
-            <input type="date" value={fechaEntrada} onChange={e => setFechaEntrada(e.target.value)}
+            <input type="date" value={fechaEntrada} onChange={e => onFechaEntrada(e.target.value)}
               className="text-sm font-semibold text-gray-800 border-none p-0 focus:outline-none w-full bg-transparent" />
           </div>
           <div className="px-3 py-3">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Salida</p>
-            <input type="date" value={fechaSalida} onChange={e => setFechaSalida(e.target.value)}
+            <input type="date" value={fechaSalida} onChange={e => onFechaSalida(e.target.value)}
               className="text-sm font-semibold text-gray-800 border-none p-0 focus:outline-none w-full bg-transparent" />
           </div>
         </div>
       </div>
 
       <button
-        onClick={() => { if (!autenticado) { router.push('/login'); return }; if (hab) onReservar(hab) }}
+        onClick={() => { if (!autenticado) { router.push('/ingresar'); return }; if (hab) onReservar(hab) }}
         className="w-full bg-[#1B4332] hover:bg-[#15362A] text-white font-bold py-4 rounded-xl text-base transition-all active:scale-[0.98] shadow-md mb-4">
         Reservar ahora
       </button>
 
       {hab && (
-        <div className="space-y-2 text-sm text-gray-600 border-t border-gray-100 pt-4">
+        <div className="space-y-2 text-sm text-gray-600 border-t border-gray-100 pt-4 mb-4">
           <div className="flex justify-between">
             <span className="underline decoration-dotted">{formatearPrecio(Number(hab.precioPorNoche))} × {noches} noche{noches !== 1 ? 's' : ''}</span>
             <span>{formatearPrecio(Number(hab.precioPorNoche) * noches)}</span>
@@ -287,13 +363,11 @@ function WidgetReserva({ hotel, habitaciones, onReservar, autenticado, router }:
         </div>
       )}
 
-      {hotel.comercio.whatsapp && (
-        <a href={`https://wa.me/57${hotel.comercio.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener"
-          className="mt-4 flex items-center justify-center gap-2 w-full py-3 rounded-xl text-[#128C7E] font-semibold text-sm border border-[#25D366]/40 hover:bg-[#F0FDF4] transition-colors">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-          Consultar por WhatsApp
-        </a>
-      )}
+      <button onClick={compartir}
+        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-gray-600 font-medium text-sm border border-gray-200 hover:bg-gray-50 transition-colors">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Compartir alojamiento
+      </button>
 
       <p className="text-xs text-center text-gray-400 mt-3">Sin cobros ocultos · Pago en el hotel</p>
     </div>
@@ -301,20 +375,21 @@ function WidgetReserva({ hotel, habitaciones, onReservar, autenticado, router }:
 }
 
 /* ── Form reserva modal ─────────────────────────────────── */
-function FormReserva({ hotel, habitacion, onClose, onSuccess }: {
-  hotel: ConfigHotel; habitacion: HabitacionTipo; onClose: () => void; onSuccess: () => void
+type ModoPago = 'efectivo' | 'deposito' | 'total'
+
+function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicial, onClose, onSuccess }: {
+  hotel: ConfigHotel; habitacion: HabitacionTipo
+  fechaEntradaInicial: string; fechaSalidaInicial: string
+  onClose: () => void; onSuccess: () => void
 }) {
   const { usuario } = useAuth()
-  const hoy    = new Date().toISOString().split('T')[0]
-  const manana = new Date(Date.now() + 86400000).toISOString().split('T')[0]
-  const [fechaEntrada, setFechaEntrada] = useState(hoy)
-  const [fechaSalida,  setFechaSalida]  = useState(manana)
+  const [fechaEntrada, setFechaEntrada] = useState(fechaEntradaInicial)
+  const [fechaSalida,  setFechaSalida]  = useState(fechaSalidaInicial)
   const [huespedes,    setHuespedes]    = useState(1)
-  const [metodoPago,   setMetodoPago]   = useState('EFECTIVO')
   const [notas,        setNotas]        = useState('')
   const [nombre,       setNombre]       = useState(usuario?.nombre ?? '')
   const [telefono,     setTelefono]     = useState(usuario?.telefono?.replace(/\D/g, '').replace(/^57/, '') ?? '')
-  const [pagarDeposito, setPagarDeposito] = useState(false)
+  const [modoPago,     setModoPago]     = useState<ModoPago>('efectivo')
   const [disponibilidad, setDisponibilidad] = useState<{ disponibles: number } | null>(null)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
@@ -332,7 +407,7 @@ function FormReserva({ hotel, habitacion, onClose, onSuccess }: {
     if (fechaSalida <= fechaEntrada) { setError('La fecha de salida debe ser posterior'); return }
     setError(''); setCargando(true)
     try {
-      const metodoPagoFinal = pagarDeposito ? 'WOMPI' : metodoPago
+      const metodoPagoFinal = modoPago === 'efectivo' ? 'EFECTIVO' : 'WOMPI'
       const reservaCreada = await crearReserva({
         habitacionTipoId: habitacion.id,
         fechaEntrada, fechaSalida, huespedes,
@@ -341,16 +416,25 @@ function FormReserva({ hotel, habitacion, onClose, onSuccess }: {
         nombreHuesped: nombre.trim(),
         telefonoHuesped: telefono.trim(),
       })
-
-      if (pagarDeposito) {
+      if (modoPago !== 'efectivo') {
         const { checkoutUrl } = await iniciarPagoReserva(reservaCreada.id)
         window.location.href = checkoutUrl
         return
       }
-
       onSuccess()
     } catch (e: any) { setError(e.message) } finally { setCargando(false) }
   }
+
+  const opcionesPago: { id: ModoPago; icon: string; titulo: string; desc: string }[] = [
+    { id: 'efectivo', icon: '💵', titulo: 'Pagar al llegar', desc: 'Sin cargo ahora. Efectivo, Nequi o transferencia al check-in.' },
+    { id: 'deposito', icon: '💳', titulo: `Depósito 30% — ${formatearPrecio(Math.round(total * 0.30))}`, desc: 'Confirma inmediatamente. El resto lo pagas al llegar.' },
+    { id: 'total',    icon: '🔒', titulo: `Pagar total — ${formatearPrecio(total)}`, desc: 'Pago completo ahora. Reserva garantizada al 100%.' },
+  ]
+
+  const textoBoton = cargando ? 'Procesando…'
+    : modoPago === 'deposito' ? `Pagar depósito ${formatearPrecio(Math.round(total * 0.30))} →`
+    : modoPago === 'total'    ? `Pagar total ${formatearPrecio(total)} →`
+    : hotel.confirmacionAuto  ? 'Confirmar reserva' : 'Solicitar reserva'
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end lg:items-center justify-center p-0 lg:p-6" onClick={onClose}>
@@ -407,26 +491,36 @@ function FormReserva({ hotel, habitacion, onClose, onSuccess }: {
 
           <div className="space-y-2">
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿Cómo quieres pagar?</label>
-            {[
-              { id: false, icon: '💵', titulo: 'Pagar al llegar', desc: 'Sin cargo ahora. Efectivo, Nequi o transferencia al check-in.' },
-              { id: true,  icon: '💳', titulo: 'Reservar con depósito (30%)', desc: `Paga ${formatearPrecio(Math.round(total * 0.30))} ahora. Confirma inmediatamente. Resto al llegar.` },
-            ].map(op => (
-              <button key={String(op.id)} type="button"
-                onClick={() => setPagarDeposito(op.id)}
-                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${pagarDeposito === op.id ? 'border-[#1B4332] bg-[#F0FDF4]' : 'border-gray-200 hover:border-gray-300'}`}>
+            {opcionesPago.map(op => (
+              <button key={op.id} type="button" onClick={() => setModoPago(op.id)}
+                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${modoPago === op.id ? 'border-[#1B4332] bg-[#F0FDF4]' : 'border-gray-200 hover:border-gray-300'}`}>
                 <div className="flex items-center gap-3">
-                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${pagarDeposito === op.id ? 'border-[#1B4332]' : 'border-gray-300'}`}>
-                    {pagarDeposito === op.id && <div className="w-2 h-2 rounded-full bg-[#1B4332]" />}
+                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${modoPago === op.id ? 'border-[#1B4332]' : 'border-gray-300'}`}>
+                    {modoPago === op.id && <div className="w-2 h-2 rounded-full bg-[#1B4332]" />}
                   </div>
                   <span className="text-lg">{op.icon}</span>
                   <div>
-                    <p className={`font-bold text-sm ${pagarDeposito === op.id ? 'text-[#1B4332]' : 'text-gray-800'}`}>{op.titulo}</p>
+                    <p className={`font-bold text-sm ${modoPago === op.id ? 'text-[#1B4332]' : 'text-gray-800'}`}>{op.titulo}</p>
                     <p className="text-xs text-gray-500 mt-0.5">{op.desc}</p>
                   </div>
                 </div>
               </button>
             ))}
           </div>
+
+          {/* Política de cancelación */}
+          {hotel.politicaCancelacion && (
+            <div className="flex gap-3 bg-amber-50 border border-amber-100 rounded-xl p-4">
+              <span className="text-lg flex-shrink-0">⚠️</span>
+              <div>
+                <p className="text-xs font-bold text-amber-800 uppercase tracking-wide mb-1">Política de cancelación</p>
+                <p className="text-xs text-amber-700 leading-relaxed">{hotel.politicaCancelacion}</p>
+                {modoPago !== 'efectivo' && (
+                  <p className="text-xs text-amber-800 font-semibold mt-2">Si cancelas tras pagar, el hotel gestionará el reembolso según esta política.</p>
+                )}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Notas especiales (opcional)</label>
@@ -440,10 +534,10 @@ function FormReserva({ hotel, habitacion, onClose, onSuccess }: {
           <button onClick={reservar}
             disabled={cargando || (disponibilidad !== null && disponibilidad.disponibles <= 0)}
             className="w-full bg-[#1B4332] text-white font-bold py-4 rounded-xl text-base hover:bg-[#15362A] transition-colors disabled:opacity-50 active:scale-[0.98] shadow-md">
-            {cargando ? 'Procesando…' : pagarDeposito ? 'Pagar depósito y reservar →' : hotel.confirmacionAuto ? 'Confirmar reserva' : 'Solicitar reserva'}
+            {textoBoton}
           </button>
 
-          {!hotel.confirmacionAuto && (
+          {!hotel.confirmacionAuto && modoPago === 'efectivo' && (
             <p className="text-xs text-center text-gray-400">El hotel confirmará en máx. {hotel.horasLimiteConfirm} horas</p>
           )}
         </div>
@@ -465,7 +559,33 @@ export default function HotelDetallePage() {
   const [reservaElegibleId, setReservaElegibleId] = useState<number | undefined>()
   const [lightbox, setLightbox]   = useState<{ fotos: string[]; idx: number } | null>(null)
   const [similares, setSimilares] = useState<ConfigHotel[]>([])
+  const [widgetHabIdx, setWidgetHabIdx] = useState(0)
+  const [fechaEntrada, setFechaEntrada] = useState(new Date().toISOString().split('T')[0])
+  const [fechaSalida,  setFechaSalida]  = useState(new Date(Date.now() + 86400000).toISOString().split('T')[0])
   const { mostrar: mostrarToast, toastProps } = useToast()
+
+  function abrirReserva(h: HabitacionTipo) {
+    if (!autenticado) { router.push('/ingresar'); return }
+    const idx = hotel?.habitaciones.findIndex(x => x.id === h.id) ?? 0
+    if (idx >= 0) setWidgetHabIdx(idx)
+    setHabSelec(h)
+  }
+
+  function seleccionarHabYScroll(h: HabitacionTipo) {
+    if (!autenticado) { router.push('/ingresar'); return }
+    const idx = hotel?.habitaciones.findIndex(x => x.id === h.id) ?? 0
+    if (idx >= 0) setWidgetHabIdx(idx)
+    const widget = document.querySelector('[data-widget]')
+    if (widget) {
+      // Desktop: scroll al widget para que el usuario confirme fechas ahí
+      widget.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      widget.classList.add('ring-2', 'ring-[#1B4332]', 'ring-offset-2')
+      setTimeout(() => widget.classList.remove('ring-2', 'ring-[#1B4332]', 'ring-offset-2'), 1500)
+    } else {
+      // Mobile: no hay widget, abrir formulario directamente
+      setHabSelec(h)
+    }
+  }
 
   useEffect(() => {
     obtenerHotel(Number(id))
@@ -543,6 +663,27 @@ export default function HotelDetallePage() {
         {/* GALERÍA */}
         <GaleriaHero fotos={todasFotos} nombre={hotel.comercio.nombre} onOpen={i => setLightbox({ fotos: todasFotos, idx: i })} />
 
+        {/* ACCESO RÁPIDO A HABITACIONES */}
+        {hotel.habitaciones.length > 0 && (
+          <button
+            onClick={() => document.querySelector('[data-rooms]')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            className="mt-4 w-full flex items-center justify-between bg-[#F0FDF4] border border-[#BBF7D0] hover:border-[#1B4332] rounded-2xl px-5 py-4 transition-all group">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🛏️</span>
+              <div className="text-left">
+                <p className="font-bold text-gray-900 text-sm">
+                  {hotel.habitaciones.length === 1 ? '1 tipo de habitación disponible' : `${hotel.habitaciones.length} tipos de habitación disponibles`}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Desde {formatearPrecio(Math.min(...hotel.habitaciones.map(h => Number(h.precioPorNoche))))} / noche
+                  {hotel.habitaciones.some(h => h.videoUrl) && <span className="ml-2 text-[#1B4332] font-medium">· Incluye video</span>}
+                </p>
+              </div>
+            </div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="text-[#1B4332] group-hover:translate-y-1 transition-transform"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          </button>
+        )}
+
         {/* LAYOUT 2 COL */}
         <div className="flex gap-12 mt-8">
           {/* Columna principal */}
@@ -609,7 +750,7 @@ export default function HotelDetallePage() {
             )}
 
             {/* HABITACIONES */}
-            <div className="py-6 border-b border-gray-100">
+            <div data-rooms className="py-6 border-b border-gray-100">
               <h2 className="text-xl font-bold text-gray-900 mb-1">
                 Habitaciones disponibles
               </h2>
@@ -623,7 +764,7 @@ export default function HotelDetallePage() {
                 <div className="space-y-5">
                   {hotel.habitaciones.map(hab => (
                     <TarjetaHabitacion key={hab.id} hab={hab}
-                      onReservar={h => { if (!autenticado) { router.push('/login'); return }; setHabSelec(h) }}
+                      onReservar={seleccionarHabYScroll}
                       onVerFotos={(f, i) => setLightbox({ fotos: f, idx: i })}
                     />
                   ))}
@@ -692,7 +833,7 @@ export default function HotelDetallePage() {
             {/* WHATSAPP mobile */}
             {hotel.comercio.whatsapp && (
               <div className="lg:hidden pb-28">
-                <a href={`https://wa.me/57${hotel.comercio.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener"
+                <a href={waUrl(hotel.comercio.whatsapp)} target="_blank" rel="noopener"
                   className="flex items-center gap-3 justify-center w-full py-4 rounded-2xl text-white font-bold text-base transition-all active:scale-[0.98] shadow-lg"
                   style={{ background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)' }}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
@@ -704,9 +845,11 @@ export default function HotelDetallePage() {
 
           {/* Widget lateral SOLO desktop */}
           {hotel.habitaciones.length > 0 && (
-            <div className="hidden lg:block w-[360px] flex-shrink-0">
+            <div className="hidden lg:block w-[360px] flex-shrink-0" data-widget>
               <WidgetReserva hotel={hotel} habitaciones={hotel.habitaciones}
-                onReservar={h => setHabSelec(h)} autenticado={autenticado} router={router} />
+                habIdx={widgetHabIdx} fechaEntrada={fechaEntrada} fechaSalida={fechaSalida}
+                onFechaEntrada={setFechaEntrada} onFechaSalida={setFechaSalida} onHabIdx={setWidgetHabIdx}
+                onReservar={abrirReserva} autenticado={autenticado} router={router} />
             </div>
           )}
         </div>
@@ -728,7 +871,7 @@ export default function HotelDetallePage() {
           </div>
           <button
             onClick={() => {
-              if (!autenticado) { router.push('/login'); return }
+              if (!autenticado) { router.push('/ingresar'); return }
               if (hotel.habitaciones.length === 1) { setHabSelec(hotel.habitaciones[0]); return }
               document.querySelector('[data-rooms]')?.scrollIntoView({ behavior: 'smooth' })
             }}
@@ -741,6 +884,7 @@ export default function HotelDetallePage() {
       {/* MODAL */}
       {habSelec && !reservaOk && (
         <FormReserva hotel={hotel} habitacion={habSelec}
+          fechaEntradaInicial={fechaEntrada} fechaSalidaInicial={fechaSalida}
           onClose={() => setHabSelec(null)}
           onSuccess={() => { setHabSelec(null); setReservaOk(true) }}
         />

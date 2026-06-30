@@ -14,10 +14,11 @@ import { obtenerToken } from '@/lib/api/client'
 import SubidorVideo from '@/components/comerciante/SubidorVideo'
 import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
 
-const SERVICIOS_OPCIONES = ['wifi', 'desayuno', 'parking', 'piscina', 'restaurante', 'aire', 'gym', 'spa', 'bar', 'mascotas']
+const SERVICIOS_OPCIONES = ['wifi', 'desayuno', 'parking', 'piscina', 'restaurante', 'aire', 'ventilador', 'gym', 'spa', 'bar', 'mascotas', 'tv', 'cocina', 'lavadora', 'agua_caliente', 'balcon']
 const SERVICIOS_LABELS: Record<string, string> = {
   wifi: '📶 WiFi', desayuno: '🍳 Desayuno', parking: '🅿️ Parqueadero', piscina: '🏊 Piscina',
-  restaurante: '🍽️ Restaurante', aire: '❄️ Aire acond.', gym: '💪 Gym', spa: '💆 Spa', bar: '🍸 Bar', mascotas: '🐾 Mascotas',
+  restaurante: '🍽️ Restaurante', aire: '❄️ Aire acond.', ventilador: '🌀 Ventilador', gym: '💪 Gym', spa: '💆 Spa', bar: '🍸 Bar', mascotas: '🐾 Mascotas',
+  tv: '📺 TV', cocina: '🍳 Cocina equipada', lavadora: '🧺 Lavadora', agua_caliente: '🚿 Agua caliente', balcon: '🌇 Balcón',
 }
 
 const ESTADO_RESERVA: Record<string, { label: string; color: string }> = {
@@ -193,14 +194,16 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
               </div>
             </div>
 
-            {/* Servicios extra */}
+            {/* Servicios extra por habitación */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Servicios incluidos</label>
-              <div className="flex flex-wrap gap-1.5">
-                {['TV', 'Baño privado', 'Balcón', 'Vista al mar', 'Minibar', 'Caja fuerte', 'Secador de pelo'].map(s => {
+              <label className="block text-xs font-medium text-gray-600 mb-1">Servicios de esta habitación</label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {['TV', 'Baño privado', 'Balcón', 'Vista al mar', 'Minibar', 'Caja fuerte', 'Secador de pelo',
+                  'Aire acond.', 'Ventilador', 'Cocina equipada', 'Nevera', 'Lavadora', 'Agua caliente',
+                  'WiFi', 'Jacuzzi', 'Terraza'].map(s => {
                   const sel = (form.serviciosExtra ?? []).includes(s)
                   return (
-                    <button key={s} onClick={() => setForm(p => {
+                    <button key={s} type="button" onClick={() => setForm(p => {
                       const list = p.serviciosExtra ?? []
                       return { ...p, serviciosExtra: sel ? list.filter(x => x !== s) : [...list, s] }
                     })} className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${sel ? 'bg-[#2D6A4F] text-white border-[#2D6A4F]' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
@@ -208,6 +211,36 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
                     </button>
                   )
                 })}
+                {/* Personalizados ya guardados */}
+                {(form.serviciosExtra ?? []).filter(s => !['TV','Baño privado','Balcón','Vista al mar','Minibar','Caja fuerte','Secador de pelo','Aire acond.','Ventilador','Cocina equipada','Nevera','Lavadora','Agua caliente','WiFi','Jacuzzi','Terraza'].includes(s)).map(s => (
+                  <span key={s} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border bg-[#2D6A4F] text-white border-[#2D6A4F]">
+                    {s}
+                    <button type="button" onClick={() => setForm(p => ({ ...p, serviciosExtra: (p.serviciosExtra ?? []).filter(x => x !== s) }))}
+                      className="hover:opacity-70 leading-none">×</button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input type="text" placeholder="Ej: Vista al río, Chimenea…"
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-[#2D6A4F]"
+                  onKeyDown={e => {
+                    if (e.key !== 'Enter') return
+                    const val = (e.target as HTMLInputElement).value.trim()
+                    if (!val) return
+                    setForm(p => ({ ...p, serviciosExtra: (p.serviciosExtra ?? []).includes(val) ? p.serviciosExtra : [...(p.serviciosExtra ?? []), val] }));
+                    (e.target as HTMLInputElement).value = ''
+                  }} />
+                <button type="button"
+                  onClick={e => {
+                    const input = e.currentTarget.previousElementSibling as HTMLInputElement
+                    const val = input.value.trim()
+                    if (!val) return
+                    setForm(p => ({ ...p, serviciosExtra: (p.serviciosExtra ?? []).includes(val) ? p.serviciosExtra : [...(p.serviciosExtra ?? []), val] }))
+                    input.value = ''
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-[#2D6A4F] text-white text-xs font-bold hover:bg-[#1B4332] transition-colors whitespace-nowrap">
+                  + Agregar
+                </button>
               </div>
             </div>
 
@@ -849,7 +882,7 @@ export default function ComercianteHotelesPage() {
             {/* Servicios del hotel */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-2">Servicios del hotel</label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 mb-3">
                 {SERVICIOS_OPCIONES.map(s => {
                   const sel = (editConfig.servicios ?? []).includes(s)
                   return (
@@ -863,6 +896,47 @@ export default function ComercianteHotelesPage() {
                     </button>
                   )
                 })}
+                {/* Servicios personalizados ya guardados */}
+                {(editConfig.servicios ?? []).filter(s => !SERVICIOS_OPCIONES.includes(s)).map(s => (
+                  <span key={s} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs border bg-[#2D6A4F] text-white border-[#2D6A4F] font-medium">
+                    {s}
+                    <button onClick={() => setEditConfig(p => ({ ...p, servicios: (p.servicios ?? []).filter(x => x !== s) }))}
+                      className="ml-0.5 hover:opacity-70 leading-none text-sm">×</button>
+                  </span>
+                ))}
+              </div>
+              {/* Agregar servicio personalizado */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Ej: Jacuzzi, Vista al río, Generador…"
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]"
+                  onKeyDown={e => {
+                    if (e.key !== 'Enter') return
+                    const val = (e.target as HTMLInputElement).value.trim()
+                    if (!val) return
+                    setEditConfig(p => ({
+                      ...p,
+                      servicios: (p.servicios ?? []).includes(val) ? p.servicios : [...(p.servicios ?? []), val],
+                    }));
+                    (e.target as HTMLInputElement).value = ''
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={e => {
+                    const input = (e.currentTarget.previousElementSibling as HTMLInputElement)
+                    const val = input.value.trim()
+                    if (!val) return
+                    setEditConfig(p => ({
+                      ...p,
+                      servicios: (p.servicios ?? []).includes(val) ? p.servicios : [...(p.servicios ?? []), val],
+                    }))
+                    input.value = ''
+                  }}
+                  className="px-4 py-2 rounded-xl bg-[#2D6A4F] text-white text-xs font-bold hover:bg-[#1B4332] transition-colors whitespace-nowrap">
+                  + Agregar
+                </button>
               </div>
             </div>
 

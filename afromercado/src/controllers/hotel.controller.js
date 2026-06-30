@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { subirVideoACloudinary, construirUrlVideoOptimizada, construirPosterVideo } = require("../utils/cloudinary");
+const { subirACloudinary, subirVideoACloudinary, construirUrlVideoOptimizada, construirPosterVideo } = require("../utils/cloudinary");
 const HotelService = require("../services/hotel.service");
 const { ErrorValidacion } = require("../utils/errores");
 const {
