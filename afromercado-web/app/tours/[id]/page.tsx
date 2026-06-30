@@ -488,9 +488,9 @@ export default function TourDetallePage() {
         <GaleriaHero fotos={tour.fotos} nombre={tour.nombre} onOpen={i => setLightbox({ fotos: tour.fotos, idx: i })} />
 
         {/* LAYOUT 2 COL */}
-        <div className="flex gap-12 mt-8">
+        <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-10 lg:items-start mt-8">
           {/* Columna principal */}
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0">
 
             {/* Título */}
             <div className="pb-6 border-b border-gray-100">
@@ -605,7 +605,7 @@ export default function TourDetallePage() {
           </div>
 
           {/* Widget lateral SOLO desktop */}
-          <div className="hidden lg:block w-[360px] flex-shrink-0">
+          <div className="hidden lg:block">
             <WidgetReservaTour tour={tour} onReservar={() => setMostrarForm(true)} autenticado={autenticado} router={router} />
           </div>
         </div>

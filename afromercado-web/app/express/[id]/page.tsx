@@ -449,7 +449,7 @@ export default function MenuExpressPage() {
     <div className="min-h-screen bg-[#FAF8F5]">
       {/* Header del restaurante */}
       <header className="bg-white border-b border-[#E8DCC8]">
-        <div className="max-w-2xl mx-auto px-4 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <Link href="/express" className="inline-flex items-center gap-1.5 text-sm text-[#2D6A4F] mb-3">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
             Express
@@ -523,7 +523,9 @@ export default function MenuExpressPage() {
       </header>
 
       {/* Menú */}
-      <main className="max-w-2xl mx-auto px-4 py-5 pb-40 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 pb-40 lg:pb-8">
+        <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8 lg:items-start">
+        <div className="space-y-6">
         {menu.productos.length === 0 ? (
           <div className="text-center py-12 text-[#999]">
             <p className="text-3xl mb-2">🥘</p>
@@ -585,11 +587,56 @@ export default function MenuExpressPage() {
             ))
           })()
         )}
+        </div>{/* fin columna izquierda */}
+
+        {/* Sidebar carrito — solo desktop */}
+        <div className="hidden lg:block">
+          <div className="lg:sticky lg:top-20 bg-white rounded-2xl border border-[#E8DCC8] shadow-lg p-5 space-y-4">
+            <p className="font-bold text-[#1A1A1A] text-base">🛒 Tu pedido</p>
+            {carrito.length === 0 ? (
+              <p className="text-sm text-[#999] text-center py-6">Agrega productos del menú</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {carrito.map(i => (
+                    <div key={i.productoId} className="flex justify-between items-center text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => quitar(i.productoId)} className="w-6 h-6 rounded-full bg-[#F0EBE3] flex items-center justify-center text-[#2D6A4F] font-bold">−</button>
+                          <span className="w-5 text-center font-semibold">{i.cantidad}</span>
+                          <button onClick={() => agregar({ id: i.productoId, nombre: i.nombre, precio: i.precio, fotoUrl: i.fotoUrl, stock: 999, stockReservado: 0, descripcion: '', unidad: 'und', menuSeccionId: null } as any)} className="w-6 h-6 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center font-bold">+</button>
+                        </div>
+                        <span className="truncate text-[#1A1A1A]">{i.nombre}</span>
+                      </div>
+                      <span className="text-[#1A1A1A] font-medium ml-2 flex-shrink-0">{formatearPrecio(i.precio * i.cantidad)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-[#E8DCC8] pt-3 flex justify-between font-bold text-[#1A1A1A]">
+                  <span>Total</span>
+                  <span>{formatearPrecio(totalPrecio)}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    if (!autenticado) { router.push('/login'); return }
+                    if (!menu.abiertoAhora) return
+                    setPaso('checkout')
+                  }}
+                  disabled={!menu.abiertoAhora}
+                  className="w-full rounded-xl bg-[#2D6A4F] text-white py-3 font-bold text-sm disabled:opacity-50"
+                >
+                  {menu.abiertoAhora ? 'Confirmar pedido' : 'Restaurante cerrado'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        </div>{/* fin grid 2 col */}
       </main>
 
-      {/* Barra de carrito flotante */}
+      {/* Barra de carrito flotante — solo mobile */}
       {totalItems > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-transparent">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-transparent lg:hidden">
           <div className="max-w-lg mx-auto">
             <button
               onClick={() => {

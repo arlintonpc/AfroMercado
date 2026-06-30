@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, iniciarPagoReserva, validarCuponHotel, esFavoritoHotel, toggleFavoritoHotel, type ConfigHotel, type HabitacionTipo, type ReservaHotel, type ValidacionCupon, type TemporadaHotel } from '@/lib/api/hotel'
+import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, iniciarPagoReserva, validarCuponHotel, esFavoritoHotel, toggleFavoritoHotel, type ConfigHotel, type HabitacionTipo, type ReservaHotel, type ValidacionCupon, type TemporadaHotel, type ModalidadReservaHotel } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
@@ -328,6 +328,11 @@ function TarjetaHabitacion({ hab, onReservar, onVerFotos }: {
                 )
               })()}
               <div className="text-xs text-gray-400 mt-1">por noche</div>
+              {hab.permitePorHoras && hab.precioPorHora && (
+                <div className="mt-2 inline-flex rounded-full bg-[#2D6A4F]/10 px-2.5 py-1 text-[11px] font-bold text-[#1B4332]">
+                  {formatearPrecio(Number(hab.precioPorHora))}/hora
+                </div>
+              )}
             </div>
           </div>
 
@@ -385,6 +390,12 @@ function WidgetReserva({ hotel, habitaciones, habIdx, fechaEntrada, fechaSalida,
         <span className="text-3xl font-black text-gray-900">{hab ? formatearPrecio(Number(hab.precioPorNoche)) : '—'}</span>
         <span className="text-gray-500 text-sm">/ noche</span>
       </div>
+
+      {hab && hotel.permiteReservasPorHora && hab.permitePorHoras && hab.precioPorHora && (
+        <div className="-mt-3 mb-4 inline-flex rounded-full bg-[#2D6A4F]/10 px-3 py-1 text-xs font-bold text-[#1B4332]">
+          Tambien por horas: {formatearPrecio(Number(hab.precioPorHora))}/hora
+        </div>
+      )}
 
       {habitaciones.length > 1 && (
         <div className="mb-4">
@@ -466,9 +477,31 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
   const [cuponAplicado, setCuponAplicado] = useState<ValidacionCupon | null>(null)
   const [cuponError, setCuponError] = useState('')
   const [aplicandoCupon, setAplicandoCupon] = useState(false)
+  const precioNoche = Number(habitacion.precioPorNoche)
+  const precioHora = Number(habitacion.precioPorHora || 0)
+  const permiteHoras = !!hotel.permiteReservasPorHora && !!habitacion.permitePorHoras && precioHora > 0
+  const [modalidad, setModalidad] = useState<ModalidadReservaHotel>('NOCHE')
+  const [horaEntrada, setHoraEntrada] = useState('09:00')
+  const [horaSalida, setHoraSalida] = useState('12:00')
 
   const noches = Math.max(1, Math.ceil((new Date(fechaSalida).getTime() - new Date(fechaEntrada).getTime()) / 86400000))
-  const total  = Number(habitacion.precioPorNoche) * noches
+  const fechaConsultaEntrada = modalidad === 'HORAS' ? `${fechaEntrada}T${horaEntrada}` : fechaEntrada
+  const fechaConsultaSalida = modalidad === 'HORAS' ? `${fechaEntrada}T${horaSalida}` : fechaSalida
+  const duracionHoras = modalidad === 'HORAS'
+    ? Math.max(0, Math.round(((new Date(fechaConsultaSalida).getTime() - new Date(fechaConsultaEntrada).getTime()) / 3600000) * 100) / 100)
+    : 0
+  const total  = modalidad === 'HORAS'
+    ? Math.round(precioHora * duracionHoras)
+    : precioNoche * noches
+  const resumenEstadia = modalidad === 'HORAS'
+    ? `${duracionHoras || 0} hora${duracionHoras === 1 ? '' : 's'}`
+    : `${noches} noche${noches !== 1 ? 's' : ''}`
+  const precioResumen = modalidad === 'HORAS' ? precioHora : precioNoche
+  const unidadResumen = modalidad === 'HORAS' ? 'hora' : 'noche'
+
+  useEffect(() => {
+    if (!permiteHoras && modalidad === 'HORAS') setModalidad('NOCHE')
+  }, [permiteHoras, modalidad])
 
   async function aplicarCupon() {
     if (!codigoCupon.trim()) return
@@ -479,8 +512,9 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
       const resultado = await validarCuponHotel({
         codigo: codigoCupon.trim().toUpperCase(),
         habitacionTipoId: habitacion.id,
-        fechaEntrada: fechaEntrada || '',
-        fechaSalida: fechaSalida || '',
+        fechaEntrada: fechaConsultaEntrada || '',
+        fechaSalida: fechaConsultaSalida || '',
+        modalidad,
       })
       setCuponAplicado(resultado)
     } catch (e: unknown) {
@@ -491,20 +525,35 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
   }
 
   useEffect(() => {
-    if (!fechaEntrada || !fechaSalida || fechaSalida <= fechaEntrada) { setDisponibilidad(null); return }
-    verificarDisponibilidad(habitacion.id, fechaEntrada, fechaSalida).then(setDisponibilidad).catch(() => setDisponibilidad(null))
-  }, [fechaEntrada, fechaSalida, habitacion.id])
+    if (!fechaConsultaEntrada || !fechaConsultaSalida) { setDisponibilidad(null); return }
+    if (new Date(fechaConsultaSalida) <= new Date(fechaConsultaEntrada)) { setDisponibilidad(null); return }
+    verificarDisponibilidad(habitacion.id, fechaConsultaEntrada, fechaConsultaSalida, modalidad)
+      .then(setDisponibilidad)
+      .catch(() => setDisponibilidad(null))
+  }, [fechaConsultaEntrada, fechaConsultaSalida, modalidad, habitacion.id])
 
   async function reservar() {
     if (opcionesPago.length === 0) { setError('Este hotel aun no tiene metodos de pago activos'); return }
     if (!nombre.trim() || !telefono.trim()) { setError('Completa nombre y teléfono'); return }
-    if (fechaSalida <= fechaEntrada) { setError('La fecha de salida debe ser posterior'); return }
+    if (modalidad === 'HORAS') {
+      if (!permiteHoras) { setError('Esta habitacion no permite reservas por horas'); return }
+      if (new Date(fechaConsultaSalida) <= new Date(fechaConsultaEntrada)) { setError('La hora de salida debe ser posterior'); return }
+      const minHoras = Number(habitacion.duracionMinHoras || 1)
+      const maxHoras = habitacion.duracionMaxHoras ? Number(habitacion.duracionMaxHoras) : null
+      if (duracionHoras < minHoras) { setError(`La reserva minima es de ${minHoras} hora(s)`); return }
+      if (maxHoras && duracionHoras > maxHoras) { setError(`La reserva maxima es de ${maxHoras} hora(s)`); return }
+    } else if (fechaSalida <= fechaEntrada) { setError('La fecha de salida debe ser posterior'); return }
     setError(''); setCargando(true)
     try {
       const metodoPagoFinal = modoPago === 'efectivo' ? 'EFECTIVO' : 'WOMPI'
       const reservaCreada = await crearReserva({
         habitacionTipoId: habitacion.id,
-        fechaEntrada, fechaSalida, huespedes,
+        fechaEntrada: fechaConsultaEntrada,
+        fechaSalida: fechaConsultaSalida,
+        modalidad,
+        horaEntrada: modalidad === 'HORAS' ? horaEntrada : undefined,
+        horaSalida: modalidad === 'HORAS' ? horaSalida : undefined,
+        huespedes,
         metodoPago: metodoPagoFinal,
         notasCliente: notas || undefined,
         nombreHuesped: nombre.trim(),
@@ -536,21 +585,69 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
             <h3 className="font-bold text-xl text-gray-900">{habitacion.nombre}</h3>
-            <p className="text-sm text-[#1B4332] font-semibold mt-0.5">{formatearPrecio(Number(habitacion.precioPorNoche))}<span className="text-gray-400 font-normal"> / noche</span></p>
+            <p className="text-sm text-[#1B4332] font-semibold mt-0.5">
+              {formatearPrecio(precioResumen)}<span className="text-gray-400 font-normal"> / {unidadResumen}</span>
+            </p>
           </div>
           <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors text-xl leading-none font-bold">×</button>
         </div>
         <div className="px-6 pt-5 pb-8 space-y-5">
-          <CalendarioReserva fechaEntrada={fechaEntrada} fechaSalida={fechaSalida}
-            onChangeFechaEntrada={setFechaEntrada} onChangeFechaSalida={setFechaSalida}
-            checkInHora={hotel.checkInHora} checkOutHora={hotel.checkOutHora} />
+          {permiteHoras && (
+            <div className="grid grid-cols-2 gap-2 rounded-2xl bg-gray-50 p-1.5">
+              {[
+                { id: 'NOCHE' as ModalidadReservaHotel, titulo: 'Por noche', desc: `${formatearPrecio(precioNoche)}/noche` },
+                { id: 'HORAS' as ModalidadReservaHotel, titulo: 'Por horas', desc: `${formatearPrecio(precioHora)}/hora` },
+              ].map(op => (
+                <button
+                  key={op.id}
+                  type="button"
+                  onClick={() => { setModalidad(op.id); setCuponAplicado(null); setCuponError('') }}
+                  className={`rounded-xl px-3 py-2.5 text-left transition-all ${
+                    modalidad === op.id ? 'bg-white text-[#1B4332] shadow-sm ring-1 ring-[#1B4332]/10' : 'text-gray-500 hover:bg-white/70'
+                  }`}
+                >
+                  <p className="text-sm font-black">{op.titulo}</p>
+                  <p className="text-[11px]">{op.desc}</p>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {modalidad === 'NOCHE' ? (
+            <CalendarioReserva fechaEntrada={fechaEntrada} fechaSalida={fechaSalida}
+              onChangeFechaEntrada={setFechaEntrada} onChangeFechaSalida={setFechaSalida}
+              checkInHora={hotel.checkInHora} checkOutHora={hotel.checkOutHora} />
+          ) : (
+            <div className="rounded-2xl border border-gray-200 p-4">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Reserva por horas</label>
+              <input type="date" value={fechaEntrada} onChange={e => { setFechaEntrada(e.target.value); setCuponAplicado(null) }}
+                className="mb-3 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold focus:outline-none focus:border-[#1B4332]" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">Entrada</p>
+                  <input type="time" value={horaEntrada} onChange={e => { setHoraEntrada(e.target.value); setCuponAplicado(null) }}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold focus:outline-none focus:border-[#1B4332]" />
+                </div>
+                <div>
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">Salida</p>
+                  <input type="time" value={horaSalida} onChange={e => { setHoraSalida(e.target.value); setCuponAplicado(null) }}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold focus:outline-none focus:border-[#1B4332]" />
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-gray-400">
+                Minimo {habitacion.duracionMinHoras ?? 1} hora(s)
+                {habitacion.duracionMaxHoras ? ` · maximo ${habitacion.duracionMaxHoras} hora(s)` : ''}
+                {hotel.minutosLimpiezaEntreReservas ? ` · incluye ${hotel.minutosLimpiezaEntreReservas} min de limpieza` : ''}
+              </p>
+            </div>
+          )}
 
           <div className={`rounded-xl p-4 flex items-center justify-between border ${
             disponibilidad === null ? 'bg-gray-50 border-gray-100'
             : disponibilidad.disponibles > 0 ? 'bg-emerald-50 border-emerald-100'
             : 'bg-red-50 border-red-100'}`}>
             <div>
-              <p className="font-semibold text-gray-900">{noches} noche{noches !== 1 ? 's' : ''}</p>
+              <p className="font-semibold text-gray-900">{resumenEstadia}</p>
               {disponibilidad !== null && (
                 <p className={`text-xs mt-0.5 font-medium ${disponibilidad.disponibles > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
                   {disponibilidad.disponibles > 0 ? `✓ ${disponibilidad.disponibles} habitación(es) disponible(s)` : '✗ Sin disponibilidad'}
@@ -672,7 +769,7 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
           {error && <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>}
 
           <button onClick={reservar}
-            disabled={cargando || (disponibilidad !== null && disponibilidad.disponibles <= 0)}
+            disabled={cargando || total <= 0 || (disponibilidad !== null && disponibilidad.disponibles <= 0)}
             className="w-full bg-[#1B4332] text-white font-bold py-4 rounded-xl text-base hover:bg-[#15362A] transition-colors disabled:opacity-50 active:scale-[0.98] shadow-md">
             {textoBoton}
           </button>
@@ -843,9 +940,9 @@ export default function HotelDetallePage() {
         )}
 
         {/* LAYOUT 2 COL */}
-        <div className="flex gap-12 mt-8">
+        <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-10 lg:items-start mt-8">
           {/* Columna principal */}
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0">
 
             {/* Título */}
             <div className="pb-6 border-b border-gray-100">
@@ -1021,7 +1118,7 @@ export default function HotelDetallePage() {
 
           {/* Widget lateral SOLO desktop */}
           {hotel.habitaciones.length > 0 && (
-            <div className="hidden lg:block w-[360px] flex-shrink-0" data-widget>
+            <div className="hidden lg:block" data-widget>
               <WidgetReserva hotel={hotel} habitaciones={hotel.habitaciones}
                 habIdx={widgetHabIdx} fechaEntrada={fechaEntrada} fechaSalida={fechaSalida}
                 onFechaEntrada={setFechaEntrada} onFechaSalida={setFechaSalida} onHabIdx={setWidgetHabIdx}
@@ -1103,7 +1200,14 @@ export default function HotelDetallePage() {
             {reservaOk.habitacionTipo && (
               <p className="text-sm text-gray-500 mb-5">
                 {reservaOk.habitacionTipo.nombre} ·{' '}
-                {Math.ceil((new Date(reservaOk.fechaSalida).getTime() - new Date(reservaOk.fechaEntrada).getTime()) / 86400000)} noche{Math.ceil((new Date(reservaOk.fechaSalida).getTime() - new Date(reservaOk.fechaEntrada).getTime()) / 86400000) !== 1 ? 's' : ''} ·{' '}
+                {(() => {
+                  if (reservaOk.modalidad === 'HORAS') {
+                    const horas = Number(reservaOk.duracionHoras || Math.max(1, (new Date(reservaOk.fechaSalida).getTime() - new Date(reservaOk.fechaEntrada).getTime()) / 3600000))
+                    return `${horas} hora${horas === 1 ? '' : 's'}`
+                  }
+                  const nochesReserva = Math.ceil((new Date(reservaOk.fechaSalida).getTime() - new Date(reservaOk.fechaEntrada).getTime()) / 86400000)
+                  return `${nochesReserva} noche${nochesReserva !== 1 ? 's' : ''}`
+                })()} ·{' '}
                 <span className="font-bold text-gray-900">{formatearPrecio(Number(reservaOk.total))}</span>
               </p>
             )}
