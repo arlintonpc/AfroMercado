@@ -3,6 +3,7 @@ const multer  = require("multer");
 const path    = require("path");
 const { autenticar, autorizar } = require("../middlewares/auth");
 const TransporteController = require("../controllers/transporte.controller");
+const ReviewController     = require("../controllers/review.controller");
 
 const router = express.Router();
 const soloAuth     = [autenticar];
@@ -45,6 +46,10 @@ router.put(   "/mi-transporte/rutas/:id",           ...soloComercio, TransporteC
 router.delete("/mi-transporte/rutas/:id",           ...soloComercio, TransporteController.eliminarRuta);
 router.get(   "/mi-transporte/reservas",            ...soloComercio, TransporteController.reservasOperador);
 router.patch( "/mi-transporte/reservas/:id/estado", ...soloComercio, TransporteController.cambiarEstado);
+
+// ── REVIEWS ──────────────────────────────────────────────────
+router.get( "/:id/reviews",              ReviewController.reviewsTransporte);
+router.post("/reservas/:id/review", ...soloAuth, ReviewController.crearReviewTransporte);
 
 // ── ADMIN ─────────────────────────────────────────────────────
 router.get(   "/admin/todos",      ...soloAdmin, TransporteController.adminListar);

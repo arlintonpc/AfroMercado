@@ -378,6 +378,7 @@ const ExpressService = {
       include: {
         items:    { include: { producto: { select: { nombre: true, fotoUrl: true } } } },
         configExpress: { include: { comercio: { select: { nombre: true, logoUrl: true } } } },
+        review: { select: { id: true } },
       },
     });
   },

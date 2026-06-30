@@ -5,6 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { listarTransportes, type ConfigTransporte } from '@/lib/api/transporte'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import { optimizarImagenPequena } from '@/lib/cloudinary'
 
 const MapaTransportes = dynamic(() => import('@/components/hoteles/MapaTransportes'), { ssr: false })
 
@@ -64,7 +65,7 @@ function TarjetaTransporte({ t, userLat, userLon }: { t: ConfigTransporte; userL
     <Link href={`/transportes/${t.id}`} className="block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all hover:-translate-y-0.5">
       <div className="h-40 bg-gradient-to-br from-[#023E8A] to-[#0077B6] relative flex items-center justify-center">
         {t.fotos[0] ? (
-          <img src={t.fotos[0]} alt={t.nombre} className="w-full h-full object-cover" />
+          <img src={optimizarImagenPequena(t.fotos[0])} alt={t.nombre} className="w-full h-full object-cover" />
         ) : (
           <span className="text-5xl">{TIPO_ICONO[t.tipo] ?? '🛥️'}</span>
         )}

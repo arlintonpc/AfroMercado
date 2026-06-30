@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { obtenerTransporte, verificarDisponibilidadTransporte, crearReservaTransporte, misReservasTransporte, type ConfigTransporte, type RutaTransporte } from '@/lib/api/transporte'
+import { reviewsTransporte, crearReviewTransporte, type ReviewTransporte } from '@/lib/api/review'
+import SeccionReviews, { type ReviewItem } from '@/components/ui/SeccionReviews'
 import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
@@ -372,11 +374,35 @@ export default function TransporteDetallePage() {
   const [rutaSeleccionada, setRutaSel]    = useState<RutaTransporte | null>(null)
   const [reservado, setReservado]         = useState(false)
   const [lightbox, setLightbox]           = useState<{ fotos: string[]; idx: number } | null>(null)
+  const [reviews, setReviews]             = useState<ReviewTransporte[]>([])
+  const [cargandoReviews, setCargandoRev] = useState(true)
+  const [reservaElegibleId, setReservaElegibleId] = useState<number | undefined>()
   const { mostrar: mostrarToast, toastProps } = useToast()
 
   useEffect(() => {
     obtenerTransporte(Number(id)).then(d => { setTransporte(d); setCargando(false) }).catch(() => setCargando(false))
+    reviewsTransporte(Number(id)).then(r => { setReviews(r); setCargandoRev(false) }).catch(() => setCargandoRev(false))
   }, [id])
+
+  useEffect(() => {
+    if (!usuario) return
+    misReservasTransporte().then(rs => {
+      // Buscar reserva COMPLETADA de este transporte que no tenga review aún
+      const comp = rs.find((r: any) =>
+        r.estado === 'COMPLETADA' &&
+        !r.review &&
+        (r.ruta?.configTransporteId === Number(id) || r.ruta?.configTransporte?.id === Number(id))
+      )
+      setReservaElegibleId(comp?.id)
+    }).catch(() => {})
+  }, [usuario, id])
+
+  useEffect(() => {
+    if (transporte?.nombre) {
+      document.title = `${transporte.nombre} — Transporte AfroMercado`
+    }
+    return () => { document.title = 'AfroMercado' }
+  }, [transporte?.nombre])
 
   if (cargando) return (
     <div className="min-h-screen flex items-center justify-center bg-white">
@@ -508,6 +534,21 @@ export default function TransporteDetallePage() {
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* RESEÑAS */}
+            <div className="py-6">
+              <SeccionReviews
+                reviews={reviews.map(r => ({ ...r, clienteId: r.clienteId }))}
+                cargando={cargandoReviews}
+                elegibleId={reservaElegibleId}
+                placeholder="¿Cómo fue el viaje?"
+                onCrear={async (elegibleId, cal, com) => {
+                  const nueva = await crearReviewTransporte(elegibleId, cal, com)
+                  return nueva as ReviewItem
+                }}
+                onNueva={r => setReviews(prev => [r as ReviewTransporte, ...prev])}
+              />
             </div>
 
             {/* WhatsApp mobile */}

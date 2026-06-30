@@ -9,12 +9,15 @@ import {
   obtenerMenuComercioExpress,
   crearPedidoExpress,
   validarCuponExpress,
+  misPedidosExpress,
   type MenuComercioExpress,
   type MenuSeccion,
   type ModalidadExpress,
   type MetodoPagoExpress,
   type ValidacionCuponExpress,
 } from '@/lib/api/express'
+import { reviewsExpress, crearReviewExpress, type ReviewExpress } from '@/lib/api/review'
+import SeccionReviews, { type ReviewItem } from '@/components/ui/SeccionReviews'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 
@@ -98,6 +101,9 @@ export default function MenuExpressPage() {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pedidoId, setPedidoId] = useState<number | null>(null)
+  const [reviews, setReviews] = useState<ReviewExpress[]>([])
+  const [cargandoReviews, setCargandoRev] = useState(true)
+  const [pedidoElegibleId, setPedidoElegibleId] = useState<number | undefined>()
 
   // Cupón
   const [codigoCupon, setCodigoCupon]         = useState('')
@@ -128,6 +134,25 @@ export default function MenuExpressPage() {
   }, [comercioId])
 
   useEffect(() => { cargar() }, [cargar])
+
+  useEffect(() => {
+    reviewsExpress(comercioId).then(r => { setReviews(r); setCargandoRev(false) }).catch(() => setCargandoRev(false))
+  }, [comercioId])
+
+  useEffect(() => {
+    if (!usuario) return
+    misPedidosExpress().then(ps => {
+      const elegible = ps.find((p: any) => p.comercioId === comercioId && p.estado === 'ENTREGADO' && !p.review)
+      setPedidoElegibleId(elegible?.id)
+    }).catch(() => {})
+  }, [usuario, comercioId])
+
+  useEffect(() => {
+    if (menu?.comercio?.nombre) {
+      document.title = `${menu.comercio.nombre} — Pedidos AfroMercado`
+    }
+    return () => { document.title = 'AfroMercado' }
+  }, [menu?.comercio?.nombre])
 
   function agregar(p: MenuComercioExpress['productos'][0]) {
     setCarrito(prev => {
@@ -595,6 +620,20 @@ export default function MenuExpressPage() {
             ))
           })()
         )}
+        {/* RESEÑAS */}
+        <div className="mt-6">
+          <SeccionReviews
+            reviews={reviews.map(r => ({ ...r, clienteId: r.clienteId }))}
+            cargando={cargandoReviews}
+            elegibleId={pedidoElegibleId}
+            placeholder="¿Cómo estuvo el pedido?"
+            onCrear={async (elegibleId, cal, com) => {
+              const nueva = await crearReviewExpress(elegibleId, cal, com)
+              return nueva as ReviewItem
+            }}
+            onNueva={r => setReviews(prev => [r as ReviewExpress, ...prev])}
+          />
+        </div>
         </div>{/* fin columna izquierda */}
 
         {/* Sidebar carrito — solo desktop */}

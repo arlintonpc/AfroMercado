@@ -16,6 +16,7 @@ import { mapearProductos, type ProductoCrudo } from '@/lib/mapearProducto'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { precioVigente } from '@/lib/precioProducto'
 import { registrarEventoPatrocinado } from '@/lib/publicidadTracking'
+import { optimizarImagenPequena } from '@/lib/cloudinary'
 import { listarHoteles, type ConfigHotel } from '@/lib/api/hotel'
 import { listarTours, type ConfigTour } from '@/lib/api/tour'
 import { listarTransportes, type ConfigTransporte } from '@/lib/api/transporte'
@@ -85,7 +86,7 @@ function SeccionHoteles({ hoteles }: { hoteles: ConfigHotel[] }) {
                 className="flex-shrink-0 w-52 bg-[#F8F5F0] rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
                 <div className="h-32 bg-gradient-to-br from-[#2D6A4F] to-[#40916C] flex items-center justify-center overflow-hidden">
                   {foto
-                    ? <img src={foto} alt={h.comercio.nombre} className="w-full h-full object-cover" />
+                    ? <img src={optimizarImagenPequena(foto)} alt={h.comercio.nombre} className="w-full h-full object-cover" />
                     : <span className="text-4xl">🏨</span>
                   }
                 </div>
@@ -128,7 +129,7 @@ function SeccionTours({ tours }: { tours: ConfigTour[] }) {
               className="flex-shrink-0 w-52 bg-white rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
               <div className="h-32 bg-gradient-to-br from-[#40916C] to-[#74C69D] flex items-center justify-center overflow-hidden">
                 {t.fotos[0]
-                  ? <img src={t.fotos[0]} alt={t.nombre} className="w-full h-full object-cover" />
+                  ? <img src={optimizarImagenPequena(t.fotos[0])} alt={t.nombre} className="w-full h-full object-cover" />
                   : <span className="text-4xl">🗺️</span>}
               </div>
               <div className="p-3">
@@ -172,7 +173,7 @@ function SeccionTransporte({ transportes }: { transportes: ConfigTransporte[] })
                 className="flex-shrink-0 w-52 bg-[#F8F5F0] rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
                 <div className="h-32 bg-gradient-to-br from-[#023E8A] to-[#0077B6] flex items-center justify-center overflow-hidden">
                   {t.fotos[0]
-                    ? <img src={t.fotos[0]} alt={t.nombre} className="w-full h-full object-cover" />
+                    ? <img src={optimizarImagenPequena(t.fotos[0])} alt={t.nombre} className="w-full h-full object-cover" />
                     : <span className="text-4xl">{TIPO_ICONO[t.tipo] ?? '🛥️'}</span>}
                 </div>
                 <div className="p-3">
@@ -445,18 +446,24 @@ export default function Home() {
   const [hoteles, setHoteles] = useState<ConfigHotel[]>([])
   const [tours, setTours] = useState<ConfigTour[]>([])
   const [transportes, setTransportes] = useState<ConfigTransporte[]>([])
+  const [paginaActual, setPaginaActual] = useState(1)
+  const [hayMas, setHayMas] = useState(false)
+  const [cargandoMas, setCargandoMas] = useState(false)
 
   /** Carga productos según el filtro de categoría activo. */
   const cargarProductos = useCallback(async (filtro: string) => {
     setCargando(true)
     setError(null)
+    setPaginaActual(1)
     try {
       const categoriaId = filtro === 'todos' ? undefined : filtro
-      const { items } = await listarProductos({ categoriaId, porPagina: 24 })
-      setProductos(mapearProductos(items))
+      const resultado = await listarProductos({ categoriaId, porPagina: 24, pagina: 1 })
+      setProductos(mapearProductos(resultado.items))
+      setHayMas(resultado.pagina < resultado.paginas)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudieron cargar los productos.')
       setProductos([])
+      setHayMas(false)
     } finally {
       setCargando(false)
     }
@@ -537,14 +544,18 @@ export default function Home() {
     }
 
     cargarInicial()
-    listarProductos({ porPagina: 24 })
-      .then(({ items }) => {
-        if (!cancelado) setProductos(mapearProductos(items))
+    listarProductos({ porPagina: 24, pagina: 1 })
+      .then((resultado) => {
+        if (!cancelado) {
+          setProductos(mapearProductos(resultado.items))
+          setHayMas(resultado.pagina < resultado.paginas)
+        }
       })
       .catch((e) => {
         if (!cancelado) {
           setError(e instanceof Error ? e.message : 'No se pudieron cargar los productos.')
           setProductos([])
+          setHayMas(false)
         }
       })
       .finally(() => { if (!cancelado) setCargando(false) })
@@ -568,6 +579,22 @@ export default function Home() {
   function handleFiltroChange(filtro: string) {
     setFiltroActivo(filtro)
     cargarProductos(filtro)
+  }
+
+  async function cargarMas() {
+    setCargandoMas(true)
+    try {
+      const nuevaPagina = paginaActual + 1
+      const categoriaId = filtroActivo === 'todos' ? undefined : filtroActivo
+      const resultado = await listarProductos({ categoriaId, porPagina: 24, pagina: nuevaPagina })
+      setProductos(prev => [...prev, ...mapearProductos(resultado.items)])
+      setPaginaActual(nuevaPagina)
+      setHayMas(resultado.pagina < resultado.paginas)
+    } catch {
+      // no bloquea si falla
+    } finally {
+      setCargandoMas(false)
+    }
   }
 
   return (
@@ -693,6 +720,19 @@ export default function Home() {
                   etiquetaDestacado={destCatalogo.get(producto.id)}
                 />
               ))}
+            </div>
+          )}
+
+          {/* Botón cargar más */}
+          {!cargando && !error && hayMas && (
+            <div className="flex justify-center mt-8">
+              <button
+                onClick={cargarMas}
+                disabled={cargandoMas}
+                className="px-8 py-3 bg-[#2D6A4F] text-white font-semibold rounded-2xl hover:bg-[#1B4332] disabled:opacity-50 transition-colors"
+              >
+                {cargandoMas ? 'Cargando…' : 'Ver más productos'}
+              </button>
             </div>
           )}
         </section>

@@ -843,6 +843,13 @@ export default function HotelDetallePage() {
       .catch(() => setCargando(false))
   }, [id, usuario])
 
+  useEffect(() => {
+    if (hotel?.comercio?.nombre) {
+      document.title = `${hotel.comercio.nombre} — Hoteles AfroMercado`
+    }
+    return () => { document.title = 'AfroMercado' }
+  }, [hotel?.comercio?.nombre])
+
   async function toggleFav() {
     if (!usuario) { router.push('/ingresar'); return }
     setToggling(true)

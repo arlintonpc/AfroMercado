@@ -301,6 +301,7 @@ const HotelController = {
 
   async subirVideoHabitacion(req, res, next) {
     let cloud = null;
+    const filePath = req.file?.path;
     try {
       if (!req.file) throw new ErrorValidacion('Adjunta un video en el campo "video"');
 
@@ -321,8 +322,6 @@ const HotelController = {
       const posterUrl = cloud ? (construirPosterVideo?.(cloud.secureUrl, recorte) ?? cloud.posterUrl ?? null) : null;
       const duracion  = recorte.duracionFinal ?? cloud?.duration ?? null;
 
-      if (cloud) fs.unlink(req.file.path, () => {});
-
       const hab = await HotelService.subirVideoHabitacion(
         req.usuario.comercio.id, Number(req.params.id), videoUrl, posterUrl, duracion
       );
@@ -332,8 +331,9 @@ const HotelController = {
         videoDuracionSeg: hab.videoDuracionSeg,
       }});
     } catch (e) {
-      if (req.file?.path) fs.unlink(req.file.path, () => {});
       next(e);
+    } finally {
+      if (filePath) fs.unlink(filePath, () => {});
     }
   },
 

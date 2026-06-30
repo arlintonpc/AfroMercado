@@ -109,7 +109,7 @@ const TransporteService = {
   async misReservas(clienteId) {
     return prisma.reservaTransporte.findMany({
       where: { clienteId },
-      include: { ruta: { include: { configTransporte: { include: TRANSPORTE_INCLUDE } } } },
+      include: { ruta: { include: { configTransporte: { include: TRANSPORTE_INCLUDE } } }, review: { select: { id: true } } },
       orderBy: { creadoAt: "desc" },
     });
   },

@@ -132,6 +132,7 @@ async function uploadVideoTransporte(req, res, next) {
 }
 
 async function subirVideoTransporte(req, res, next) {
+  const filePath = req.file?.path;
   try {
     const comercioId = req.usuario.comercio.id;
     if (!req.file) return res.status(400).json({ ok: false, error: "No se recibió archivo de video" });
@@ -141,9 +142,10 @@ async function subirVideoTransporte(req, res, next) {
     const videoUrl = construirUrlVideoOptimizada(secureUrl, recorte);
     const posterFinal = construirPosterVideo(secureUrl, recorte);
     const result = await TransporteService.subirVideoTransporte(comercioId, videoUrl, posterFinal, recorte.duracionFinal);
-    eliminarArchivoLocalDesdeUrl(urlLocalVideo(req, req.file.path)).catch(() => {});
     res.json({ ok: true, data: result });
-  } catch (err) { next(err); }
+  } catch (err) { next(err); } finally {
+    if (filePath) fs.unlink(filePath, () => {});
+  }
 }
 
 async function quitarVideoTransporte(req, res, next) {

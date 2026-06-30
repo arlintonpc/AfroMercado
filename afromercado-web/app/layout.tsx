@@ -18,11 +18,11 @@ const dmSerifDisplay = DM_Serif_Display({
 });
 
 export const metadata: Metadata = {
-  title: "AfroMercado — Del Chocó para el mundo",
-  description: "Marketplace cultural del Chocó. Productos ancestrales, artesanías, gastronomía y turismo afrochocoano e indígena.",
+  title: "AfroMercado — Productos y Servicios del Chocó",
+  description: "Descubre productos artesanales, hoteles, tours, restaurantes y transporte fluvial de los emprendedores afrocolombianos del Chocó.",
   openGraph: {
-    title: "AfroMercado — Del Chocó para el mundo",
-    description: "Marketplace cultural del Chocó. Productos ancestrales, artesanías, gastronomía y turismo afrochocoano e indígena.",
+    title: "AfroMercado — Productos y Servicios del Chocó",
+    description: "Descubre productos artesanales, hoteles, tours, restaurantes y transporte fluvial de los emprendedores afrocolombianos del Chocó.",
     images: [{ url: "/og-logo.png", width: 1200, height: 630, alt: "AfroMercado" }],
     locale: "es_CO",
     type: "website",

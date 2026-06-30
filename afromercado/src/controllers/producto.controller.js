@@ -358,6 +358,7 @@ const ProductoController = {
   // POST /productos/:id/video  (multipart)
   async subirVideo(req, res, next) {
     let cloud = null;
+    const filePath = req.file?.path;
     try {
       if (!req.file) {
         throw new ErrorValidacion("Adjunta un video en el campo 'video'");
@@ -404,18 +405,15 @@ const ProductoController = {
             videoMimeType: meta.mimeType,
           };
 
-      if (cloud) {
-        fs.unlink(req.file.path, () => {});
-      }
-
       const producto = await ProductoService.actualizarVideo(req.usuario.id, req.params.id, datosVideo);
       res.status(201).json({ ok: true, producto });
     } catch (err) {
       if (cloud?.publicId) {
-        await eliminarDeCloudinary(cloud.publicId, "video").catch(() => {});
+        await eliminarDeCloudinary(cloud.publicId, "video").catch(e => console.error('[Cloudinary]', e?.message ?? e));
       }
-      if (req.file?.path) fs.unlink(req.file.path, () => {});
       next(err);
+    } finally {
+      if (filePath) fs.unlink(filePath, () => {});
     }
   },
 

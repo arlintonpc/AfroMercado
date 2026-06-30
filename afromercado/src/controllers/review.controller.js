@@ -33,6 +33,36 @@ const ReviewController = {
     } catch (e) { next(e); }
   },
 
+  // ── TRANSPORTE ──────────────────────────────────────────────
+  async crearReviewTransporte(req, res, next) {
+    try {
+      res.status(201).json({ ok: true, data: await ReviewService.crearReviewTransporte(req.usuario.id, req.body) });
+    } catch (e) { next(e); }
+  },
+
+  async reviewsTransporte(req, res, next) {
+    try {
+      res.json({ ok: true, data: await ReviewService.reviewsTransporte(Number(req.params.id)) });
+    } catch (e) { next(e); }
+  },
+
+  // ── EXPRESS ─────────────────────────────────────────────────
+  async crearReviewExpress(req, res, next) {
+    try {
+      res.status(201).json({ ok: true, data: await ReviewService.crearReviewExpress(req.usuario.id, req.body) });
+    } catch (e) { next(e); }
+  },
+
+  async reviewsExpress(req, res, next) {
+    try {
+      // req.params.id = comercioId (desde la URL /express/comercios/:id/reviews)
+      const prisma = require("../config/prisma");
+      const cfg = await prisma.configExpress.findUnique({ where: { comercioId: Number(req.params.id) }, select: { id: true } });
+      if (!cfg) return res.json({ ok: true, data: [] });
+      res.json({ ok: true, data: await ReviewService.reviewsExpress(cfg.id) });
+    } catch (e) { next(e); }
+  },
+
   // ── PRODUCTO ────────────────────────────────────────────────
   async crear(req, res, next) {
     try {

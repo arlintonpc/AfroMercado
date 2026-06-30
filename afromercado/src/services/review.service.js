@@ -1,6 +1,12 @@
 const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 
+async function _getConfigTransporteId(rutaTransporteId) {
+  const ruta = await prisma.rutaTransporte.findUnique({ where: { id: rutaTransporteId }, select: { configTransporteId: true } });
+  if (!ruta) throw new ErrorValidacion("Ruta no encontrada");
+  return ruta.configTransporteId;
+}
+
 const ReviewService = {
   // ── HOTEL ───────────────────────────────────────────────────
   async crearReviewHotel(clienteId, { reservaHotelId, calificacion, comentario }) {
@@ -39,6 +45,57 @@ const ReviewService = {
   async reviewsHotel(configHotelId) {
     return prisma.reviewHotel.findMany({
       where: { configHotelId },
+      include: { cliente: { select: { nombre: true, avatarUrl: true } } },
+      orderBy: { creadoAt: "desc" },
+      take: 50,
+    });
+  },
+
+  // ── TRANSPORTE ──────────────────────────────────────────────
+  async crearReviewTransporte(clienteId, { reservaTransporteId, calificacion, comentario }) {
+    const reserva = await prisma.reservaTransporte.findFirst({
+      where: { id: reservaTransporteId, clienteId, estado: "COMPLETADA" },
+    });
+    if (!reserva) throw new ErrorValidacion("Solo puedes reseñar viajes completados");
+
+    const existente = await prisma.reviewTransporte.findUnique({ where: { reservaTransporteId } });
+    if (existente) throw new ErrorValidacion("Ya dejaste una reseña para este viaje");
+
+    const configTransporteId = await _getConfigTransporteId(reserva.rutaTransporteId);
+    return prisma.reviewTransporte.create({
+      data: { configTransporteId, clienteId, reservaTransporteId, calificacion, comentario: comentario || null },
+      include: { cliente: { select: { nombre: true, avatarUrl: true } } },
+    });
+  },
+
+  async reviewsTransporte(configTransporteId) {
+    return prisma.reviewTransporte.findMany({
+      where: { configTransporteId },
+      include: { cliente: { select: { nombre: true, avatarUrl: true } } },
+      orderBy: { creadoAt: "desc" },
+      take: 50,
+    });
+  },
+
+  // ── EXPRESS ─────────────────────────────────────────────────
+  async crearReviewExpress(clienteId, { pedidoExpressId, calificacion, comentario }) {
+    const pedido = await prisma.pedidoExpress.findFirst({
+      where: { id: pedidoExpressId, clienteId, estado: "ENTREGADO" },
+    });
+    if (!pedido) throw new ErrorValidacion("Solo puedes reseñar pedidos entregados");
+
+    const existente = await prisma.reviewExpress.findUnique({ where: { pedidoExpressId } });
+    if (existente) throw new ErrorValidacion("Ya dejaste una reseña para este pedido");
+
+    return prisma.reviewExpress.create({
+      data: { configExpressId: pedido.configExpressId, clienteId, pedidoExpressId, calificacion, comentario: comentario || null },
+      include: { cliente: { select: { nombre: true, avatarUrl: true } } },
+    });
+  },
+
+  async reviewsExpress(configExpressId) {
+    return prisma.reviewExpress.findMany({
+      where: { configExpressId },
       include: { cliente: { select: { nombre: true, avatarUrl: true } } },
       orderBy: { creadoAt: "desc" },
       take: 50,

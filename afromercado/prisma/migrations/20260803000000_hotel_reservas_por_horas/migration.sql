@@ -1,0 +1,16 @@
+ALTER TABLE "ConfigHotel"
+  ADD COLUMN IF NOT EXISTS "permiteReservasPorHora" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "minutosLimpiezaEntreReservas" INTEGER NOT NULL DEFAULT 30;
+
+ALTER TABLE "HabitacionTipo"
+  ADD COLUMN IF NOT EXISTS "precioPorHora" DECIMAL(12,2),
+  ADD COLUMN IF NOT EXISTS "permitePorHoras" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "duracionMinHoras" INTEGER NOT NULL DEFAULT 2,
+  ADD COLUMN IF NOT EXISTS "duracionMaxHoras" INTEGER;
+
+ALTER TABLE "ReservaHotel"
+  ADD COLUMN IF NOT EXISTS "modalidad" TEXT NOT NULL DEFAULT 'NOCHE',
+  ADD COLUMN IF NOT EXISTS "duracionHoras" DECIMAL(6,2);
+
+CREATE INDEX IF NOT EXISTS "ReservaHotel_modalidad_idx"
+  ON "ReservaHotel"("modalidad");

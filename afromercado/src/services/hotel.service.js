@@ -540,7 +540,7 @@ const HotelService = {
         reserva,
         habitacion: tipo,
         comercioNombre: reserva.configHotel.comercio.nombre,
-      }).catch(() => {});
+      }).catch(e => console.error('[WhatsApp]', e?.message ?? e));
     });
 
     setImmediate(() => {
@@ -549,7 +549,7 @@ const HotelService = {
         reserva,
         habitacion: tipo,
         comercioNombre: reserva.configHotel.comercio.nombre,
-      }).catch(() => {});
+      }).catch(e => console.error('[WhatsApp]', e?.message ?? e));
     });
 
     return reserva;

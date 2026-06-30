@@ -5,6 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { listarTours, type ConfigTour } from '@/lib/api/tour'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import { optimizarImagenPequena } from '@/lib/cloudinary'
 
 const MapaTours = dynamic(() => import('@/components/tours/MapaTours'), { ssr: false })
 
@@ -58,7 +59,7 @@ function TarjetaTour({ tour, userLat, userLon }: { tour: ConfigTour; userLat: nu
     <Link href={`/tours/${tour.id}`} className="block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all hover:-translate-y-0.5">
       <div className="h-44 bg-gradient-to-br from-[#40916C] to-[#74C69D] relative flex items-center justify-center">
         {tour.fotos[0] ? (
-          <img src={tour.fotos[0]} alt={tour.nombre} className="w-full h-full object-cover" />
+          <img src={optimizarImagenPequena(tour.fotos[0])} alt={tour.nombre} className="w-full h-full object-cover" />
         ) : (
           <span className="text-5xl">🗺️</span>
         )}

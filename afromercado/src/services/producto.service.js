@@ -12,7 +12,7 @@ const ALCANCES_VALIDOS = ["LOCAL", "NACIONAL", "AMBOS"];
 async function limpiarVideoAnterior(producto) {
   if (!producto) return;
   if (producto.videoPublicId) {
-    await eliminarDeCloudinary(producto.videoPublicId, "video").catch(() => {});
+    await eliminarDeCloudinary(producto.videoPublicId, "video").catch(e => console.error('[Cloudinary]', e?.message ?? e));
     return;
   }
   if (producto.videoUrl) {

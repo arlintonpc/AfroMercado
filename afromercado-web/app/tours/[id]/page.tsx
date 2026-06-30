@@ -421,6 +421,13 @@ export default function TourDetallePage() {
   }, [id, autenticado])
 
   useEffect(() => {
+    if (tour?.nombre) {
+      document.title = `${tour.nombre} — Tours AfroMercado`
+    }
+    return () => { document.title = 'AfroMercado' }
+  }, [tour?.nombre])
+
+  useEffect(() => {
     if (!usuario || !tour) return
     misReservasTour().then(rs => {
       const elegible = rs.find(r => r.configTourId === tour.id && r.estado === 'COMPLETADA' && !r.review)

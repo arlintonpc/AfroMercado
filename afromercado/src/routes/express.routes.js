@@ -1,6 +1,7 @@
 const express = require("express");
 const { autenticar, autorizar } = require("../middlewares/auth");
 const ExpressController = require("../controllers/express.controller");
+const ReviewController  = require("../controllers/review.controller");
 
 const router = express.Router();
 
@@ -48,6 +49,10 @@ router.get(    "/mis-estadisticas",     ...soloComercio, ExpressController.estad
 router.post(  "/config/video",      ...soloComercio, ExpressController.uploadVideoExpress, ExpressController.subirVideoExpress);
 router.delete("/config/video",      ...soloComercio, ExpressController.quitarVideoExpress);
 router.patch( "/config/video-link", ...soloComercio, ExpressController.guardarVideoLinkExpress);
+
+// ── REVIEWS ──────────────────────────────────────────────────
+router.get( "/comercios/:id/reviews",        ReviewController.reviewsExpress);
+router.post("/pedidos/:id/review", ...soloAuth, ReviewController.crearReviewExpress);
 
 // ── ADMIN ────────────────────────────────────────────────────
 router.get(  "/admin/deudas",                          ...soloAdmin, ExpressController.deudasAdmin);

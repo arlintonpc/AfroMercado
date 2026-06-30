@@ -204,6 +204,13 @@ export default function PaginaProducto({
   }, [id])
 
   useEffect(() => {
+    if (producto?.nombre) {
+      document.title = `${producto.nombre} — AfroMercado`
+    }
+    return () => { document.title = 'AfroMercado' }
+  }, [producto?.nombre])
+
+  useEffect(() => {
     if (!producto?.comercioId) return
     let activo = true
     setCargandoTienda(true)

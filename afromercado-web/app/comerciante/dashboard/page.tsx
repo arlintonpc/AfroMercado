@@ -23,6 +23,7 @@ import {
   type SubPedidoComerciante,
 } from '@/components/comerciante/api'
 import { etiquetaUnidad } from '@/components/comerciante/constantes'
+import ChecklistOnboarding from '@/components/comerciante/ChecklistOnboarding'
 
 interface SlotMetrica {
   id: number
@@ -572,6 +573,47 @@ function DashboardContenido() {
 
       {/* Banner de pagos digitales */}
       {renderBannerCuentaDispersion()}
+
+      {/* Checklist de onboarding */}
+      {!cargando && comercio && (
+        <ChecklistOnboarding pasos={[
+          {
+            id: 'logo',
+            titulo: 'Agrega tu logo o foto de perfil',
+            descripcion: 'Una imagen profesional genera más confianza.',
+            completado: !!(comercio.logoUrl),
+            href: '/comerciante/perfil',
+          },
+          {
+            id: 'descripcion',
+            titulo: 'Completa la descripción de tu negocio',
+            descripcion: 'Cuéntales a los clientes qué ofreces.',
+            completado: !!(comercio.descripcion && comercio.descripcion.length > 20),
+            href: '/comerciante/perfil',
+          },
+          {
+            id: 'whatsapp',
+            titulo: 'Agrega tu número de WhatsApp',
+            descripcion: 'Para que los clientes puedan contactarte directamente.',
+            completado: !!(comercio.whatsapp),
+            href: '/comerciante/perfil',
+          },
+          {
+            id: 'producto',
+            titulo: 'Publica tu primer producto o servicio',
+            descripcion: 'Empieza a vender — un producto es suficiente para comenzar.',
+            completado: productos.length > 0,
+            href: '/comerciante/publicar',
+          },
+          {
+            id: 'foto',
+            titulo: 'Sube al menos una foto',
+            descripcion: 'Los productos con fotos venden 3x más.',
+            completado: productos.some(p => !!(p.fotoUrl)),
+            href: '/comerciante/publicar',
+          },
+        ]} />
+      )}
 
       {/* Métricas */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

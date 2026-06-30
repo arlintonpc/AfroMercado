@@ -210,6 +210,8 @@ model Usuario {
   reservasTransporte        ReservaTransporte[] @relation("ReservasTransporteCliente")
   reviewsHotel              ReviewHotel[]       @relation("ReviewsHotelCliente")
   reviewsTour               ReviewTour[]        @relation("ReviewsTourCliente")
+  reviewsTransporte         ReviewTransporte[]  @relation("ReviewsTransporteCliente")
+  reviewsExpress            ReviewExpress[]     @relation("ReviewsExpressCliente")
   cuponesHotelUsos          CuponHotelUso[]
   cuponesExpressUsos        CuponExpressUso[]
   favoritosTour             FavoritoTour[]
@@ -1183,6 +1185,7 @@ model ConfigExpress {
   horarios        HorarioExpress[]
   secciones       MenuSeccion[]
   cupones         CuponExpress[]
+  reviews         ReviewExpress[]
 
   @@index([activo, abierto])
 }
@@ -1269,6 +1272,7 @@ model PedidoExpress {
   configExpress    ConfigExpress       @relation(fields: [configExpressId],  references: [id])
   items            ItemPedidoExpress[]
   cuponUso         CuponExpressUso?
+  review           ReviewExpress?
 
   @@index([comercioId, estado])
   @@index([clienteId,  estado])
@@ -1315,6 +1319,8 @@ model ConfigHotel {
   permitePagarAlLlegar    Boolean   @default(true)
   permiteDeposito30       Boolean   @default(true)
   permiteTotal            Boolean   @default(true)
+  permiteReservasPorHora  Boolean   @default(false)
+  minutosLimpiezaEntreReservas Int   @default(30)
   // Política de cancelación con penalización
   horasLibresCancelacion  Int       @default(48)
   pctPenalidadCancelacion Int       @default(0)
@@ -1342,6 +1348,10 @@ model HabitacionTipo {
   descripcion     String?
   capacidad       Int         @default(2)
   precioPorNoche  Decimal     @db.Decimal(12, 2)
+  precioPorHora   Decimal?    @db.Decimal(12, 2)
+  permitePorHoras Boolean     @default(false)
+  duracionMinHoras Int        @default(2)
+  duracionMaxHoras Int?
   cantidad        Int         @default(1)
   fotos            String[]
   serviciosExtra   String[]
@@ -1392,6 +1402,8 @@ model ReservaHotel {
   fechaSalida       DateTime
   huespedes         Int                @default(1)
   total             Decimal            @db.Decimal(12, 2)
+  modalidad         String             @default("NOCHE")
+  duracionHoras     Decimal?           @db.Decimal(6, 2)
   estado            EstadoReservaHotel @default(PENDIENTE)
   metodoPago        String             @default("EFECTIVO")
   notasCliente      String?
@@ -1512,6 +1524,7 @@ model ConfigTransporte {
 
   comercio Comercio         @relation(fields: [comercioId], references: [id])
   rutas    RutaTransporte[]
+  reviews  ReviewTransporte[]
 
   @@index([activo])
 }
@@ -1558,8 +1571,9 @@ model ReservaTransporte {
   creadoAt         DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 
-  ruta    RutaTransporte @relation(fields: [rutaTransporteId], references: [id])
-  cliente Usuario        @relation("ReservasTransporteCliente", fields: [clienteId], references: [id])
+  ruta    RutaTransporte   @relation(fields: [rutaTransporteId], references: [id])
+  cliente Usuario          @relation("ReservasTransporteCliente", fields: [clienteId], references: [id])
+  review  ReviewTransporte?
 
   @@index([rutaTransporteId, estado])
   @@index([clienteId])
@@ -1598,6 +1612,38 @@ model ReviewTour {
   reservaTour ReservaTour @relation(fields: [reservaTourId], references: [id], onDelete: Cascade)
 
   @@index([configTourId])
+}
+
+model ReviewTransporte {
+  id                  Int      @id @default(autoincrement())
+  configTransporteId  Int
+  clienteId           Int
+  reservaTransporteId Int      @unique
+  calificacion        Int
+  comentario          String?
+  creadoAt            DateTime @default(now())
+
+  configTransporte  ConfigTransporte  @relation(fields: [configTransporteId],  references: [id], onDelete: Cascade)
+  cliente           Usuario           @relation("ReviewsTransporteCliente",    fields: [clienteId], references: [id])
+  reservaTransporte ReservaTransporte @relation(fields: [reservaTransporteId], references: [id], onDelete: Cascade)
+
+  @@index([configTransporteId])
+}
+
+model ReviewExpress {
+  id              Int      @id @default(autoincrement())
+  configExpressId Int
+  clienteId       Int
+  pedidoExpressId Int      @unique
+  calificacion    Int
+  comentario      String?
+  creadoAt        DateTime @default(now())
+
+  configExpress ConfigExpress @relation(fields: [configExpressId], references: [id], onDelete: Cascade)
+  cliente       Usuario       @relation("ReviewsExpressCliente",   fields: [clienteId], references: [id])
+  pedidoExpress PedidoExpress @relation(fields: [pedidoExpressId], references: [id], onDelete: Cascade)
+
+  @@index([configExpressId])
 }
 
 // ─── CUPONES HOTEL ────────────────────────────────────────────

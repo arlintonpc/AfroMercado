@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { listarHoteles, type ConfigHotel } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import { optimizarImagenPequena } from '@/lib/cloudinary'
 
 const MapaHoteles = dynamic(() => import('@/components/hoteles/MapaHoteles'), { ssr: false })
 
@@ -47,7 +48,7 @@ function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat
       <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100 mb-3">
         {foto ? (
           <img
-            src={foto}
+            src={optimizarImagenPequena(foto)}
             alt={hotel.comercio.nombre}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
