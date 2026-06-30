@@ -5,6 +5,7 @@ const sseManager = require("../utils/sse-manager");
 const { enviarPushAUsuario } = require("../utils/push");
 const { enviarEmail } = require("../utils/email");
 const emailHotel = require("../utils/templates/email-hotel");
+const { notificarReservaHotel, notificarClienteReserva } = require("../utils/notificaciones");
 
 function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -180,6 +181,26 @@ const HotelService = {
         }).catch((err) => console.error("[EMAIL-HOTEL]", err.message));
       });
     }
+
+    // WhatsApp al hotelero (fire and forget — nunca bloquea la reserva)
+    setImmediate(() => {
+      notificarReservaHotel({
+        hotelWhatsapp: reserva.configHotel.comercio.whatsapp,
+        reserva,
+        habitacion: tipo,
+        comercioNombre: reserva.configHotel.comercio.nombre,
+      }).catch(() => {}); // ya está manejado internamente, double-safety
+    });
+
+    // WhatsApp al cliente con su código (fire and forget)
+    setImmediate(() => {
+      notificarClienteReserva({
+        telefonoCliente: telefonoHuesped,
+        reserva,
+        habitacion: tipo,
+        comercioNombre: reserva.configHotel.comercio.nombre,
+      }).catch(() => {});
+    });
 
     return reserva;
   },

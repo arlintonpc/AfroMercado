@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, iniciarPagoReserva, type ConfigHotel, type HabitacionTipo } from '@/lib/api/hotel'
+import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, iniciarPagoReserva, type ConfigHotel, type HabitacionTipo, type ReservaHotel } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
@@ -380,7 +380,7 @@ type ModoPago = 'efectivo' | 'deposito' | 'total'
 function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicial, onClose, onSuccess }: {
   hotel: ConfigHotel; habitacion: HabitacionTipo
   fechaEntradaInicial: string; fechaSalidaInicial: string
-  onClose: () => void; onSuccess: () => void
+  onClose: () => void; onSuccess: (r: ReservaHotel) => void
 }) {
   const { usuario } = useAuth()
   const [fechaEntrada, setFechaEntrada] = useState(fechaEntradaInicial)
@@ -421,7 +421,7 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
         window.location.href = checkoutUrl
         return
       }
-      onSuccess()
+      onSuccess(reservaCreada)
     } catch (e: any) { setError(e.message) } finally { setCargando(false) }
   }
 
@@ -555,7 +555,7 @@ export default function HotelDetallePage() {
   const [hotel, setHotel]         = useState<ConfigHotel | null>(null)
   const [cargando, setCargando]   = useState(true)
   const [habSelec, setHabSelec]   = useState<HabitacionTipo | null>(null)
-  const [reservaOk, setReservaOk] = useState(false)
+  const [reservaOk, setReservaOk] = useState<ReservaHotel | null>(null)
   const [reservaElegibleId, setReservaElegibleId] = useState<number | undefined>()
   const [lightbox, setLightbox]   = useState<{ fotos: string[]; idx: number } | null>(null)
   const [similares, setSimilares] = useState<ConfigHotel[]>([])
@@ -886,7 +886,7 @@ export default function HotelDetallePage() {
         <FormReserva hotel={hotel} habitacion={habSelec}
           fechaEntradaInicial={fechaEntrada} fechaSalidaInicial={fechaSalida}
           onClose={() => setHabSelec(null)}
-          onSuccess={() => { setHabSelec(null); setReservaOk(true) }}
+          onSuccess={(r) => { setHabSelec(null); setReservaOk(r) }}
         />
       )}
 
@@ -894,23 +894,52 @@ export default function HotelDetallePage() {
       {reservaOk && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
-            <div className="w-20 h-20 bg-[#ECFDF5] rounded-full flex items-center justify-center mx-auto mb-5">
+            <div className="w-20 h-20 bg-[#ECFDF5] rounded-full flex items-center justify-center mx-auto mb-4">
               <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
-            <h3 className="font-black text-2xl text-gray-900 mb-2">¡Reserva enviada!</h3>
-            <p className="text-sm text-gray-500 leading-relaxed mb-6">
+            <h3 className="font-black text-2xl text-gray-900 mb-1">¡Reserva enviada!</h3>
+            <p className="text-sm text-gray-500 mb-5">
               {hotel.confirmacionAuto
                 ? 'Tu reserva fue confirmada exitosamente. ¡Te esperamos!'
                 : `El hotel revisará tu solicitud y te confirmará en máx. ${hotel.horasLimiteConfirm} horas.`}
             </p>
+
+            {/* Código de reserva prominente */}
+            <div className="mb-5">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Tu código de reserva</p>
+              <div className="flex items-center justify-center gap-2">
+                <span className="font-mono text-2xl font-black tracking-widest text-gray-900 bg-gray-100 px-5 py-3 rounded-xl border border-gray-200">
+                  {reservaOk.codigo}
+                </span>
+                <button
+                  onClick={() => navigator.clipboard.writeText(reservaOk!.codigo).then(() => mostrarToast('¡Código copiado!')).catch(() => {})}
+                  title="Copiar código"
+                  className="w-11 h-11 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl transition-colors flex-shrink-0">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                </button>
+              </div>
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-3 font-medium">
+                Guarda este código — lo necesitarás al hacer check-in
+              </p>
+            </div>
+
+            {/* Resumen */}
+            {reservaOk.habitacionTipo && (
+              <p className="text-sm text-gray-500 mb-5">
+                {reservaOk.habitacionTipo.nombre} ·{' '}
+                {Math.ceil((new Date(reservaOk.fechaSalida).getTime() - new Date(reservaOk.fechaEntrada).getTime()) / 86400000)} noche{Math.ceil((new Date(reservaOk.fechaSalida).getTime() - new Date(reservaOk.fechaEntrada).getTime()) / 86400000) !== 1 ? 's' : ''} ·{' '}
+                <span className="font-bold text-gray-900">{formatearPrecio(Number(reservaOk.total))}</span>
+              </p>
+            )}
+
             <div className="flex gap-3">
-              <button onClick={() => setReservaOk(false)}
+              <button onClick={() => setReservaOk(null)}
                 className="flex-1 border border-gray-200 rounded-xl py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
                 Seguir viendo
               </button>
               <Link href="/hoteles/mis-reservas"
                 className="flex-1 bg-[#1B4332] text-white rounded-xl py-3 text-sm font-bold text-center hover:bg-[#15362A] transition-colors">
-                Ver reserva
+                Ver mis reservas
               </Link>
             </div>
           </div>

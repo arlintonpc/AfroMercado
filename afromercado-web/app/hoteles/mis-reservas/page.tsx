@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { misReservasHotel, cancelarReservaHotel, consultarPoliticaCancelacion, type ReservaHotel, type PoliticaCancelacionInfo } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
@@ -45,6 +45,14 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
   const [politica, setPolitica]       = useState<PoliticaCancelacionInfo | null>(null)
   const [modalCancelar, setModalCancelar] = useState(false)
   const [cargandoPolitica, setCargandoPolitica] = useState(false)
+  const [copiado, setCopiado] = useState(false)
+
+  const copiarCodigo = useCallback(() => {
+    navigator.clipboard.writeText(reserva.codigo).then(() => {
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 2000)
+    }).catch(() => {})
+  }, [reserva.codigo])
 
   const entrada = new Date(reserva.fechaEntrada)
   const salida  = new Date(reserva.fechaSalida)
@@ -70,7 +78,20 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0">
           <p className="font-bold text-[#1A1A1A] truncate">{reserva.configHotel?.comercio.nombre ?? 'Hotel'}</p>
-          <p className="text-xs text-gray-400">{reserva.codigo}</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="font-mono text-xs bg-gray-900 text-white px-2 py-0.5 rounded-md tracking-wider">
+              {reserva.codigo}
+            </span>
+            <button
+              onClick={copiarCodigo}
+              title="Copiar código"
+              className="flex items-center justify-center w-6 h-6 rounded-md bg-gray-100 hover:bg-gray-200 transition-colors flex-shrink-0">
+              {copiado
+                ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              }
+            </button>
+          </div>
         </div>
         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${info.color}`}>{info.label}</span>
       </div>
@@ -94,6 +115,18 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
         <p className="text-gray-600">🛏️ {reserva.habitacionTipo?.nombre} · {noches} noche{noches !== 1 ? 's' : ''}</p>
         <p className="text-gray-600">👤 {reserva.huespedes} huésped{reserva.huespedes !== 1 ? 'es' : ''}</p>
       </div>
+
+      {/* Info penalización/reembolso para canceladas */}
+      {reserva.estado === 'CANCELADA' && (reserva.montoPenalidad != null || reserva.montoReembolso != null) && (
+        <div className="mt-3 bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-xs space-y-0.5">
+          {reserva.montoPenalidad != null && reserva.montoPenalidad > 0 && (
+            <p className="text-red-600 font-medium">Penalización: <span className="font-bold">{formatearPrecio(Number(reserva.montoPenalidad))}</span></p>
+          )}
+          {reserva.montoReembolso != null && (
+            <p className="text-gray-600">Reembolso: <span className="font-bold text-gray-800">{formatearPrecio(Number(reserva.montoReembolso))}</span></p>
+          )}
+        </div>
+      )}
 
       <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
         <span className="text-xs text-gray-400">{reserva.metodoPago}</span>

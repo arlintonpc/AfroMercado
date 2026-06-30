@@ -138,7 +138,6 @@ export async function consultarPoliticaCancelacion(reservaId: number): Promise<P
   const r = await apiFetch<{ ok: boolean; data: PoliticaCancelacionInfo }>(`/hoteles/reservas/${reservaId}/politica-cancelacion`)
   return r.data
 }
-}
 
 export async function cancelarReservaHotel(id: number): Promise<ReservaHotel> {
   const r = await apiFetch<{ ok: boolean; data: ReservaHotel }>(`/hoteles/reservas/${id}/cancelar`, { method: 'PATCH' })
