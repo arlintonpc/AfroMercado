@@ -257,6 +257,42 @@ function Resultados() {
           <option value="">Todas las categorías</option>
           {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.icono ? `${cat.icono} ` : ''}{cat.nombre}</option>)}
         </select>
+        {(() => {
+          const cat = categorias.find(c => c.id === filtros.categoriaId)
+          if (!cat) return null
+          const n = cat.nombre.toLowerCase()
+          if (n.includes('hotel') || n.includes('hosped') || n.includes('alojam')) {
+            return (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-800">
+                ¿Buscas hoteles para reservar?{' '}
+                <button type="button" onClick={() => cambiarTab('hoteles')} className="font-semibold underline">
+                  Ir a tab Hoteles →
+                </button>
+              </div>
+            )
+          }
+          if (n.includes('tour') || n.includes('turismo') || n.includes('excurs')) {
+            return (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-800">
+                ¿Buscas tours o excursiones?{' '}
+                <button type="button" onClick={() => cambiarTab('tours')} className="font-semibold underline">
+                  Ir a tab Tours →
+                </button>
+              </div>
+            )
+          }
+          if (n.includes('transport') || n.includes('lancha') || n.includes('fluvial')) {
+            return (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-800">
+                ¿Buscas transporte fluvial?{' '}
+                <button type="button" onClick={() => cambiarTab('transportes')} className="font-semibold underline">
+                  Ir a tab Transporte →
+                </button>
+              </div>
+            )
+          }
+          return null
+        })()}
       </div>
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-semibold text-[#1A1A1A]/60 uppercase tracking-wide">Precio</label>
