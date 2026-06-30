@@ -61,7 +61,7 @@ function Lightbox({ fotos, inicial, onClose }: { fotos: string[]; inicial: numbe
 }
 
 /* ── Galería tipo Airbnb ─────────────────────────────── */
-function GaleriaHero({ fotos, nombre, tipo, onOpen }: { fotos: string[]; nombre: string; tipo: string; onOpen: (i: number) => void }) {
+function GaleriaHero({ fotos, nombre, tipo, videoUrl, onOpen }: { fotos: string[]; nombre: string; tipo: string; videoUrl?: string | null; onOpen: (i: number) => void }) {
   if (fotos.length === 0) {
     return (
       <div className="h-64 lg:h-[460px] bg-gradient-to-br from-[#1B4332] to-[#40916C] flex items-center justify-center rounded-2xl">
@@ -107,6 +107,13 @@ function GaleriaHero({ fotos, nombre, tipo, onOpen }: { fotos: string[]; nombre:
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
         Ver {fotos.length} fotos
       </button>
+      {videoUrl && (
+        <button onClick={() => document.getElementById('seccion-video')?.scrollIntoView({ behavior: 'smooth' })}
+          className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm text-white font-semibold text-sm px-3 py-2 rounded-xl shadow-lg hover:bg-black/85 transition-colors flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Ver video
+        </button>
+      )}
     </div>
   )
 }
@@ -424,11 +431,11 @@ export default function TransporteDetallePage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* GALERÍA */}
         <GaleriaHero fotos={transporte.fotos} nombre={transporte.nombre} tipo={transporte.tipo}
-          onOpen={i => setLightbox({ fotos: transporte.fotos, idx: i })} />
+          videoUrl={(transporte as any).videoUrl} onOpen={i => setLightbox({ fotos: transporte.fotos, idx: i })} />
 
         {/* VIDEO */}
         {(transporte as any).videoUrl && (
-          <section className="mt-4 pb-4">
+          <section id="seccion-video" className="mt-4 pb-4">
             <ReproductorVideo url={(transporte as any).videoUrl} />
           </section>
         )}

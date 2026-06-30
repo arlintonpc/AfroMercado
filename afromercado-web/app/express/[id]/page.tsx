@@ -525,7 +525,7 @@ export default function MenuExpressPage() {
 
       {/* Video del restaurante */}
       {(menu as any).videoUrl && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+        <div id="seccion-video" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
           <ReproductorVideo url={(menu as any).videoUrl} />
         </div>
       )}
