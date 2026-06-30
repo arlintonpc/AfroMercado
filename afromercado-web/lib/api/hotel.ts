@@ -2,6 +2,19 @@ import { apiFetch } from './client'
 
 export type EstadoReservaHotel = 'PENDIENTE' | 'CONFIRMADA' | 'CHECKIN' | 'CHECKOUT' | 'CANCELADA' | 'RECHAZADA'
 
+export interface TemporadaHotel {
+  id: number
+  configHotelId: number
+  habitacionTipoId?: number | null
+  nombre: string
+  inicio: string
+  fin: string
+  precioPorNoche: number | string
+  activo: boolean
+  createdAt: string
+  habitacionTipo?: { nombre: string } | null
+}
+
 export interface HabitacionTipo {
   id: number
   configHotelId: number
@@ -17,6 +30,7 @@ export interface HabitacionTipo {
   videoUrl?: string | null
   videoPosterUrl?: string | null
   videoDuracionSeg?: number | null
+  temporadas?: TemporadaHotel[]
 }
 
 export interface ConfigHotel {
@@ -338,4 +352,25 @@ export async function eliminarBloqueo(bloqueoId: string): Promise<void> {
 export async function iniciarPagoReserva(reservaId: number): Promise<{ checkoutUrl: string; referencia: string; montoDeposito: number; pct: number }> {
   const d = await apiFetch<{ ok: boolean; data: any }>(`/hotel/reservas/${reservaId}/checkout`, { method: 'POST', auth: true })
   return d.data
+}
+
+// ── TEMPORADAS ────────────────────────────────────────────────
+export async function listarTemporadasHotel(): Promise<TemporadaHotel[]> {
+  const r = await apiFetch<{ ok: boolean; data: TemporadaHotel[] }>('/hoteles/mi-hotel/temporadas')
+  return r.data
+}
+
+export async function crearTemporadaHotel(datos: {
+  nombre: string
+  inicio: string
+  fin: string
+  precioPorNoche: number
+  habitacionTipoId?: number | null
+}): Promise<TemporadaHotel> {
+  const r = await apiFetch<{ ok: boolean; data: TemporadaHotel }>('/hoteles/mi-hotel/temporadas', { method: 'POST', body: datos })
+  return r.data
+}
+
+export async function eliminarTemporadaHotel(id: number): Promise<void> {
+  await apiFetch(`/hoteles/mi-hotel/temporadas/${id}`, { method: 'DELETE' })
 }

@@ -63,6 +63,11 @@ router.get(   "/mi-hotel/cupones",      ...soloComercio, HotelController.listarC
 router.post(  "/mi-hotel/cupones",      ...soloComercio, HotelController.crearCupon);
 router.delete("/mi-hotel/cupones/:id",  ...soloComercio, HotelController.eliminarCupon);
 
+// Temporadas (precios por temporada)
+router.get(   "/mi-hotel/temporadas",     ...soloComercio, HotelController.listarTemporadas);
+router.post(  "/mi-hotel/temporadas",     ...soloComercio, HotelController.crearTemporada);
+router.delete("/mi-hotel/temporadas/:id", ...soloComercio, HotelController.eliminarTemporada);
+
 // ── REVIEWS ──────────────────────────────────────────────────
 router.get( "/:id/reviews",        ReviewController.reviewsHotel);
 router.post("/reservas/:id/review",...soloAuth, ReviewController.crearReviewHotel);

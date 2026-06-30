@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, iniciarPagoReserva, validarCuponHotel, type ConfigHotel, type HabitacionTipo, type ReservaHotel, type ValidacionCupon } from '@/lib/api/hotel'
+import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, iniciarPagoReserva, validarCuponHotel, type ConfigHotel, type HabitacionTipo, type ReservaHotel, type ValidacionCupon, type TemporadaHotel } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
@@ -257,7 +257,22 @@ function TarjetaHabitacion({ hab, onReservar, onVerFotos }: {
               </div>
             </div>
             <div className="text-right flex-shrink-0">
-              <div className="text-2xl font-black text-[#1B4332] leading-none">{formatearPrecio(Number(hab.precioPorNoche))}</div>
+              {(() => {
+                const hoy = new Date()
+                const temporadaVigente = hab.temporadas?.find(t =>
+                  t.activo && new Date(t.inicio) <= hoy && new Date(t.fin) >= hoy
+                )
+                const precioMostrar = temporadaVigente ? Number(temporadaVigente.precioPorNoche) : Number(hab.precioPorNoche)
+                return temporadaVigente ? (
+                  <div className="flex items-baseline gap-1.5 justify-end flex-wrap">
+                    <span className="text-xs text-gray-400 line-through">{formatearPrecio(Number(hab.precioPorNoche))}</span>
+                    <span className="text-2xl font-black text-[#1B4332] leading-none">{formatearPrecio(precioMostrar)}</span>
+                    <span className="text-xs font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{temporadaVigente.nombre}</span>
+                  </div>
+                ) : (
+                  <div className="text-2xl font-black text-[#1B4332] leading-none">{formatearPrecio(precioMostrar)}</div>
+                )
+              })()}
               <div className="text-xs text-gray-400 mt-1">por noche</div>
             </div>
           </div>

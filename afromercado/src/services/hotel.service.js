@@ -37,6 +37,12 @@ const HOTEL_INCLUDE = {
   habitaciones: {
     where: { activo: true },
     orderBy: { precioPorNoche: "asc" },
+    include: {
+      temporadas: {
+        where: { activo: true },
+        orderBy: { inicio: "asc" },
+      },
+    },
   },
 };
 
@@ -126,7 +132,28 @@ const HotelService = {
     const { disponibles, tipo } = await this.verificarDisponibilidad(habitacionTipoId, entrada, salida);
     if (disponibles <= 0) throw new ErrorValidacion("No hay disponibilidad para esas fechas");
 
-    const totalOriginal = Number(tipo.precioPorNoche) * noches;
+    // Precio por temporada (la más específica por habitación tiene prioridad sobre la del hotel)
+    const temporadaHab = await prisma.temporadaHotel.findFirst({
+      where: {
+        activo: true,
+        habitacionTipoId: habitacionTipoId,
+        inicio: { lte: salida },
+        fin:   { gte: entrada },
+      },
+    });
+    const temporadaHotel = !temporadaHab ? await prisma.temporadaHotel.findFirst({
+      where: {
+        activo: true,
+        habitacionTipoId: null,
+        configHotelId: tipo.configHotelId,
+        inicio: { lte: salida },
+        fin:   { gte: entrada },
+      },
+    }) : null;
+    const temporada = temporadaHab || temporadaHotel;
+    const precioPorNoche = temporada ? Number(temporada.precioPorNoche) : Number(tipo.precioPorNoche);
+
+    const totalOriginal = precioPorNoche * noches;
 
     // Validar cupón si viene
     let montoDescuento = 0;
@@ -830,6 +857,48 @@ const HotelService = {
       where: { id: cuponId },
       data:  { activo: false },
     });
+  },
+
+  // ── TEMPORADAS ────────────────────────────────────────────────
+
+  async crearTemporada(comercioId, datos) {
+    const hotel = await prisma.configHotel.findUnique({ where: { comercioId } });
+    if (!hotel) throw new ErrorNoEncontrado("Hotel no encontrado");
+    const { nombre, inicio, fin, precioPorNoche, habitacionTipoId } = datos;
+    if (!nombre || !inicio || !fin || !precioPorNoche) throw new ErrorValidacion("Faltan campos requeridos");
+    if (new Date(fin) <= new Date(inicio)) throw new ErrorValidacion("La fecha de fin debe ser posterior al inicio");
+    if (habitacionTipoId) {
+      const hab = await prisma.habitacionTipo.findFirst({ where: { id: Number(habitacionTipoId), configHotelId: hotel.id } });
+      if (!hab) throw new ErrorValidacion("Habitación no pertenece a este hotel");
+    }
+    return prisma.temporadaHotel.create({
+      data: {
+        configHotelId: hotel.id,
+        habitacionTipoId: habitacionTipoId ? Number(habitacionTipoId) : null,
+        nombre,
+        inicio: new Date(inicio),
+        fin: new Date(fin),
+        precioPorNoche: Number(precioPorNoche),
+      },
+    });
+  },
+
+  async listarTemporadas(comercioId) {
+    const hotel = await prisma.configHotel.findUnique({ where: { comercioId } });
+    if (!hotel) throw new ErrorNoEncontrado("Hotel no encontrado");
+    return prisma.temporadaHotel.findMany({
+      where: { configHotelId: hotel.id },
+      include: { habitacionTipo: { select: { nombre: true } } },
+      orderBy: { inicio: "asc" },
+    });
+  },
+
+  async eliminarTemporada(comercioId, temporadaId) {
+    const hotel = await prisma.configHotel.findUnique({ where: { comercioId } });
+    if (!hotel) throw new ErrorNoEncontrado("Hotel no encontrado");
+    const t = await prisma.temporadaHotel.findFirst({ where: { id: temporadaId, configHotelId: hotel.id } });
+    if (!t) throw new ErrorNoEncontrado("Temporada no encontrada");
+    await prisma.temporadaHotel.update({ where: { id: temporadaId }, data: { activo: false } });
   },
 };
 

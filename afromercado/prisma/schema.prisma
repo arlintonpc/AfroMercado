@@ -1299,6 +1299,7 @@ model ConfigHotel {
   reservas      ReservaHotel[]
   reviews       ReviewHotel[]
   cupones       CuponHotel[]
+  temporadas    TemporadaHotel[]
 
   @@index([activo])
 }
@@ -1321,6 +1322,7 @@ model HabitacionTipo {
 
   configHotel ConfigHotel    @relation(fields: [configHotelId], references: [id], onDelete: Cascade)
   reservas    ReservaHotel[]
+  temporadas  TemporadaHotel[]
 
   @@index([configHotelId, activo])
 }
@@ -1562,4 +1564,23 @@ model CuponHotelUso {
   reservaHotel ReservaHotel @relation(fields: [reservaHotelId], references: [id])
 
   @@index([cuponHotelId, clienteId])
+}
+
+model TemporadaHotel {
+  id               Int       @id @default(autoincrement())
+  configHotelId    Int
+  habitacionTipoId Int?
+  nombre           String
+  inicio           DateTime
+  fin              DateTime
+  precioPorNoche   Decimal   @db.Decimal(12, 2)
+  activo           Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+
+  configHotel    ConfigHotel     @relation(fields: [configHotelId], references: [id], onDelete: Cascade)
+  habitacionTipo HabitacionTipo? @relation(fields: [habitacionTipoId], references: [id], onDelete: SetNull)
+
+  @@index([configHotelId, activo])
+  @@index([habitacionTipoId, activo])
+  @@index([inicio, fin])
 }

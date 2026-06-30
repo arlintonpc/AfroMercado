@@ -8,7 +8,8 @@ import {
   quitarVideoHabitacion,
   listarBloqueos, crearBloqueo, eliminarBloqueo,
   listarCuponesHotel, crearCuponHotel, eliminarCuponHotel,
-  type ConfigHotel, type HabitacionTipo, type ReservaHotel, type EstadoReservaHotel, type BloqueoFecha, type CuponHotel,
+  listarTemporadasHotel, crearTemporadaHotel, eliminarTemporadaHotel,
+  type ConfigHotel, type HabitacionTipo, type ReservaHotel, type EstadoReservaHotel, type BloqueoFecha, type CuponHotel, type TemporadaHotel,
 } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
@@ -366,6 +367,89 @@ function FormNuevoCupon({ onCreado, onCancelar }: { onCreado: () => void; onCanc
   )
 }
 
+function FormNuevaTemporada({
+  habitaciones,
+  onCreada,
+  onCancelar,
+}: {
+  habitaciones: HabitacionTipo[]
+  onCreada: () => void
+  onCancelar: () => void
+}) {
+  const [nombre, setNombre] = useState('')
+  const [inicio, setInicio] = useState('')
+  const [fin, setFin] = useState('')
+  const [precio, setPrecio] = useState('')
+  const [habId, setHabId] = useState<string>('todas')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+
+  async function guardar() {
+    if (!nombre || !inicio || !fin || !precio) { setError('Completa todos los campos'); return }
+    setGuardando(true); setError('')
+    try {
+      await crearTemporadaHotel({
+        nombre,
+        inicio,
+        fin,
+        precioPorNoche: Number(precio),
+        habitacionTipoId: habId === 'todas' ? null : Number(habId),
+      })
+      onCreada()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al guardar')
+    }
+    setGuardando(false)
+  }
+
+  return (
+    <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+      <h3 className="font-semibold text-sm text-gray-800">Nueva temporada</h3>
+      <input value={nombre} onChange={e => setNombre(e.target.value)}
+        placeholder="Ej: Semana Santa 2027, Temporada alta..."
+        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs text-gray-500">Fecha inicio</label>
+          <input type="date" value={inicio} onChange={e => setInicio(e.target.value)}
+            className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-xl" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500">Fecha fin</label>
+          <input type="date" value={fin} onChange={e => setFin(e.target.value)}
+            className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-xl" />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs text-gray-500">Precio por noche ($COP)</label>
+        <input type="number" value={precio} onChange={e => setPrecio(e.target.value)} placeholder="0"
+          className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-xl" />
+      </div>
+      <div>
+        <label className="text-xs text-gray-500">Aplicar a</label>
+        <select value={habId} onChange={e => setHabId(e.target.value)}
+          className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white">
+          <option value="todas">Todas las habitaciones</option>
+          {habitaciones.map(h => (
+            <option key={h.id} value={String(h.id)}>{h.nombre}</option>
+          ))}
+        </select>
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      <div className="flex gap-2">
+        <button onClick={guardar} disabled={guardando}
+          className="flex-1 py-2 text-sm font-medium bg-[#1B4332] text-white rounded-xl disabled:opacity-50 hover:bg-[#2D6A4F] transition-colors">
+          {guardando ? 'Guardando...' : 'Guardar temporada'}
+        </button>
+        <button onClick={onCancelar}
+          className="px-4 py-2 text-sm font-medium border border-gray-200 rounded-xl hover:bg-gray-50">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function ComercianteHotelesPage() {
   const [cfg, setCfg]               = useState<ConfigHotel | null>(null)
   const [reservas, setReservas]     = useState<ReservaHotel[]>([])
@@ -378,6 +462,8 @@ export default function ComercianteHotelesPage() {
   const [errorBloqueo, setErrorBloqueo] = useState('')
   const [cupones, setCupones]       = useState<CuponHotel[]>([])
   const [mostrarFormCupon, setMostrarFormCupon] = useState(false)
+  const [temporadas, setTemporadas] = useState<TemporadaHotel[]>([])
+  const [mostrarFormTemporada, setMostrarFormTemporada] = useState(false)
   const [cargando, setCargando]     = useState(true)
   const [guardando, setGuardando]   = useState(false)
   const [error, setError]           = useState('')
@@ -480,8 +566,12 @@ export default function ComercianteHotelesPage() {
     } catch {}
   }
 
+  async function cargarTemporadas() {
+    try { setTemporadas(await listarTemporadasHotel()) } catch {}
+  }
+
   useEffect(() => {
-    if (cfg) cargarCupones()
+    if (cfg) { cargarCupones(); cargarTemporadas() }
   }, [cfg])
 
   async function handleCrearBloqueo() {
@@ -1159,6 +1249,61 @@ export default function ComercianteHotelesPage() {
 
             {mostrarFormCupon && (
               <FormNuevoCupon onCreado={() => { setMostrarFormCupon(false); cargarCupones() }} onCancelar={() => setMostrarFormCupon(false)} />
+            )}
+          </section>
+        )}
+
+        {/* ── TEMPORADAS ── */}
+        {cfg?.activo && (
+          <section className="bg-white rounded-2xl shadow-sm p-6 mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-bold text-gray-900">Precios por temporada</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Define precios especiales para fechas como Semana Santa, temporada alta o vacaciones</p>
+              </div>
+              <button onClick={() => setMostrarFormTemporada(true)}
+                className="text-sm font-medium bg-[#1B4332] text-white px-4 py-2 rounded-xl hover:bg-[#2D6A4F] transition-colors">
+                + Nueva temporada
+              </button>
+            </div>
+
+            {temporadas.filter(t => t.activo).length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">Sin temporadas. Los precios base de cada habitación aplican todo el año.</p>
+            ) : (
+              <div className="space-y-2">
+                {temporadas.filter(t => t.activo).map(t => {
+                  const inicio = new Date(t.inicio).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
+                  const fin    = new Date(t.fin).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
+                  const vencida = new Date(t.fin) < new Date()
+                  return (
+                    <div key={t.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                      <div>
+                        <p className="font-semibold text-sm text-gray-800">{t.nombre}</p>
+                        <p className="text-xs text-gray-500">
+                          {inicio} → {fin}
+                          {t.habitacionTipo ? ` · Solo: ${t.habitacionTipo.nombre}` : ' · Todas las habitaciones'}
+                          {' · '}
+                          <span className="font-medium text-[#1B4332]">${Number(t.precioPorNoche).toLocaleString('es-CO')}/noche</span>
+                          {vencida && <span className="text-red-400 ml-1">(vencida)</span>}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => eliminarTemporadaHotel(t.id).then(cargarTemporadas)}
+                        className="text-xs text-red-400 hover:text-red-600">
+                        Quitar
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {mostrarFormTemporada && (
+              <FormNuevaTemporada
+                habitaciones={cfg.habitaciones}
+                onCreada={() => { setMostrarFormTemporada(false); cargarTemporadas() }}
+                onCancelar={() => setMostrarFormTemporada(false)}
+              />
             )}
           </section>
         )}

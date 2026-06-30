@@ -283,6 +283,28 @@ const HotelController = {
     } catch (e) { next(e); }
   },
 
+  // ── TEMPORADAS ────────────────────────────────────────────────
+  async listarTemporadas(req, res, next) {
+    try {
+      const data = await HotelService.listarTemporadas(req.usuario.comercio.id);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async crearTemporada(req, res, next) {
+    try {
+      const data = await HotelService.crearTemporada(req.usuario.comercio.id, req.body);
+      res.status(201).json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async eliminarTemporada(req, res, next) {
+    try {
+      await HotelService.eliminarTemporada(req.usuario.comercio.id, Number(req.params.id));
+      res.json({ ok: true });
+    } catch (e) { next(e); }
+  },
+
   // ── PAGO DIGITAL ──────────────────────────────────────────────
   async iniciarPagoReserva(req, res, next) {
     try {
