@@ -70,6 +70,14 @@ router.patch("/comercios/:id/verificar",        ...soloAdmin, AdminController.ve
 router.patch("/comercios/:id/whatsapp-visible", ...soloAdmin, AdminController.toggleWhatsappVisible);
 router.post("/comercios/:id/comision",          ...soloAdmin, AdminController.setComisionComercio);
 
+// Panel de administración — dashboard y gestión avanzada
+router.get("/dashboard",                    ...soloAdmin, AdminController.dashboard);
+router.get("/comercios/:id/detalle",        ...soloAdmin, AdminController.detalleComercio);
+router.patch("/comercios/:id/estado",       ...soloAdmin, AdminController.cambiarEstadoComercio);
+router.patch("/usuarios/:id/rol",           ...soloAdmin, AdminController.cambiarRol);
+router.delete("/categorias/:id",            ...soloAdmin, AdminController.eliminarCategoria);
+router.patch("/productos/:id/destacado",    ...soloAdmin, AdminController.destacarProducto);
+
 // Mantenimiento puntual
 router.post("/backfill-pesos", ...soloAdmin, AdminController.backfillPesos);
 

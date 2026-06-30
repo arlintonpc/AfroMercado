@@ -379,6 +379,131 @@ const AdminService = {
       },
     });
   },
+
+  // ── Métodos para el panel de administración ───────────────────
+
+  /**
+   * Resumen de métricas para el dashboard del panel admin.
+   * Nota: Comercio y Usuario usan createdAt; reservas usan creadoAt.
+   * Categoria no tiene campo "orden" ni "descripcion" en el schema actual.
+   * Producto no tiene campo "destacado" en el schema actual.
+   */
+  async dashboard() {
+    const [
+      totalComercios,
+      comerciosActivos,
+      totalUsuarios,
+      totalProductos,
+    ] = await Promise.all([
+      prisma.comercio.count(),
+      prisma.comercio.count({ where: { activo: true } }),
+      prisma.usuario.count(),
+      prisma.producto.count({ where: { activo: true, deletedAt: null } }),
+    ]);
+
+    // Reservas del mes actual (cada módulo usa "creadoAt")
+    const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const [reservasTour, reservasHotel, reservasTransporte, pedidosExpress] = await Promise.all([
+      prisma.reservaTour.count({ where: { creadoAt: { gte: inicioMes } } }),
+      prisma.reservaHotel.count({ where: { creadoAt: { gte: inicioMes } } }),
+      prisma.reservaTransporte.count({ where: { creadoAt: { gte: inicioMes } } }),
+      prisma.pedidoExpress.count({ where: { creadoAt: { gte: inicioMes } } }),
+    ]);
+
+    // Comercios nuevos por semana (últimas 4 semanas) — Comercio usa createdAt
+    const comerciosPorSemana = await prisma.$queryRaw`
+      SELECT DATE_TRUNC('week', "createdAt") as semana, COUNT(*)::int as total
+      FROM "Comercio"
+      WHERE "createdAt" >= NOW() - INTERVAL '28 days'
+      GROUP BY semana ORDER BY semana
+    `;
+
+    // Alertas: comercios activos sin productos activos
+    const comerciosSinProductos = await prisma.comercio.count({
+      where: { activo: true, productos: { none: { activo: true, deletedAt: null } } },
+    });
+
+    return {
+      totalComercios,
+      comerciosActivos,
+      totalUsuarios,
+      totalProductos,
+      reservasMes: reservasTour + reservasHotel + reservasTransporte + pedidosExpress,
+      pedidosExpress,
+      comerciosPorSemana,
+      alertas: { comerciosSinProductos },
+    };
+  },
+
+  /**
+   * Detalle completo de un comercio para el panel admin.
+   */
+  async detalleComercio(id) {
+    return prisma.comercio.findUniqueOrThrow({
+      where: { id },
+      include: {
+        usuario: { select: { id: true, nombre: true, email: true, telefono: true } },
+        _count: { select: { productos: true } },
+        configHotel: { select: { id: true, nombre: true, activo: true } },
+        configTour: { select: { id: true, nombre: true, activo: true } },
+        configExpress: { select: { id: true, activo: true } },
+        configTransporte: { select: { id: true, nombre: true, activo: true } },
+        comisiones: {
+          where: { OR: [{ hasta: null }, { hasta: { gt: new Date() } }] },
+          orderBy: { desde: "desc" },
+          take: 1,
+        },
+      },
+    });
+  },
+
+  /**
+   * Activa o desactiva un comercio directamente (sin flujo de verificación).
+   * Para el flujo de verificación formal usa verificarComerciante().
+   */
+  async cambiarEstadoComercio(id, activo, motivo) {
+    return prisma.comercio.update({
+      where: { id },
+      data: { activo: Boolean(activo) },
+      select: { id: true, nombre: true, activo: true },
+    });
+  },
+
+  /**
+   * Cambia el rol de un usuario.
+   * Roles válidos según el enum Rol del schema: COMPRADOR, COMERCIANTE, REPARTIDOR, ADMIN.
+   */
+  async cambiarRol(id, rol) {
+    const rolesValidos = ["COMPRADOR", "COMERCIANTE", "REPARTIDOR", "ADMIN"];
+    if (!rolesValidos.includes(rol)) throw new ErrorValidacion("Rol inválido. Opciones: " + rolesValidos.join(", "));
+    return prisma.usuario.update({
+      where: { id },
+      data: { rol },
+      select: { id: true, nombre: true, email: true, rol: true },
+    });
+  },
+
+  /**
+   * Elimina una categoría. Lanzará error de Prisma si tiene productos asociados.
+   * La categoría solo tiene: id, nombre, slug, icono, activa (no tiene "orden" ni "descripcion").
+   */
+  async eliminarCategoria(id) {
+    return prisma.categoria.delete({ where: { id } });
+  },
+
+  /**
+   * "Destacar" un producto.
+   * NOTA: el schema actual de Producto NO tiene campo "destacado".
+   * Este método lanza un error informativo para que el frontend sepa
+   * que la funcionalidad requiere una migración de schema.
+   * Cuando se agregue `destacado Boolean @default(false)` a Producto,
+   * reemplazar el body por: return prisma.producto.update({ where: { id }, data: { destacado } });
+   */
+  async destacarProducto(id, destacado) {
+    throw new ErrorValidacion(
+      "El campo 'destacado' no existe en el schema actual. Agrega `destacado Boolean @default(false)` al modelo Producto y ejecuta la migración correspondiente."
+    );
+  },
 };
 
 module.exports = AdminService;

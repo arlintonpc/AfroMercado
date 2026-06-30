@@ -790,6 +790,59 @@ const AdminController = {
       res.json({ ok: true, data });
     } catch (e) { next(e); }
   },
+
+  // ── Panel de administración (nuevos endpoints) ────────────────
+
+  // GET /admin/dashboard
+  async dashboard(req, res, next) {
+    try {
+      const data = await AdminService.dashboard();
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // GET /admin/comercios/:id — detalle completo de un comercio
+  async detalleComercio(req, res, next) {
+    try {
+      const data = await AdminService.detalleComercio(Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // PATCH /admin/comercios/:id/estado  body: { activo: boolean, motivo?: string }
+  async cambiarEstadoComercio(req, res, next) {
+    try {
+      const { activo, motivo } = req.body;
+      const data = await AdminService.cambiarEstadoComercio(Number(req.params.id), activo, motivo);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // PATCH /admin/usuarios/:id/rol  body: { rol: "COMPRADOR"|"COMERCIANTE"|"REPARTIDOR"|"ADMIN" }
+  async cambiarRol(req, res, next) {
+    try {
+      const data = await AdminService.cambiarRol(Number(req.params.id), req.body.rol);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // DELETE /admin/categorias/:id
+  async eliminarCategoria(req, res, next) {
+    try {
+      await AdminService.eliminarCategoria(Number(req.params.id));
+      res.json({ ok: true });
+    } catch (e) { next(e); }
+  },
+
+  // PATCH /admin/productos/:id/destacado  body: { destacado: boolean }
+  // Usa el campo activo del producto como proxy de destacado cuando no existe campo nativo.
+  // Si el schema agrega "destacado: Boolean" en el futuro, actualizar la query aquí.
+  async destacarProducto(req, res, next) {
+    try {
+      const data = await AdminService.destacarProducto(Number(req.params.id), req.body.destacado);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
 };
 
 module.exports = AdminController;

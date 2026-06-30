@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: '/admin',                      label: 'Resumen'        },
   { href: '/admin/categorias',           label: 'Categorías'     },
   { href: '/admin/usuarios',             label: 'Usuarios'       },
+  { href: '/admin/comercios',            label: '🏪 Comercios'   },
   { href: '/admin/comerciantes',         label: 'Comerciantes'   },
   { href: '/admin/solicitudes-repartidor', label: 'Repartidores' },
   { href: '/admin/liquidaciones',        label: 'Liquidaciones'  },
