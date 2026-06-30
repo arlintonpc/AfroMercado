@@ -43,14 +43,15 @@ function TarjetaHotelBuscar({ h }: { h: ConfigHotel }) {
   const desde = h.habitaciones.length > 0 ? Math.min(...h.habitaciones.map(x => Number(x.precioPorNoche))) : null
   const foto = h.habitaciones[0]?.fotos[0]
   return (
-    <Link href={`/hoteles/${h.id}`} className="flex gap-3 bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow p-3">
-      <div className="w-20 h-20 rounded-xl flex-shrink-0 bg-gradient-to-br from-[#2D6A4F] to-[#40916C] flex items-center justify-center overflow-hidden">
-        {foto ? <img src={foto} alt={h.comercio.nombre} className="w-full h-full object-cover" /> : <span className="text-2xl">🏨</span>}
+    <Link href={`/hoteles/${h.id}`} className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md hover:border-[#2D6A4F]/30 transition-all flex flex-col">
+      <div className="h-40 bg-gradient-to-br from-[#2D6A4F] to-[#40916C] flex items-center justify-center overflow-hidden relative">
+        {foto ? <img src={foto} alt={h.comercio.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" /> : <span className="text-4xl">🏨</span>}
       </div>
-      <div className="flex-1 min-w-0 py-0.5">
+      <div className="p-3 flex flex-col gap-1">
         <p className="font-bold text-sm text-[#1A1A1A] truncate">{h.comercio.nombre}</p>
-        <p className="text-xs text-gray-500 mt-0.5">📍 {h.comercio.municipio}</p>
-        {desde !== null && <p className="text-xs text-[#2D6A4F] font-semibold mt-1">Desde {formatearPrecio(desde)}/noche</p>}
+        <p className="text-xs text-gray-500">📍 {h.comercio.municipio}</p>
+        {h.comercio.calificacion > 0 && <p className="text-xs text-amber-500">{'★'.repeat(Math.round(Number(h.comercio.calificacion)))} <span className="text-gray-400">{Number(h.comercio.calificacion).toFixed(1)}</span></p>}
+        {desde !== null && <p className="text-sm text-[#2D6A4F] font-semibold mt-1">Desde {formatearPrecio(desde)}<span className="text-xs font-normal text-gray-400">/noche</span></p>}
       </div>
     </Link>
   )
@@ -58,14 +59,15 @@ function TarjetaHotelBuscar({ h }: { h: ConfigHotel }) {
 
 function TarjetaTourBuscar({ t }: { t: ConfigTour }) {
   return (
-    <Link href={`/tours/${t.id}`} className="flex gap-3 bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow p-3">
-      <div className="w-20 h-20 rounded-xl flex-shrink-0 bg-gradient-to-br from-[#40916C] to-[#74C69D] flex items-center justify-center overflow-hidden">
-        {t.fotos[0] ? <img src={t.fotos[0]} alt={t.nombre} className="w-full h-full object-cover" /> : <span className="text-2xl">🗺️</span>}
+    <Link href={`/tours/${t.id}`} className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md hover:border-[#2D6A4F]/30 transition-all flex flex-col">
+      <div className="h-40 bg-gradient-to-br from-[#40916C] to-[#74C69D] flex items-center justify-center overflow-hidden">
+        {t.fotos[0] ? <img src={t.fotos[0]} alt={t.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" /> : <span className="text-4xl">🗺️</span>}
       </div>
-      <div className="flex-1 min-w-0 py-0.5">
+      <div className="p-3 flex flex-col gap-1">
         <p className="font-bold text-sm text-[#1A1A1A] truncate">{t.nombre}</p>
-        <p className="text-xs text-gray-500 mt-0.5">📍 {t.comercio.municipio} · ⏱️ {t.duracionHoras}h</p>
-        <p className="text-xs text-[#2D6A4F] font-semibold mt-1">{formatearPrecio(Number(t.precioPersona))}/pers.</p>
+        <p className="text-xs text-gray-500">📍 {t.comercio.municipio} · ⏱️ {t.duracionHoras}h · 👥 máx {t.maxParticipantes}</p>
+        {t.comercio.calificacion > 0 && <p className="text-xs text-amber-500">{'★'.repeat(Math.round(Number(t.comercio.calificacion)))} <span className="text-gray-400">{Number(t.comercio.calificacion).toFixed(1)}</span></p>}
+        <p className="text-sm text-[#2D6A4F] font-semibold mt-1">{formatearPrecio(Number(t.precioPersona))}<span className="text-xs font-normal text-gray-400">/persona</span></p>
       </div>
     </Link>
   )
@@ -76,15 +78,15 @@ function TarjetaTransporteBuscar({ t }: { t: ConfigTransporte }) {
   const precioMin = rutas.length > 0 ? Math.min(...rutas.map(r => Number(r.precioAsiento))) : null
   const TIPO_ICONO: Record<string, string> = { LANCHA: '🛥️', BOTE: '⛵', CHALUPA: '🚤', CANOA: '🛶' }
   return (
-    <Link href={`/transportes/${t.id}`} className="flex gap-3 bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow p-3">
-      <div className="w-20 h-20 rounded-xl flex-shrink-0 bg-gradient-to-br from-[#023E8A] to-[#0077B6] flex items-center justify-center overflow-hidden">
-        {t.fotos[0] ? <img src={t.fotos[0]} alt={t.nombre} className="w-full h-full object-cover" /> : <span className="text-2xl">{TIPO_ICONO[t.tipo] ?? '🛥️'}</span>}
+    <Link href={`/transportes/${t.id}`} className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md hover:border-[#023E8A]/30 transition-all flex flex-col">
+      <div className="h-40 bg-gradient-to-br from-[#023E8A] to-[#0077B6] flex items-center justify-center overflow-hidden">
+        {t.fotos[0] ? <img src={t.fotos[0]} alt={t.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" /> : <span className="text-4xl">{TIPO_ICONO[t.tipo] ?? '🛥️'}</span>}
       </div>
-      <div className="flex-1 min-w-0 py-0.5">
+      <div className="p-3 flex flex-col gap-1">
         <p className="font-bold text-sm text-[#1A1A1A] truncate">{t.nombre}</p>
-        <p className="text-xs text-gray-500 mt-0.5">📍 {t.comercio.municipio} · {TIPO_ICONO[t.tipo]} {t.tipo}</p>
-        {precioMin !== null && <p className="text-xs text-[#023E8A] font-semibold mt-1">Desde {formatearPrecio(precioMin)}/asiento</p>}
-        {rutas.length > 0 && <p className="text-xs text-gray-400">{rutas.length} ruta{rutas.length !== 1 ? 's' : ''}</p>}
+        <p className="text-xs text-gray-500">📍 {t.comercio.municipio} · {TIPO_ICONO[t.tipo]} {t.tipo}</p>
+        {rutas.length > 0 && <p className="text-xs text-gray-400">{rutas.length} ruta{rutas.length !== 1 ? 's' : ''} disponible{rutas.length !== 1 ? 's' : ''}</p>}
+        {precioMin !== null && <p className="text-sm text-[#023E8A] font-semibold mt-1">Desde {formatearPrecio(precioMin)}<span className="text-xs font-normal text-gray-400">/asiento</span></p>}
       </div>
     </Link>
   )
@@ -131,14 +133,14 @@ function Resultados() {
   }, [])
 
   useEffect(() => {
-    if (tab === 'productos' || turismoYaCargado.current) return
+    if (turismoYaCargado.current) return
     turismoYaCargado.current = true
     setCargandoTurismo(true)
     Promise.all([listarHoteles(), listarTours(), listarTransportes()])
       .then(([h, t, tr]) => { setHoteles(h); setTours(t); setTransportes(tr) })
       .catch(() => {})
       .finally(() => setCargandoTurismo(false))
-  }, [tab])
+  }, [])
 
   useEffect(() => {
     if (!categoriaSlug || categorias.length === 0) return
@@ -366,20 +368,16 @@ function Resultados() {
             {tab === 'hoteles' && (
               <>
                 {cargandoTurismo && <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 bg-gray-200 rounded-2xl animate-pulse" />)}</div>}
-                {!cargandoTurismo && !q && (
-                  <div className="text-center py-8 text-gray-400">
-                    <p className="text-4xl mb-3">🏨</p>
-                    <p className="font-medium text-gray-600">Escribe algo para buscar hoteles</p>
-                    <Link href="/hoteles" className="text-sm text-[#2D6A4F] underline mt-2 block">Ver todos los hoteles →</Link>
-                  </div>
-                )}
                 {!cargandoTurismo && q && hotelesFiltrados.length === 0 && (
                   <EmptyState titulo={`Sin hoteles para «${q}»`} descripcion="Prueba con el nombre de una ciudad o del hotel." />
+                )}
+                {!cargandoTurismo && hotelesFiltrados.length === 0 && !q && (
+                  <EmptyState titulo="No hay hoteles disponibles" descripcion="Aún no hay hoteles registrados." />
                 )}
                 {!cargandoTurismo && hotelesFiltrados.length > 0 && (
                   <>
                     <p className="text-xs text-gray-400">{hotelesFiltrados.length} hotel{hotelesFiltrados.length !== 1 ? 'es' : ''}</p>
-                    <div className="space-y-3">{hotelesFiltrados.map(h => <TarjetaHotelBuscar key={h.id} h={h} />)}</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{hotelesFiltrados.map(h => <TarjetaHotelBuscar key={h.id} h={h} />)}</div>
                   </>
                 )}
               </>
@@ -389,20 +387,16 @@ function Resultados() {
             {tab === 'tours' && (
               <>
                 {cargandoTurismo && <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 bg-gray-200 rounded-2xl animate-pulse" />)}</div>}
-                {!cargandoTurismo && !q && (
-                  <div className="text-center py-8 text-gray-400">
-                    <p className="text-4xl mb-3">🗺️</p>
-                    <p className="font-medium text-gray-600">Escribe algo para buscar tours</p>
-                    <Link href="/tours" className="text-sm text-[#2D6A4F] underline mt-2 block">Ver todos los tours →</Link>
-                  </div>
-                )}
                 {!cargandoTurismo && q && toursFiltrados.length === 0 && (
                   <EmptyState titulo={`Sin tours para «${q}»`} descripcion="Prueba con la ciudad, el nombre del tour o el operador." />
+                )}
+                {!cargandoTurismo && toursFiltrados.length === 0 && !q && (
+                  <EmptyState titulo="No hay tours disponibles" descripcion="Aún no hay tours registrados." />
                 )}
                 {!cargandoTurismo && toursFiltrados.length > 0 && (
                   <>
                     <p className="text-xs text-gray-400">{toursFiltrados.length} tour{toursFiltrados.length !== 1 ? 's' : ''}</p>
-                    <div className="space-y-3">{toursFiltrados.map(t => <TarjetaTourBuscar key={t.id} t={t} />)}</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{toursFiltrados.map(t => <TarjetaTourBuscar key={t.id} t={t} />)}</div>
                   </>
                 )}
               </>
@@ -412,20 +406,16 @@ function Resultados() {
             {tab === 'transportes' && (
               <>
                 {cargandoTurismo && <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 bg-gray-200 rounded-2xl animate-pulse" />)}</div>}
-                {!cargandoTurismo && !q && (
-                  <div className="text-center py-8 text-gray-400">
-                    <p className="text-4xl mb-3">🛥️</p>
-                    <p className="font-medium text-gray-600">Escribe una ruta u origen para buscar</p>
-                    <Link href="/transportes" className="text-sm text-[#2D6A4F] underline mt-2 block">Ver todos los transportes →</Link>
-                  </div>
-                )}
                 {!cargandoTurismo && q && transportesFiltrados.length === 0 && (
                   <EmptyState titulo={`Sin transporte para «${q}»`} descripcion="Prueba con el origen, destino o tipo de embarcación." />
+                )}
+                {!cargandoTurismo && transportesFiltrados.length === 0 && !q && (
+                  <EmptyState titulo="No hay servicios disponibles" descripcion="Aún no hay transportes registrados." />
                 )}
                 {!cargandoTurismo && transportesFiltrados.length > 0 && (
                   <>
                     <p className="text-xs text-gray-400">{transportesFiltrados.length} servicio{transportesFiltrados.length !== 1 ? 's' : ''}</p>
-                    <div className="space-y-3">{transportesFiltrados.map(t => <TarjetaTransporteBuscar key={t.id} t={t} />)}</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{transportesFiltrados.map(t => <TarjetaTransporteBuscar key={t.id} t={t} />)}</div>
                   </>
                 )}
               </>
