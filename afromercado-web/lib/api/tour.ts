@@ -245,6 +245,10 @@ export async function quitarVideoTour(): Promise<void> {
   await apiFetch('/tours/mi-tour/config/video', { method: 'DELETE' })
 }
 
+export async function guardarVideoLinkTour(videoUrl: string): Promise<void> {
+  await apiFetch('/tours/mi-tour/config/video-link', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl }) })
+}
+
 export async function subirFotosTour(archivos: FileList): Promise<ConfigTour> {
   const form = new FormData()
   Array.from(archivos).forEach(f => form.append('fotos', f))

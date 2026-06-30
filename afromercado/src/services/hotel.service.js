@@ -49,6 +49,15 @@ const HOTEL_INCLUDE = {
 
 const ESTADOS_HABITACION_FISICA = new Set(["LIBRE", "OCUPADA", "LIMPIEZA", "MANTENIMIENTO", "BLOQUEADA"]);
 const ESTADOS_RESERVA_OCUPAN_HABITACION = ["PENDIENTE", "CONFIRMADA", "CHECKIN"];
+const MODALIDADES_RESERVA_HOTEL = new Set(["NOCHE", "HORAS"]);
+
+function normalizarModalidadReserva(modalidad) {
+  const normalizada = String(modalidad || "NOCHE").trim().toUpperCase();
+  if (!MODALIDADES_RESERVA_HOTEL.has(normalizada)) {
+    throw new ErrorValidacion("Modalidad de reserva no valida");
+  }
+  return normalizada;
+}
 
 function normalizarEstadoHabitacionFisica(estado) {
   const normalizado = String(estado || "LIBRE").trim().toUpperCase();
@@ -58,7 +67,44 @@ function normalizarEstadoHabitacionFisica(estado) {
   return normalizado;
 }
 
-async function verificarDisponibilidadInterna(db, habitacionTipoId, fechaEntrada, fechaSalida, { bloquearTipo = false } = {}) {
+function construirFechaHora(fecha, hora, nombreCampo) {
+  if (!fecha) throw new ErrorValidacion(`${nombreCampo} es obligatorio`);
+  const valor = String(fecha);
+  const fechaFinal = valor.includes("T") ? valor : `${valor}T${hora || "00:00"}`;
+  const parsed = new Date(fechaFinal);
+  if (Number.isNaN(parsed.getTime())) throw new ErrorValidacion(`${nombreCampo} no es valido`);
+  return parsed;
+}
+
+function prepararRangoReservaHotel(datos = {}) {
+  const modalidad = normalizarModalidadReserva(datos.modalidad || "NOCHE");
+  if (modalidad === "HORAS") {
+    const entrada = construirFechaHora(datos.fechaEntrada, datos.horaEntrada, "Fecha/hora de entrada");
+    const salida = construirFechaHora(datos.fechaSalida || datos.fechaEntrada, datos.horaSalida, "Fecha/hora de salida");
+    if (salida <= entrada) throw new ErrorValidacion("La hora de salida debe ser posterior a la de entrada");
+    const duracionHoras = Math.round(((salida.getTime() - entrada.getTime()) / 3600000) * 100) / 100;
+    return { modalidad, entrada, salida, noches: 1, duracionHoras };
+  }
+
+  const entrada = new Date(datos.fechaEntrada);
+  const salida = new Date(datos.fechaSalida);
+  if (Number.isNaN(entrada.getTime()) || Number.isNaN(salida.getTime())) {
+    throw new ErrorValidacion("Fechas invalidas");
+  }
+  if (salida <= entrada) throw new ErrorValidacion("La fecha de salida debe ser posterior a la de entrada");
+  const noches = Math.ceil((salida.getTime() - entrada.getTime()) / 86400000);
+  return { modalidad, entrada, salida, noches, duracionHoras: null };
+}
+
+function rangoConBuffer(fechaEntrada, fechaSalida, minutosBuffer = 0) {
+  const bufferMs = Math.max(0, Number(minutosBuffer) || 0) * 60 * 1000;
+  return {
+    inicio: new Date(fechaEntrada.getTime() - bufferMs),
+    fin: new Date(fechaSalida.getTime() + bufferMs),
+  };
+}
+
+async function verificarDisponibilidadInterna(db, habitacionTipoId, fechaEntrada, fechaSalida, { bloquearTipo = false, modalidad = "NOCHE" } = {}) {
   if (bloquearTipo) {
     await db.$queryRaw`SELECT id FROM "HabitacionTipo" WHERE id = ${Number(habitacionTipoId)} FOR UPDATE`;
   }
@@ -68,13 +114,26 @@ async function verificarDisponibilidadInterna(db, habitacionTipoId, fechaEntrada
     include: { configHotel: true },
   });
   if (!tipo || !tipo.activo) throw new ErrorNoEncontrado("Tipo de habitacion no disponible");
+  const modalidadNormalizada = normalizarModalidadReserva(modalidad);
+  if (modalidadNormalizada === "HORAS") {
+    if (tipo.configHotel?.permiteReservasPorHora === false || tipo.permitePorHoras === false) {
+      throw new ErrorValidacion("Esta habitacion no permite reservas por horas");
+    }
+    if (!tipo.precioPorHora || Number(tipo.precioPorHora) <= 0) {
+      throw new ErrorValidacion("Esta habitacion aun no tiene precio por hora");
+    }
+  }
+
+  const rangoConsulta = modalidadNormalizada === "HORAS"
+    ? rangoConBuffer(fechaEntrada, fechaSalida, tipo.configHotel?.minutosLimpiezaEntreReservas ?? 30)
+    : { inicio: fechaEntrada, fin: fechaSalida };
 
   const reservasSolapadas = await db.reservaHotel.count({
     where: {
       habitacionTipoId: Number(habitacionTipoId),
       estado: { in: ["PENDIENTE", "CONFIRMADA", "CHECKIN"] },
-      fechaEntrada: { lt: fechaSalida },
-      fechaSalida:  { gt: fechaEntrada },
+      fechaEntrada: { lt: rangoConsulta.fin },
+      fechaSalida:  { gt: rangoConsulta.inicio },
     },
   });
 
@@ -87,8 +146,49 @@ async function verificarDisponibilidadInterna(db, habitacionTipoId, fechaEntrada
     b.fechaFin > fechaEntrada.toISOString().slice(0, 10)
   );
 
+  const habitacionesFisicas = await db.habitacionFisica.findMany({
+    where: {
+      configHotelId: tipo.configHotelId,
+      habitacionTipoId: Number(habitacionTipoId),
+      activo: true,
+      estado: { notIn: ["MANTENIMIENTO", "BLOQUEADA"] },
+    },
+    select: { id: true },
+  });
+
+  if (habitacionesFisicas.length > 0) {
+    const ids = habitacionesFisicas.map(h => h.id);
+    const reservasAsignadas = await db.reservaHotel.findMany({
+      where: {
+        habitacionFisicaId: { in: ids },
+        estado: { in: ESTADOS_RESERVA_OCUPAN_HABITACION },
+        fechaEntrada: { lt: rangoConsulta.fin },
+        fechaSalida:  { gt: rangoConsulta.inicio },
+      },
+      select: { habitacionFisicaId: true },
+    });
+    const ocupadas = new Set(reservasAsignadas.map(r => r.habitacionFisicaId).filter(Boolean));
+    const reservasSinAsignar = await db.reservaHotel.count({
+      where: {
+        habitacionTipoId: Number(habitacionTipoId),
+        habitacionFisicaId: null,
+        estado: { in: ESTADOS_RESERVA_OCUPAN_HABITACION },
+        fechaEntrada: { lt: rangoConsulta.fin },
+        fechaSalida:  { gt: rangoConsulta.inicio },
+      },
+    });
+    const disponiblesFisicos = habitacionesFisicas.length - ocupadas.size - reservasSinAsignar;
+    return {
+      disponibles: bloqueado ? 0 : Math.max(0, disponiblesFisicos),
+      total: habitacionesFisicas.length,
+      tipo,
+      modalidad: modalidadNormalizada,
+      fuente: "FISICA",
+    };
+  }
+
   const disponibles = bloqueado ? 0 : tipo.cantidad - reservasSolapadas;
-  return { disponibles, total: tipo.cantidad, tipo };
+  return { disponibles, total: tipo.cantidad, tipo, modalidad: modalidadNormalizada, fuente: "TIPO" };
 }
 
 async function validarHabitacionFisicaDisponible(db, {
@@ -98,6 +198,7 @@ async function validarHabitacionFisicaDisponible(db, {
   fechaEntrada,
   fechaSalida,
   reservaId = null,
+  modalidad = "NOCHE",
 }) {
   const fisica = await db.habitacionFisica.findFirst({
     where: {
@@ -111,13 +212,22 @@ async function validarHabitacionFisicaDisponible(db, {
   if (["MANTENIMIENTO", "BLOQUEADA"].includes(fisica.estado)) {
     throw new ErrorValidacion(`La habitacion ${fisica.nombre} no esta disponible (${fisica.estado.toLowerCase()})`);
   }
+  const modalidadNormalizada = normalizarModalidadReserva(modalidad);
+  let rangoConsulta = { inicio: fechaEntrada, fin: fechaSalida };
+  if (modalidadNormalizada === "HORAS") {
+    const cfg = await db.configHotel.findUnique({
+      where: { id: Number(configHotelId) },
+      select: { minutosLimpiezaEntreReservas: true },
+    });
+    rangoConsulta = rangoConBuffer(fechaEntrada, fechaSalida, cfg?.minutosLimpiezaEntreReservas ?? 30);
+  }
 
   const reservaSolapada = await db.reservaHotel.findFirst({
     where: {
       habitacionFisicaId: fisica.id,
       estado: { in: ESTADOS_RESERVA_OCUPAN_HABITACION },
-      fechaEntrada: { lt: fechaSalida },
-      fechaSalida:  { gt: fechaEntrada },
+      fechaEntrada: { lt: rangoConsulta.fin },
+      fechaSalida:  { gt: rangoConsulta.inicio },
       ...(reservaId ? { NOT: { id: Number(reservaId) } } : {}),
     },
     select: { id: true, codigo: true },
@@ -138,14 +248,23 @@ async function buscarHabitacionFisicaDisponible(db, reserva) {
     },
     orderBy: [{ piso: "asc" }, { nombre: "asc" }],
   });
+  const modalidad = normalizarModalidadReserva(reserva.modalidad || "NOCHE");
+  let rangoConsulta = { inicio: reserva.fechaEntrada, fin: reserva.fechaSalida };
+  if (modalidad === "HORAS") {
+    const cfg = await db.configHotel.findUnique({
+      where: { id: Number(reserva.configHotelId) },
+      select: { minutosLimpiezaEntreReservas: true },
+    });
+    rangoConsulta = rangoConBuffer(reserva.fechaEntrada, reserva.fechaSalida, cfg?.minutosLimpiezaEntreReservas ?? 30);
+  }
 
   for (const fisica of habitaciones) {
     const solapada = await db.reservaHotel.findFirst({
       where: {
         habitacionFisicaId: fisica.id,
         estado: { in: ESTADOS_RESERVA_OCUPAN_HABITACION },
-        fechaEntrada: { lt: reserva.fechaSalida },
-        fechaSalida:  { gt: reserva.fechaEntrada },
+        fechaEntrada: { lt: rangoConsulta.fin },
+        fechaSalida:  { gt: rangoConsulta.inicio },
         NOT: { id: reserva.id },
       },
       select: { id: true },
@@ -244,44 +363,57 @@ const HotelService = {
   },
 
   // Verifica disponibilidad de un tipo de habitación en un rango de fechas
-  async verificarDisponibilidad(habitacionTipoId, fechaEntrada, fechaSalida) {
-    return verificarDisponibilidadInterna(prisma, habitacionTipoId, fechaEntrada, fechaSalida);
+  async verificarDisponibilidad(habitacionTipoId, fechaEntrada, fechaSalida, opciones = {}) {
+    return verificarDisponibilidadInterna(prisma, habitacionTipoId, fechaEntrada, fechaSalida, opciones);
   },
 
   // ── CLIENTE ──────────────────────────────────────────────────
 
   async crearReserva(clienteId, datos) {
-    {
-      const { habitacionTipoId, fechaEntrada, fechaSalida, huespedes, metodoPago, notasCliente, nombreHuesped, telefonoHuesped, codigoCupon } = datos;
+    const { habitacionTipoId, huespedes, metodoPago, notasCliente, nombreHuesped, telefonoHuesped, codigoCupon } = datos;
+    const { modalidad, entrada, salida, noches, duracionHoras } = prepararRangoReservaHotel(datos);
 
-      const entrada = new Date(fechaEntrada);
-      const salida  = new Date(fechaSalida);
-      if (Number.isNaN(entrada.getTime()) || Number.isNaN(salida.getTime())) {
-        throw new ErrorValidacion("Fechas invalidas");
-      }
-      if (entrada < new Date(new Date().toDateString())) {
-        throw new ErrorValidacion("La fecha de entrada no puede ser en el pasado");
-      }
-      if (salida <= entrada) {
-        throw new ErrorValidacion("La fecha de salida debe ser posterior a la de entrada");
-      }
+    const limitePasado = modalidad === "HORAS" ? new Date() : new Date(new Date().toDateString());
+    if (entrada < limitePasado) {
+      throw new ErrorValidacion("La fecha de entrada no puede ser en el pasado");
+    }
 
-      const noches = Math.ceil((salida - entrada) / (1000 * 60 * 60 * 24));
-      const metodoPagoFinal = metodoPago || "EFECTIVO";
-      const pagoOnline = String(metodoPagoFinal).startsWith("WOMPI");
+    const metodoPagoFinal = metodoPago || "EFECTIVO";
+    const pagoOnline = String(metodoPagoFinal).startsWith("WOMPI");
 
-      const resultado = await prisma.$transaction(async (tx) => {
-        const { disponibles, tipo } = await verificarDisponibilidadInterna(tx, habitacionTipoId, entrada, salida, { bloquearTipo: true });
-        if (disponibles <= 0) throw new ErrorValidacion("No hay disponibilidad para esas fechas");
-        if (!tipo.configHotel?.activo) throw new ErrorValidacion("Este hotel no esta activo para recibir reservas");
+    const resultado = await prisma.$transaction(async (tx) => {
+      const { disponibles, tipo } = await verificarDisponibilidadInterna(tx, habitacionTipoId, entrada, salida, {
+        bloquearTipo: true,
+        modalidad,
+      });
+      if (disponibles <= 0) throw new ErrorValidacion("No hay disponibilidad para ese rango");
+      if (!tipo.configHotel?.activo) throw new ErrorValidacion("Este hotel no esta activo para recibir reservas");
 
-        if (metodoPagoFinal === "EFECTIVO" && tipo.configHotel.permitePagarAlLlegar === false) {
-          throw new ErrorValidacion("Este hotel no acepta pago al llegar");
+      if (modalidad === "HORAS") {
+        if (!tipo.configHotel.permiteReservasPorHora || !tipo.permitePorHoras) {
+          throw new ErrorValidacion("Esta habitacion no permite reservas por horas");
         }
-        if (pagoOnline && tipo.configHotel.permiteDeposito30 === false) {
-          throw new ErrorValidacion("Este hotel no acepta deposito online por ahora");
+        const minimoHoras = Number(tipo.duracionMinHoras) || 1;
+        const maximoHoras = tipo.duracionMaxHoras ? Number(tipo.duracionMaxHoras) : null;
+        if (duracionHoras < minimoHoras) {
+          throw new ErrorValidacion(`La reserva por horas debe ser de minimo ${minimoHoras} hora(s)`);
         }
+        if (maximoHoras && duracionHoras > maximoHoras) {
+          throw new ErrorValidacion(`La reserva por horas no puede superar ${maximoHoras} hora(s)`);
+        }
+      }
 
+      if (metodoPagoFinal === "EFECTIVO" && tipo.configHotel.permitePagarAlLlegar === false) {
+        throw new ErrorValidacion("Este hotel no acepta pago al llegar");
+      }
+      if (pagoOnline && tipo.configHotel.permiteDeposito30 === false) {
+        throw new ErrorValidacion("Este hotel no acepta deposito online por ahora");
+      }
+
+      let totalOriginal = 0;
+      if (modalidad === "HORAS") {
+        totalOriginal = Math.round(Number(tipo.precioPorHora) * Number(duracionHoras) * 100) / 100;
+      } else {
         const temporadaHab = await tx.temporadaHotel.findFirst({
           where: {
             activo: true,
@@ -301,124 +433,126 @@ const HotelService = {
         }) : null;
         const temporada = temporadaHab || temporadaHotel;
         const precioPorNoche = temporada ? Number(temporada.precioPorNoche) : Number(tipo.precioPorNoche);
-        const totalOriginal = precioPorNoche * noches;
+        totalOriginal = precioPorNoche * noches;
+      }
 
-        let montoDescuento = 0;
-        let cuponValidado = null;
-        if (codigoCupon) {
-          const cuponResultado = await validarCuponHotelInterno(
-            tx,
-            codigoCupon,
-            tipo.configHotelId,
-            noches,
-            clienteId,
-            totalOriginal,
-            { bloquear: true }
-          );
-          montoDescuento = cuponResultado.descuento;
-          cuponValidado = cuponResultado.cupon;
-        }
+      let montoDescuento = 0;
+      let cuponValidado = null;
+      if (codigoCupon) {
+        const cuponResultado = await validarCuponHotelInterno(
+          tx,
+          codigoCupon,
+          tipo.configHotelId,
+          modalidad === "HORAS" ? 1 : noches,
+          clienteId,
+          totalOriginal,
+          { bloquear: true }
+        );
+        montoDescuento = cuponResultado.descuento;
+        cuponValidado = cuponResultado.cupon;
+      }
 
-        const totalFinal = totalOriginal - montoDescuento;
-        const tasaComision = 0.1;
-        const comision = Math.round(totalFinal * tasaComision * 100) / 100;
-        const estadoInicial = pagoOnline ? "PENDIENTE" : (tipo.configHotel.confirmacionAuto ? "CONFIRMADA" : "PENDIENTE");
+      const totalFinal = totalOriginal - montoDescuento;
+      const tasaComision = 0.1;
+      const comision = Math.round(totalFinal * tasaComision * 100) / 100;
+      const estadoInicial = pagoOnline ? "PENDIENTE" : (tipo.configHotel.confirmacionAuto ? "CONFIRMADA" : "PENDIENTE");
 
-        const reserva = await tx.reservaHotel.create({
-          data: {
-            codigo: generarCodigo(),
-            configHotelId: tipo.configHotelId,
-            habitacionTipoId: Number(habitacionTipoId),
-            clienteId,
-            fechaEntrada: entrada,
-            fechaSalida:  salida,
-            huespedes:    Number(huespedes) || 1,
-            total:        totalFinal,
-            estado:       estadoInicial,
-            metodoPago:   metodoPagoFinal,
-            notasCliente: notasCliente || null,
-            nombreHuesped,
-            telefonoHuesped,
-            montoDescuento: montoDescuento || null,
-            codigoCupon:    codigoCupon || null,
-            comision,
-            tasaComision,
-          },
-          include: {
-            habitacionTipo: true,
-            configHotel: { include: { comercio: { include: { usuario: { select: { email: true, nombre: true } } } } } },
-          },
-        });
-
-        if (cuponValidado) {
-          await tx.cuponHotelUso.create({
-            data: {
-              cuponHotelId:   cuponValidado.id,
-              clienteId,
-              reservaHotelId: reserva.id,
-            },
-          });
-          await tx.cuponHotel.update({
-            where: { id: cuponValidado.id },
-            data:  { usosActuales: { increment: 1 } },
-          });
-        }
-
-        return { reserva, tipo, totalFinal, estadoInicial };
+      const reserva = await tx.reservaHotel.create({
+        data: {
+          codigo: generarCodigo(),
+          configHotelId: tipo.configHotelId,
+          habitacionTipoId: Number(habitacionTipoId),
+          clienteId,
+          fechaEntrada: entrada,
+          fechaSalida:  salida,
+          modalidad,
+          duracionHoras: modalidad === "HORAS" ? duracionHoras : null,
+          huespedes:    Number(huespedes) || 1,
+          total:        totalFinal,
+          estado:       estadoInicial,
+          metodoPago:   metodoPagoFinal,
+          notasCliente: notasCliente || null,
+          nombreHuesped,
+          telefonoHuesped,
+          montoDescuento: montoDescuento || null,
+          codigoCupon:    codigoCupon || null,
+          comision,
+          tasaComision,
+        },
+        include: {
+          habitacionTipo: true,
+          configHotel: { include: { comercio: { include: { usuario: { select: { email: true, nombre: true } } } } } },
+        },
       });
 
-      const { reserva, tipo, totalFinal, estadoInicial } = resultado;
-
-      // Notificar al hotelero
-      const hoteleroId = reserva.configHotel.comercio.usuarioId;
-      await notifHotel(
-        hoteleroId,
-        estadoInicial === "CONFIRMADA" ? "Nueva reserva confirmada" : "Nueva solicitud de reserva",
-        `${nombreHuesped} - ${tipo.nombre} - ${noches} noche(s)`,
-        "/comerciante/hoteles"
-      );
-
-      // Email al hotelero (fire and forget)
-      const emailHotelero = reserva.configHotel.comercio.usuario?.email;
-      if (emailHotelero) {
-        setImmediate(() => {
-          enviarEmail({
-            to: emailHotelero,
-            subject: `Nueva reserva - ${nombreHuesped} - ${tipo.nombre} - AfroMercado`,
-            html: emailHotel.reservaNueva({
-              nombreHotelero: reserva.configHotel.comercio.usuario.nombre || "Hotelero",
-              nombreHuesped,
-              habitacion: tipo.nombre,
-              fechaEntrada: entrada,
-              fechaSalida:  salida,
-              noches,
-              total: totalFinal,
-            }),
-          }).catch((err) => console.error("[EMAIL-HOTEL]", err.message));
+      if (cuponValidado) {
+        await tx.cuponHotelUso.create({
+          data: {
+            cuponHotelId:   cuponValidado.id,
+            clienteId,
+            reservaHotelId: reserva.id,
+          },
+        });
+        await tx.cuponHotel.update({
+          where: { id: cuponValidado.id },
+          data:  { usosActuales: { increment: 1 } },
         });
       }
 
-      setImmediate(() => {
-        notificarReservaHotel({
-          hotelWhatsapp: reserva.configHotel.comercio.whatsapp,
-          reserva,
-          habitacion: tipo,
-          comercioNombre: reserva.configHotel.comercio.nombre,
-        }).catch(() => {});
-      });
+      return { reserva, tipo, totalFinal, estadoInicial };
+    });
 
-      setImmediate(() => {
-        notificarClienteReserva({
-          telefonoCliente: telefonoHuesped,
-          reserva,
-          habitacion: tipo,
-          comercioNombre: reserva.configHotel.comercio.nombre,
-        }).catch(() => {});
-      });
+    const { reserva, tipo, totalFinal, estadoInicial } = resultado;
+    const resumenTiempo = modalidad === "HORAS" ? `${duracionHoras} hora(s)` : `${noches} noche(s)`;
 
-      return reserva;
+    // Notificar al hotelero
+    const hoteleroId = reserva.configHotel.comercio.usuarioId;
+    await notifHotel(
+      hoteleroId,
+      estadoInicial === "CONFIRMADA" ? "Nueva reserva confirmada" : "Nueva solicitud de reserva",
+      `${nombreHuesped} - ${tipo.nombre} - ${resumenTiempo}`,
+      "/comerciante/hoteles"
+    );
+
+    // Email al hotelero (fire and forget)
+    const emailHotelero = reserva.configHotel.comercio.usuario?.email;
+    if (emailHotelero) {
+      setImmediate(() => {
+        enviarEmail({
+          to: emailHotelero,
+          subject: `Nueva reserva - ${nombreHuesped} - ${tipo.nombre} - AfroMercado`,
+          html: emailHotel.reservaNueva({
+            nombreHotelero: reserva.configHotel.comercio.usuario.nombre || "Hotelero",
+            nombreHuesped,
+            habitacion: tipo.nombre,
+            fechaEntrada: entrada,
+            fechaSalida:  salida,
+            noches,
+            total: totalFinal,
+          }),
+        }).catch((err) => console.error("[EMAIL-HOTEL]", err.message));
+      });
     }
 
+    setImmediate(() => {
+      notificarReservaHotel({
+        hotelWhatsapp: reserva.configHotel.comercio.whatsapp,
+        reserva,
+        habitacion: tipo,
+        comercioNombre: reserva.configHotel.comercio.nombre,
+      }).catch(() => {});
+    });
+
+    setImmediate(() => {
+      notificarClienteReserva({
+        telefonoCliente: telefonoHuesped,
+        reserva,
+        habitacion: tipo,
+        comercioNombre: reserva.configHotel.comercio.nombre,
+      }).catch(() => {});
+    });
+
+    return reserva;
   },
 
   async misReservas(clienteId) {
@@ -544,6 +678,7 @@ const HotelService = {
     const {
       activo, confirmacionAuto, horasLimiteConfirm, servicios, politicaCancelacion,
       checkInHora, checkOutHora,
+      permiteReservasPorHora, minutosLimpiezaEntreReservas,
       // Política de pagos
       permitePagarAlLlegar, permiteDeposito30, permiteTotal,
       // Política de cancelación con penalización
@@ -556,6 +691,8 @@ const HotelService = {
       update: {
         activo, confirmacionAuto, horasLimiteConfirm, servicios, politicaCancelacion,
         checkInHora, checkOutHora,
+        permiteReservasPorHora,
+        minutosLimpiezaEntreReservas: minutosLimpiezaEntreReservas !== undefined ? Number(minutosLimpiezaEntreReservas) : undefined,
         permitePagarAlLlegar, permiteDeposito30, permiteTotal,
         horasLibresCancelacion, pctPenalidadCancelacion,
         rnt,
@@ -570,6 +707,8 @@ const HotelService = {
         politicaCancelacion,
         checkInHora:             checkInHora             ?? "15:00",
         checkOutHora:            checkOutHora            ?? "12:00",
+        permiteReservasPorHora:  permiteReservasPorHora  ?? false,
+        minutosLimpiezaEntreReservas: minutosLimpiezaEntreReservas !== undefined ? Number(minutosLimpiezaEntreReservas) : 30,
         permitePagarAlLlegar:    permitePagarAlLlegar    ?? true,
         permiteDeposito30:       permiteDeposito30       ?? true,
         permiteTotal:            permiteTotal            ?? true,
@@ -593,8 +732,14 @@ const HotelService = {
   async agregarHabitacion(comercioId, datos) {
     const cfg = await prisma.configHotel.findUnique({ where: { comercioId } });
     if (!cfg) throw new ErrorNoEncontrado("Configura el hotel primero");
-    const { nombre, descripcion, capacidad, precioPorNoche, cantidad, fotos, serviciosExtra } = datos;
+    const {
+      nombre, descripcion, capacidad, precioPorNoche, cantidad, fotos, serviciosExtra,
+      precioPorHora, permitePorHoras, duracionMinHoras, duracionMaxHoras,
+    } = datos;
     if (!nombre || !precioPorNoche) throw new ErrorValidacion("Nombre y precio son obligatorios");
+    if (permitePorHoras && (!precioPorHora || Number(precioPorHora) <= 0)) {
+      throw new ErrorValidacion("Define un precio por hora valido para activar reservas por horas");
+    }
     return prisma.habitacionTipo.create({
       data: {
         configHotelId: cfg.id,
@@ -602,6 +747,10 @@ const HotelService = {
         descripcion: descripcion || null,
         capacidad:   Number(capacidad) || 2,
         precioPorNoche: Number(precioPorNoche),
+        precioPorHora: precioPorHora ? Number(precioPorHora) : null,
+        permitePorHoras: !!permitePorHoras,
+        duracionMinHoras: Number(duracionMinHoras) || 2,
+        duracionMaxHoras: duracionMaxHoras ? Number(duracionMaxHoras) : null,
         cantidad:    Number(cantidad) || 1,
         fotos:       fotos ?? [],
         serviciosExtra: serviciosExtra ?? [],
@@ -614,11 +763,32 @@ const HotelService = {
       where: { id: habitacionId, configHotel: { comercioId } },
     });
     if (!hab) throw new ErrorNoEncontrado("Habitación no encontrada");
-    const { nombre, descripcion, capacidad, precioPorNoche, cantidad, fotos, serviciosExtra, activo } = datos;
+    const {
+      nombre, descripcion, capacidad, precioPorNoche, cantidad, fotos, serviciosExtra, activo,
+      precioPorHora, permitePorHoras, duracionMinHoras, duracionMaxHoras,
+    } = datos;
+    const permitePorHorasFinal = permitePorHoras !== undefined ? !!permitePorHoras : hab.permitePorHoras;
+    const precioPorHoraFinal = precioPorHora !== undefined ? Number(precioPorHora) : Number(hab.precioPorHora || 0);
+    if (permitePorHorasFinal && (!precioPorHoraFinal || precioPorHoraFinal <= 0)) {
+      throw new ErrorValidacion("Define un precio por hora valido para activar reservas por horas");
+    }
+    const data = {
+      nombre,
+      descripcion,
+      capacidad: capacidad !== undefined ? Number(capacidad) : undefined,
+      precioPorNoche: precioPorNoche !== undefined ? Number(precioPorNoche) : undefined,
+      precioPorHora: precioPorHora !== undefined ? (precioPorHora ? Number(precioPorHora) : null) : undefined,
+      permitePorHoras: permitePorHoras !== undefined ? !!permitePorHoras : undefined,
+      duracionMinHoras: duracionMinHoras !== undefined ? (Number(duracionMinHoras) || 2) : undefined,
+      duracionMaxHoras: duracionMaxHoras !== undefined ? (duracionMaxHoras ? Number(duracionMaxHoras) : null) : undefined,
+      cantidad: cantidad !== undefined ? Number(cantidad) : undefined,
+      fotos,
+      serviciosExtra,
+      activo,
+    };
     return prisma.habitacionTipo.update({
       where: { id: habitacionId },
-      data:  { nombre, descripcion, capacidad: Number(capacidad), precioPorNoche: Number(precioPorNoche),
-                cantidad: Number(cantidad), fotos, serviciosExtra, activo },
+      data,
     });
   },
 
@@ -734,6 +904,7 @@ const HotelService = {
         fechaEntrada: reserva.fechaEntrada,
         fechaSalida: reserva.fechaSalida,
         reservaId: reserva.id,
+        modalidad: reserva.modalidad || "NOCHE",
       });
       const actualizada = await tx.reservaHotel.update({
         where: { id: reserva.id },
@@ -826,6 +997,7 @@ const HotelService = {
             fechaEntrada: reserva.fechaEntrada,
             fechaSalida: reserva.fechaSalida,
             reservaId: reserva.id,
+            modalidad: reserva.modalidad || "NOCHE",
           });
           habitacionFisicaId = fisica.id;
         } else if (!habitacionFisicaId) {
@@ -930,6 +1102,17 @@ const HotelService = {
     return prisma.habitacionTipo.update({
       where: { id: habitacionId },
       data: { videoUrl: null, videoPosterUrl: null, videoDuracionSeg: null },
+    });
+  },
+
+  async guardarVideoLinkHabitacion(comercioId, habitacionId, videoUrl) {
+    const hab = await prisma.habitacionTipo.findFirst({
+      where: { id: habitacionId, configHotel: { comercioId } },
+    });
+    if (!hab) throw new ErrorNoEncontrado("Habitación no encontrada");
+    return prisma.habitacionTipo.update({
+      where: { id: habitacionId },
+      data: { videoUrl, videoPosterUrl: null, videoDuracionSeg: null },
     });
   },
 

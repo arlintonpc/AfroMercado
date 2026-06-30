@@ -455,6 +455,10 @@ const TourService = {
       data: { videoUrl: null, videoPosterUrl: null },
     });
   },
+
+  async guardarVideoLinkTour(comercioId, videoUrl) {
+    return prisma.configTour.update({ where: { comercioId }, data: { videoUrl, videoPosterUrl: null } });
+  },
 };
 
 module.exports = TourService;

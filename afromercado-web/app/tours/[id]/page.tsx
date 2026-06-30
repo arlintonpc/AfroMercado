@@ -8,6 +8,7 @@ import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import SeccionReviewsTour from '@/components/tours/SeccionReviewsTour'
 import { Toast, useToast } from '@/components/ui/Toast'
+import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 
 const SERVICIOS_LABELS: Record<string, { icon: string; label: string }> = {
   transporte:  { icon: '🚐', label: 'Transporte incluido' },
@@ -486,6 +487,13 @@ export default function TourDetallePage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* GALERÍA */}
         <GaleriaHero fotos={tour.fotos} nombre={tour.nombre} onOpen={i => setLightbox({ fotos: tour.fotos, idx: i })} />
+
+        {/* VIDEO */}
+        {(tour as any).videoUrl && (
+          <section className="px-0 pb-4 mt-4">
+            <ReproductorVideo url={(tour as any).videoUrl} />
+          </section>
+        )}
 
         {/* LAYOUT 2 COL */}
         <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-10 lg:items-start mt-8">

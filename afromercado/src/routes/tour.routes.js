@@ -44,8 +44,9 @@ router.get(  "/favoritos/:id",          ...soloAuth, TourController.esFavorito);
 router.get(  "/mi-tour/estadisticas",   ...soloComercio, TourController.estadisticas);
 
 // Video
-router.post(  "/mi-tour/config/video", ...soloComercio, TourController.uploadVideoTour, TourController.subirVideoTour);
-router.delete("/mi-tour/config/video", ...soloComercio, TourController.quitarVideoTour);
+router.post(  "/mi-tour/config/video",      ...soloComercio, TourController.uploadVideoTour, TourController.subirVideoTour);
+router.delete("/mi-tour/config/video",      ...soloComercio, TourController.quitarVideoTour);
+router.patch( "/mi-tour/config/video-link", ...soloComercio, TourController.guardarVideoLinkTour);
 
 router.get("/:id",            TourController.obtener);
 

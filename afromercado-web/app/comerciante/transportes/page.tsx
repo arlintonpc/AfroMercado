@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import {
   obtenerMiTransporte, actualizarMiTransporte, agregarRuta, actualizarRuta, eliminarRuta,
   reservasOperadorTransporte, cambiarEstadoReservaTransporte, subirFotosTransporte,
-  subirVideoTransporte, quitarVideoTransporte,
+  subirVideoTransporte, quitarVideoTransporte, guardarVideoLinkTransporte,
   type ConfigTransporte, type RutaTransporte, type ReservaTransporte, type EstadoReservaTransporte,
 } from '@/lib/api/transporte'
 import { formatearPrecio } from '@/lib/formatearPrecio'
-import SubidorVideo from '@/components/comerciante/SubidorVideo'
+import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
 
 const TIPO_OPCIONES = ['LANCHA', 'BOTE', 'CHALUPA', 'CANOA']
@@ -122,6 +122,13 @@ export default function ComercianteTransportesPage() {
     const vacio: VideoEstado = { videoUrl: null, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
     setVideoEstadoTransporte(vacio)
     return vacio
+  }
+
+  async function handleGuardarLinkTransporte(url: string): Promise<VideoEstado> {
+    await guardarVideoLinkTransporte(url)
+    const nuevo: VideoEstado = { videoUrl: url, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
+    setVideoEstadoTransporte(nuevo)
+    return nuevo
   }
 
   if (cargando) return <div className="min-h-[60vh] flex items-center justify-center"><div className="w-8 h-8 border-2 border-[#023E8A] border-t-transparent rounded-full animate-spin" /></div>
@@ -342,12 +349,12 @@ export default function ComercianteTransportesPage() {
           {/* Video */}
           <div className="bg-white border border-gray-200 rounded-2xl p-5">
             <h3 className="font-semibold text-gray-800 mb-4">Video del servicio</h3>
-            <SubidorVideo
+            <SubidorVideoOLink
               titulo="Video del servicio"
-              descripcion="Sube un clip de hasta 45 segundos. Si el video es más largo, elige el fragmento que quieres mostrar."
               estadoInicial={videoEstadoTransporte}
               onSubir={handleSubirVideoTransporte}
               onEliminar={handleQuitarVideoTransporte}
+              onGuardarLink={handleGuardarLinkTransporte}
             />
           </div>
 

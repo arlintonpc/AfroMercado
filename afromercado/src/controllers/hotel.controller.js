@@ -38,9 +38,9 @@ const HotelController = {
 
   async disponibilidad(req, res, next) {
     try {
-      const { habitacionTipoId, fechaEntrada, fechaSalida } = req.query;
+      const { habitacionTipoId, fechaEntrada, fechaSalida, modalidad } = req.query;
       const data = await HotelService.verificarDisponibilidad(
-        Number(habitacionTipoId), new Date(fechaEntrada), new Date(fechaSalida)
+        Number(habitacionTipoId), new Date(fechaEntrada), new Date(fechaSalida), { modalidad }
       );
       res.json({ ok: true, data });
     } catch (e) { next(e); }
@@ -344,16 +344,29 @@ const HotelController = {
     } catch (e) { next(e); }
   },
 
+  async guardarVideoLinkHabitacion(req, res, next) {
+    try {
+      const { videoUrl } = req.body;
+      if (!videoUrl || typeof videoUrl !== 'string') return res.status(400).json({ ok: false, error: "videoUrl requerido" });
+      const hab = await HotelService.guardarVideoLinkHabitacion(req.usuario.comercio.id, Number(req.params.id), videoUrl.trim());
+      res.json({ ok: true, data: hab });
+    } catch (e) { next(e); }
+  },
+
   // ── CUPONES ───────────────────────────────────────────────────
   async validarCupon(req, res, next) {
     try {
-      const { codigo, habitacionTipoId, fechaEntrada, fechaSalida } = req.body;
+      const { codigo, habitacionTipoId, fechaEntrada, fechaSalida, modalidad } = req.body;
       const entrada = new Date(fechaEntrada);
       const salida  = new Date(fechaSalida);
-      const noches  = Math.ceil((salida - entrada) / 86400000);
+      const modalidadNormalizada = String(modalidad || "NOCHE").trim().toUpperCase();
+      const duracionHoras = Math.max(0, (salida - entrada) / 3600000);
+      const noches  = modalidadNormalizada === "HORAS" ? 1 : Math.ceil((salida - entrada) / 86400000);
       const tipo    = await prisma.habitacionTipo.findUnique({ where: { id: Number(habitacionTipoId) } });
       if (!tipo) return res.status(404).json({ ok: false, error: "Habitación no encontrada" });
-      const totalOriginal = Number(tipo.precioPorNoche) * noches;
+      const totalOriginal = modalidadNormalizada === "HORAS"
+        ? Number(tipo.precioPorHora || 0) * duracionHoras
+        : Number(tipo.precioPorNoche) * noches;
       const data = await HotelService.validarCuponHotel(codigo, tipo.configHotelId, noches, req.usuario?.id, totalOriginal);
       res.json({ ok: true, data });
     } catch (e) { next(e); }

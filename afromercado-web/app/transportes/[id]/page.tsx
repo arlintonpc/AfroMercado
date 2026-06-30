@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { obtenerTransporte, verificarDisponibilidadTransporte, crearReservaTransporte, misReservasTransporte, type ConfigTransporte, type RutaTransporte } from '@/lib/api/transporte'
+import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import { Toast, useToast } from '@/components/ui/Toast'
@@ -424,6 +425,13 @@ export default function TransporteDetallePage() {
         {/* GALERÍA */}
         <GaleriaHero fotos={transporte.fotos} nombre={transporte.nombre} tipo={transporte.tipo}
           onOpen={i => setLightbox({ fotos: transporte.fotos, idx: i })} />
+
+        {/* VIDEO */}
+        {(transporte as any).videoUrl && (
+          <section className="mt-4 pb-4">
+            <ReproductorVideo url={(transporte as any).videoUrl} />
+          </section>
+        )}
 
         {/* LAYOUT 2 COL */}
         <div className="flex gap-12 mt-8">

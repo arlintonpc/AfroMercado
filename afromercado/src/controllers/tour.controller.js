@@ -207,8 +207,19 @@ async function quitarVideoTour(req, res, next) {
   } catch (err) { next(err); }
 }
 
-TourController.uploadVideoTour = uploadVideoTour;
-TourController.subirVideoTour  = subirVideoTour;
-TourController.quitarVideoTour = quitarVideoTour;
+async function guardarVideoLinkTour(req, res, next) {
+  try {
+    const comercioId = req.usuario.comercio.id;
+    const { videoUrl } = req.body;
+    if (!videoUrl || typeof videoUrl !== 'string') return res.status(400).json({ ok: false, error: "videoUrl requerido" });
+    const result = await TourService.guardarVideoLinkTour(comercioId, videoUrl.trim());
+    res.json({ ok: true, data: result });
+  } catch (err) { next(err); }
+}
+
+TourController.uploadVideoTour    = uploadVideoTour;
+TourController.subirVideoTour     = subirVideoTour;
+TourController.quitarVideoTour    = quitarVideoTour;
+TourController.guardarVideoLinkTour = guardarVideoLinkTour;
 
 module.exports = TourController;

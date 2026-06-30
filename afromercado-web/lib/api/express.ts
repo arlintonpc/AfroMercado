@@ -329,3 +329,7 @@ export async function subirVideoExpress(
 export async function quitarVideoExpress(): Promise<void> {
   await apiFetch('/express/config/video', { method: 'DELETE' })
 }
+
+export async function guardarVideoLinkExpress(videoUrl: string): Promise<void> {
+  await apiFetch('/express/config/video-link', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl }) })
+}

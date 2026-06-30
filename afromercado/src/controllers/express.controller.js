@@ -296,8 +296,19 @@ async function quitarVideoExpress(req, res, next) {
   } catch (err) { next(err); }
 }
 
-ExpressController.uploadVideoExpress = uploadVideoExpress;
-ExpressController.subirVideoExpress  = subirVideoExpress;
-ExpressController.quitarVideoExpress = quitarVideoExpress;
+async function guardarVideoLinkExpress(req, res, next) {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const { videoUrl } = req.body;
+    if (!videoUrl || typeof videoUrl !== 'string') return res.status(400).json({ ok: false, error: "videoUrl requerido" });
+    const result = await ExpressService.guardarVideoLinkExpress(comercioId, videoUrl.trim());
+    res.json({ ok: true, data: result });
+  } catch (err) { next(err); }
+}
+
+ExpressController.uploadVideoExpress      = uploadVideoExpress;
+ExpressController.subirVideoExpress       = subirVideoExpress;
+ExpressController.quitarVideoExpress      = quitarVideoExpress;
+ExpressController.guardarVideoLinkExpress = guardarVideoLinkExpress;
 
 module.exports = ExpressController;

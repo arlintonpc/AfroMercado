@@ -154,8 +154,19 @@ async function quitarVideoTransporte(req, res, next) {
   } catch (err) { next(err); }
 }
 
-TransporteController.uploadVideoTransporte = uploadVideoTransporte;
-TransporteController.subirVideoTransporte  = subirVideoTransporte;
-TransporteController.quitarVideoTransporte = quitarVideoTransporte;
+async function guardarVideoLinkTransporte(req, res, next) {
+  try {
+    const comercioId = req.usuario.comercio.id;
+    const { videoUrl } = req.body;
+    if (!videoUrl || typeof videoUrl !== 'string') return res.status(400).json({ ok: false, error: "videoUrl requerido" });
+    const result = await TransporteService.guardarVideoLinkTransporte(comercioId, videoUrl.trim());
+    res.json({ ok: true, data: result });
+  } catch (err) { next(err); }
+}
+
+TransporteController.uploadVideoTransporte        = uploadVideoTransporte;
+TransporteController.subirVideoTransporte         = subirVideoTransporte;
+TransporteController.quitarVideoTransporte        = quitarVideoTransporte;
+TransporteController.guardarVideoLinkTransporte   = guardarVideoLinkTransporte;
 
 module.exports = TransporteController;

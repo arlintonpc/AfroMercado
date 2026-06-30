@@ -705,6 +705,10 @@ const ExpressService = {
       data: { videoUrl: null, videoPosterUrl: null },
     });
   },
+
+  async guardarVideoLinkExpress(comercioId, videoUrl) {
+    return prisma.configExpress.update({ where: { comercioId }, data: { videoUrl, videoPosterUrl: null } });
+  },
 };
 
 module.exports = ExpressService;

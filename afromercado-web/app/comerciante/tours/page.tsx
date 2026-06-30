@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { obtenerMiTour, actualizarMiTour, reservasOperadorTour, cambiarEstadoReservaTour, subirFotosTour, subirVideoTour, quitarVideoTour, listarCuponesTour, crearCuponTour, eliminarCuponTour, obtenerEstadisticasTour, type ConfigTour, type ReservaTour, type EstadoReservaTour, type CuponTour, type EstadisticasTour } from '@/lib/api/tour'
+import { obtenerMiTour, actualizarMiTour, reservasOperadorTour, cambiarEstadoReservaTour, subirFotosTour, subirVideoTour, quitarVideoTour, guardarVideoLinkTour, listarCuponesTour, crearCuponTour, eliminarCuponTour, obtenerEstadisticasTour, type ConfigTour, type ReservaTour, type EstadoReservaTour, type CuponTour, type EstadisticasTour } from '@/lib/api/tour'
 import { Switch } from '@/components/ui'
 import { formatearPrecio } from '@/lib/formatearPrecio'
-import SubidorVideo from '@/components/comerciante/SubidorVideo'
+import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
 
 const SERVICIOS_OPCIONES = [
@@ -150,6 +150,13 @@ export default function ComercianteTourPage() {
     const vacio: VideoEstado = { videoUrl: null, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
     setVideoEstadoTour(vacio)
     return vacio
+  }
+
+  async function handleGuardarLinkTour(url: string): Promise<VideoEstado> {
+    await guardarVideoLinkTour(url)
+    const nuevo: VideoEstado = { videoUrl: url, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
+    setVideoEstadoTour(nuevo)
+    return nuevo
   }
 
   if (cargando) return (
@@ -569,12 +576,12 @@ export default function ComercianteTourPage() {
           {/* Video */}
           <div className="bg-white border border-gray-200 rounded-2xl p-5">
             <h3 className="font-semibold text-gray-800 mb-4">Video del tour</h3>
-            <SubidorVideo
+            <SubidorVideoOLink
               titulo="Video del tour"
-              descripcion="Sube un clip de hasta 45 segundos. Si el video es más largo, elige el fragmento que quieres mostrar."
               estadoInicial={videoEstadoTour}
               onSubir={handleSubirVideoTour}
               onEliminar={handleQuitarVideoTour}
+              onGuardarLink={handleGuardarLinkTour}
             />
           </div>
 

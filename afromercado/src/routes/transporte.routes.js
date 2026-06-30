@@ -39,6 +39,7 @@ router.put(   "/mi-transporte/config",              ...soloComercio, TransporteC
 router.post(  "/mi-transporte/config/fotos",        ...soloComercio, uploadFotos, TransporteController.subirFotos);
 router.post(  "/mi-transporte/config/video",        ...soloComercio, TransporteController.uploadVideoTransporte, TransporteController.subirVideoTransporte);
 router.delete("/mi-transporte/config/video",        ...soloComercio, TransporteController.quitarVideoTransporte);
+router.patch( "/mi-transporte/config/video-link",   ...soloComercio, TransporteController.guardarVideoLinkTransporte);
 router.post(  "/mi-transporte/rutas",               ...soloComercio, TransporteController.agregarRuta);
 router.put(   "/mi-transporte/rutas/:id",           ...soloComercio, TransporteController.actualizarRuta);
 router.delete("/mi-transporte/rutas/:id",           ...soloComercio, TransporteController.eliminarRuta);

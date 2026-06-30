@@ -8,7 +8,7 @@ import {
   listarSeccionesExpress, crearSeccionExpress, actualizarSeccionExpress,
   eliminarSeccionExpress, asignarSeccionProducto,
   listarCuponesExpress, crearCuponExpress, eliminarCuponExpress, obtenerEstadisticasExpress,
-  subirVideoExpress, quitarVideoExpress,
+  subirVideoExpress, quitarVideoExpress, guardarVideoLinkExpress,
   type ConfigExpress, type PedidoExpress, type ModalidadExpress, type DiaSemana, type HorarioExpress,
   type MenuSeccion, type MenuComercioExpress, type CuponExpress, type EstadisticasExpress,
 } from '@/lib/api/express'
@@ -17,7 +17,7 @@ import { obtenerToken } from '@/lib/api/client'
 import { obtenerMiComercio } from '@/components/comerciante/api'
 import { Switch } from '@/components/ui'
 import { MUNICIPIOS_POR_DEPARTAMENTO } from '@/components/comerciante/constantes'
-import SubidorVideo from '@/components/comerciante/SubidorVideo'
+import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
 
 const DIAS: { dia: DiaSemana; label: string }[] = [
@@ -240,6 +240,13 @@ export default function ExpressComerciante() {
     const vacio: VideoEstado = { videoUrl: null, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
     setVideoEstadoExpress(vacio)
     return vacio
+  }
+
+  async function handleGuardarLinkExpress(url: string): Promise<VideoEstado> {
+    await guardarVideoLinkExpress(url)
+    const nuevo: VideoEstado = { videoUrl: url, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
+    setVideoEstadoExpress(nuevo)
+    return nuevo
   }
 
   async function guardarConfig() {
@@ -1133,12 +1140,12 @@ export default function ExpressComerciante() {
           {/* Video */}
           <div className="bg-white border border-gray-200 rounded-2xl p-5">
             <h3 className="font-semibold text-gray-800 mb-4">Video del restaurante</h3>
-            <SubidorVideo
+            <SubidorVideoOLink
               titulo="Video del restaurante"
-              descripcion="Sube un clip de hasta 45 segundos. Si el video es más largo, elige el fragmento que quieres mostrar."
               estadoInicial={videoEstadoExpress}
               onSubir={handleSubirVideoExpress}
               onEliminar={handleQuitarVideoExpress}
+              onGuardarLink={handleGuardarLinkExpress}
             />
           </div>
 

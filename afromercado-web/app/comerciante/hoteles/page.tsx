@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   obtenerMiHotel, actualizarMiHotel, agregarHabitacion, actualizarHabitacion, eliminarHabitacion,
   reservasHotelero, cambiarEstadoReserva, ocupacionHotel, subirFotosHabitacion, subirVideoHabitacion,
-  quitarVideoHabitacion,
+  quitarVideoHabitacion, guardarVideoLinkHabitacion,
   listarHabitacionesFisicas, crearHabitacionFisica,
   cambiarEstadoHabitacionFisica, eliminarHabitacionFisica, asignarHabitacionFisicaReserva,
   listarBloqueos, crearBloqueo, eliminarBloqueo,
@@ -18,7 +18,7 @@ import {
 } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
-import SubidorVideo from '@/components/comerciante/SubidorVideo'
+import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
 import { Switch } from '@/components/ui'
 
@@ -130,6 +130,13 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
     const vacio: VideoEstado = { videoUrl: null, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
     setVideoEstado(vacio)
     return vacio
+  }
+
+  async function handleGuardarLinkVideo(url: string): Promise<VideoEstado> {
+    if (inicial?.id) await guardarVideoLinkHabitacion(inicial.id, url)
+    const nuevo: VideoEstado = { videoUrl: url, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
+    setVideoEstado(nuevo)
+    return nuevo
   }
 
   async function handleGuardar() {
@@ -247,12 +254,12 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
               {/* Video de la habitación */}
               <div className="mt-4">
                 {inicial?.id ? (
-                  <SubidorVideo
+                  <SubidorVideoOLink
                     titulo="Video de la habitación"
-                    descripcion="Sube un clip de hasta 45 segundos. Si el video es más largo, elige el fragmento que quieres publicar."
                     estadoInicial={videoEstado}
                     onSubir={handleSubirVideo}
                     onEliminar={handleQuitarVideo}
+                    onGuardarLink={handleGuardarLinkVideo}
                   />
                 ) : (
                   <p className="text-xs text-gray-400 bg-gray-50 rounded-xl px-4 py-3 text-center">

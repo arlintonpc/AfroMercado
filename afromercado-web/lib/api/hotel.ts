@@ -2,6 +2,7 @@ import { apiFetch } from './client'
 
 export type EstadoReservaHotel = 'PENDIENTE' | 'CONFIRMADA' | 'CHECKIN' | 'CHECKOUT' | 'CANCELADA' | 'RECHAZADA'
 export type EstadoHabitacionFisica = 'LIBRE' | 'OCUPADA' | 'LIMPIEZA' | 'MANTENIMIENTO' | 'BLOQUEADA'
+export type ModalidadReservaHotel = 'NOCHE' | 'HORAS'
 
 export interface TemporadaHotel {
   id: number
@@ -38,6 +39,10 @@ export interface HabitacionTipo {
   descripcion?: string | null
   capacidad: number
   precioPorNoche: number | string
+  precioPorHora?: number | string | null
+  permitePorHoras?: boolean
+  duracionMinHoras?: number
+  duracionMaxHoras?: number | null
   cantidad: number
   fotos: string[]
   serviciosExtra: string[]
@@ -70,6 +75,8 @@ export interface ConfigHotel {
   politicaCancelacion?: string | null
   checkInHora: string
   checkOutHora: string
+  permiteReservasPorHora?: boolean
+  minutosLimpiezaEntreReservas?: number
   creadoAt: string
   updatedAt: string
   rnt?: string | null
@@ -115,6 +122,8 @@ export interface ReservaHotel {
   clienteId: number
   fechaEntrada: string
   fechaSalida: string
+  modalidad?: ModalidadReservaHotel | string
+  duracionHoras?: number | string | null
   huespedes: number
   total: number | string
   estado: EstadoReservaHotel
@@ -133,7 +142,7 @@ export interface ReservaHotel {
   horaEstimadaLlegada?: string | null
   solicitudesEspeciales?: string | null
   tokenCheckin?: string | null
-  habitacionTipo?: { nombre: string; fotos: string[]; precioPorNoche: number | string }
+  habitacionTipo?: { nombre: string; fotos: string[]; precioPorNoche: number | string; precioPorHora?: number | string | null }
   habitacionFisica?: { id: number; nombre: string; piso?: string | null; zona?: string | null; estado?: string | null } | null
   configHotel?: {
     id: number
@@ -160,8 +169,14 @@ export async function obtenerHotel(id: number): Promise<ConfigHotel> {
   return r.data
 }
 
-export async function verificarDisponibilidad(habitacionTipoId: number, fechaEntrada: string, fechaSalida: string) {
+export async function verificarDisponibilidad(
+  habitacionTipoId: number,
+  fechaEntrada: string,
+  fechaSalida: string,
+  modalidad?: ModalidadReservaHotel
+) {
   const q = new URLSearchParams({ habitacionTipoId: String(habitacionTipoId), fechaEntrada, fechaSalida })
+  if (modalidad) q.set('modalidad', modalidad)
   const r = await apiFetch<{ ok: boolean; data: { disponibles: number; total: number } }>(`/hoteles/disponibilidad?${q}`, { auth: false })
   return r.data
 }
@@ -193,6 +208,7 @@ export async function validarCuponHotel(datos: {
   habitacionTipoId: number
   fechaEntrada: string
   fechaSalida: string
+  modalidad?: ModalidadReservaHotel
 }): Promise<ValidacionCupon> {
   const r = await apiFetch<{ ok: boolean; data: ValidacionCupon }>('/hoteles/cupones/validar', { method: 'POST', body: datos, auth: false })
   return r.data
@@ -224,6 +240,9 @@ export async function crearReserva(datos: {
   habitacionTipoId: number
   fechaEntrada: string
   fechaSalida: string
+  modalidad?: ModalidadReservaHotel
+  horaEntrada?: string
+  horaSalida?: string
   huespedes: number
   metodoPago: string
   notasCliente?: string
@@ -369,6 +388,10 @@ export async function quitarVideoHabitacion(habitacionId: number): Promise<void>
     `/hoteles/mi-hotel/habitaciones/${habitacionId}/video`,
     { method: 'DELETE', auth: true }
   )
+}
+
+export async function guardarVideoLinkHabitacion(habitacionId: number, videoUrl: string): Promise<void> {
+  await apiFetch(`/hoteles/mi-hotel/habitaciones/${habitacionId}/video-link`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl }) })
 }
 
 export async function ocupacionHotel(): Promise<{ habitaciones: HabitacionTipo[]; habitacionesFisicas: HabitacionFisica[]; reservas: ReservaHotel[] }> {

@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext'
 import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
 import SeccionReviewsHotel from '@/components/hoteles/SeccionReviewsHotel'
 import { Toast, useToast } from '@/components/ui/Toast'
+import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 
 const MapaHoteles = dynamic(() => import('@/components/hoteles/MapaHoteles'), { ssr: false })
 
@@ -233,7 +234,7 @@ function TarjetaHabitacion({ hab, onReservar, onVerFotos }: {
             }}>
             {cur ? (
               esVideo(cur)
-                ? <video src={cur} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+                ? <ReproductorVideo url={cur} className="w-full h-full" />
                 : <img src={cur} alt={hab.nombre} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-[#E8F4F0] to-[#B7E4C7] flex items-center justify-center">

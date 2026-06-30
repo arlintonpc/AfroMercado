@@ -45,8 +45,9 @@ router.get(  "/mi-hotel/config",                ...soloComercio, HotelController
 router.put(  "/mi-hotel/config",                ...soloComercio, HotelController.actualizarConfig);
 router.post( "/mi-hotel/habitaciones",          ...soloComercio, HotelController.agregarHabitacion);
 router.post( "/mi-hotel/habitaciones/:id/fotos",  ...soloComercio, uploadFotos, HotelController.subirFotosHabitacion);
-router.post( "/mi-hotel/habitaciones/:id/video",  ...soloComercio, HotelController.uploadVideoHabitacion, HotelController.subirVideoHabitacion);
-router.delete("/mi-hotel/habitaciones/:id/video", ...soloComercio, HotelController.quitarVideoHabitacion);
+router.post(  "/mi-hotel/habitaciones/:id/video",      ...soloComercio, HotelController.uploadVideoHabitacion, HotelController.subirVideoHabitacion);
+router.delete("/mi-hotel/habitaciones/:id/video",      ...soloComercio, HotelController.quitarVideoHabitacion);
+router.patch( "/mi-hotel/habitaciones/:id/video-link", ...soloComercio, HotelController.guardarVideoLinkHabitacion);
 router.put(  "/mi-hotel/habitaciones/:id",      ...soloComercio, HotelController.actualizarHabitacion);
 router.delete("/mi-hotel/habitaciones/:id",     ...soloComercio, HotelController.eliminarHabitacion);
 router.get(  "/mi-hotel/habitaciones-fisicas",  ...soloComercio, HotelController.habitacionesFisicas);

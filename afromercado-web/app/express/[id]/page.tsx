@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
+import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 import {
   obtenerMenuComercioExpress,
   crearPedidoExpress,
@@ -521,6 +522,13 @@ export default function MenuExpressPage() {
           )}
         </div>
       </header>
+
+      {/* Video del restaurante */}
+      {(menu as any).videoUrl && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+          <ReproductorVideo url={(menu as any).videoUrl} />
+        </div>
+      )}
 
       {/* Menú */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 pb-40 lg:pb-8">

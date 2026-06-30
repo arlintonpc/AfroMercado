@@ -246,6 +246,10 @@ const TransporteService = {
       data: { videoUrl: null, videoPosterUrl: null },
     });
   },
+
+  async guardarVideoLinkTransporte(comercioId, videoUrl) {
+    return prisma.configTransporte.update({ where: { comercioId }, data: { videoUrl, videoPosterUrl: null } });
+  },
 };
 
 module.exports = TransporteService;
