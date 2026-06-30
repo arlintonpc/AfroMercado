@@ -34,7 +34,8 @@ router.get("/:id",                      HotelController.obtener);
 // ── CLIENTE ──────────────────────────────────────────────────
 router.post(  "/reservas",                   ...soloAuth, HotelController.reservar);
 router.get(   "/reservas/mis",               ...soloAuth, HotelController.misReservas);
-router.patch( "/reservas/:id/cancelar",      ...soloAuth, HotelController.cancelarReserva);
+router.patch( "/reservas/:id/cancelar",           ...soloAuth, HotelController.cancelarReserva);
+router.get(   "/reservas/:id/politica-cancelacion", ...soloAuth, HotelController.politicaCancelacion);
 router.post(  "/reservas/:id/checkout",      ...soloAuth, HotelController.iniciarPagoReserva);
 
 // ── HOTELERO ─────────────────────────────────────────────────

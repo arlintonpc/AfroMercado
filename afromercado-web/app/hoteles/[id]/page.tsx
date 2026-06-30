@@ -426,9 +426,9 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
   }
 
   const opcionesPago: { id: ModoPago; icon: string; titulo: string; desc: string }[] = [
-    { id: 'efectivo', icon: '💵', titulo: 'Pagar al llegar', desc: 'Sin cargo ahora. Efectivo, Nequi o transferencia al check-in.' },
-    { id: 'deposito', icon: '💳', titulo: `Depósito 30% — ${formatearPrecio(Math.round(total * 0.30))}`, desc: 'Confirma inmediatamente. El resto lo pagas al llegar.' },
-    { id: 'total',    icon: '🔒', titulo: `Pagar total — ${formatearPrecio(total)}`, desc: 'Pago completo ahora. Reserva garantizada al 100%.' },
+    ...(hotel.permitePagarAlLlegar !== false ? [{ id: 'efectivo' as ModoPago, icon: '💵', titulo: 'Pagar al llegar', desc: 'Sin cargo ahora. Efectivo, Nequi o transferencia al check-in.' }] : []),
+    ...(hotel.permiteDeposito30    !== false ? [{ id: 'deposito' as ModoPago, icon: '💳', titulo: `Depósito 30% — ${formatearPrecio(Math.round(total * 0.30))}`, desc: 'Confirma inmediatamente. El resto lo pagas al llegar.' }] : []),
+    ...(hotel.permiteTotal         !== false ? [{ id: 'total'    as ModoPago, icon: '🔒', titulo: `Pagar total — ${formatearPrecio(total)}`, desc: 'Pago completo ahora. Reserva garantizada al 100%.' }] : []),
   ]
 
   const textoBoton = cargando ? 'Procesando…'

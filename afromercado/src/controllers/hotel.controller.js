@@ -65,6 +65,13 @@ const HotelController = {
     } catch (e) { next(e); }
   },
 
+  async politicaCancelacion(req, res, next) {
+    try {
+      const data = await HotelService.consultarPoliticaCancelacion(Number(req.params.id), req.usuario.id);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
   // ── HOTELERO ─────────────────────────────────────────────────
   async miConfig(req, res, next) {
     try {

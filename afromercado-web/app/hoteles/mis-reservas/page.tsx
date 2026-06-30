@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { misReservasHotel, cancelarReservaHotel, type ReservaHotel } from '@/lib/api/hotel'
+import { misReservasHotel, cancelarReservaHotel, consultarPoliticaCancelacion, type ReservaHotel, type PoliticaCancelacionInfo } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -41,7 +41,10 @@ function BarraProgreso({ paso }: { paso: number }) {
 function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCancelado: () => void }) {
   const info = ESTADO_INFO[reserva.estado] ?? { label: reserva.estado, color: 'bg-gray-100 text-gray-600', paso: -1 }
   const activa = !['CHECKOUT', 'CANCELADA', 'RECHAZADA'].includes(reserva.estado)
-  const [cancelando, setCancelando] = useState(false)
+  const [cancelando, setCancelando]   = useState(false)
+  const [politica, setPolitica]       = useState<PoliticaCancelacionInfo | null>(null)
+  const [modalCancelar, setModalCancelar] = useState(false)
+  const [cargandoPolitica, setCargandoPolitica] = useState(false)
 
   const entrada = new Date(reserva.fechaEntrada)
   const salida  = new Date(reserva.fechaSalida)
@@ -49,10 +52,16 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
 
   const fmtFecha = (d: Date) => d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
 
-  async function handleCancelar() {
-    if (!confirm('¿Cancelar esta reserva?')) return
+  async function abrirModalCancelar() {
+    setModalCancelar(true)
+    setCargandoPolitica(true)
+    try { setPolitica(await consultarPoliticaCancelacion(reserva.id)) } catch { setPolitica(null) }
+    setCargandoPolitica(false)
+  }
+
+  async function confirmarCancelacion() {
     setCancelando(true)
-    try { await cancelarReservaHotel(reserva.id); onCancelado() } catch {}
+    try { await cancelarReservaHotel(reserva.id); setModalCancelar(false); onCancelado() } catch {}
     setCancelando(false)
   }
 
@@ -92,10 +101,59 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
       </div>
 
       {['PENDIENTE', 'CONFIRMADA'].includes(reserva.estado) && (
-        <button onClick={handleCancelar} disabled={cancelando}
-          className="mt-3 w-full text-center text-xs font-medium text-red-500 border border-red-200 rounded-xl py-2 hover:bg-red-50 transition-colors disabled:opacity-50">
-          {cancelando ? 'Cancelando…' : 'Cancelar reserva'}
+        <button onClick={abrirModalCancelar}
+          className="mt-3 w-full text-center text-xs font-medium text-red-500 border border-red-200 rounded-xl py-2 hover:bg-red-50 transition-colors">
+          Cancelar reserva
         </button>
+      )}
+
+      {/* Modal confirmación cancelación */}
+      {modalCancelar && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setModalCancelar(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-lg text-gray-900 mb-1">¿Cancelar reserva?</h3>
+            <p className="text-xs text-gray-500 mb-4">Código: <span className="font-mono font-semibold">{reserva.codigo}</span></p>
+
+            {cargandoPolitica ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="w-6 h-6 border-2 border-[#1B4332] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : politica ? (
+              <div className={`rounded-xl p-4 mb-4 ${politica.dentroPlazoGratuito ? 'bg-emerald-50 border border-emerald-100' : 'bg-amber-50 border border-amber-100'}`}>
+                {politica.dentroPlazoGratuito ? (
+                  <>
+                    <p className="font-bold text-emerald-700 text-sm">✓ Cancelación gratuita</p>
+                    <p className="text-xs text-emerald-600 mt-1">Recibes reembolso completo de <strong>{formatearPrecio(politica.montoReembolso)}</strong></p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-bold text-amber-700 text-sm">⚠️ Cancelación con penalización</p>
+                    <p className="text-xs text-amber-600 mt-1">Faltan menos de {politica.horasRestantes < 1 ? 'una hora' : `${Math.round(politica.horasRestantes)}h`} para tu check-in.</p>
+                    <div className="mt-3 space-y-1 text-xs">
+                      <div className="flex justify-between text-gray-600"><span>Total pagado</span><span>{formatearPrecio(Number(reserva.total))}</span></div>
+                      <div className="flex justify-between text-red-600 font-medium"><span>Penalización ({politica.penalizacionPct}%)</span><span>− {formatearPrecio(politica.montoPenalidad)}</span></div>
+                      <div className="flex justify-between text-gray-900 font-bold border-t border-amber-200 pt-1"><span>Te devolvemos</span><span>{formatearPrecio(politica.montoReembolso)}</span></div>
+                    </div>
+                    {politica.montoReembolso === 0 && <p className="text-xs text-red-600 font-semibold mt-2">Sin reembolso — ya no hay tiempo de reasignar la habitación.</p>}
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-xl p-4 mb-4 text-xs text-gray-500 text-center">No se pudo consultar la política. Puedes cancelar igual.</div>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={() => setModalCancelar(false)}
+                className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+                Volver
+              </button>
+              <button onClick={confirmarCancelacion} disabled={cancelando}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl py-2.5 text-sm font-bold transition-colors disabled:opacity-50">
+                {cancelando ? 'Cancelando…' : 'Sí, cancelar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

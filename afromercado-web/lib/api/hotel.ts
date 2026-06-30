@@ -31,6 +31,13 @@ export interface ConfigHotel {
   checkOutHora: string
   creadoAt: string
   updatedAt: string
+  // Política de pagos
+  permitePagarAlLlegar: boolean
+  permiteDeposito30: boolean
+  permiteTotal: boolean
+  // Política de cancelación
+  horasLibresCancelacion: number
+  pctPenalidadCancelacion: number
   habitaciones: HabitacionTipo[]
   comercio: {
     id: number
@@ -45,6 +52,14 @@ export interface ConfigHotel {
     whatsapp?: string | null
     descripcion?: string | null
   }
+}
+
+export interface PoliticaCancelacionInfo {
+  horasRestantes: number
+  penalizacionPct: number
+  montoPenalidad: number
+  montoReembolso: number
+  dentroPlazoGratuito: boolean
 }
 
 export interface ReservaHotel {
@@ -63,6 +78,10 @@ export interface ReservaHotel {
   nombreHuesped: string
   telefonoHuesped: string
   creadoAt: string
+  montoDescuento?: number | null
+  montoPenalidad?: number | null
+  montoReembolso?: number | null
+  codigoCupon?: string | null
   habitacionTipo?: { nombre: string; fotos: string[]; precioPorNoche: number | string }
   configHotel?: {
     id: number
@@ -113,6 +132,12 @@ export async function crearReserva(datos: {
 export async function misReservasHotel(): Promise<ReservaHotel[]> {
   const r = await apiFetch<{ ok: boolean; data: ReservaHotel[] }>('/hoteles/reservas/mis')
   return r.data
+}
+
+export async function consultarPoliticaCancelacion(reservaId: number): Promise<PoliticaCancelacionInfo> {
+  const r = await apiFetch<{ ok: boolean; data: PoliticaCancelacionInfo }>(`/hoteles/reservas/${reservaId}/politica-cancelacion`)
+  return r.data
+}
 }
 
 export async function cancelarReservaHotel(id: number): Promise<ReservaHotel> {

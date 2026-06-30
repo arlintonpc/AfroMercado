@@ -204,15 +204,77 @@ const HotelService = {
   async cancelarReservaCliente(reservaId, clienteId) {
     const reserva = await prisma.reservaHotel.findFirst({
       where: { id: reservaId, clienteId },
+      include: {
+        configHotel: {
+          select: { horasLibresCancelacion: true, pctPenalidadCancelacion: true },
+        },
+      },
     });
     if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
     if (["CHECKIN", "CHECKOUT", "CANCELADA", "RECHAZADA"].includes(reserva.estado)) {
       throw new ErrorValidacion("No se puede cancelar una reserva en este estado");
     }
+
+    // Calcular penalización
+    const ahora = new Date();
+    const horasRestantes = (reserva.fechaEntrada - ahora) / (1000 * 60 * 60);
+    const totalPagado = Number(reserva.total);
+    const horasLibres = reserva.configHotel?.horasLibresCancelacion ?? 48;
+    const pctPenalidad = reserva.configHotel?.pctPenalidadCancelacion ?? 0;
+
+    let montoPenalidad = 0;
+    let montoReembolso = totalPagado;
+
+    if (horasRestantes < horasLibres && pctPenalidad > 0) {
+      montoPenalidad = Math.round(totalPagado * pctPenalidad / 100);
+      montoReembolso = totalPagado - montoPenalidad;
+    }
+
     return prisma.reservaHotel.update({
       where: { id: reservaId },
-      data:  { estado: "CANCELADA", updatedAt: new Date() },
+      data: {
+        estado: "CANCELADA",
+        montoPenalidad,
+        montoReembolso,
+        updatedAt: new Date(),
+      },
     });
+  },
+
+  // Consultar política de cancelación sin cancelar
+  async consultarPoliticaCancelacion(reservaId, clienteId) {
+    const reserva = await prisma.reservaHotel.findFirst({
+      where: { id: reservaId, clienteId },
+      include: {
+        configHotel: {
+          select: { horasLibresCancelacion: true, pctPenalidadCancelacion: true },
+        },
+      },
+    });
+    if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
+
+    const ahora = new Date();
+    const horasRestantes = Math.max(0, (reserva.fechaEntrada - ahora) / (1000 * 60 * 60));
+    const totalPagado = Number(reserva.total);
+    const horasLibres = reserva.configHotel?.horasLibresCancelacion ?? 48;
+    const pctPenalidad = reserva.configHotel?.pctPenalidadCancelacion ?? 0;
+
+    const dentroPlazoGratuito = horasRestantes >= horasLibres;
+    let montoPenalidad = 0;
+    let montoReembolso = totalPagado;
+
+    if (!dentroPlazoGratuito && pctPenalidad > 0) {
+      montoPenalidad = Math.round(totalPagado * pctPenalidad / 100);
+      montoReembolso = totalPagado - montoPenalidad;
+    }
+
+    return {
+      horasRestantes: Math.round(horasRestantes * 10) / 10,
+      penalizacionPct: pctPenalidad,
+      montoPenalidad,
+      montoReembolso,
+      dentro_plazo_gratuito: dentroPlazoGratuito,
+    };
   },
 
   // ── HOTELERO ─────────────────────────────────────────────────
@@ -232,13 +294,38 @@ const HotelService = {
   },
 
   async actualizarConfig(comercioId, datos) {
-    const { activo, confirmacionAuto, horasLimiteConfirm, servicios, politicaCancelacion, checkInHora, checkOutHora } = datos;
+    const {
+      activo, confirmacionAuto, horasLimiteConfirm, servicios, politicaCancelacion,
+      checkInHora, checkOutHora,
+      // Política de pagos
+      permitePagarAlLlegar, permiteDeposito30, permiteTotal,
+      // Política de cancelación con penalización
+      horasLibresCancelacion, pctPenalidadCancelacion,
+    } = datos;
     return prisma.configHotel.upsert({
       where:  { comercioId },
-      update: { activo, confirmacionAuto, horasLimiteConfirm, servicios, politicaCancelacion, checkInHora, checkOutHora, updatedAt: new Date() },
-      create: { comercioId, activo: activo ?? false, confirmacionAuto: confirmacionAuto ?? false,
-                horasLimiteConfirm: horasLimiteConfirm ?? 2, servicios: servicios ?? [],
-                politicaCancelacion, checkInHora: checkInHora ?? "15:00", checkOutHora: checkOutHora ?? "12:00" },
+      update: {
+        activo, confirmacionAuto, horasLimiteConfirm, servicios, politicaCancelacion,
+        checkInHora, checkOutHora,
+        permitePagarAlLlegar, permiteDeposito30, permiteTotal,
+        horasLibresCancelacion, pctPenalidadCancelacion,
+        updatedAt: new Date(),
+      },
+      create: {
+        comercioId,
+        activo:                  activo                  ?? false,
+        confirmacionAuto:        confirmacionAuto        ?? false,
+        horasLimiteConfirm:      horasLimiteConfirm      ?? 2,
+        servicios:               servicios               ?? [],
+        politicaCancelacion,
+        checkInHora:             checkInHora             ?? "15:00",
+        checkOutHora:            checkOutHora            ?? "12:00",
+        permitePagarAlLlegar:    permitePagarAlLlegar    ?? true,
+        permiteDeposito30:       permiteDeposito30       ?? true,
+        permiteTotal:            permiteTotal            ?? true,
+        horasLibresCancelacion:  horasLibresCancelacion  ?? 48,
+        pctPenalidadCancelacion: pctPenalidadCancelacion ?? 0,
+      },
       include: { habitaciones: true },
     });
   },

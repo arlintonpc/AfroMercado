@@ -940,12 +940,58 @@ export default function ComercianteHotelesPage() {
               </div>
             </div>
 
+            {/* Métodos de pago aceptados */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">Métodos de pago aceptados</label>
+              <p className="text-xs text-gray-400 mb-3">Desactiva "Pagar al llegar" si no quieres arriesgarte a no-shows sin pago.</p>
+              <div className="space-y-2">
+                {[
+                  { key: 'permitePagarAlLlegar', label: 'Pagar al llegar', desc: 'Efectivo, Nequi o transferencia al check-in' },
+                  { key: 'permiteDeposito30',    label: 'Depósito 30% online', desc: 'El cliente paga el 30% ahora y el resto al llegar' },
+                  { key: 'permiteTotal',         label: 'Pago total online', desc: 'El cliente paga el 100% al reservar' },
+                ].map(op => (
+                  <div key={op.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{op.label}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{op.desc}</p>
+                    </div>
+                    <button type="button"
+                      onClick={() => setEditConfig(p => ({ ...p, [op.key]: !(p as any)[op.key] }))}
+                      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${(editConfig as any)[op.key] !== false ? 'bg-[#2D6A4F]' : 'bg-gray-300'}`}>
+                      <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${(editConfig as any)[op.key] !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Política de cancelación */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Política de cancelación</label>
-              <textarea value={editConfig.politicaCancelacion ?? ''} rows={3}
+              <label className="block text-xs font-medium text-gray-600 mb-2">Política de cancelación</label>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Horas de cancelación gratuita</label>
+                  <input type="number" min={0} max={720}
+                    value={(editConfig as any).horasLibresCancelacion ?? 48}
+                    onChange={e => setEditConfig(p => ({ ...p, horasLibresCancelacion: Number(e.target.value) }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+                  <p className="text-[10px] text-gray-400 mt-1">0 = sin cancelación gratuita</p>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Penalización si cancela tarde (%)</label>
+                  <input type="number" min={0} max={100}
+                    value={(editConfig as any).pctPenalidadCancelacion ?? 0}
+                    onChange={e => setEditConfig(p => ({ ...p, pctPenalidadCancelacion: Number(e.target.value) }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+                  <p className="text-[10px] text-gray-400 mt-1">0 = sin penalización</p>
+                </div>
+              </div>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-xs text-blue-700 mb-3">
+                Ejemplo: 48 horas gratuitas + 50% penalización → si cancela con más de 48h de anticipación, reembolso total. Si cancela después, retiene el 50%.
+              </div>
+              <textarea value={editConfig.politicaCancelacion ?? ''} rows={2}
                 onChange={e => setEditConfig(p => ({ ...p, politicaCancelacion: e.target.value }))}
-                placeholder="Ej: Cancelación gratuita hasta 24h antes. Después se cobra el 50%."
+                placeholder="Texto que verá el cliente al reservar. Ej: Cancelación gratuita hasta 48h antes."
                 className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F] resize-none" />
             </div>
 

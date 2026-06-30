@@ -1274,17 +1274,24 @@ enum EstadoReservaHotel {
 }
 
 model ConfigHotel {
-  id                  Int       @id @default(autoincrement())
-  comercioId          Int       @unique
-  activo              Boolean   @default(false)
-  confirmacionAuto    Boolean   @default(false)
-  horasLimiteConfirm  Int       @default(2)
-  servicios           String[]
-  politicaCancelacion String?
-  checkInHora         String    @default("15:00")
-  checkOutHora        String    @default("12:00")
-  creadoAt            DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                      Int       @id @default(autoincrement())
+  comercioId              Int       @unique
+  activo                  Boolean   @default(false)
+  confirmacionAuto        Boolean   @default(false)
+  horasLimiteConfirm      Int       @default(2)
+  servicios               String[]
+  politicaCancelacion     String?
+  checkInHora             String    @default("15:00")
+  checkOutHora            String    @default("12:00")
+  // Política de pagos
+  permitePagarAlLlegar    Boolean   @default(true)
+  permiteDeposito30       Boolean   @default(true)
+  permiteTotal            Boolean   @default(true)
+  // Política de cancelación con penalización
+  horasLibresCancelacion  Int       @default(48)
+  pctPenalidadCancelacion Int       @default(0)
+  creadoAt                DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   comercio      Comercio         @relation(fields: [comercioId], references: [id])
   habitaciones  HabitacionTipo[]
@@ -1331,6 +1338,11 @@ model ReservaHotel {
   notasCliente      String?
   nombreHuesped     String
   telefonoHuesped   String
+  // Descuentos, penalizaciones y reembolsos
+  montoDescuento    Decimal?           @db.Decimal(10, 2)
+  montoPenalidad    Decimal?           @db.Decimal(10, 2)
+  montoReembolso    Decimal?           @db.Decimal(10, 2)
+  codigoCupon       String?
   creadoAt          DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
