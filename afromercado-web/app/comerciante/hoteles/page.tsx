@@ -43,6 +43,29 @@ function esVideo(url: string): boolean {
   return url.includes('/video/upload/') || /\.(mp4|webm|mov|avi)$/i.test(url)
 }
 
+type MetodoPagoHotelKey = 'permitePagarAlLlegar' | 'permiteDeposito30' | 'permiteTotal'
+
+function SwitchElegante({ activo, onClick }: { activo: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={activo}
+      onClick={onClick}
+      className={`group inline-flex min-w-[92px] items-center justify-between gap-2 rounded-full border px-2 py-1 text-[11px] font-bold transition-all focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/25 ${
+        activo
+          ? 'border-[#2D6A4F]/25 bg-[#2D6A4F]/10 text-[#1B4332] shadow-sm'
+          : 'border-gray-200 bg-white text-gray-400'
+      }`}
+    >
+      <span className={`relative h-5 w-9 rounded-full transition-colors ${activo ? 'bg-[#2D6A4F]' : 'bg-gray-200'}`}>
+        <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${activo ? 'translate-x-4' : 'translate-x-0'}`} />
+      </span>
+      <span>{activo ? 'Activo' : 'Inactivo'}</span>
+    </button>
+  )
+}
+
 function FormHabitacion({ inicial, onGuardar, onCancelar }: {
   inicial?: Partial<HabitacionTipo>
   onGuardar: (datos: Partial<HabitacionTipo>, archivos?: File[]) => Promise<void>
@@ -1362,19 +1385,32 @@ export default function ComercianteHotelesPage() {
                   { key: 'permitePagarAlLlegar', label: 'Pagar al llegar', desc: 'Efectivo, Nequi o transferencia al check-in' },
                   { key: 'permiteDeposito30',    label: 'Depósito 30% online', desc: 'El cliente paga el 30% ahora y el resto al llegar' },
                   { key: 'permiteTotal',         label: 'Pago total online', desc: 'El cliente paga el 100% al reservar' },
-                ].map(op => (
-                  <div key={op.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{op.label}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{op.desc}</p>
+                ].map(op => {
+                  const key = op.key as MetodoPagoHotelKey
+                  const activo = editConfig[key] !== false
+                  return (
+                    <div
+                      key={op.key}
+                      className={`flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 transition-all ${
+                        activo
+                          ? 'border-[#2D6A4F]/20 bg-[#F7FCF9]'
+                          : 'border-gray-100 bg-gray-50/80'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-gray-800">{op.label}</p>
+                          {activo && <span className="h-1.5 w-1.5 rounded-full bg-[#2D6A4F]" />}
+                        </div>
+                        <p className="mt-0.5 text-xs leading-relaxed text-gray-400">{op.desc}</p>
+                      </div>
+                      <SwitchElegante
+                        activo={activo}
+                        onClick={() => setEditConfig(p => ({ ...p, [key]: !activo }))}
+                      />
                     </div>
-                    <button type="button"
-                      onClick={() => setEditConfig(p => ({ ...p, [op.key]: !(p as any)[op.key] }))}
-                      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${(editConfig as any)[op.key] !== false ? 'bg-[#2D6A4F]' : 'bg-gray-300'}`}>
-                      <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${(editConfig as any)[op.key] !== false ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
 
