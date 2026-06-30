@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { misReservasHotel, cancelarReservaHotel, consultarPoliticaCancelacion, type ReservaHotel, type PoliticaCancelacionInfo } from '@/lib/api/hotel'
+import { misReservasHotel, cancelarReservaHotel, consultarPoliticaCancelacion, solicitarTokenCheckin, type ReservaHotel, type PoliticaCancelacionInfo } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -39,6 +39,7 @@ function BarraProgreso({ paso }: { paso: number }) {
 }
 
 function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCancelado: () => void }) {
+  const router = useRouter()
   const info = ESTADO_INFO[reserva.estado] ?? { label: reserva.estado, color: 'bg-gray-100 text-gray-600', paso: -1 }
   const activa = !['CHECKOUT', 'CANCELADA', 'RECHAZADA'].includes(reserva.estado)
   const [cancelando, setCancelando]   = useState(false)
@@ -46,6 +47,20 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
   const [modalCancelar, setModalCancelar] = useState(false)
   const [cargandoPolitica, setCargandoPolitica] = useState(false)
   const [copiado, setCopiado] = useState(false)
+  const [generandoToken, setGenerandoToken] = useState(false)
+
+  const puedeCheckin = reserva.estado === 'CONFIRMADA' && !reserva.checkinOnlineAt
+  const diasParaEntrada = Math.ceil((new Date(reserva.fechaEntrada).getTime() - Date.now()) / 86400000)
+  const mostrarCheckin = puedeCheckin && diasParaEntrada <= 7
+
+  async function iniciarCheckin() {
+    setGenerandoToken(true)
+    try {
+      const { token } = await solicitarTokenCheckin(reserva.id)
+      router.push(`/hoteles/checkin/${token}`)
+    } catch { /* error silencioso */ }
+    setGenerandoToken(false)
+  }
 
   const copiarCodigo = useCallback(() => {
     navigator.clipboard.writeText(reserva.codigo).then(() => {
@@ -146,6 +161,19 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
           className="mt-3 w-full text-center text-xs font-medium text-red-500 border border-red-200 rounded-xl py-2 hover:bg-red-50 transition-colors">
           Cancelar reserva
         </button>
+      )}
+
+      {mostrarCheckin && (
+        <button onClick={iniciarCheckin} disabled={generandoToken}
+          className="mt-3 w-full py-2 text-sm font-medium bg-[#1B4332] text-white rounded-xl disabled:opacity-50 hover:bg-[#2D6A4F] transition-colors">
+          {generandoToken ? 'Preparando...' : '✓ Hacer check-in online'}
+        </button>
+      )}
+      {reserva.checkinOnlineAt && (
+        <div className="mt-3 flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 rounded-xl px-3 py-2">
+          <span>✓</span>
+          <span>Check-in realizado · {new Date(reserva.checkinOnlineAt).toLocaleDateString('es-CO')}</span>
+        </div>
       )}
 
       {/* Modal confirmación cancelación */}

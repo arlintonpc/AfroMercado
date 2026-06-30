@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const ConfigRepository = require("../repositories/config.repository");
@@ -899,6 +900,83 @@ const HotelService = {
     const t = await prisma.temporadaHotel.findFirst({ where: { id: temporadaId, configHotelId: hotel.id } });
     if (!t) throw new ErrorNoEncontrado("Temporada no encontrada");
     await prisma.temporadaHotel.update({ where: { id: temporadaId }, data: { activo: false } });
+  },
+
+  // ── CHECK-IN ONLINE ───────────────────────────────────────────
+
+  async generarTokenCheckin(reservaId, clienteId) {
+    const reserva = await prisma.reservaHotel.findFirst({
+      where: { id: reservaId, clienteId },
+    });
+    if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
+    if (["CANCELADA", "CHECKOUT"].includes(reserva.estado)) {
+      throw new ErrorValidacion("No se puede generar token para una reserva en estado " + reserva.estado);
+    }
+    // Idempotente: si ya tiene token, retornarlo
+    if (reserva.tokenCheckin) {
+      return { token: reserva.tokenCheckin, reserva };
+    }
+    const token = crypto.randomBytes(16).toString("hex");
+    const actualizada = await prisma.reservaHotel.update({
+      where: { id: reservaId },
+      data: { tokenCheckin: token },
+    });
+    return { token, reserva: actualizada };
+  },
+
+  async obtenerReservaPorToken(token) {
+    const reserva = await prisma.reservaHotel.findUnique({
+      where: { tokenCheckin: token },
+      include: {
+        habitacionTipo: true,
+        configHotel: { include: { comercio: true } },
+      },
+    });
+    if (!reserva) throw new ErrorNoEncontrado("Token de check-in no válido");
+    return reserva;
+  },
+
+  async realizarCheckinOnline(token, datos) {
+    const reserva = await prisma.reservaHotel.findUnique({
+      where: { tokenCheckin: token },
+      include: {
+        configHotel: { include: { comercio: { select: { usuarioId: true } } } },
+      },
+    });
+    if (!reserva) throw new ErrorNoEncontrado("Token de check-in no válido");
+    if (["CANCELADA", "CHECKOUT"].includes(reserva.estado)) {
+      throw new ErrorValidacion("No se puede hacer check-in en una reserva en estado " + reserva.estado);
+    }
+    if (!datos.docTipo || !datos.docNumero) {
+      throw new ErrorValidacion("El tipo y número de documento son obligatorios");
+    }
+    // Idempotente: si ya hizo check-in, retornar sin modificar
+    if (reserva.checkinOnlineAt) {
+      return reserva;
+    }
+    const actualizada = await prisma.reservaHotel.update({
+      where: { tokenCheckin: token },
+      data: {
+        checkinOnlineAt:       new Date(),
+        docTipo:               datos.docTipo,
+        docNumero:             datos.docNumero,
+        horaEstimadaLlegada:   datos.horaEstimadaLlegada   || null,
+        solicitudesEspeciales: datos.solicitudesEspeciales || null,
+      },
+      include: {
+        habitacionTipo: true,
+        configHotel: { include: { comercio: true } },
+      },
+    });
+    // Notificar al hotelero
+    const hoteleroId = reserva.configHotel.comercio.usuarioId;
+    await notifHotel(
+      hoteleroId,
+      "Check-in online recibido",
+      `${actualizada.nombreHuesped} completó el check-in online · ${actualizada.docTipo} ${actualizada.docNumero}`,
+      "/comerciante/hoteles"
+    );
+    return actualizada;
   },
 };
 

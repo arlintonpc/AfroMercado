@@ -96,6 +96,12 @@ export interface ReservaHotel {
   montoPenalidad?: number | null
   montoReembolso?: number | null
   codigoCupon?: string | null
+  checkinOnlineAt?: string | null
+  docTipo?: string | null
+  docNumero?: string | null
+  horaEstimadaLlegada?: string | null
+  solicitudesEspeciales?: string | null
+  tokenCheckin?: string | null
   habitacionTipo?: { nombre: string; fotos: string[]; precioPorNoche: number | string }
   configHotel?: {
     id: number
@@ -352,6 +358,32 @@ export async function eliminarBloqueo(bloqueoId: string): Promise<void> {
 export async function iniciarPagoReserva(reservaId: number): Promise<{ checkoutUrl: string; referencia: string; montoDeposito: number; pct: number }> {
   const d = await apiFetch<{ ok: boolean; data: any }>(`/hotel/reservas/${reservaId}/checkout`, { method: 'POST', auth: true })
   return d.data
+}
+
+// ── CHECK-IN ONLINE ───────────────────────────────────────────
+export interface CheckinInfo {
+  token: string
+  reserva: ReservaHotel
+}
+
+export async function solicitarTokenCheckin(reservaId: number): Promise<CheckinInfo> {
+  const r = await apiFetch<{ ok: boolean; data: CheckinInfo }>(`/hoteles/reservas/${reservaId}/checkin-token`, { method: 'POST' })
+  return r.data
+}
+
+export async function verCheckinPublico(token: string): Promise<ReservaHotel> {
+  const r = await apiFetch<{ ok: boolean; data: ReservaHotel }>(`/hoteles/checkin/${token}`, { auth: false })
+  return r.data
+}
+
+export async function realizarCheckin(token: string, datos: {
+  docTipo: string
+  docNumero: string
+  horaEstimadaLlegada?: string
+  solicitudesEspeciales?: string
+}): Promise<ReservaHotel> {
+  const r = await apiFetch<{ ok: boolean; data: ReservaHotel }>(`/hoteles/checkin/${token}`, { method: 'POST', body: datos, auth: false })
+  return r.data
 }
 
 // ── TEMPORADAS ────────────────────────────────────────────────

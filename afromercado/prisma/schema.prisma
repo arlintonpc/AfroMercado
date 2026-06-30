@@ -1349,6 +1349,12 @@ model ReservaHotel {
   codigoCupon       String?
   comision          Decimal?           @db.Decimal(10, 2)
   tasaComision      Decimal?           @db.Decimal(5, 4)
+  checkinOnlineAt       DateTime?
+  docTipo               String?
+  docNumero             String?
+  horaEstimadaLlegada   String?
+  solicitudesEspeciales String?
+  tokenCheckin          String?        @unique
   creadoAt          DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 

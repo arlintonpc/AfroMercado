@@ -68,6 +68,14 @@ router.get(   "/mi-hotel/temporadas",     ...soloComercio, HotelController.lista
 router.post(  "/mi-hotel/temporadas",     ...soloComercio, HotelController.crearTemporada);
 router.delete("/mi-hotel/temporadas/:id", ...soloComercio, HotelController.eliminarTemporada);
 
+// ── CHECK-IN ONLINE ───────────────────────────────────────────
+// Cliente genera su token (requiere auth)
+router.post("/reservas/:id/checkin-token", ...soloAuth, HotelController.solicitarTokenCheckin);
+
+// Formulario público de check-in (el token actúa como credencial)
+router.get( "/checkin/:token", HotelController.verCheckinPublico);
+router.post("/checkin/:token", HotelController.realizarCheckin);
+
 // ── REVIEWS ──────────────────────────────────────────────────
 router.get( "/:id/reviews",        ReviewController.reviewsHotel);
 router.post("/reservas/:id/review",...soloAuth, ReviewController.crearReviewHotel);

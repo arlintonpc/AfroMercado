@@ -450,11 +450,114 @@ function FormNuevaTemporada({
   )
 }
 
+function CalendarioOcupacion({
+  mes,
+  habitaciones,
+  reservas,
+  onMesAnterior,
+  onMesSiguiente,
+}: {
+  mes: Date
+  habitaciones: HabitacionTipo[]
+  reservas: ReservaHotel[]
+  onMesAnterior: () => void
+  onMesSiguiente: () => void
+}) {
+  const diasEnMes = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate()
+  const dias = Array.from({ length: diasEnMes }, (_, i) => i + 1)
+
+  const mesNombre = mes.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })
+
+  function getReservaInfo(habId: number, dia: number): ReservaHotel | null {
+    const fecha = new Date(mes.getFullYear(), mes.getMonth(), dia)
+    return reservas.find(r =>
+      r.habitacionTipoId === habId &&
+      ['PENDIENTE', 'CONFIRMADA', 'CHECKIN'].includes(r.estado) &&
+      new Date(r.fechaEntrada) <= fecha &&
+      new Date(r.fechaSalida) > fecha
+    ) ?? null
+  }
+
+  const esHoy = (dia: number) => {
+    const hoy = new Date()
+    return hoy.getFullYear() === mes.getFullYear() && hoy.getMonth() === mes.getMonth() && hoy.getDate() === dia
+  }
+
+  return (
+    <div>
+      {/* Navegación de mes */}
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={onMesAnterior} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+        </button>
+        <span className="font-semibold text-gray-800 capitalize">{mesNombre}</span>
+        <button onClick={onMesSiguiente} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </button>
+      </div>
+
+      {/* Leyenda */}
+      <div className="flex gap-4 mb-3 text-xs text-gray-500">
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-[#1B4332] inline-block" /> Reservada</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-400 inline-block" /> Pendiente</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-gray-100 border border-gray-200 inline-block" /> Libre</span>
+      </div>
+
+      {/* Grid */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr>
+              <th className="text-left p-1 text-gray-400 font-medium sticky left-0 bg-white min-w-[80px]">Día</th>
+              {habitaciones.map(h => (
+                <th key={h.id} className="text-center p-1 text-gray-600 font-medium min-w-[70px] max-w-[90px] truncate"
+                  title={h.nombre}>{h.nombre.length > 10 ? h.nombre.slice(0, 10) + '…' : h.nombre}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {dias.map(dia => (
+              <tr key={dia} className={esHoy(dia) ? 'bg-blue-50' : ''}>
+                <td className={`p-1 font-medium sticky left-0 ${esHoy(dia) ? 'bg-blue-50' : 'bg-white'} ${esHoy(dia) ? 'text-blue-600' : 'text-gray-500'}`}>
+                  {dia}{esHoy(dia) ? ' ·hoy' : ''}
+                </td>
+                {habitaciones.map(h => {
+                  const r = getReservaInfo(h.id, dia)
+                  const ocupado = !!r
+                  const pendiente = r?.estado === 'PENDIENTE'
+                  return (
+                    <td key={h.id} className="p-0.5">
+                      <div
+                        title={r ? `${r.nombreHuesped} · ${r.codigo}` : 'Libre'}
+                        className={`h-6 rounded text-center leading-6 text-[10px] font-medium cursor-default transition-colors ${
+                          pendiente ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                          ocupado   ? 'bg-[#1B4332]/90 text-white' :
+                          'bg-gray-50 border border-gray-100 text-gray-300'
+                        }`}>
+                        {ocupado ? (pendiente ? 'P' : '✓') : ''}
+                      </div>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export default function ComercianteHotelesPage() {
   const [cfg, setCfg]               = useState<ConfigHotel | null>(null)
   const [reservas, setReservas]     = useState<ReservaHotel[]>([])
   const [ocupacion, setOcupacion]   = useState<{ habitaciones: HabitacionTipo[]; reservas: ReservaHotel[] } | null>(null)
   const [tab, setTab]               = useState<'reservas' | 'habitaciones' | 'config' | 'ocupacion' | 'bloqueos'>('reservas')
+  const [mesCalendario, setMesCalendario] = useState(() => {
+    const hoy = new Date()
+    return new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+  })
+  const [reservasCalendario, setReservasCalendario] = useState<ReservaHotel[]>([])
   const [bloqueos, setBloqueos]     = useState<BloqueoFecha[]>([])
   const [cargandoBloqueos, setCargandoBloqueos] = useState(false)
   const [formBloqueo, setFormBloqueo] = useState<{ habitacionId: string; fechaInicio: string; fechaFin: string; motivo: string }>({ habitacionId: '', fechaInicio: '', fechaFin: '', motivo: '' })
@@ -507,6 +610,7 @@ export default function ComercianteHotelesPage() {
       }
       reservasRef.current = reservasData
       setReservas(reservasData)
+      setReservasCalendario(reservasData)
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -1214,6 +1318,20 @@ export default function ComercianteHotelesPage() {
             </button>
           </div>
         )}
+        {/* ── CALENDARIO DE OCUPACIÓN ── */}
+        {cfg?.activo && (cfg.habitaciones?.length ?? 0) > 0 && (
+          <section className="bg-white rounded-2xl shadow-sm p-6 mt-4">
+            <h2 className="font-bold text-gray-900 mb-4">Calendario de ocupación</h2>
+            <CalendarioOcupacion
+              mes={mesCalendario}
+              habitaciones={cfg.habitaciones}
+              reservas={reservasCalendario}
+              onMesAnterior={() => setMesCalendario(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+              onMesSiguiente={() => setMesCalendario(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+            />
+          </section>
+        )}
+
         {/* ── CUPONES ── */}
         {cfg?.activo && (
           <section className="bg-white rounded-2xl shadow-sm p-6 mt-4">

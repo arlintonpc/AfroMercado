@@ -312,6 +312,28 @@ const HotelController = {
       res.json({ ok: true, data: resultado });
     } catch (e) { next(e); }
   },
+
+  // ── CHECK-IN ONLINE ───────────────────────────────────────────
+  async solicitarTokenCheckin(req, res, next) {
+    try {
+      const data = await HotelService.generarTokenCheckin(Number(req.params.id), req.usuario.id);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async verCheckinPublico(req, res, next) {
+    try {
+      const data = await HotelService.obtenerReservaPorToken(req.params.token);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async realizarCheckin(req, res, next) {
+    try {
+      const data = await HotelService.realizarCheckinOnline(req.params.token, req.body);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
 };
 
 module.exports = HotelController;
