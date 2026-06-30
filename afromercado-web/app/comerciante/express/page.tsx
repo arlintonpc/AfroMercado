@@ -7,8 +7,9 @@ import {
   festivosColombia, obtenerMenuComercioExpress,
   listarSeccionesExpress, crearSeccionExpress, actualizarSeccionExpress,
   eliminarSeccionExpress, asignarSeccionProducto,
+  listarCuponesExpress, crearCuponExpress, eliminarCuponExpress, obtenerEstadisticasExpress,
   type ConfigExpress, type PedidoExpress, type ModalidadExpress, type DiaSemana, type HorarioExpress,
-  type MenuSeccion, type MenuComercioExpress,
+  type MenuSeccion, type MenuComercioExpress, type CuponExpress, type EstadisticasExpress,
 } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
@@ -68,7 +69,7 @@ const ACCION_AVANZAR: Record<string, string> = {
   EN_CAMINO:      'Marcar entregado',
 }
 
-type Pestana = 'activos' | 'config' | 'historial' | 'menu'
+type Pestana = 'activos' | 'config' | 'historial' | 'menu' | 'cupones' | 'estadisticas'
 
 export default function ExpressComerciante() {
   const [pestana, setPestana]   = useState<Pestana>('activos')
@@ -96,6 +97,17 @@ export default function ExpressComerciante() {
   const [editandoSeccion, setEditandoSeccion] = useState<number | null>(null)
   const [editSeccionNombre, setEditSeccionNombre] = useState('')
   const [editSeccionIcono, setEditSeccionIcono]   = useState('')
+  const [cupones, setCupones]           = useState<CuponExpress[]>([])
+  const [estadisticas, setEstadisticas] = useState<EstadisticasExpress | null>(null)
+  const [cargandoStats, setCargandoStats] = useState(false)
+  const [nuevoCupon, setNuevoCupon]     = useState({
+    codigo: '', tipo: 'PORCENTAJE' as 'PORCENTAJE' | 'VALOR_FIJO',
+    valor: '', minimoSubtotal: '', usosMaximos: '',
+    inicio: new Date().toISOString().split('T')[0],
+    fin: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+  })
+  const [guardandoCupon, setGuardandoCupon] = useState(false)
+  const [errorCupon, setErrorCupon]         = useState('')
 
   const cargar = useCallback(async () => {
     try {
@@ -294,11 +306,13 @@ export default function ExpressComerciante() {
       )}
 
       {/* Pestañas */}
-      <div className="flex border-b border-gray-200 gap-1">
+      <div className="flex border-b border-gray-200 gap-1 overflow-x-auto">
         {([
           ['activos', `Activos (${activos.length})`],
           ['historial', 'Historial'],
           ['menu', '🗂️ Menú'],
+          ['cupones', '🎟️ Cupones'],
+          ['estadisticas', '📊 Stats'],
           ['config', 'Configuración'],
         ] as [Pestana, string][]).map(([id, label]) => (
           <button
@@ -310,8 +324,13 @@ export default function ExpressComerciante() {
                 listarSeccionesExpress().then(setSecciones).catch(() => {})
                 cargarMenuExpressPropio()
               }
+              if (id === 'cupones') listarCuponesExpress().then(setCupones).catch(() => {})
+              if (id === 'estadisticas') {
+                setCargandoStats(true)
+                obtenerEstadisticasExpress().then(setEstadisticas).catch(() => {}).finally(() => setCargandoStats(false))
+              }
             }}
-            className={`relative px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`relative px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               pestana === id ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -541,6 +560,297 @@ export default function ExpressComerciante() {
             )}
           </div>
 
+        </div>
+      )}
+
+      {/* ── ESTADÍSTICAS ── */}
+      {pestana === 'estadisticas' && (
+        <div className="space-y-5">
+          {cargandoStats || !estadisticas ? (
+            <div className="flex justify-center py-16">
+              <div className="w-8 h-8 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <>
+              {/* KPIs */}
+              <div className="grid grid-cols-3 gap-3">
+                {([
+                  { label: 'Hoy', data: estadisticas.hoy, color: 'bg-blue-50 border-blue-100' },
+                  { label: 'Esta semana', data: estadisticas.semana, color: 'bg-green-50 border-green-100' },
+                  { label: 'Este mes', data: estadisticas.mes, color: 'bg-purple-50 border-purple-100' },
+                ] as const).map(({ label, data, color }) => (
+                  <div key={label} className={`rounded-2xl border p-3 ${color}`}>
+                    <p className="text-xs font-medium text-gray-500 mb-1">{label}</p>
+                    <p className="text-lg font-bold text-gray-800">{data.pedidos}</p>
+                    <p className="text-xs text-gray-500">pedidos</p>
+                    <p className="text-sm font-semibold text-gray-700 mt-1">${data.ingresos.toLocaleString('es-CO')}</p>
+                    <p className="text-xs text-gray-400">ingresos</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Horas pico */}
+              {estadisticas.horasPico.some(h => h > 0) && (
+                <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                  <h3 className="font-semibold text-gray-800 mb-4">Horas pico (últimos 30 días)</h3>
+                  <div className="flex items-end gap-1 h-16">
+                    {estadisticas.horasPico.map((count, hora) => {
+                      const max = Math.max(...estadisticas.horasPico, 1)
+                      const h = hora % 12 || 12
+                      const ampm = hora < 12 ? 'a' : 'p'
+                      return (
+                        <div key={hora} className="flex-1 flex flex-col items-center gap-1">
+                          <div
+                            className="w-full bg-[#2D6A4F] rounded-t transition-all"
+                            style={{ height: `${(count / max) * 56}px`, minHeight: count > 0 ? 4 : 0 }}
+                            title={`${hora}h: ${count} pedidos`}
+                          />
+                          {(hora % 6 === 0) && (
+                            <span className="text-[9px] text-gray-400">{h}{ampm}</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Top productos */}
+              {estadisticas.topProductos.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                  <h3 className="font-semibold text-gray-800 mb-4">Productos más pedidos</h3>
+                  <div className="space-y-3">
+                    {estadisticas.topProductos.map((item, idx) => (
+                      <div key={item.producto.id} className="flex items-center gap-3">
+                        <span className="text-gray-400 text-sm font-bold w-5">{idx + 1}</span>
+                        {item.producto.fotoUrl ? (
+                          <img src={item.producto.fotoUrl} alt={item.producto.nombre} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-base flex-shrink-0">🥘</div>
+                        )}
+                        <p className="flex-1 text-sm font-medium text-gray-800 truncate">{item.producto.nombre}</p>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-[#1B4332]">{item.cantidad}</p>
+                          <p className="text-xs text-gray-400">unid.</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Últimos pedidos */}
+              {estadisticas.ultimosPedidos.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                  <h3 className="font-semibold text-gray-800 mb-4">Últimos pedidos</h3>
+                  <div className="space-y-2">
+                    {estadisticas.ultimosPedidos.map(p => (
+                      <div key={p.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+                        <div>
+                          <span className="font-mono text-xs text-gray-500">{p.codigo}</span>
+                          <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full font-medium ${ESTADO_COLOR[p.estado]}`}>
+                            {ESTADO_LABEL[p.estado]}
+                          </span>
+                        </div>
+                        <span className="font-semibold text-gray-700">${Number(p.total).toLocaleString('es-CO')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sin datos */}
+              {estadisticas.mes.pedidos === 0 && (
+                <div className="text-center py-12 text-gray-400">
+                  <p className="text-3xl mb-2">📊</p>
+                  <p>Aún no hay datos de pedidos entregados.</p>
+                  <p className="text-sm mt-1">Las estadísticas aparecerán cuando tengas pedidos completados.</p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── CUPONES ── */}
+      {pestana === 'cupones' && (
+        <div className="space-y-5">
+
+          {/* Lista de cupones */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-gray-800">Cupones activos</h2>
+              <span className="text-xs text-gray-400">{cupones.filter(c => c.activo).length} activos</span>
+            </div>
+
+            {cupones.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">
+                No hay cupones creados. Crea uno abajo para que tus clientes obtengan descuentos.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {cupones.map(c => {
+                  const vencido = new Date(c.fin) < new Date()
+                  return (
+                    <div key={c.id} className={`flex items-start gap-3 p-3 rounded-xl border ${
+                      !c.activo || vencido ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-green-50 border-green-100'
+                    }`}>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold text-sm text-[#1B4332]">{c.codigo}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            c.tipo === 'PORCENTAJE' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                          }`}>
+                            {c.tipo === 'PORCENTAJE' ? `${Number(c.valor)}% OFF` : `-$${Number(c.valor).toLocaleString('es-CO')}`}
+                          </span>
+                          {vencido && <span className="text-xs text-red-500 font-medium">Vencido</span>}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1 space-y-0.5">
+                          {c.minimoSubtotal && <p>Mínimo: ${Number(c.minimoSubtotal).toLocaleString('es-CO')}</p>}
+                          <p>
+                            {new Date(c.inicio).toLocaleDateString('es-CO')} → {new Date(c.fin).toLocaleDateString('es-CO')}
+                          </p>
+                          <p>Usos: {c.usosActuales}{c.usosMaximos ? ` / ${c.usosMaximos}` : ''}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`¿Desactivar el cupón ${c.codigo}?`)) return
+                          await eliminarCuponExpress(c.id)
+                          setCupones(prev => prev.map(x => x.id === c.id ? { ...x, activo: false } : x))
+                        }}
+                        className="text-xs text-red-500 border border-red-200 px-2 py-1 rounded-lg flex-shrink-0"
+                      >
+                        Desactivar
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Crear cupón */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+            <h2 className="font-semibold text-gray-800">Crear cupón</h2>
+
+            {errorCupon && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{errorCupon}</p>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Código *</label>
+                <input
+                  value={nuevoCupon.codigo}
+                  onChange={e => setNuevoCupon(p => ({ ...p, codigo: e.target.value.toUpperCase().replace(/\s/g, '') }))}
+                  placeholder="Ej: BEBIDA20, LAUNCH10…"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono uppercase"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
+                <select
+                  value={nuevoCupon.tipo}
+                  onChange={e => setNuevoCupon(p => ({ ...p, tipo: e.target.value as any }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
+                >
+                  <option value="PORCENTAJE">% Porcentaje</option>
+                  <option value="VALOR_FIJO">$ Valor fijo</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Valor * {nuevoCupon.tipo === 'PORCENTAJE' ? '(%)' : '($)'}
+                </label>
+                <input
+                  type="number" min={1} max={nuevoCupon.tipo === 'PORCENTAJE' ? 100 : undefined}
+                  value={nuevoCupon.valor}
+                  onChange={e => setNuevoCupon(p => ({ ...p, valor: e.target.value }))}
+                  placeholder={nuevoCupon.tipo === 'PORCENTAJE' ? '20' : '5000'}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Subtotal mínimo ($)</label>
+                <input
+                  type="number" min={0}
+                  value={nuevoCupon.minimoSubtotal}
+                  onChange={e => setNuevoCupon(p => ({ ...p, minimoSubtotal: e.target.value }))}
+                  placeholder="Opcional"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Límite de usos</label>
+                <input
+                  type="number" min={1}
+                  value={nuevoCupon.usosMaximos}
+                  onChange={e => setNuevoCupon(p => ({ ...p, usosMaximos: e.target.value }))}
+                  placeholder="Sin límite"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Fecha inicio *</label>
+                <input
+                  type="date"
+                  value={nuevoCupon.inicio}
+                  onChange={e => setNuevoCupon(p => ({ ...p, inicio: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Fecha fin *</label>
+                <input
+                  type="date"
+                  value={nuevoCupon.fin}
+                  onChange={e => setNuevoCupon(p => ({ ...p, fin: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <button
+              disabled={guardandoCupon || !nuevoCupon.codigo.trim() || !nuevoCupon.valor}
+              onClick={async () => {
+                if (!nuevoCupon.codigo.trim() || !nuevoCupon.valor) return
+                setGuardandoCupon(true)
+                setErrorCupon('')
+                try {
+                  await crearCuponExpress({
+                    codigo: nuevoCupon.codigo.trim(),
+                    tipo: nuevoCupon.tipo,
+                    valor: Number(nuevoCupon.valor),
+                    minimoSubtotal: nuevoCupon.minimoSubtotal ? Number(nuevoCupon.minimoSubtotal) : undefined,
+                    usosMaximos: nuevoCupon.usosMaximos ? Number(nuevoCupon.usosMaximos) : undefined,
+                    inicio: nuevoCupon.inicio,
+                    fin: nuevoCupon.fin,
+                  })
+                  const updated = await listarCuponesExpress()
+                  setCupones(updated)
+                  setNuevoCupon({
+                    codigo: '', tipo: 'PORCENTAJE', valor: '', minimoSubtotal: '', usosMaximos: '',
+                    inicio: new Date().toISOString().split('T')[0],
+                    fin: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+                  })
+                } catch (e: any) {
+                  setErrorCupon(e?.message ?? 'Error al crear el cupón')
+                } finally {
+                  setGuardandoCupon(false)
+                }
+              }}
+              className="w-full bg-[#2D6A4F] text-white py-3 rounded-xl font-semibold disabled:opacity-50"
+            >
+              {guardandoCupon ? 'Creando...' : '🎟️ Crear cupón'}
+            </button>
+          </div>
         </div>
       )}
 

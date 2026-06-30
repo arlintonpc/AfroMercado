@@ -61,6 +61,8 @@ export interface PedidoExpress {
   aceptadoAt: string | null
   entregadoAt: string | null
   expiresAt: string
+  montoDescuento: number | null
+  codigoCupon: string | null
   items: ItemPedidoExpress[]
   cliente?: { nombre: string; email: string; telefono: string | null }
   configExpress?: { comercio: { nombre: string; logoUrl: string | null; municipio: string } }
@@ -130,6 +132,7 @@ export async function crearPedidoExpress(body: {
   notaCliente?: string
   direccionTexto?: string
   municipioEntrega?: string
+  codigoCupon?: string
 }): Promise<PedidoExpress> {
   const r = await apiFetch<{ ok: boolean; data: PedidoExpress }>('/express/pedidos', { method: 'POST', body })
   return r.data
@@ -224,4 +227,81 @@ export async function eliminarSeccionExpress(id: number): Promise<void> {
 
 export async function asignarSeccionProducto(productoId: number, menuSeccionId: number | null): Promise<void> {
   await apiFetch(`/express/config/secciones/productos/${productoId}`, { method: 'PATCH', body: { menuSeccionId } })
+}
+
+// ── CUPONES EXPRESS ────────────────────────────────────────────
+
+export interface CuponExpress {
+  id: number
+  codigo: string
+  tipo: 'PORCENTAJE' | 'VALOR_FIJO'
+  valor: number
+  minimoSubtotal: number | null
+  usosMaximos: number | null
+  usosActuales: number
+  activo: boolean
+  inicio: string
+  fin: string
+  configExpressId: number | null
+  createdAt: string
+  _count?: { usos: number }
+}
+
+export interface ValidacionCuponExpress {
+  cupon: CuponExpress
+  descuento: number
+  subtotalConDescuento: number
+}
+
+export async function validarCuponExpress(codigo: string, subtotal: number, comercioId?: number): Promise<ValidacionCuponExpress> {
+  const q = comercioId ? `?comercioId=${comercioId}` : ''
+  const r = await apiFetch<{ ok: boolean; data: ValidacionCuponExpress }>(`/express/cupones/validar${q}`, {
+    method: 'POST',
+    body: { codigo, subtotal },
+  })
+  return r.data
+}
+
+export async function listarCuponesExpress(): Promise<CuponExpress[]> {
+  const r = await apiFetch<{ ok: boolean; data: CuponExpress[] }>('/express/mis-cupones')
+  return r.data ?? []
+}
+
+export async function crearCuponExpress(datos: {
+  codigo: string
+  tipo: 'PORCENTAJE' | 'VALOR_FIJO'
+  valor: number
+  minimoSubtotal?: number
+  usosMaximos?: number
+  inicio: string
+  fin: string
+}): Promise<CuponExpress> {
+  const r = await apiFetch<{ ok: boolean; data: CuponExpress }>('/express/mis-cupones', { method: 'POST', body: datos })
+  return r.data
+}
+
+export async function eliminarCuponExpress(id: number): Promise<void> {
+  await apiFetch(`/express/mis-cupones/${id}`, { method: 'DELETE' })
+}
+
+// ── ESTADÍSTICAS EXPRESS ───────────────────────────────────────
+
+export interface EstadisticasExpress {
+  hoy: { pedidos: number; ingresos: number; comision: number }
+  semana: { pedidos: number; ingresos: number; comision: number }
+  mes: { pedidos: number; ingresos: number; comision: number }
+  horasPico: number[]
+  topProductos: Array<{
+    producto: { id: number; nombre: string; fotoUrl: string | null }
+    cantidad: number
+    pedidos: number
+  }>
+  ultimosPedidos: Array<{
+    id: number; codigo: string; estado: string; total: number; creadoAt: string; modalidad: string
+  }>
+}
+
+export async function obtenerEstadisticasExpress(): Promise<EstadisticasExpress> {
+  const r = await apiFetch<{ ok: boolean; data: EstadisticasExpress }>('/express/mis-estadisticas')
+  return r.data
 }

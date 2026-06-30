@@ -39,12 +39,12 @@ const ExpressController = {
   async crearPedido(req, res, next) {
     try {
       const clienteId = req.usuario.id;
-      const { comercioId, modalidad, metodoPago, items, notaCliente, direccionTexto, municipioEntrega } = req.body;
+      const { comercioId, modalidad, metodoPago, items, notaCliente, direccionTexto, municipioEntrega, codigoCupon } = req.body;
       if (!comercioId || !modalidad || !metodoPago || !items?.length) {
         return res.status(400).json({ ok: false, error: "Faltan campos requeridos" });
       }
       const pedido = await ExpressService.crearPedido({
-        clienteId, comercioId: Number(comercioId), modalidad, metodoPago, items, notaCliente, direccionTexto, municipioEntrega,
+        clienteId, comercioId: Number(comercioId), modalidad, metodoPago, items, notaCliente, direccionTexto, municipioEntrega, codigoCupon,
       });
       res.status(201).json({ ok: true, data: pedido });
     } catch (err) { next(err); }
@@ -196,6 +196,57 @@ const ExpressController = {
         comercioId, Number(req.params.productoId),
         menuSeccionId === null ? null : Number(menuSeccionId)
       );
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  // ── CUPONES EXPRESS ──────────────────────────────────────────
+
+  async validarCupon(req, res, next) {
+    try {
+      const { codigo, subtotal } = req.body;
+      if (!codigo || !subtotal) return res.status(400).json({ ok: false, error: "codigo y subtotal requeridos" });
+      let configExpressId = null;
+      const { comercioId } = req.query;
+      if (comercioId) {
+        const cfg = await prisma.configExpress.findUnique({ where: { comercioId: Number(comercioId) } });
+        configExpressId = cfg?.id ?? null;
+      }
+      const data = await ExpressService.validarCuponExpress(codigo, configExpressId, Number(subtotal), req.usuario?.id ?? null);
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async listarCupones(req, res, next) {
+    try {
+      const comercioId = await getComercioId(req.usuario.id);
+      const data = await ExpressService.listarCuponesExpress(comercioId);
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async crearCupon(req, res, next) {
+    try {
+      const comercioId = await getComercioId(req.usuario.id);
+      const data = await ExpressService.crearCuponExpress(comercioId, req.body);
+      res.status(201).json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async eliminarCupon(req, res, next) {
+    try {
+      const comercioId = await getComercioId(req.usuario.id);
+      await ExpressService.eliminarCuponExpress(comercioId, Number(req.params.id));
+      res.json({ ok: true });
+    } catch (err) { next(err); }
+  },
+
+  // ── ESTADÍSTICAS ──────────────────────────────────────────────
+
+  async estadisticas(req, res, next) {
+    try {
+      const comercioId = await getComercioId(req.usuario.id);
+      const data = await ExpressService.estadisticasExpress(comercioId);
       res.json({ ok: true, data });
     } catch (err) { next(err); }
   },

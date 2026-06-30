@@ -211,6 +211,7 @@ model Usuario {
   reviewsHotel              ReviewHotel[]       @relation("ReviewsHotelCliente")
   reviewsTour               ReviewTour[]        @relation("ReviewsTourCliente")
   cuponesHotelUsos          CuponHotelUso[]
+  cuponesExpressUsos        CuponExpressUso[]
 }
 
 model Comercio {
@@ -1179,6 +1180,7 @@ model ConfigExpress {
   pedidosExpress  PedidoExpress[]
   horarios        HorarioExpress[]
   secciones       MenuSeccion[]
+  cupones         CuponExpress[]
 
   @@index([activo, abierto])
 }
@@ -1239,6 +1241,8 @@ model PedidoExpress {
   subtotal         Decimal             @db.Decimal(12, 2)
   costoEnvio       Decimal             @default(0) @db.Decimal(10, 2)
   comision         Decimal             @db.Decimal(12, 2)
+  montoDescuento   Decimal?            @db.Decimal(10, 2)
+  codigoCupon      String?
   total            Decimal             @db.Decimal(12, 2)
 
   direccionTexto   String?
@@ -1262,6 +1266,7 @@ model PedidoExpress {
   repartidor       Usuario?            @relation("PedidosExpressRepartidor", fields: [repartidorId],   references: [id])
   configExpress    ConfigExpress       @relation(fields: [configExpressId],  references: [id])
   items            ItemPedidoExpress[]
+  cuponUso         CuponExpressUso?
 
   @@index([comercioId, estado])
   @@index([clienteId,  estado])
@@ -1318,6 +1323,7 @@ model ConfigHotel {
 
   comercio      Comercio         @relation(fields: [comercioId], references: [id])
   habitaciones  HabitacionTipo[]
+  habitacionesFisicas HabitacionFisica[]
   reservas      ReservaHotel[]
   reviews       ReviewHotel[]
   cupones       CuponHotel[]
@@ -1346,8 +1352,31 @@ model HabitacionTipo {
   configHotel ConfigHotel    @relation(fields: [configHotelId], references: [id], onDelete: Cascade)
   reservas    ReservaHotel[]
   temporadas  TemporadaHotel[]
+  unidadesFisicas HabitacionFisica[]
 
   @@index([configHotelId, activo])
+}
+
+model HabitacionFisica {
+  id               Int      @id @default(autoincrement())
+  configHotelId    Int
+  habitacionTipoId Int
+  nombre           String
+  piso             String?
+  zona             String?
+  estado           String   @default("LIBRE")
+  notas            String?
+  activo           Boolean  @default(true)
+  creadoAt         DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  configHotel    ConfigHotel    @relation(fields: [configHotelId], references: [id], onDelete: Cascade)
+  habitacionTipo HabitacionTipo @relation(fields: [habitacionTipoId], references: [id], onDelete: Cascade)
+  reservas       ReservaHotel[]
+
+  @@unique([habitacionTipoId, nombre])
+  @@index([configHotelId, estado])
+  @@index([habitacionTipoId, activo])
 }
 
 model ReservaHotel {
@@ -1355,6 +1384,7 @@ model ReservaHotel {
   codigo            String             @unique
   configHotelId     Int
   habitacionTipoId  Int
+  habitacionFisicaId Int?
   clienteId         Int
   fechaEntrada      DateTime
   fechaSalida       DateTime
@@ -1383,11 +1413,13 @@ model ReservaHotel {
 
   configHotel    ConfigHotel    @relation(fields: [configHotelId],    references: [id])
   habitacionTipo HabitacionTipo @relation(fields: [habitacionTipoId], references: [id])
+  habitacionFisica HabitacionFisica? @relation(fields: [habitacionFisicaId], references: [id])
   cliente        Usuario        @relation("ReservasHotelCliente",     fields: [clienteId], references: [id])
   review         ReviewHotel?
   cuponHotelUso  CuponHotelUso?
 
   @@index([configHotelId, estado])
+  @@index([habitacionFisicaId])
   @@index([clienteId])
   @@index([fechaEntrada, fechaSalida])
 }
@@ -1612,6 +1644,44 @@ model TemporadaHotel {
   @@index([configHotelId, activo])
   @@index([habitacionTipoId, activo])
   @@index([inicio, fin])
+}
+
+// ─── CUPONES EXPRESS ──────────────────────────────────────────
+
+model CuponExpress {
+  id              Int       @id @default(autoincrement())
+  codigo          String    @unique
+  tipo            String    @default("PORCENTAJE")  // PORCENTAJE | VALOR_FIJO
+  valor           Decimal   @db.Decimal(10, 2)
+  minimoSubtotal  Decimal?  @db.Decimal(10, 2)
+  usosMaximos     Int?
+  usosActuales    Int       @default(0)
+  activo          Boolean   @default(true)
+  inicio          DateTime
+  fin             DateTime
+  configExpressId Int?
+  createdAt       DateTime  @default(now())
+
+  configExpress ConfigExpress?    @relation(fields: [configExpressId], references: [id], onDelete: SetNull)
+  usos          CuponExpressUso[]
+
+  @@index([codigo, activo])
+  @@index([activo, fin])
+  @@index([configExpressId])
+}
+
+model CuponExpressUso {
+  id              Int      @id @default(autoincrement())
+  cuponExpressId  Int
+  clienteId       Int
+  pedidoExpressId Int      @unique
+  createdAt       DateTime @default(now())
+
+  cupon         CuponExpress  @relation(fields: [cuponExpressId], references: [id])
+  cliente       Usuario       @relation(fields: [clienteId],      references: [id])
+  pedidoExpress PedidoExpress @relation(fields: [pedidoExpressId], references: [id])
+
+  @@index([cuponExpressId, clienteId])
 }
 
 model FavoritoHotel {

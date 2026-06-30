@@ -122,7 +122,7 @@ const ExpressService = {
 
   // ── CREAR PEDIDO (CLIENTE) ───────────────────────────────────
 
-  async crearPedido({ clienteId, comercioId, modalidad, metodoPago, items, notaCliente, direccionTexto, municipioEntrega }) {
+  async crearPedido({ clienteId, comercioId, modalidad, metodoPago, items, notaCliente, direccionTexto, municipioEntrega, codigoCupon }) {
     const cfg = await prisma.configExpress.findUnique({
       where: { comercioId },
       include: { horarios: true },
@@ -169,9 +169,18 @@ const ExpressService = {
                precioUnitario, subtotal: sub, nota: item.nota ?? null };
     });
 
+    // Aplicar cupón si viene
+    let montoDescuento = 0;
+    let cuponAplicado = null;
+    if (codigoCupon) {
+      const validacion = await this.validarCuponExpress(codigoCupon, cfg.id, subtotal, clienteId);
+      montoDescuento = validacion.descuento;
+      cuponAplicado = validacion.cupon;
+    }
+
     const costoEnvio = modalidad === "DOMICILIO" ? Number(cfg.costoEnvioBase) : 0;
-    const comision   = Math.round(subtotal * TASA_COMISION);
-    const total      = subtotal + costoEnvio;
+    const comision   = Math.round((subtotal - montoDescuento) * TASA_COMISION);
+    const total      = subtotal - montoDescuento + costoEnvio;
     const expiresAt  = new Date(Date.now() + TIMEOUT_ACEPTACION_MIN * 60 * 1000);
 
     const pedido = await prisma.pedidoExpress.create({
@@ -185,6 +194,8 @@ const ExpressService = {
         subtotal,
         costoEnvio,
         comision,
+        montoDescuento: montoDescuento > 0 ? montoDescuento : null,
+        codigoCupon: cuponAplicado?.codigo ?? null,
         total,
         notaCliente,
         direccionTexto,
@@ -195,6 +206,17 @@ const ExpressService = {
       },
       include: { items: { include: { producto: { select: { nombre: true } } } } },
     });
+
+    // Registrar uso del cupón
+    if (cuponAplicado) {
+      await prisma.cuponExpressUso.create({
+        data: { cuponExpressId: cuponAplicado.id, clienteId, pedidoExpressId: pedido.id },
+      });
+      await prisma.cuponExpress.update({
+        where: { id: cuponAplicado.id },
+        data: { usosActuales: { increment: 1 } },
+      });
+    }
 
     // Notificar al comerciante
     const uidComerciante = await usuarioDelComercio(comercioId);
@@ -408,6 +430,177 @@ const ExpressService = {
       data:   { estado: "CANCELADO", canceladoAt: new Date(), motivoCancelacion: "Tiempo de aceptación expirado" },
     });
     return result.count;
+  },
+
+  // ── CUPONES EXPRESS ──────────────────────────────────────────
+
+  async validarCuponExpress(codigo, configExpressId, subtotal, clienteId) {
+    const cupon = await prisma.cuponExpress.findFirst({
+      where: {
+        codigo: codigo.trim().toUpperCase(),
+        activo: true,
+        fin:   { gte: new Date() },
+        inicio: { lte: new Date() },
+        OR: [
+          { configExpressId: null },
+          { configExpressId },
+        ],
+      },
+    });
+    if (!cupon) throw new ErrorValidacion("Cupón inválido o expirado");
+    if (cupon.usosMaximos && cupon.usosActuales >= cupon.usosMaximos) {
+      throw new ErrorValidacion("Este cupón ya alcanzó su límite de usos");
+    }
+    if (cupon.minimoSubtotal && Number(subtotal) < Number(cupon.minimoSubtotal)) {
+      throw new ErrorValidacion(`Subtotal mínimo requerido: $${Number(cupon.minimoSubtotal).toLocaleString("es-CO")}`);
+    }
+    // Verificar que el cliente no lo haya usado antes
+    if (clienteId) {
+      const yaUso = await prisma.cuponExpressUso.findFirst({
+        where: { cuponExpressId: cupon.id, clienteId },
+      });
+      if (yaUso) throw new ErrorValidacion("Ya usaste este cupón anteriormente");
+    }
+    const descuento = cupon.tipo === "PORCENTAJE"
+      ? Math.round(Number(subtotal) * Number(cupon.valor) / 100)
+      : Math.min(Number(cupon.valor), Number(subtotal));
+    return { cupon, descuento, subtotalConDescuento: Number(subtotal) - descuento };
+  },
+
+  async listarCuponesExpress(comercioId) {
+    const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
+    if (!cfg) return [];
+    return prisma.cuponExpress.findMany({
+      where: { configExpressId: cfg.id },
+      orderBy: { createdAt: "desc" },
+      include: { _count: { select: { usos: true } } },
+    });
+  },
+
+  async crearCuponExpress(comercioId, datos) {
+    const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
+    if (!cfg) throw new ErrorValidacion("Activa primero el módulo Express");
+    const { codigo, tipo, valor, minimoSubtotal, usosMaximos, inicio, fin } = datos;
+    if (!codigo?.trim()) throw new ErrorValidacion("El código es requerido");
+    if (!valor || Number(valor) <= 0) throw new ErrorValidacion("El valor debe ser positivo");
+    if (tipo === "PORCENTAJE" && Number(valor) > 100) throw new ErrorValidacion("El porcentaje no puede superar 100");
+    return prisma.cuponExpress.create({
+      data: {
+        codigo: codigo.trim().toUpperCase(),
+        tipo: tipo ?? "PORCENTAJE",
+        valor: Number(valor),
+        minimoSubtotal: minimoSubtotal ? Number(minimoSubtotal) : null,
+        usosMaximos: usosMaximos ? Number(usosMaximos) : null,
+        activo: true,
+        inicio: new Date(inicio),
+        fin:    new Date(fin),
+        configExpressId: cfg.id,
+      },
+    });
+  },
+
+  async eliminarCuponExpress(comercioId, cuponId) {
+    const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
+    if (!cfg) throw new ErrorNoEncontrado("Config no encontrada");
+    const cupon = await prisma.cuponExpress.findFirst({
+      where: { id: cuponId, configExpressId: cfg.id },
+    });
+    if (!cupon) throw new ErrorNoEncontrado("Cupón no encontrado");
+    return prisma.cuponExpress.update({ where: { id: cuponId }, data: { activo: false } });
+  },
+
+  // ── ESTADÍSTICAS EXPRESS ──────────────────────────────────────
+
+  async estadisticasExpress(comercioId) {
+    const hoy = new Date();
+    const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    const inicioSemana = new Date(inicioHoy);
+    inicioSemana.setDate(inicioHoy.getDate() - 6);
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+
+    const [hoyStats, semanaStats, mesStats, porHora, topProductos, ultimosPedidos] = await Promise.all([
+      // Hoy
+      prisma.pedidoExpress.aggregate({
+        where: { comercioId, estado: "ENTREGADO", entregadoAt: { gte: inicioHoy } },
+        _count: { id: true },
+        _sum: { total: true, comision: true },
+      }),
+      // Últimos 7 días
+      prisma.pedidoExpress.aggregate({
+        where: { comercioId, estado: "ENTREGADO", entregadoAt: { gte: inicioSemana } },
+        _count: { id: true },
+        _sum: { total: true, comision: true },
+      }),
+      // Este mes
+      prisma.pedidoExpress.aggregate({
+        where: { comercioId, estado: "ENTREGADO", entregadoAt: { gte: inicioMes } },
+        _count: { id: true },
+        _sum: { total: true, comision: true },
+      }),
+      // Pedidos por hora del día (últimos 30 días)
+      prisma.pedidoExpress.findMany({
+        where: { comercioId, estado: "ENTREGADO", creadoAt: { gte: new Date(Date.now() - 30 * 86400000) } },
+        select: { creadoAt: true },
+      }),
+      // Top 5 productos más pedidos (últimos 30 días)
+      prisma.itemPedidoExpress.groupBy({
+        by: ["productoId"],
+        where: {
+          pedidoExpress: { comercioId, estado: "ENTREGADO", creadoAt: { gte: new Date(Date.now() - 30 * 86400000) } },
+        },
+        _sum: { cantidad: true },
+        _count: { id: true },
+        orderBy: { _sum: { cantidad: "desc" } },
+        take: 5,
+      }),
+      // Últimos 10 pedidos de cualquier estado
+      prisma.pedidoExpress.findMany({
+        where: { comercioId },
+        orderBy: { creadoAt: "desc" },
+        take: 10,
+        select: { id: true, codigo: true, estado: true, total: true, creadoAt: true, modalidad: true },
+      }),
+    ]);
+
+    // Calcular distribución por hora
+    const horaCount = Array(24).fill(0);
+    for (const p of porHora) {
+      const hora = new Date(p.creadoAt).getUTCHours() - 5; // UTC-5 Colombia
+      horaCount[((hora % 24) + 24) % 24]++;
+    }
+
+    // Obtener nombres de productos top
+    const productoIds = topProductos.map(p => p.productoId);
+    const productos = await prisma.producto.findMany({
+      where: { id: { in: productoIds } },
+      select: { id: true, nombre: true, fotoUrl: true },
+    });
+    const prodMap = Object.fromEntries(productos.map(p => [p.id, p]));
+
+    return {
+      hoy: {
+        pedidos: hoyStats._count.id,
+        ingresos: Number(hoyStats._sum.total ?? 0),
+        comision: Number(hoyStats._sum.comision ?? 0),
+      },
+      semana: {
+        pedidos: semanaStats._count.id,
+        ingresos: Number(semanaStats._sum.total ?? 0),
+        comision: Number(semanaStats._sum.comision ?? 0),
+      },
+      mes: {
+        pedidos: mesStats._count.id,
+        ingresos: Number(mesStats._sum.total ?? 0),
+        comision: Number(mesStats._sum.comision ?? 0),
+      },
+      horasPico: horaCount,
+      topProductos: topProductos.map(p => ({
+        producto: prodMap[p.productoId] ?? { id: p.productoId, nombre: "Desconocido", fotoUrl: null },
+        cantidad: p._sum.cantidad ?? 0,
+        pedidos: p._count.id,
+      })),
+      ultimosPedidos,
+    };
   },
 
   // ── HELPERS ──────────────────────────────────────────────────

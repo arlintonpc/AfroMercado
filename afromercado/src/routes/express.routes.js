@@ -35,6 +35,15 @@ router.post(  "/mis-pedidos/:id/aceptar",   ...soloComercio, ExpressController.a
 router.post(  "/mis-pedidos/:id/rechazar",  ...soloComercio, ExpressController.rechazarPedido);
 router.post(  "/mis-pedidos/:id/avanzar",   ...soloComercio, ExpressController.avanzarEstado);
 
+// Cupones Express (validar es público con auth opcional)
+router.post(   "/cupones/validar",      ExpressController.validarCupon);
+router.get(    "/mis-cupones",          ...soloComercio, ExpressController.listarCupones);
+router.post(   "/mis-cupones",          ...soloComercio, ExpressController.crearCupon);
+router.delete( "/mis-cupones/:id",      ...soloComercio, ExpressController.eliminarCupon);
+
+// Estadísticas del comerciante
+router.get(    "/mis-estadisticas",     ...soloComercio, ExpressController.estadisticas);
+
 // ── ADMIN ────────────────────────────────────────────────────
 router.get(  "/admin/deudas",                          ...soloAdmin, ExpressController.deudasAdmin);
 router.post( "/admin/deudas/:comercioId/saldar",       ...soloAdmin, ExpressController.saldarDeudaAdmin);

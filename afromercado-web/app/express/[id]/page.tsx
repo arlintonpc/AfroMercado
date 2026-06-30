@@ -7,10 +7,12 @@ import Link from 'next/link'
 import {
   obtenerMenuComercioExpress,
   crearPedidoExpress,
+  validarCuponExpress,
   type MenuComercioExpress,
   type MenuSeccion,
   type ModalidadExpress,
   type MetodoPagoExpress,
+  type ValidacionCuponExpress,
 } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
@@ -96,6 +98,12 @@ export default function MenuExpressPage() {
   const [error, setError] = useState<string | null>(null)
   const [pedidoId, setPedidoId] = useState<number | null>(null)
 
+  // Cupón
+  const [codigoCupon, setCodigoCupon]         = useState('')
+  const [cuponAplicado, setCuponAplicado]     = useState<ValidacionCuponExpress | null>(null)
+  const [validandoCupon, setValidandoCupon]   = useState(false)
+  const [errorCupon, setErrorCupon]           = useState<string | null>(null)
+
   // Checkout fields
   const [modalidad, setModalidad] = useState<ModalidadExpress>('RECOGER')
   const [metodoPago, setMetodoPago] = useState<MetodoPagoExpress>('EFECTIVO')
@@ -150,6 +158,22 @@ export default function MenuExpressPage() {
   const totalItems = carrito.reduce((s, i) => s + i.cantidad, 0)
   const totalPrecio = carrito.reduce((s, i) => s + i.precio * i.cantidad, 0)
 
+  async function aplicarCupon() {
+    if (!codigoCupon.trim()) return
+    setValidandoCupon(true)
+    setErrorCupon(null)
+    try {
+      const validacion = await validarCuponExpress(codigoCupon.trim(), totalPrecio, comercioId)
+      setCuponAplicado(validacion)
+      setErrorCupon(null)
+    } catch (e: any) {
+      setErrorCupon(e?.message ?? 'Cupón inválido')
+      setCuponAplicado(null)
+    } finally {
+      setValidandoCupon(false)
+    }
+  }
+
   async function confirmarPedido() {
     if (!autenticado) { router.push('/login'); return }
     if (carrito.length === 0) return
@@ -172,6 +196,7 @@ export default function MenuExpressPage() {
         notaCliente: notaCliente || undefined,
         direccionTexto: direccionFinal,
         municipioEntrega: menu?.comercio.municipio,
+        codigoCupon: cuponAplicado ? codigoCupon.trim() : undefined,
       })
       setPedidoId(pedido.id)
       setPaso('confirmado')
@@ -262,6 +287,18 @@ export default function MenuExpressPage() {
             {modalidad === 'DOMICILIO' && menu.costoEnvioBase > 0 && (
               <p className="text-xs text-[#999] mt-1">Incluye domicilio: {formatearPrecio(menu.costoEnvioBase)}</p>
             )}
+            {cuponAplicado && (
+              <>
+                <div className="flex justify-between text-sm py-1 text-green-700">
+                  <span>Descuento ({cuponAplicado.cupon.codigo})</span>
+                  <span>-{formatearPrecio(cuponAplicado.descuento)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-[#1A1A1A] mt-1 pt-2 border-t border-[#E8DCC8]">
+                  <span>Total con descuento</span>
+                  <span>{formatearPrecio(cuponAplicado.subtotalConDescuento + (modalidad === 'DOMICILIO' ? (menu?.costoEnvioBase ?? 0) : 0))}</span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Modalidad */}
@@ -348,6 +385,46 @@ export default function MenuExpressPage() {
               value={notaCliente}
               onChange={e => setNotaCliente(e.target.value)}
             />
+          </div>
+
+          {/* Cupón de descuento */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <p className="font-semibold text-[#1A1A1A] mb-2">¿Tienes un cupón?</p>
+            {cuponAplicado ? (
+              <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                <div>
+                  <p className="text-sm font-bold text-green-700">✅ {cuponAplicado.cupon.codigo} aplicado</p>
+                  <p className="text-xs text-green-600">
+                    Descuento: -{formatearPrecio(cuponAplicado.descuento)}
+                    {cuponAplicado.cupon.tipo === 'PORCENTAJE' ? ` (${Number(cuponAplicado.cupon.valor)}%)` : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setCuponAplicado(null); setCodigoCupon('') }}
+                  className="text-xs text-red-500 font-medium"
+                >
+                  Quitar
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  value={codigoCupon}
+                  onChange={e => setCodigoCupon(e.target.value.toUpperCase())}
+                  onKeyDown={e => e.key === 'Enter' && aplicarCupon()}
+                  placeholder="Código de descuento"
+                  className="flex-1 rounded-xl border border-[#E8DCC8] px-4 py-2.5 text-sm font-mono uppercase focus:outline-none focus:border-[#2D6A4F]"
+                />
+                <button
+                  onClick={aplicarCupon}
+                  disabled={validandoCupon || !codigoCupon.trim()}
+                  className="px-4 py-2.5 rounded-xl bg-[#2D6A4F] text-white text-sm font-semibold disabled:opacity-50"
+                >
+                  {validandoCupon ? '...' : 'Aplicar'}
+                </button>
+              </div>
+            )}
+            {errorCupon && <p className="text-xs text-red-600 mt-2">{errorCupon}</p>}
           </div>
 
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{error}</p>}
