@@ -4,9 +4,12 @@ import { useEffect, useRef, useState } from 'react'
 import {
   obtenerMiTransporte, actualizarMiTransporte, agregarRuta, actualizarRuta, eliminarRuta,
   reservasOperadorTransporte, cambiarEstadoReservaTransporte, subirFotosTransporte,
+  subirVideoTransporte, quitarVideoTransporte,
   type ConfigTransporte, type RutaTransporte, type ReservaTransporte, type EstadoReservaTransporte,
 } from '@/lib/api/transporte'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import SubidorVideo from '@/components/comerciante/SubidorVideo'
+import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
 
 const TIPO_OPCIONES = ['LANCHA', 'BOTE', 'CHALUPA', 'CANOA']
 const TIPO_ICONO: Record<string, string> = { LANCHA: '🛥️', BOTE: '⛵', CHALUPA: '🚤', CANOA: '🛶' }
@@ -36,10 +39,23 @@ export default function ComercianteTransportesPage() {
   const [mostrarFormRuta, setMostrarFormRuta] = useState(false)
   const inputFotoRef = useRef<HTMLInputElement>(null)
   const reservasRef = useRef<ReservaTransporte[]>([])
+  const [videoEstadoTransporte, setVideoEstadoTransporte] = useState<VideoEstado>({
+    videoUrl: null,
+    videoPosterUrl: null,
+    videoDuracionSegundos: null,
+    videoMimeType: null,
+  })
 
   useEffect(() => {
     Promise.all([obtenerMiTransporte(), reservasOperadorTransporte()]).then(([t, rs]) => {
-      setCfg(t); setEditCfg(t); setReservas(rs); reservasRef.current = rs; setCargando(false)
+      setCfg(t); setEditCfg(t); setReservas(rs); reservasRef.current = rs
+      setVideoEstadoTransporte({
+        videoUrl: (t as any).videoUrl ?? null,
+        videoPosterUrl: (t as any).videoPosterUrl ?? null,
+        videoDuracionSegundos: null,
+        videoMimeType: null,
+      })
+      setCargando(false)
     })
   }, [])
 
@@ -92,6 +108,20 @@ export default function ComercianteTransportesPage() {
 
   async function subirFotos(files: FileList) {
     try { const t = await subirFotosTransporte(Array.from(files)); setCfg(t) } catch (e: any) { alert(e.message) }
+  }
+
+  async function handleSubirVideoTransporte(file: File, meta: VideoMetaCaptura): Promise<VideoEstado> {
+    const r = await subirVideoTransporte(file, meta)
+    const nuevo: VideoEstado = { videoUrl: r.videoUrl, videoPosterUrl: r.videoPosterUrl ?? null, videoDuracionSegundos: meta.duracionSegundos, videoMimeType: file.type }
+    setVideoEstadoTransporte(nuevo)
+    return nuevo
+  }
+
+  async function handleQuitarVideoTransporte(): Promise<VideoEstado> {
+    await quitarVideoTransporte()
+    const vacio: VideoEstado = { videoUrl: null, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
+    setVideoEstadoTransporte(vacio)
+    return vacio
   }
 
   if (cargando) return <div className="min-h-[60vh] flex items-center justify-center"><div className="w-8 h-8 border-2 border-[#023E8A] border-t-transparent rounded-full animate-spin" /></div>
@@ -307,6 +337,18 @@ export default function ComercianteTransportesPage() {
               className="w-full border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm text-gray-400 hover:border-[#023E8A] hover:text-[#023E8A] transition-colors">
               📸 Agregar fotos
             </button>
+          </div>
+
+          {/* Video */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+            <h3 className="font-semibold text-gray-800 mb-4">Video del servicio</h3>
+            <SubidorVideo
+              titulo="Video del servicio"
+              descripcion="Sube un clip de hasta 45 segundos. Si el video es más largo, elige el fragmento que quieres mostrar."
+              estadoInicial={videoEstadoTransporte}
+              onSubir={handleSubirVideoTransporte}
+              onEliminar={handleQuitarVideoTransporte}
+            />
           </div>
 
           <button onClick={guardarConfig} disabled={guardando}

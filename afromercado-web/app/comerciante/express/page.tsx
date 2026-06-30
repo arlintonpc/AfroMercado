@@ -8,6 +8,7 @@ import {
   listarSeccionesExpress, crearSeccionExpress, actualizarSeccionExpress,
   eliminarSeccionExpress, asignarSeccionProducto,
   listarCuponesExpress, crearCuponExpress, eliminarCuponExpress, obtenerEstadisticasExpress,
+  subirVideoExpress, quitarVideoExpress,
   type ConfigExpress, type PedidoExpress, type ModalidadExpress, type DiaSemana, type HorarioExpress,
   type MenuSeccion, type MenuComercioExpress, type CuponExpress, type EstadisticasExpress,
 } from '@/lib/api/express'
@@ -16,6 +17,8 @@ import { obtenerToken } from '@/lib/api/client'
 import { obtenerMiComercio } from '@/components/comerciante/api'
 import { Switch } from '@/components/ui'
 import { MUNICIPIOS_POR_DEPARTAMENTO } from '@/components/comerciante/constantes'
+import SubidorVideo from '@/components/comerciante/SubidorVideo'
+import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
 
 const DIAS: { dia: DiaSemana; label: string }[] = [
   { dia: 'LUNES',     label: 'Lunes' },
@@ -109,6 +112,12 @@ export default function ExpressComerciante() {
   })
   const [guardandoCupon, setGuardandoCupon] = useState(false)
   const [errorCupon, setErrorCupon]         = useState('')
+  const [videoEstadoExpress, setVideoEstadoExpress] = useState<VideoEstado>({
+    videoUrl: null,
+    videoPosterUrl: null,
+    videoDuracionSegundos: null,
+    videoMimeType: null,
+  })
 
   const cargar = useCallback(async () => {
     try {
@@ -131,6 +140,12 @@ export default function ExpressComerciante() {
       // Solo inicializar editConfig en la primera carga — no pisar cambios no guardados
       if (primerasCarga.current) {
         setEditConfig(cfg)
+        setVideoEstadoExpress({
+          videoUrl: (cfg as any).videoUrl ?? null,
+          videoPosterUrl: (cfg as any).videoPosterUrl ?? null,
+          videoDuracionSegundos: null,
+          videoMimeType: null,
+        })
         primerasCarga.current = false
       }
       // Detectar pedidos PENDIENTE nuevos vs los que ya teníamos
@@ -211,6 +226,20 @@ export default function ExpressComerciante() {
       const updated = await toggleAbiertoExpress(!config.abierto)
       setConfig(updated)
     } catch (e: any) { setError(e.message) }
+  }
+
+  async function handleSubirVideoExpress(file: File, meta: VideoMetaCaptura): Promise<VideoEstado> {
+    const r = await subirVideoExpress(file, meta)
+    const nuevo: VideoEstado = { videoUrl: r.videoUrl, videoPosterUrl: r.videoPosterUrl ?? null, videoDuracionSegundos: meta.duracionSegundos, videoMimeType: file.type }
+    setVideoEstadoExpress(nuevo)
+    return nuevo
+  }
+
+  async function handleQuitarVideoExpress(): Promise<VideoEstado> {
+    await quitarVideoExpress()
+    const vacio: VideoEstado = { videoUrl: null, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
+    setVideoEstadoExpress(vacio)
+    return vacio
   }
 
   async function guardarConfig() {
@@ -1099,6 +1128,18 @@ export default function ExpressComerciante() {
                 + Agregar
               </button>
             </div>
+          </div>
+
+          {/* Video */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+            <h3 className="font-semibold text-gray-800 mb-4">Video del restaurante</h3>
+            <SubidorVideo
+              titulo="Video del restaurante"
+              descripcion="Sube un clip de hasta 45 segundos. Si el video es más largo, elige el fragmento que quieres mostrar."
+              estadoInicial={videoEstadoExpress}
+              onSubir={handleSubirVideoExpress}
+              onEliminar={handleQuitarVideoExpress}
+            />
           </div>
 
           <button

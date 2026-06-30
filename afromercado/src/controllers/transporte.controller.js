@@ -1,6 +1,20 @@
 const fs = require("fs");
-const { subirACloudinary } = require("../utils/cloudinary");
+const path = require("path");
+const { subirACloudinary, subirVideoACloudinary, construirUrlVideoOptimizada, construirPosterVideo } = require("../utils/cloudinary");
 const TransporteService = require("../services/transporte.service");
+const {
+  crearUploadVideo,
+  extraerVideoMeta,
+  normalizarRecorteVideo,
+  urlLocalVideo,
+  eliminarArchivoLocalDesdeUrl,
+} = require("../utils/video-media");
+
+const _uploadVideoTransporte = crearUploadVideo({
+  dir: path.join(__dirname, "../../uploads/videos/transportes"),
+  prefijo: "transporte-video",
+  fieldName: "video",
+});
 
 const TransporteController = {
   async listar(req, res, next) {
@@ -110,5 +124,38 @@ const TransporteController = {
     } catch (e) { next(e); }
   },
 };
+
+// ── VIDEO TRANSPORTE ──────────────────────────────────────────
+
+async function uploadVideoTransporte(req, res, next) {
+  _uploadVideoTransporte(req, res, err => { if (err) return next(err); next(); });
+}
+
+async function subirVideoTransporte(req, res, next) {
+  try {
+    const comercioId = req.usuario.comercio.id;
+    if (!req.file) return res.status(400).json({ ok: false, error: "No se recibió archivo de video" });
+    const meta = extraerVideoMeta(req.body);
+    const recorte = normalizarRecorteVideo(meta);
+    const { secureUrl } = await subirVideoACloudinary(req.file.path, "afromercado/videos/transportes");
+    const videoUrl = construirUrlVideoOptimizada(secureUrl, recorte);
+    const posterFinal = construirPosterVideo(secureUrl, recorte);
+    const result = await TransporteService.subirVideoTransporte(comercioId, videoUrl, posterFinal, recorte.duracionFinal);
+    eliminarArchivoLocalDesdeUrl(urlLocalVideo(req, req.file.path)).catch(() => {});
+    res.json({ ok: true, data: result });
+  } catch (err) { next(err); }
+}
+
+async function quitarVideoTransporte(req, res, next) {
+  try {
+    const comercioId = req.usuario.comercio.id;
+    const result = await TransporteService.quitarVideoTransporte(comercioId);
+    res.json({ ok: true, data: result });
+  } catch (err) { next(err); }
+}
+
+TransporteController.uploadVideoTransporte = uploadVideoTransporte;
+TransporteController.subirVideoTransporte  = subirVideoTransporte;
+TransporteController.quitarVideoTransporte = quitarVideoTransporte;
 
 module.exports = TransporteController;

@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { obtenerMiTour, actualizarMiTour, reservasOperadorTour, cambiarEstadoReservaTour, subirFotosTour, listarCuponesTour, crearCuponTour, eliminarCuponTour, obtenerEstadisticasTour, type ConfigTour, type ReservaTour, type EstadoReservaTour, type CuponTour, type EstadisticasTour } from '@/lib/api/tour'
+import { obtenerMiTour, actualizarMiTour, reservasOperadorTour, cambiarEstadoReservaTour, subirFotosTour, subirVideoTour, quitarVideoTour, listarCuponesTour, crearCuponTour, eliminarCuponTour, obtenerEstadisticasTour, type ConfigTour, type ReservaTour, type EstadoReservaTour, type CuponTour, type EstadisticasTour } from '@/lib/api/tour'
 import { Switch } from '@/components/ui'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import SubidorVideo from '@/components/comerciante/SubidorVideo'
+import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
 
 const SERVICIOS_OPCIONES = [
   { key: 'transporte', label: '🚐 Transporte' },
@@ -52,6 +54,12 @@ export default function ComercianteTourPage() {
   })
   const [guardandoCupon, setGuardandoCupon] = useState(false)
   const [errorCupon, setErrorCupon]         = useState('')
+  const [videoEstadoTour, setVideoEstadoTour] = useState<VideoEstado>({
+    videoUrl: null,
+    videoPosterUrl: null,
+    videoDuracionSegundos: null,
+    videoMimeType: null,
+  })
 
   const pendientes = reservas.filter(r => r.estado === 'PENDIENTE')
 
@@ -61,6 +69,12 @@ export default function ComercianteTourPage() {
       setEditConfig(t)
       setReservas(rs)
       reservasRef.current = rs
+      setVideoEstadoTour({
+        videoUrl: (t as any).videoUrl ?? null,
+        videoPosterUrl: (t as any).videoPosterUrl ?? null,
+        videoDuracionSegundos: null,
+        videoMimeType: null,
+      })
       setCargando(false)
     })
   }, [])
@@ -122,6 +136,20 @@ export default function ComercianteTourPage() {
     } finally {
       setGuardando(false)
     }
+  }
+
+  async function handleSubirVideoTour(file: File, meta: VideoMetaCaptura): Promise<VideoEstado> {
+    const r = await subirVideoTour(file, meta)
+    const nuevo: VideoEstado = { videoUrl: r.videoUrl, videoPosterUrl: r.videoPosterUrl ?? null, videoDuracionSegundos: meta.duracionSegundos, videoMimeType: file.type }
+    setVideoEstadoTour(nuevo)
+    return nuevo
+  }
+
+  async function handleQuitarVideoTour(): Promise<VideoEstado> {
+    await quitarVideoTour()
+    const vacio: VideoEstado = { videoUrl: null, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
+    setVideoEstadoTour(vacio)
+    return vacio
   }
 
   if (cargando) return (
@@ -536,6 +564,18 @@ export default function ComercianteTourPage() {
               className="w-full border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm text-gray-500 hover:border-[#2D6A4F] hover:text-[#2D6A4F] disabled:opacity-50 transition-colors">
               {subiendoFotos ? '⏳ Subiendo…' : '📸 Agregar fotos'}
             </button>
+          </div>
+
+          {/* Video */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+            <h3 className="font-semibold text-gray-800 mb-4">Video del tour</h3>
+            <SubidorVideo
+              titulo="Video del tour"
+              descripcion="Sube un clip de hasta 45 segundos. Si el video es más largo, elige el fragmento que quieres mostrar."
+              estadoInicial={videoEstadoTour}
+              onSubir={handleSubirVideoTour}
+              onEliminar={handleQuitarVideoTour}
+            />
           </div>
 
           {/* Política cancelación */}

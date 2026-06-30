@@ -43,6 +43,10 @@ router.get(  "/favoritos/:id",          ...soloAuth, TourController.esFavorito);
 // Estadísticas
 router.get(  "/mi-tour/estadisticas",   ...soloComercio, TourController.estadisticas);
 
+// Video
+router.post(  "/mi-tour/config/video", ...soloComercio, TourController.uploadVideoTour, TourController.subirVideoTour);
+router.delete("/mi-tour/config/video", ...soloComercio, TourController.quitarVideoTour);
+
 router.get("/:id",            TourController.obtener);
 
 // ── CLIENTE ──────────────────────────────────────────────────

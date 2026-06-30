@@ -1,5 +1,20 @@
+const path            = require("path");
 const ExpressService  = require("../services/express.service");
 const prisma          = require("../config/prisma");
+const { subirVideoACloudinary, construirUrlVideoOptimizada, construirPosterVideo } = require("../utils/cloudinary");
+const {
+  crearUploadVideo,
+  extraerVideoMeta,
+  normalizarRecorteVideo,
+  urlLocalVideo,
+  eliminarArchivoLocalDesdeUrl,
+} = require("../utils/video-media");
+
+const _uploadVideoExpress = crearUploadVideo({
+  dir: path.join(__dirname, "../../uploads/videos/express"),
+  prefijo: "express-video",
+  fieldName: "video",
+});
 
 async function getComercioId(usuarioId) {
   const c = await prisma.comercio.findUnique({ where: { usuarioId }, select: { id: true } });
@@ -251,5 +266,38 @@ const ExpressController = {
     } catch (err) { next(err); }
   },
 };
+
+// ── VIDEO EXPRESS ─────────────────────────────────────────────
+
+async function uploadVideoExpress(req, res, next) {
+  _uploadVideoExpress(req, res, err => { if (err) return next(err); next(); });
+}
+
+async function subirVideoExpress(req, res, next) {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    if (!req.file) return res.status(400).json({ ok: false, error: "No se recibió archivo de video" });
+    const meta = extraerVideoMeta(req.body);
+    const recorte = normalizarRecorteVideo(meta);
+    const { secureUrl } = await subirVideoACloudinary(req.file.path, "afromercado/videos/express");
+    const videoUrl = construirUrlVideoOptimizada(secureUrl, recorte);
+    const posterFinal = construirPosterVideo(secureUrl, recorte);
+    const result = await ExpressService.subirVideoExpress(comercioId, videoUrl, posterFinal, recorte.duracionFinal);
+    eliminarArchivoLocalDesdeUrl(urlLocalVideo(req, req.file.path)).catch(() => {});
+    res.json({ ok: true, data: result });
+  } catch (err) { next(err); }
+}
+
+async function quitarVideoExpress(req, res, next) {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const result = await ExpressService.quitarVideoExpress(comercioId);
+    res.json({ ok: true, data: result });
+  } catch (err) { next(err); }
+}
+
+ExpressController.uploadVideoExpress = uploadVideoExpress;
+ExpressController.subirVideoExpress  = subirVideoExpress;
+ExpressController.quitarVideoExpress = quitarVideoExpress;
 
 module.exports = ExpressController;

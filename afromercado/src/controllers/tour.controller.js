@@ -1,6 +1,20 @@
 const fs = require("fs");
-const { subirACloudinary } = require("../utils/cloudinary");
+const path = require("path");
+const { subirACloudinary, subirVideoACloudinary, construirUrlVideoOptimizada, construirPosterVideo } = require("../utils/cloudinary");
 const TourService = require("../services/tour.service");
+const {
+  crearUploadVideo,
+  extraerVideoMeta,
+  normalizarRecorteVideo,
+  urlLocalVideo,
+  eliminarArchivoLocalDesdeUrl,
+} = require("../utils/video-media");
+
+const _uploadVideoTour = crearUploadVideo({
+  dir: path.join(__dirname, "../../uploads/videos/tours"),
+  prefijo: "tour-video",
+  fieldName: "video",
+});
 
 const TourController = {
   async listar(req, res, next) {
@@ -163,5 +177,38 @@ const TourController = {
     } catch (err) { next(err); }
   },
 };
+
+// ── VIDEO TOUR ────────────────────────────────────────────────
+
+async function uploadVideoTour(req, res, next) {
+  _uploadVideoTour(req, res, err => { if (err) return next(err); next(); });
+}
+
+async function subirVideoTour(req, res, next) {
+  try {
+    const comercioId = req.usuario.comercio.id;
+    if (!req.file) return res.status(400).json({ ok: false, error: "No se recibió archivo de video" });
+    const meta = extraerVideoMeta(req.body);
+    const recorte = normalizarRecorteVideo(meta);
+    const { secureUrl } = await subirVideoACloudinary(req.file.path, "afromercado/videos/tours");
+    const videoUrl = construirUrlVideoOptimizada(secureUrl, recorte);
+    const posterFinal = construirPosterVideo(secureUrl, recorte);
+    const result = await TourService.subirVideoTour(comercioId, videoUrl, posterFinal, recorte.duracionFinal);
+    eliminarArchivoLocalDesdeUrl(urlLocalVideo(req, req.file.path)).catch(() => {});
+    res.json({ ok: true, data: result });
+  } catch (err) { next(err); }
+}
+
+async function quitarVideoTour(req, res, next) {
+  try {
+    const comercioId = req.usuario.comercio.id;
+    const result = await TourService.quitarVideoTour(comercioId);
+    res.json({ ok: true, data: result });
+  } catch (err) { next(err); }
+}
+
+TourController.uploadVideoTour = uploadVideoTour;
+TourController.subirVideoTour  = subirVideoTour;
+TourController.quitarVideoTour = quitarVideoTour;
 
 module.exports = TourController;

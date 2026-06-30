@@ -228,6 +228,24 @@ const TransporteService = {
   async adminCambiarEstado(id, activo) {
     return prisma.configTransporte.update({ where: { id }, data: { activo } });
   },
+
+  // ── VIDEO TRANSPORTE ──────────────────────────────────────────
+
+  async subirVideoTransporte(comercioId, videoUrl, posterUrl, duracion) {
+    const config = await prisma.configTransporte.findUnique({ where: { comercioId } });
+    if (!config) throw new Error("Config transporte no encontrada");
+    return prisma.configTransporte.update({
+      where: { comercioId },
+      data: { videoUrl, videoPosterUrl: posterUrl },
+    });
+  },
+
+  async quitarVideoTransporte(comercioId) {
+    return prisma.configTransporte.update({
+      where: { comercioId },
+      data: { videoUrl: null, videoPosterUrl: null },
+    });
+  },
 };
 
 module.exports = TransporteService;

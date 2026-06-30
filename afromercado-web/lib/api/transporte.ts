@@ -167,3 +167,27 @@ export async function adminCambiarEstadoTransporte(id: number, activo: boolean):
   const r = await apiFetch<{ ok: boolean; data: ConfigTransporte }>(`/transportes/admin/${id}/estado`, { method: 'PATCH', body: { activo } })
   return r.data
 }
+
+// ── VIDEO TRANSPORTE ──────────────────────────────────────────
+
+export async function subirVideoTransporte(
+  file: File,
+  meta?: { duracionSegundos?: number; ancho?: number; alto?: number; bytes?: number; mimeType?: string; formato?: string; recorteInicioSegundos?: number; recorteFinSegundos?: number }
+): Promise<{ videoUrl: string; videoPosterUrl?: string }> {
+  const form = new FormData()
+  form.append('video', file)
+  if (meta?.duracionSegundos != null) form.append('duracionSegundos', String(meta.duracionSegundos))
+  if (meta?.ancho != null) form.append('ancho', String(meta.ancho))
+  if (meta?.alto != null) form.append('alto', String(meta.alto))
+  if (meta?.bytes != null) form.append('bytes', String(meta.bytes))
+  if (meta?.mimeType) form.append('mimeType', meta.mimeType)
+  if (meta?.formato) form.append('formato', meta.formato)
+  if (meta?.recorteInicioSegundos != null) form.append('recorteInicioSegundos', String(meta.recorteInicioSegundos))
+  if (meta?.recorteFinSegundos != null) form.append('recorteFinSegundos', String(meta.recorteFinSegundos))
+  const r = await apiFetch<{ ok: boolean; data: any }>('/transportes/mi-transporte/config/video', { method: 'POST', body: form })
+  return r.data
+}
+
+export async function quitarVideoTransporte(): Promise<void> {
+  await apiFetch('/transportes/mi-transporte/config/video', { method: 'DELETE' })
+}

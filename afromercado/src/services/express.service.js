@@ -687,6 +687,24 @@ const ExpressService = {
     if (!sec) throw new ErrorNoEncontrado("Sección no encontrada");
     return prisma.producto.update({ where: { id: productoId }, data: { menuSeccionId } });
   },
+
+  // ── VIDEO EXPRESS ─────────────────────────────────────────────
+
+  async subirVideoExpress(comercioId, videoUrl, posterUrl, duracion) {
+    const config = await prisma.configExpress.findUnique({ where: { comercioId } });
+    if (!config) throw new Error("Config express no encontrada");
+    return prisma.configExpress.update({
+      where: { comercioId },
+      data: { videoUrl, videoPosterUrl: posterUrl },
+    });
+  },
+
+  async quitarVideoExpress(comercioId) {
+    return prisma.configExpress.update({
+      where: { comercioId },
+      data: { videoUrl: null, videoPosterUrl: null },
+    });
+  },
 };
 
 module.exports = ExpressService;

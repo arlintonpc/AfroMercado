@@ -37,6 +37,8 @@ router.patch( "/reservas/:id/cancelar", ...soloAuth, TransporteController.cancel
 router.get(   "/mi-transporte/config",              ...soloComercio, TransporteController.miConfig);
 router.put(   "/mi-transporte/config",              ...soloComercio, TransporteController.actualizarConfig);
 router.post(  "/mi-transporte/config/fotos",        ...soloComercio, uploadFotos, TransporteController.subirFotos);
+router.post(  "/mi-transporte/config/video",        ...soloComercio, TransporteController.uploadVideoTransporte, TransporteController.subirVideoTransporte);
+router.delete("/mi-transporte/config/video",        ...soloComercio, TransporteController.quitarVideoTransporte);
 router.post(  "/mi-transporte/rutas",               ...soloComercio, TransporteController.agregarRuta);
 router.put(   "/mi-transporte/rutas/:id",           ...soloComercio, TransporteController.actualizarRuta);
 router.delete("/mi-transporte/rutas/:id",           ...soloComercio, TransporteController.eliminarRuta);

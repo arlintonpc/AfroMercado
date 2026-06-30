@@ -437,6 +437,24 @@ const TourService = {
       porMes: Object.entries(porMes).sort(([a], [b]) => a.localeCompare(b)).map(([mes, data]) => ({ mes, ...data })),
     };
   },
+
+  // ── VIDEO TOUR ────────────────────────────────────────────────
+
+  async subirVideoTour(comercioId, videoUrl, posterUrl, duracion) {
+    const config = await prisma.configTour.findUnique({ where: { comercioId } });
+    if (!config) throw new Error("Config tour no encontrada");
+    return prisma.configTour.update({
+      where: { comercioId },
+      data: { videoUrl, videoPosterUrl: posterUrl },
+    });
+  },
+
+  async quitarVideoTour(comercioId) {
+    return prisma.configTour.update({
+      where: { comercioId },
+      data: { videoUrl: null, videoPosterUrl: null },
+    });
+  },
 };
 
 module.exports = TourService;

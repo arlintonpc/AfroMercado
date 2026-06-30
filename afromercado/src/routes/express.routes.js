@@ -44,6 +44,10 @@ router.delete( "/mis-cupones/:id",      ...soloComercio, ExpressController.elimi
 // Estadísticas del comerciante
 router.get(    "/mis-estadisticas",     ...soloComercio, ExpressController.estadisticas);
 
+// Video Express
+router.post(  "/config/video", ...soloComercio, ExpressController.uploadVideoExpress, ExpressController.subirVideoExpress);
+router.delete("/config/video", ...soloComercio, ExpressController.quitarVideoExpress);
+
 // ── ADMIN ────────────────────────────────────────────────────
 router.get(  "/admin/deudas",                          ...soloAdmin, ExpressController.deudasAdmin);
 router.post( "/admin/deudas/:comercioId/saldar",       ...soloAdmin, ExpressController.saldarDeudaAdmin);

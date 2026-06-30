@@ -305,3 +305,27 @@ export async function obtenerEstadisticasExpress(): Promise<EstadisticasExpress>
   const r = await apiFetch<{ ok: boolean; data: EstadisticasExpress }>('/express/mis-estadisticas')
   return r.data
 }
+
+// ── VIDEO EXPRESS ─────────────────────────────────────────────
+
+export async function subirVideoExpress(
+  file: File,
+  meta?: { duracionSegundos?: number; ancho?: number; alto?: number; bytes?: number; mimeType?: string; formato?: string; recorteInicioSegundos?: number; recorteFinSegundos?: number }
+): Promise<{ videoUrl: string; videoPosterUrl?: string }> {
+  const form = new FormData()
+  form.append('video', file)
+  if (meta?.duracionSegundos != null) form.append('duracionSegundos', String(meta.duracionSegundos))
+  if (meta?.ancho != null) form.append('ancho', String(meta.ancho))
+  if (meta?.alto != null) form.append('alto', String(meta.alto))
+  if (meta?.bytes != null) form.append('bytes', String(meta.bytes))
+  if (meta?.mimeType) form.append('mimeType', meta.mimeType)
+  if (meta?.formato) form.append('formato', meta.formato)
+  if (meta?.recorteInicioSegundos != null) form.append('recorteInicioSegundos', String(meta.recorteInicioSegundos))
+  if (meta?.recorteFinSegundos != null) form.append('recorteFinSegundos', String(meta.recorteFinSegundos))
+  const r = await apiFetch<{ ok: boolean; data: any }>('/express/config/video', { method: 'POST', body: form })
+  return r.data
+}
+
+export async function quitarVideoExpress(): Promise<void> {
+  await apiFetch('/express/config/video', { method: 'DELETE' })
+}
