@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { Switch } from '@/components/ui'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import {
   obtenerMiComercio,
@@ -233,29 +234,11 @@ function TarjetaProductoComerciante({
         {/* Acciones */}
         <div className="flex items-center gap-2 mt-auto pt-1 border-t border-[#1A1A1A]/5">
           {/* Toggle visible/oculto */}
-          <button
-            type="button"
-            role="switch"
-            aria-checked={producto.activo}
-            aria-label={producto.activo ? `Ocultar ${producto.nombre} del catalogo` : `Publicar ${producto.nombre} en el catalogo`}
-            onClick={handleToggle}
+          <Switch
+            activo={producto.activo}
+            onChange={handleToggle}
             disabled={toggling}
-            title={producto.activo ? 'Ocultar del catálogo' : 'Publicar en el catálogo'}
-            className="group inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-full p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2D6A4F]/35 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <span
-              className={`relative block h-7 w-12 rounded-full border transition-all duration-200 ${
-                producto.activo
-                  ? 'border-[#2D6A4F] bg-[#2D6A4F] shadow-sm shadow-[#2D6A4F]/20'
-                  : 'border-[#1A1A1A]/15 bg-[#EDE7DD]'
-              }`}
-              aria-hidden="true"
-            >
-              <span className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm ring-1 ring-black/5 transition-transform duration-200 ${
-                producto.activo ? 'translate-x-5' : 'translate-x-0'
-              }`} />
-            </span>
-          </button>
+          />
           <span className="text-xs text-[#1A1A1A]/40 flex-1">
             {producto.activo ? 'Visible' : 'Oculto'}
           </span>

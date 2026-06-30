@@ -20,6 +20,7 @@ import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
 import SubidorVideo from '@/components/comerciante/SubidorVideo'
 import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
+import { Switch } from '@/components/ui'
 
 const SERVICIOS_OPCIONES = ['wifi', 'desayuno', 'parking', 'piscina', 'restaurante', 'aire', 'ventilador', 'gym', 'spa', 'bar', 'mascotas', 'tv', 'cocina', 'lavadora', 'agua_caliente', 'balcon']
 const SERVICIOS_LABELS: Record<string, string> = {
@@ -63,26 +64,6 @@ function esVideo(url: string): boolean {
 
 type MetodoPagoHotelKey = 'permitePagarAlLlegar' | 'permiteDeposito30' | 'permiteTotal'
 
-function SwitchElegante({ activo, onClick }: { activo: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={activo}
-      onClick={onClick}
-      className={`group inline-flex min-w-[92px] items-center justify-between gap-2 rounded-full border px-2 py-1 text-[11px] font-bold transition-all focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/25 ${
-        activo
-          ? 'border-[#2D6A4F]/25 bg-[#2D6A4F]/10 text-[#1B4332] shadow-sm'
-          : 'border-gray-200 bg-white text-gray-400'
-      }`}
-    >
-      <span className={`relative h-5 w-9 rounded-full transition-colors ${activo ? 'bg-[#2D6A4F]' : 'bg-gray-200'}`}>
-        <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${activo ? 'translate-x-4' : 'translate-x-0'}`} />
-      </span>
-      <span>{activo ? 'Activo' : 'Inactivo'}</span>
-    </button>
-  )
-}
 
 function FormHabitacion({ inicial, onGuardar, onCancelar }: {
   inicial?: Partial<HabitacionTipo>
@@ -91,6 +72,7 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
 }) {
   const [form, setForm] = useState<Partial<HabitacionTipo>>({
     nombre: '', descripcion: '', capacidad: 2, precioPorNoche: 80000, cantidad: 1,
+    precioPorHora: null, permitePorHoras: false, duracionMinHoras: 2, duracionMaxHoras: null,
     fotos: [], serviciosExtra: [], ...inicial,
   })
   const [subiendoFotos, setSubiendoFotos] = useState(false)
@@ -152,6 +134,14 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
 
   async function handleGuardar() {
     if (!form.nombre?.trim() || !form.precioPorNoche) { setError('Nombre y precio son obligatorios'); return }
+    if (form.permitePorHoras && (!form.precioPorHora || Number(form.precioPorHora) <= 0)) {
+      setError('Define un precio por hora valido para activar reservas por horas')
+      return
+    }
+    if (form.permitePorHoras && form.duracionMaxHoras && Number(form.duracionMaxHoras) < Number(form.duracionMinHoras ?? 1)) {
+      setError('La duracion maxima por horas debe ser mayor o igual a la minima')
+      return
+    }
     setGuardando(true); setError('')
     try {
       const datos = inicial?.id
@@ -199,6 +189,40 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
                 <input type="number" min={1} value={form.cantidad ?? 1} onChange={e => setForm(p => ({ ...p, cantidad: Number(e.target.value) }))}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
               </div>
+            </div>
+
+            <div className={`rounded-2xl border p-3 transition-colors ${
+              form.permitePorHoras ? 'border-[#2D6A4F]/25 bg-[#F4FBF7]' : 'border-gray-100 bg-gray-50'
+            }`}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-[#1A1A1A]">Reservas por horas</p>
+                  <p className="text-xs text-gray-500">Ideal para hoteles por turnos, day pass o descansos cortos.</p>
+                </div>
+                <Switch
+                  activo={!!form.permitePorHoras}
+                  onChange={v => setForm(p => ({ ...p, permitePorHoras: v }))}
+                />
+              </div>
+              {form.permitePorHoras && (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Precio/hora *</label>
+                    <input type="number" min={0} value={form.precioPorHora ?? ''} onChange={e => setForm(p => ({ ...p, precioPorHora: Number(e.target.value) }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Min. horas</label>
+                    <input type="number" min={1} value={form.duracionMinHoras ?? 2} onChange={e => setForm(p => ({ ...p, duracionMinHoras: Number(e.target.value) }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Max. horas</label>
+                    <input type="number" min={1} value={form.duracionMaxHoras ?? ''} placeholder="Libre" onChange={e => setForm(p => ({ ...p, duracionMaxHoras: e.target.value ? Number(e.target.value) : null }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Fotos */}
@@ -1698,6 +1722,11 @@ export default function ComercianteHotelesPage() {
                   <div className="text-right flex-shrink-0">
                     <p className="font-bold text-[#2D6A4F]">{formatearPrecio(Number(hab.precioPorNoche))}</p>
                     <p className="text-xs text-gray-400">por noche</p>
+                    {hab.permitePorHoras && hab.precioPorHora && (
+                      <p className="mt-1 rounded-full bg-[#2D6A4F]/10 px-2 py-0.5 text-[10px] font-bold text-[#1B4332]">
+                        {formatearPrecio(Number(hab.precioPorHora))}/hora
+                      </p>
+                    )}
                   </div>
                 </div>
                 {hab.descripcion && <p className="text-xs text-gray-500 mt-1.5">{hab.descripcion}</p>}
@@ -1899,6 +1928,30 @@ export default function ComercianteHotelesPage() {
               </div>
             </div>
 
+            <div className={`rounded-2xl border p-4 transition-colors ${
+              editConfig.permiteReservasPorHora ? 'border-[#2D6A4F]/25 bg-[#F4FBF7]' : 'border-gray-100 bg-gray-50'
+            }`}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium text-sm">Reservas por horas</p>
+                  <p className="text-xs text-gray-500">Activa turnos cortos, day pass o descansos sin bloquear noches completas.</p>
+                </div>
+                <Switch
+                  activo={!!editConfig.permiteReservasPorHora}
+                  onChange={v => setEditConfig(p => ({ ...p, permiteReservasPorHora: v }))}
+                />
+              </div>
+              {editConfig.permiteReservasPorHora && (
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Minutos de limpieza entre reservas por horas</label>
+                  <input type="number" min={0} max={240} value={editConfig.minutosLimpiezaEntreReservas ?? 30}
+                    onChange={e => setEditConfig(p => ({ ...p, minutosLimpiezaEntreReservas: Number(e.target.value) }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+                  <p className="mt-1 text-[11px] text-gray-400">La disponibilidad bloquea este margen antes y despues de cada reserva por horas.</p>
+                </div>
+              )}
+            </div>
+
             {/* Servicios del hotel */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-2">Servicios del hotel</label>
@@ -1988,9 +2041,9 @@ export default function ComercianteHotelesPage() {
                         </div>
                         <p className="mt-0.5 text-xs leading-relaxed text-gray-400">{op.desc}</p>
                       </div>
-                      <SwitchElegante
+                      <Switch
                         activo={activo}
-                        onClick={() => setEditConfig(p => ({ ...p, [key]: !activo }))}
+                        onChange={() => setEditConfig(p => ({ ...p, [key]: !activo }))}
                       />
                     </div>
                   )

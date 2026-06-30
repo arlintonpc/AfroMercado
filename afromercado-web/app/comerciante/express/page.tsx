@@ -14,6 +14,7 @@ import {
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
 import { obtenerMiComercio } from '@/components/comerciante/api'
+import { Switch } from '@/components/ui'
 import { MUNICIPIOS_POR_DEPARTAMENTO } from '@/components/comerciante/constantes'
 
 const DIAS: { dia: DiaSemana; label: string }[] = [
@@ -881,16 +882,10 @@ export default function ExpressComerciante() {
                     h.abierto ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
                   }`}>
                     {/* Toggle abierto */}
-                    <button
-                      onClick={() => actualizarHorario(dia, 'abierto', !h.abierto)}
-                      className={`w-10 h-5 rounded-full transition-colors flex-shrink-0 relative ${
-                        h.abierto ? 'bg-green-500' : 'bg-gray-300'
-                      }`}
-                    >
-                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                        h.abierto ? 'translate-x-5' : 'translate-x-0.5'
-                      }`} />
-                    </button>
+                    <Switch
+                      activo={h.abierto}
+                      onChange={v => actualizarHorario(dia, 'abierto', v)}
+                    />
 
                     {/* Nombre día */}
                     <span className={`text-sm font-medium w-24 flex-shrink-0 ${h.abierto ? 'text-gray-800' : 'text-gray-400'}`}>

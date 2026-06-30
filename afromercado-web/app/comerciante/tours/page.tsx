@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { obtenerMiTour, actualizarMiTour, reservasOperadorTour, cambiarEstadoReservaTour, subirFotosTour, listarCuponesTour, crearCuponTour, eliminarCuponTour, obtenerEstadisticasTour, type ConfigTour, type ReservaTour, type EstadoReservaTour, type CuponTour, type EstadisticasTour } from '@/lib/api/tour'
+import { Switch } from '@/components/ui'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
 const SERVICIOS_OPCIONES = [
@@ -420,10 +421,10 @@ export default function ComercianteTourPage() {
               <p className="font-medium text-[#1A1A1A]">Tour visible al público</p>
               <p className="text-xs text-gray-400 mt-0.5">Actívalo cuando tengas todo configurado</p>
             </div>
-            <button onClick={() => setEditConfig(p => ({ ...p, activo: !p.activo }))}
-              className={`relative w-12 h-6 rounded-full transition-colors ${editConfig.activo ? 'bg-[#2D6A4F]' : 'bg-gray-200'}`}>
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${editConfig.activo ? 'translate-x-6' : ''}`} />
-            </button>
+            <Switch
+              activo={!!editConfig.activo}
+              onChange={v => setEditConfig(p => ({ ...p, activo: v }))}
+            />
           </div>
 
           {/* Confirmación automática */}
@@ -432,10 +433,10 @@ export default function ComercianteTourPage() {
               <p className="font-medium text-[#1A1A1A]">Confirmación automática</p>
               <p className="text-xs text-gray-400 mt-0.5">Confirmar reservas sin revisión manual</p>
             </div>
-            <button onClick={() => setEditConfig(p => ({ ...p, confirmacionAuto: !p.confirmacionAuto }))}
-              className={`relative w-12 h-6 rounded-full transition-colors ${editConfig.confirmacionAuto ? 'bg-[#2D6A4F]' : 'bg-gray-200'}`}>
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${editConfig.confirmacionAuto ? 'translate-x-6' : ''}`} />
-            </button>
+            <Switch
+              activo={!!editConfig.confirmacionAuto}
+              onChange={v => setEditConfig(p => ({ ...p, confirmacionAuto: v }))}
+            />
           </div>
 
           {/* Datos básicos */}
