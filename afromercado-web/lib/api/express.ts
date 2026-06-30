@@ -331,5 +331,5 @@ export async function quitarVideoExpress(): Promise<void> {
 }
 
 export async function guardarVideoLinkExpress(videoUrl: string): Promise<void> {
-  await apiFetch('/express/config/video-link', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl }) })
+  await apiFetch('/express/config/video-link', { method: 'PATCH', body: { videoUrl } as any })
 }

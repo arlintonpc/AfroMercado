@@ -391,7 +391,7 @@ export async function quitarVideoHabitacion(habitacionId: number): Promise<void>
 }
 
 export async function guardarVideoLinkHabitacion(habitacionId: number, videoUrl: string): Promise<void> {
-  await apiFetch(`/hoteles/mi-hotel/habitaciones/${habitacionId}/video-link`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl }) })
+  await apiFetch(`/hoteles/mi-hotel/habitaciones/${habitacionId}/video-link`, { method: 'PATCH', body: { videoUrl } as any })
 }
 
 export async function ocupacionHotel(): Promise<{ habitaciones: HabitacionTipo[]; habitacionesFisicas: HabitacionFisica[]; reservas: ReservaHotel[] }> {

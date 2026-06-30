@@ -193,5 +193,5 @@ export async function quitarVideoTransporte(): Promise<void> {
 }
 
 export async function guardarVideoLinkTransporte(videoUrl: string): Promise<void> {
-  await apiFetch('/transportes/mi-transporte/config/video-link', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl }) })
+  await apiFetch('/transportes/mi-transporte/config/video-link', { method: 'PATCH', body: { videoUrl } as any })
 }

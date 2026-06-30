@@ -246,7 +246,7 @@ export async function quitarVideoTour(): Promise<void> {
 }
 
 export async function guardarVideoLinkTour(videoUrl: string): Promise<void> {
-  await apiFetch('/tours/mi-tour/config/video-link', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl }) })
+  await apiFetch('/tours/mi-tour/config/video-link', { method: 'PATCH', body: { videoUrl } as any })
 }
 
 export async function subirFotosTour(archivos: FileList): Promise<ConfigTour> {
