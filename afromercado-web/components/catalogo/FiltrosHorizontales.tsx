@@ -44,7 +44,16 @@ function construirFiltros(categorias: Categoria[]): Filtro[] {
   // Disponibles primero, "Próximamente" al final (orden original del diseño).
   reales.sort((a, b) => Number(a.proximamente) - Number(b.proximamente))
 
-  return [{ id: 'todos', etiqueta: 'Todos', proximamente: false }, ...reales]
+  const disponibles = reales.filter((f) => !f.proximamente)
+
+  // Ocultar siempre las categorías "Próximamente".
+  // Si no hay ninguna disponible, mostrar todas sin el badge para no dejar la barra vacía.
+  const filtradas =
+    disponibles.length > 0
+      ? disponibles
+      : reales.map((f) => ({ ...f, proximamente: false }))
+
+  return [{ id: 'todos', etiqueta: 'Todos', proximamente: false }, ...filtradas]
 }
 
 interface FiltrosHorizontalesProps {

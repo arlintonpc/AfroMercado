@@ -225,6 +225,7 @@ function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClo
   const [cuponAplicado, setCuponAplicado]   = useState<ValidacionCuponTour | null>(null)
   const [validandoCupon, setValidandoCupon] = useState(false)
   const [errorCupon, setErrorCupon]         = useState<string | null>(null)
+  const [mostrarCupon, setMostrarCupon]     = useState(false)
 
   const subtotal = Number(tour.precioPersona) * participantes
   const total = cuponAplicado ? cuponAplicado.subtotalConDescuento : subtotal
@@ -297,16 +298,16 @@ function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClo
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {[
-              { label: 'Nombre de contacto', value: nombre, set: setNombre, type: 'text', ph: 'Nombre completo' },
-              { label: 'Teléfono', value: telefono, set: setTelefono, type: 'tel', ph: '3001234567' },
-            ].map(f => (
-              <div key={f.label}>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">{f.label}</label>
-                <input type={f.type} value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.ph}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#1B4332] focus:ring-2 focus:ring-[#1B4332]/10" />
-              </div>
-            ))}
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Nombre de contacto</label>
+              <input type="text" autoComplete="name" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre completo"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#1B4332] focus:ring-2 focus:ring-[#1B4332]/10" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Teléfono</label>
+              <input type="tel" autoComplete="tel" value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="3001234567"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#1B4332] focus:ring-2 focus:ring-[#1B4332]/10" />
+            </div>
           </div>
 
           <div>
@@ -328,7 +329,6 @@ function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClo
 
           {/* Cupón */}
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">¿Tienes un cupón?</label>
             {cuponAplicado ? (
               <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-3 py-2.5">
                 <div>
@@ -338,8 +338,13 @@ function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClo
                     {cuponAplicado.cupon.tipo === 'PORCENTAJE' ? ` (${Number(cuponAplicado.cupon.valor)}%)` : ''}
                   </p>
                 </div>
-                <button onClick={() => { setCuponAplicado(null); setCodigoCupon('') }} className="text-xs text-red-500">Quitar</button>
+                <button onClick={() => { setCuponAplicado(null); setCodigoCupon(''); setMostrarCupon(false) }} className="text-xs text-red-500">Quitar</button>
               </div>
+            ) : !mostrarCupon ? (
+              <button onClick={() => setMostrarCupon(true)}
+                className="text-xs text-[#2D6A4F] underline hover:text-[#1B4332] text-left">
+                ¿Tienes un código de descuento?
+              </button>
             ) : (
               <div className="flex gap-2">
                 <input
@@ -347,6 +352,7 @@ function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClo
                   onChange={e => setCodigoCupon(e.target.value.toUpperCase())}
                   onKeyDown={e => e.key === 'Enter' && aplicarCupon()}
                   placeholder="Código de descuento"
+                  autoFocus
                   className="flex-1 border border-[#E8DCC8] rounded-xl px-3 py-2.5 text-sm font-mono uppercase focus:outline-none focus:border-[#2D6A4F]"
                 />
                 <button
@@ -677,15 +683,26 @@ export default function TourDetallePage() {
                 ? 'Tu reserva fue confirmada exitosamente. ¡Disfruta el tour!'
                 : `El operador revisará tu solicitud y te confirmará en máx. ${tour.horasLimiteConfirm} horas.`}
             </p>
-            <div className="flex gap-3">
-              <button onClick={() => setReservado(false)}
-                className="flex-1 border border-gray-200 rounded-xl py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
-                Seguir viendo
-              </button>
-              <Link href="/tours/mis-reservas"
-                className="flex-1 bg-[#1B4332] text-white rounded-xl py-3 text-sm font-bold text-center hover:bg-[#15362A] transition-colors">
-                Ver reserva
-              </Link>
+            <div className="flex flex-col gap-3">
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(`¡Acabo de reservar en AfroMercado! 🎉\n${tour.nombre}\nhttps://afromercado.co`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-xl font-semibold text-sm hover:bg-[#20b858] transition-colors"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                Compartir por WhatsApp
+              </a>
+              <div className="flex gap-3">
+                <button onClick={() => setReservado(false)}
+                  className="flex-1 border border-gray-200 rounded-xl py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+                  Seguir viendo
+                </button>
+                <Link href="/tours/mis-reservas"
+                  className="flex-1 bg-[#1B4332] text-white rounded-xl py-3 text-sm font-bold text-center hover:bg-[#15362A] transition-colors">
+                  Ver reserva
+                </Link>
+              </div>
             </div>
           </div>
         </div>
