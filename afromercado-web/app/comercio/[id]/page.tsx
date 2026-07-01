@@ -199,7 +199,7 @@ function CabeceraComercio({ c, onChatear }: { c: ComercioPublico; onChatear?: ()
 // ── Iniciales del comprador ───────────────────────────────────
 
 function Iniciales({ nombre }: { nombre: string }) {
-  const partes = nombre.trim().split(/\s+/)
+  const partes = (nombre.trim() || 'Cliente').split(/\s+/)
   const letras =
     partes.length >= 2
       ? partes[0][0] + partes[1][0]
@@ -238,9 +238,9 @@ function SeccionResenas({ comercioId }: { comercioId: number }) {
     listarReviewsTienda(comercioId)
       .then((d) => {
         if (!activo) return
-        setReviews(d.reviews)
-        setPromedio(d.promedio)
-        setTotal(d.total)
+        setReviews(Array.isArray(d.reviews) ? d.reviews : [])
+        setPromedio(d.promedio ?? null)
+        setTotal(Number(d.total ?? 0))
       })
       .catch(() => {})
       .finally(() => { if (activo) setCargando(false) })
@@ -286,26 +286,29 @@ function SeccionResenas({ comercioId }: { comercioId: number }) {
             </div>
           )}
 
-          {reviews.map((r) => (
-            <div
-              key={r.id}
-              className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-4 flex gap-3"
-            >
-              <Iniciales nombre={r.comprador.nombre} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-[#1A1A1A]">
-                    {r.comprador.nombre}
-                  </span>
-                  <span className="text-xs text-[#1A1A1A]/40">{fechaRelativa(r.createdAt)}</span>
+          {reviews.map((r) => {
+            const nombreComprador = r.comprador?.nombre?.trim() || 'Cliente'
+            return (
+              <div
+                key={r.id}
+                className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-4 flex gap-3"
+              >
+                <Iniciales nombre={nombreComprador} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-[#1A1A1A]">
+                      {nombreComprador}
+                    </span>
+                    <span className="text-xs text-[#1A1A1A]/40">{fechaRelativa(r.createdAt)}</span>
+                  </div>
+                  <Estrellas valor={Number(r.calificacion) || 0} />
+                  {r.comentario && (
+                    <p className="text-sm text-[#1A1A1A]/70 mt-1 leading-relaxed">{r.comentario}</p>
+                  )}
                 </div>
-                <Estrellas valor={r.calificacion} />
-                {r.comentario && (
-                  <p className="text-sm text-[#1A1A1A]/70 mt-1 leading-relaxed">{r.comentario}</p>
-                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

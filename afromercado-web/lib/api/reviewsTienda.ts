@@ -5,12 +5,15 @@ export interface ReviewTienda {
   calificacion: number
   comentario: string | null
   createdAt: string
-  comprador: { nombre: string }
+  comprador?: { nombre?: string | null } | null
 }
 
 interface ListarReviewsResponse {
   ok: boolean
-  data: { reviews: ReviewTienda[]; promedio: number | null; total: number }
+  data:
+    | { reviews?: ReviewTienda[]; promedio?: number | null; total?: number }
+    | ReviewTienda[]
+    | null
 }
 
 interface PuedeCalificarResponse {
@@ -27,7 +30,20 @@ export async function listarReviewsTienda(
   comercioId: number,
 ): Promise<{ reviews: ReviewTienda[]; promedio: number | null; total: number }> {
   const res = await apiFetch<ListarReviewsResponse>(`/reviews/comercio/${comercioId}`, { auth: false })
-  return res.data
+  if (Array.isArray(res.data)) {
+    return {
+      reviews: res.data,
+      promedio: null,
+      total: res.data.length,
+    }
+  }
+
+  const reviews = Array.isArray(res.data?.reviews) ? res.data.reviews : []
+  return {
+    reviews,
+    promedio: res.data?.promedio ?? null,
+    total: Number(res.data?.total ?? reviews.length),
+  }
 }
 
 export async function puedeCalificarTienda(
