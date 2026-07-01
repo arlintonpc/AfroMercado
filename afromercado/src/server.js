@@ -1,4 +1,19 @@
 // Punto de entrada — arranca el servidor
+// Sentry debe inicializarse antes de cualquier otro require
+const Sentry = require("@sentry/node");
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || "development",
+    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+    // Filtra eventos de test/desarrollo si es necesario
+    beforeSend(event) {
+      if (process.env.NODE_ENV === "test") return null;
+      return event;
+    },
+  });
+}
+
 const app = require("./app");
 const config = require("./config");
 const { cerrarConexion } = require("./utils/whatsapp");
@@ -500,9 +515,11 @@ async function aplicarMigraciones() {
 // Evitar que excepciones de Baileys/WhatsApp tumben el proceso
 process.on("uncaughtException", (err) => {
   console.error("[PROCESO] Excepción no capturada:", err.message);
+  if (process.env.SENTRY_DSN) Sentry.captureException(err);
 });
 process.on("unhandledRejection", (reason) => {
   console.error("[PROCESO] Promesa rechazada sin manejar:", reason?.message ?? reason);
+  if (process.env.SENTRY_DSN) Sentry.captureException(reason);
 });
 
 // Cierre limpio al reiniciar (SIGTERM de nodemon, SIGINT de Ctrl+C)
