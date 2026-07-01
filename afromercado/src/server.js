@@ -286,6 +286,203 @@ async function aplicarMigraciones() {
       CONSTRAINT "FavoritoTransporte_usuarioId_configTransporteId_key" UNIQUE ("usuarioId", "configTransporteId")
     )`,
     `CREATE INDEX IF NOT EXISTS "FavoritoTransporte_usuarioId_idx" ON "FavoritoTransporte"("usuarioId")`,
+
+    // ── Columnas de video en tablas existentes ─────────────────────────
+    `ALTER TABLE "ConfigTour" ADD COLUMN IF NOT EXISTS "videoUrl" TEXT`,
+    `ALTER TABLE "ConfigTour" ADD COLUMN IF NOT EXISTS "videoPosterUrl" TEXT`,
+    `ALTER TABLE "HabitacionTipo" ADD COLUMN IF NOT EXISTS "videoUrl" TEXT`,
+    `ALTER TABLE "HabitacionTipo" ADD COLUMN IF NOT EXISTS "videoPosterUrl" TEXT`,
+    `ALTER TABLE "HabitacionTipo" ADD COLUMN IF NOT EXISTS "videoDuracionSeg" INTEGER`,
+
+    // ── GrupoComplemento / ItemComplemento (Express) ───────────────────
+    `CREATE TABLE IF NOT EXISTS "GrupoComplemento" (
+      "id"         SERIAL PRIMARY KEY,
+      "productoId" INTEGER NOT NULL,
+      "nombre"     TEXT NOT NULL,
+      "minimo"     INTEGER NOT NULL DEFAULT 0,
+      "maximo"     INTEGER NOT NULL DEFAULT 1,
+      "requerido"  BOOLEAN NOT NULL DEFAULT false,
+      "orden"      INTEGER NOT NULL DEFAULT 0,
+      "activo"     BOOLEAN NOT NULL DEFAULT true,
+      CONSTRAINT "GrupoComplemento_productoId_fkey" FOREIGN KEY ("productoId") REFERENCES "Producto"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "GrupoComplemento_productoId_idx" ON "GrupoComplemento"("productoId")`,
+    `CREATE TABLE IF NOT EXISTS "ItemComplemento" (
+      "id"                  SERIAL PRIMARY KEY,
+      "grupoComplementoId"  INTEGER NOT NULL,
+      "nombre"              TEXT NOT NULL,
+      "icono"               TEXT,
+      "imagenUrl"           TEXT,
+      "precio"              DECIMAL(12,2) NOT NULL DEFAULT 0,
+      "disponible"          BOOLEAN NOT NULL DEFAULT true,
+      "orden"               INTEGER NOT NULL DEFAULT 0,
+      CONSTRAINT "ItemComplemento_grupoComplementoId_fkey" FOREIGN KEY ("grupoComplementoId") REFERENCES "GrupoComplemento"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "ItemComplemento_grupoComplementoId_idx" ON "ItemComplemento"("grupoComplementoId")`,
+
+    // ── ReviewTransporte ───────────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS "ReviewTransporte" (
+      "id"                  SERIAL PRIMARY KEY,
+      "configTransporteId"  INTEGER NOT NULL,
+      "clienteId"           INTEGER NOT NULL,
+      "reservaTransporteId" INTEGER NOT NULL UNIQUE,
+      "calificacion"        INTEGER NOT NULL CHECK ("calificacion" BETWEEN 1 AND 5),
+      "comentario"          TEXT,
+      "creadoAt"            TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ReviewTransporte_configTransporteId_fkey"  FOREIGN KEY ("configTransporteId")  REFERENCES "ConfigTransporte"("id")  ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "ReviewTransporte_clienteId_fkey"           FOREIGN KEY ("clienteId")           REFERENCES "Usuario"("id")          ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "ReviewTransporte_reservaTransporteId_fkey" FOREIGN KEY ("reservaTransporteId") REFERENCES "ReservaTransporte"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "ReviewTransporte_configTransporteId_idx" ON "ReviewTransporte"("configTransporteId")`,
+
+    // ── ReviewExpress ──────────────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS "ReviewExpress" (
+      "id"              SERIAL PRIMARY KEY,
+      "configExpressId" INTEGER NOT NULL,
+      "clienteId"       INTEGER NOT NULL,
+      "pedidoExpressId" INTEGER NOT NULL UNIQUE,
+      "calificacion"    INTEGER NOT NULL CHECK ("calificacion" BETWEEN 1 AND 5),
+      "comentario"      TEXT,
+      "creadoAt"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ReviewExpress_configExpressId_fkey" FOREIGN KEY ("configExpressId") REFERENCES "ConfigExpress"("id")  ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "ReviewExpress_clienteId_fkey"       FOREIGN KEY ("clienteId")       REFERENCES "Usuario"("id")        ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "ReviewExpress_pedidoExpressId_fkey" FOREIGN KEY ("pedidoExpressId") REFERENCES "PedidoExpress"("id")  ON DELETE CASCADE ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "ReviewExpress_configExpressId_idx" ON "ReviewExpress"("configExpressId")`,
+
+    // ── CuponHotel / CuponHotelUso / TemporadaHotel ───────────────────
+    `CREATE TABLE IF NOT EXISTS "CuponHotel" (
+      "id"            SERIAL PRIMARY KEY,
+      "codigo"        TEXT NOT NULL UNIQUE,
+      "tipo"          TEXT NOT NULL DEFAULT 'PORCENTAJE',
+      "valor"         DECIMAL(10,2) NOT NULL,
+      "minimoNoches"  INTEGER,
+      "usosMaximos"   INTEGER,
+      "usosActuales"  INTEGER NOT NULL DEFAULT 0,
+      "activo"        BOOLEAN NOT NULL DEFAULT true,
+      "inicio"        TIMESTAMP(3) NOT NULL,
+      "fin"           TIMESTAMP(3) NOT NULL,
+      "configHotelId" INTEGER,
+      "createdAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "CuponHotel_configHotelId_fkey" FOREIGN KEY ("configHotelId") REFERENCES "ConfigHotel"("id") ON DELETE SET NULL ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "CuponHotel_codigo_activo_idx"     ON "CuponHotel"("codigo", "activo")`,
+    `CREATE INDEX IF NOT EXISTS "CuponHotel_activo_fin_idx"        ON "CuponHotel"("activo", "fin")`,
+    `CREATE INDEX IF NOT EXISTS "CuponHotel_configHotelId_idx"     ON "CuponHotel"("configHotelId")`,
+    `CREATE TABLE IF NOT EXISTS "CuponHotelUso" (
+      "id"             SERIAL PRIMARY KEY,
+      "cuponHotelId"   INTEGER NOT NULL,
+      "clienteId"      INTEGER NOT NULL,
+      "reservaHotelId" INTEGER NOT NULL UNIQUE,
+      "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "CuponHotelUso_cuponHotelId_fkey"   FOREIGN KEY ("cuponHotelId")   REFERENCES "CuponHotel"("id")   ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "CuponHotelUso_clienteId_fkey"      FOREIGN KEY ("clienteId")      REFERENCES "Usuario"("id")      ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "CuponHotelUso_reservaHotelId_fkey" FOREIGN KEY ("reservaHotelId") REFERENCES "ReservaHotel"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "CuponHotelUso_cuponHotelId_clienteId_idx" ON "CuponHotelUso"("cuponHotelId", "clienteId")`,
+    `CREATE TABLE IF NOT EXISTS "TemporadaHotel" (
+      "id"               SERIAL PRIMARY KEY,
+      "configHotelId"    INTEGER NOT NULL,
+      "habitacionTipoId" INTEGER,
+      "nombre"           TEXT NOT NULL,
+      "inicio"           TIMESTAMP(3) NOT NULL,
+      "fin"              TIMESTAMP(3) NOT NULL,
+      "precioPorNoche"   DECIMAL(12,2) NOT NULL,
+      "activo"           BOOLEAN NOT NULL DEFAULT true,
+      "createdAt"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "TemporadaHotel_configHotelId_fkey"    FOREIGN KEY ("configHotelId")    REFERENCES "ConfigHotel"("id")    ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "TemporadaHotel_habitacionTipoId_fkey" FOREIGN KEY ("habitacionTipoId") REFERENCES "HabitacionTipo"("id") ON DELETE SET NULL ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "TemporadaHotel_configHotelId_activo_idx"    ON "TemporadaHotel"("configHotelId", "activo")`,
+    `CREATE INDEX IF NOT EXISTS "TemporadaHotel_habitacionTipoId_activo_idx" ON "TemporadaHotel"("habitacionTipoId", "activo")`,
+    `CREATE INDEX IF NOT EXISTS "TemporadaHotel_inicio_fin_idx"              ON "TemporadaHotel"("inicio", "fin")`,
+
+    // ── CuponExpress / CuponExpressUso ─────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS "CuponExpress" (
+      "id"              SERIAL PRIMARY KEY,
+      "codigo"          TEXT NOT NULL UNIQUE,
+      "tipo"            TEXT NOT NULL DEFAULT 'PORCENTAJE',
+      "valor"           DECIMAL(10,2) NOT NULL,
+      "minimoSubtotal"  DECIMAL(10,2),
+      "usosMaximos"     INTEGER,
+      "usosActuales"    INTEGER NOT NULL DEFAULT 0,
+      "activo"          BOOLEAN NOT NULL DEFAULT true,
+      "inicio"          TIMESTAMP(3) NOT NULL,
+      "fin"             TIMESTAMP(3) NOT NULL,
+      "configExpressId" INTEGER,
+      "createdAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "CuponExpress_configExpressId_fkey" FOREIGN KEY ("configExpressId") REFERENCES "ConfigExpress"("id") ON DELETE SET NULL ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "CuponExpress_codigo_activo_idx"     ON "CuponExpress"("codigo", "activo")`,
+    `CREATE INDEX IF NOT EXISTS "CuponExpress_activo_fin_idx"        ON "CuponExpress"("activo", "fin")`,
+    `CREATE INDEX IF NOT EXISTS "CuponExpress_configExpressId_idx"   ON "CuponExpress"("configExpressId")`,
+    `CREATE TABLE IF NOT EXISTS "CuponExpressUso" (
+      "id"              SERIAL PRIMARY KEY,
+      "cuponExpressId"  INTEGER NOT NULL,
+      "clienteId"       INTEGER NOT NULL,
+      "pedidoExpressId" INTEGER NOT NULL UNIQUE,
+      "createdAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "CuponExpressUso_cuponExpressId_fkey"  FOREIGN KEY ("cuponExpressId")  REFERENCES "CuponExpress"("id")  ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "CuponExpressUso_clienteId_fkey"       FOREIGN KEY ("clienteId")       REFERENCES "Usuario"("id")       ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "CuponExpressUso_pedidoExpressId_fkey" FOREIGN KEY ("pedidoExpressId") REFERENCES "PedidoExpress"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "CuponExpressUso_cuponExpressId_clienteId_idx" ON "CuponExpressUso"("cuponExpressId", "clienteId")`,
+
+    // ── FavoritoHotel ──────────────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS "FavoritoHotel" (
+      "id"            SERIAL PRIMARY KEY,
+      "usuarioId"     INTEGER NOT NULL,
+      "configHotelId" INTEGER NOT NULL,
+      "createdAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "FavoritoHotel_usuarioId_fkey"     FOREIGN KEY ("usuarioId")     REFERENCES "Usuario"("id")     ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "FavoritoHotel_configHotelId_fkey" FOREIGN KEY ("configHotelId") REFERENCES "ConfigHotel"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "FavoritoHotel_usuarioId_configHotelId_key" UNIQUE ("usuarioId", "configHotelId")
+    )`,
+    `CREATE INDEX IF NOT EXISTS "FavoritoHotel_usuarioId_idx"     ON "FavoritoHotel"("usuarioId")`,
+    `CREATE INDEX IF NOT EXISTS "FavoritoHotel_configHotelId_idx" ON "FavoritoHotel"("configHotelId")`,
+
+    // ── CuponTour / CuponTourUso ───────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS "CuponTour" (
+      "id"             SERIAL PRIMARY KEY,
+      "codigo"         TEXT NOT NULL UNIQUE,
+      "tipo"           TEXT NOT NULL DEFAULT 'PORCENTAJE',
+      "valor"          DECIMAL(10,2) NOT NULL,
+      "minimoPersonas" INTEGER,
+      "usosMaximos"    INTEGER,
+      "usosActuales"   INTEGER NOT NULL DEFAULT 0,
+      "activo"         BOOLEAN NOT NULL DEFAULT true,
+      "inicio"         TIMESTAMP(3) NOT NULL,
+      "fin"            TIMESTAMP(3) NOT NULL,
+      "configTourId"   INTEGER,
+      "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "CuponTour_configTourId_fkey" FOREIGN KEY ("configTourId") REFERENCES "ConfigTour"("id") ON DELETE SET NULL ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "CuponTour_codigo_activo_idx"   ON "CuponTour"("codigo", "activo")`,
+    `CREATE INDEX IF NOT EXISTS "CuponTour_activo_fin_idx"      ON "CuponTour"("activo", "fin")`,
+    `CREATE INDEX IF NOT EXISTS "CuponTour_configTourId_idx"    ON "CuponTour"("configTourId")`,
+    `CREATE TABLE IF NOT EXISTS "CuponTourUso" (
+      "id"            SERIAL PRIMARY KEY,
+      "cuponTourId"   INTEGER NOT NULL,
+      "clienteId"     INTEGER NOT NULL,
+      "reservaTourId" INTEGER NOT NULL UNIQUE,
+      "createdAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "CuponTourUso_cuponTourId_fkey"   FOREIGN KEY ("cuponTourId")   REFERENCES "CuponTour"("id")   ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "CuponTourUso_clienteId_fkey"     FOREIGN KEY ("clienteId")     REFERENCES "Usuario"("id")     ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "CuponTourUso_reservaTourId_fkey" FOREIGN KEY ("reservaTourId") REFERENCES "ReservaTour"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "CuponTourUso_cuponTourId_clienteId_idx" ON "CuponTourUso"("cuponTourId", "clienteId")`,
+
+    // ── FavoritoTour ───────────────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS "FavoritoTour" (
+      "id"           SERIAL PRIMARY KEY,
+      "usuarioId"    INTEGER NOT NULL,
+      "configTourId" INTEGER NOT NULL,
+      "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "FavoritoTour_usuarioId_fkey"    FOREIGN KEY ("usuarioId")    REFERENCES "Usuario"("id")    ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "FavoritoTour_configTourId_fkey" FOREIGN KEY ("configTourId") REFERENCES "ConfigTour"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "FavoritoTour_usuarioId_configTourId_key" UNIQUE ("usuarioId", "configTourId")
+    )`,
+    `CREATE INDEX IF NOT EXISTS "FavoritoTour_usuarioId_idx" ON "FavoritoTour"("usuarioId")`,
   ];
   for (const sql of migraciones) {
     try {
