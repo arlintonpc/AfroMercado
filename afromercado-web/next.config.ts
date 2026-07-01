@@ -2,9 +2,6 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    instrumentationHook: true,
-  },
   images: {
     // El optimizador de Next no sirve imágenes http://localhost; además, en
     // producción las imágenes irán a Cloudinary (con su propia optimización).
@@ -42,6 +39,10 @@ export default withSentryConfig(nextConfig, {
   project: process.env.SENTRY_PROJECT,
   silent: true,
   widenClientFileUpload: true,
-  disableLogger: true,
-  automaticVercelMonitors: false,
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+    automaticVercelMonitors: false,
+  },
 });
