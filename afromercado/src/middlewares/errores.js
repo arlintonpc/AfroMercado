@@ -11,10 +11,8 @@ function manejadorErrores(err, req, res, next) {
     ? "Ocurrió un error en el servidor"
     : err.message;
 
-  if (config.entorno === "development") {
-    console.error(`[ERROR ${statusCode}]`, err.message);
-    if (esError500) console.error(err.stack);
-  }
+  console.error(`[ERROR ${statusCode}]`, err.message);
+  if (esError500) console.error(err.stack);
 
   res.status(statusCode).json({
     ok: false,

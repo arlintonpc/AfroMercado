@@ -109,23 +109,25 @@ app.use(
 const esProd = process.env.NODE_ENV === "production";
 const saltarEnDev = () => !esProd;
 
+// Opciones base del rate limiter — validate.xForwardedForHeader:false evita el
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR que lanza Render al pasar múltiples IPs en el header.
+const rlBase = { standardHeaders: true, legacyHeaders: false, validate: { xForwardedForHeader: false } };
+
 // Límite general para API pública: 60 peticiones por minuto
 const apiLimiter = rateLimit({
+  ...rlBase,
   windowMs: 60 * 1000,
   max: 60,
   skip: saltarEnDev,
-  standardHeaders: true,
-  legacyHeaders: false,
   message: { error: "Demasiadas peticiones. Intenta en un minuto." },
 });
 
 // Límite estricto para auth: 10 intentos cada 15 minutos
 const authLimiter = rateLimit({
+  ...rlBase,
   windowMs: 15 * 60 * 1000,
   max: 10,
   skip: saltarEnDev,
-  standardHeaders: true,
-  legacyHeaders: false,
   message: { error: "Demasiados intentos. Espera 15 minutos." },
 });
 
@@ -134,11 +136,10 @@ app.use("/api/auth", authLimiter);
 
 // Rate limiter específico para recuperación de contraseña
 const recuperacionLimiter = rateLimit({
+  ...rlBase,
   windowMs: 15 * 60 * 1000,
   max: 10,
   skip: saltarEnDev,
-  standardHeaders: true,
-  legacyHeaders: false,
   message: { error: "Demasiados intentos. Espera 15 minutos." },
 });
 app.use("/api/auth/recuperar", recuperacionLimiter);

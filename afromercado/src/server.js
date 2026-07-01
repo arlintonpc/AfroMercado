@@ -483,6 +483,9 @@ async function aplicarMigraciones() {
       CONSTRAINT "FavoritoTour_usuarioId_configTourId_key" UNIQUE ("usuarioId", "configTourId")
     )`,
     `CREATE INDEX IF NOT EXISTS "FavoritoTour_usuarioId_idx" ON "FavoritoTour"("usuarioId")`,
+
+    // Desactivar categoría "Turismo" duplicada — reemplazada por "Tours & Experiencias" (slug 'tours')
+    `UPDATE "Categoria" SET "activa" = false WHERE "slug" = 'turismo'`,
   ];
   for (const sql of migraciones) {
     try {
