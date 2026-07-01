@@ -1,5 +1,6 @@
 // Enrutador principal — agrupa todas las rutas de la API
 const express = require("express");
+const packageJson = require("../../package.json");
 const authRoutes = require("./auth.routes");
 const usuarioRoutes = require("./usuario.routes");
 const productoRoutes = require("./producto.routes");
@@ -12,7 +13,18 @@ const reviewRoutes = require("./review.routes");
 const router = express.Router();
 
 router.get("/", (req, res) => {
-  res.json({ ok: true, mensaje: "API de AfroMercado 🌿", version: "1.0.0-mvp" });
+  const commit =
+    process.env.RENDER_GIT_COMMIT ||
+    process.env.GIT_COMMIT ||
+    process.env.COMMIT_SHA ||
+    null;
+
+  res.json({
+    ok: true,
+    mensaje: "API de AfroMercado",
+    version: process.env.APP_VERSION || packageJson.version,
+    commit: commit ? commit.slice(0, 7) : null,
+  });
 });
 
 router.use("/auth", authRoutes);
