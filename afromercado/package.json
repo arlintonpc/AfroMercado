@@ -4,7 +4,7 @@
   "description": "API de AfroMercado - Marketplace cultural del Choco",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "prisma generate && node src/server.js",
     "dev": "nodemon src/server.js",
     "build": "prisma generate",
     "postinstall": "prisma generate",
@@ -36,12 +36,12 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "nodemailer": "^9.0.0",
+    "prisma": "^5.0.0",
     "qrcode": "^1.5.4",
     "resend": "^6.12.4",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "nodemon": "^3.0.0",
-    "prisma": "^5.0.0"
+    "nodemon": "^3.0.0"
   }
 }
