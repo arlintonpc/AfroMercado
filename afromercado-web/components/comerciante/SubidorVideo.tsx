@@ -13,6 +13,8 @@ interface SubidorVideoProps {
   estadoInicial: VideoEstado
   onSubir: (file: File, meta: VideoMetaCaptura) => Promise<VideoEstado>
   onEliminar: () => Promise<VideoEstado>
+  compacto?: boolean
+  ocultarEncabezado?: boolean
 }
 
 interface VideoPendiente {
@@ -72,6 +74,8 @@ export default function SubidorVideo({
   estadoInicial,
   onSubir,
   onEliminar,
+  compacto = false,
+  ocultarEncabezado = false,
 }: SubidorVideoProps) {
   const [estado, setEstado] = useState<VideoEstado>(estadoInicial)
   const [pendiente, setPendiente] = useState<VideoPendiente | null>(null)
@@ -197,73 +201,78 @@ export default function SubidorVideo({
   }
 
   return (
-    <div className="rounded-2xl border border-[#1A1A1A]/8 bg-white p-5 shadow-sm flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-base font-bold text-[#1A1A1A]">{titulo}</h3>
-          <p className="mt-1 text-sm text-[#1A1A1A]/60 leading-relaxed">
-            {descripcion}
-          </p>
-        </div>
-        {estado.videoUrl && !pendiente && (
-          <span className="rounded-full bg-[#2D6A4F]/10 px-3 py-1 text-xs font-semibold text-[#2D6A4F]">
-            Video activo
-          </span>
-        )}
-      </div>
-
-      <div className="relative overflow-hidden rounded-2xl border border-[#1A1A1A]/10 bg-[#0F0F0F]">
-        {pendiente ? (
-          <>
-            <video
-              ref={previewRef}
-              className="w-full aspect-video max-h-[420px] object-contain bg-black"
-              controls
-              playsInline
-              preload="metadata"
-              src={pendiente.previewUrl}
-              onTimeUpdate={controlarPreview}
-            />
-            <span className="absolute left-3 top-3 rounded-full bg-black/65 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur">
-              Fragmento {formatearDuracion(duracionSeleccionada)}
-            </span>
-          </>
-        ) : estado.videoUrl ? (
-          <>
-            <video
-              className="w-full aspect-video max-h-[420px] object-contain bg-black"
-              controls
-              playsInline
-              preload="metadata"
-              poster={estado.videoPosterUrl ?? undefined}
-            >
-              <source src={estado.videoUrl} type={estado.videoMimeType ?? undefined} />
-              Tu navegador no soporta video HTML5.
-            </video>
-            {estado.videoDuracionSegundos !== null && estado.videoDuracionSegundos !== undefined && (
-              <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur">
-                {formatearDuracion(estado.videoDuracionSegundos)}
-              </span>
-            )}
-          </>
-        ) : (
-          <div className="flex aspect-video min-h-[220px] items-center justify-center bg-gradient-to-br from-[#1A1A1A] to-[#2D6A4F] px-4 text-center">
-            <div className="flex flex-col items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-white">
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-white">Aun no hay video</p>
-                <p className="mt-1 max-w-sm text-xs leading-relaxed text-white/70">
-                  Sube un clip corto para contar mejor la historia del producto o de la finca.
-                </p>
-              </div>
-            </div>
+    <div className={`flex flex-col ${compacto ? 'gap-3' : 'gap-4'}`}>
+      {!ocultarEncabezado && (
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-base font-bold text-[#1A1A1A]">{titulo}</h3>
+            <p className={`mt-1 text-[#1A1A1A]/60 leading-relaxed ${compacto ? 'text-xs' : 'text-sm'}`}>
+              {descripcion}
+            </p>
           </div>
-        )}
-      </div>
+          {estado.videoUrl && !pendiente && (
+            <span className="rounded-full bg-[#2D6A4F]/10 px-3 py-1 text-xs font-semibold text-[#2D6A4F]">
+              Video activo
+            </span>
+          )}
+        </div>
+      )}
+
+      {(pendiente || estado.videoUrl) ? (
+        <div className="relative overflow-hidden rounded-2xl border border-[#1A1A1A]/10 bg-[#0F0F0F]">
+          {pendiente ? (
+            <>
+              <video
+                ref={previewRef}
+                className={`w-full aspect-video object-contain bg-black ${compacto ? 'max-h-[220px]' : 'max-h-[420px]'}`}
+                controls
+                playsInline
+                preload="metadata"
+                src={pendiente.previewUrl}
+                onTimeUpdate={controlarPreview}
+              />
+              <span className="absolute left-3 top-3 rounded-full bg-black/65 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur">
+                Fragmento {formatearDuracion(duracionSeleccionada)}
+              </span>
+            </>
+          ) : (
+            <>
+              <video
+                className={`w-full aspect-video object-contain bg-black ${compacto ? 'max-h-[220px]' : 'max-h-[420px]'}`}
+                controls
+                playsInline
+                preload="metadata"
+                poster={estado.videoPosterUrl ?? undefined}
+              >
+                <source src={estado.videoUrl!} type={estado.videoMimeType ?? undefined} />
+                Tu navegador no soporta video HTML5.
+              </video>
+              {estado.videoDuracionSegundos !== null && estado.videoDuracionSegundos !== undefined && (
+                <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur">
+                  {formatearDuracion(estado.videoDuracionSegundos)}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={ocupado}
+          className={`w-full flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-gray-200 hover:border-[#2D6A4F] hover:bg-[#F6FAF7] transition-colors text-gray-400 hover:text-[#2D6A4F] disabled:opacity-50 ${compacto ? 'py-8' : 'py-14'}`}
+        >
+          <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold">Seleccionar video</p>
+            <p className="text-xs mt-0.5">MP4, MOV · hasta 100 MB · máx. 45 seg</p>
+          </div>
+        </button>
+      )}
 
       {pendiente && (
         <div className="rounded-2xl border border-[#2D6A4F]/15 bg-[#F8F5F0] p-4">
@@ -393,10 +402,12 @@ export default function SubidorVideo({
         aria-label="Subir video"
       />
 
-      <p className="text-xs leading-relaxed text-[#1A1A1A]/50">
-        Puedes subir un video mas largo y seleccionar un fragmento de hasta 45 segundos.
-        La plataforma publica ese tramo optimizado.
-      </p>
+      {!compacto && (
+        <p className="text-xs leading-relaxed text-[#1A1A1A]/50">
+          Puedes subir un video mas largo y seleccionar un fragmento de hasta 45 segundos.
+          La plataforma publica ese tramo optimizado.
+        </p>
+      )}
 
       {error && (
         <p role="alert" className="text-sm text-[#C0392B]">

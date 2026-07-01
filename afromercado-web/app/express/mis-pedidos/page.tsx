@@ -3,22 +3,21 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { misPedidosExpress, type PedidoExpress } from '@/lib/api/express'
+import { crearReviewExpress } from '@/lib/api/review'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { obtenerToken } from '@/lib/api/client'
 
-const ESTADOS_ORDEN = ['PENDIENTE','ACEPTADO','EN_PREPARACION','LISTO','EN_CAMINO','ENTREGADO']
-
 const ESTADO_INFO: Record<string, { label: string; color: string; paso: number }> = {
-  PENDIENTE:      { label: '⏳ Pendiente de confirmación', color: 'bg-amber-100 text-amber-700',   paso: 0 },
-  ACEPTADO:       { label: '✅ Confirmado por el restaurante', color: 'bg-blue-100 text-blue-700',  paso: 1 },
-  EN_PREPARACION: { label: '👨‍🍳 Preparando tu pedido',         color: 'bg-blue-100 text-blue-700',  paso: 2 },
-  LISTO:          { label: '🔔 ¡Listo! Espera al repartidor', color: 'bg-green-100 text-green-700', paso: 3 },
-  EN_CAMINO:      { label: '🛵 En camino hacia ti',            color: 'bg-green-100 text-green-700', paso: 4 },
-  ENTREGADO:      { label: '🎉 ¡Entregado!',                   color: 'bg-green-100 text-green-700', paso: 5 },
-  CANCELADO:      { label: '❌ Cancelado',                     color: 'bg-red-100 text-red-600',     paso: -1 },
-  RECHAZADO:      { label: '🚫 Rechazado por el restaurante', color: 'bg-red-100 text-red-600',     paso: -1 },
+  PENDIENTE:      { label: 'Pendiente de confirmacion', color: 'bg-amber-100 text-amber-700',   paso: 0 },
+  ACEPTADO:       { label: 'Confirmado',                color: 'bg-blue-100 text-blue-700',     paso: 1 },
+  EN_PREPARACION: { label: 'Preparando tu pedido',      color: 'bg-blue-100 text-blue-700',     paso: 2 },
+  LISTO:          { label: 'Listo para recoger',        color: 'bg-green-100 text-green-700',   paso: 3 },
+  EN_CAMINO:      { label: 'En camino',                 color: 'bg-green-100 text-green-700',   paso: 4 },
+  ENTREGADO:      { label: 'Entregado',                 color: 'bg-green-100 text-green-700',   paso: 5 },
+  CANCELADO:      { label: 'Cancelado',                 color: 'bg-red-100 text-red-600',       paso: -1 },
+  RECHAZADO:      { label: 'Rechazado',                 color: 'bg-red-100 text-red-600',       paso: -1 },
 }
 
 const PASOS = ['Enviado', 'Aceptado', 'Preparando', 'Listo', 'En camino', 'Entregado']
@@ -32,9 +31,7 @@ function BarraProgreso({ estado }: { estado: string }) {
         {PASOS.map((p, i) => (
           <div key={p} className="flex flex-col items-center gap-0.5" style={{ flex: 1 }}>
             <div className={`w-4 h-4 rounded-full border-2 transition-all ${
-              i <= info.paso
-                ? 'bg-green-600 border-green-600'
-                : 'bg-white border-gray-300'
+              i <= info.paso ? 'bg-green-600 border-green-600' : 'bg-white border-gray-300'
             }`} />
             <span className={`text-[9px] text-center leading-tight ${i <= info.paso ? 'text-green-700 font-medium' : 'text-gray-400'}`}>
               {p}
@@ -52,62 +49,253 @@ function BarraProgreso({ estado }: { estado: string }) {
   )
 }
 
-function TarjetaPedido({ pedido, onActualizar }: { pedido: PedidoExpress; onActualizar?: () => void }) {
-  const info = ESTADO_INFO[pedido.estado] ?? { label: pedido.estado, color: 'bg-gray-100 text-gray-600', paso: -1 }
-  const activo = !['ENTREGADO','CANCELADO','RECHAZADO'].includes(pedido.estado)
+function EstrellaReview({ valor, onClick }: { valor: number; onClick: (n: number) => void }) {
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map(n => (
+        <button key={n} onClick={() => onClick(n)} className="text-2xl transition-transform hover:scale-110">
+          <span className={n <= valor ? 'text-[#D4A017]' : 'text-gray-300'}>★</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ModalReview({
+  pedidoId,
+  restaurante,
+  onGuardado,
+  onCerrar,
+}: {
+  pedidoId: number
+  restaurante: string
+  onGuardado: () => void
+  onCerrar: () => void
+}) {
+  const [estrellas, setEstrellas] = useState(0)
+  const [comentario, setComentario] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function enviar() {
+    if (estrellas === 0) { setError('Elige una calificacion'); return }
+    setEnviando(true)
+    try {
+      await crearReviewExpress(pedidoId, estrellas, comentario.trim() || undefined)
+      onGuardado()
+    } catch (e: any) {
+      setError(e.message ?? 'Error al enviar')
+    } finally {
+      setEnviando(false)
+    }
+  }
 
   return (
-    <div className={`bg-white rounded-2xl shadow-sm p-4 border-l-4 transition-all ${
-      activo ? 'border-green-500' : 'border-gray-200'
-    }`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-bold text-[#1A1A1A] truncate">
-            {pedido.configExpress?.comercio.nombre ?? `Pedido #${pedido.id}`}
-          </p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {new Date(pedido.creadoAt).toLocaleDateString('es-CO', {
-              day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-            })}
-          </p>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ background: 'rgba(0,0,0,0.5)' }}
+      onClick={e => { if (e.target === e.currentTarget) onCerrar() }}
+    >
+      <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-bold text-[#1A1A1A] text-lg">Califica tu pedido</h2>
+          <button onClick={onCerrar} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 text-xl">×</button>
         </div>
-        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${info.color}`}>
-          {info.label}
-        </span>
-      </div>
+        <p className="text-sm text-gray-500 mb-4">{restaurante}</p>
 
-      {/* Barra de progreso */}
-      {activo && <BarraProgreso estado={pedido.estado} />}
+        <div className="flex justify-center mb-4">
+          <EstrellaReview valor={estrellas} onClick={setEstrellas} />
+        </div>
 
-      {/* Items */}
-      <div className="mt-3 space-y-0.5">
-        {pedido.items.map(i => (
-          <p key={i.id} className="text-sm text-gray-600">
-            {i.cantidad}× {i.producto?.nombre ?? `Producto #${i.productoId}`}
-          </p>
-        ))}
-      </div>
+        <textarea
+          rows={3}
+          value={comentario}
+          onChange={e => setComentario(e.target.value)}
+          placeholder="Cuéntanos tu experiencia (opcional)"
+          className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F] resize-none"
+        />
 
-      {/* Footer */}
-      <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
-        <span className="text-xs text-gray-400">
-          {pedido.modalidad === 'DOMICILIO' ? '🛵 Domicilio' : pedido.modalidad === 'MESA' ? '🪑 Mesa' : '🏪 Recoger'}
-          {' · '}
-          {pedido.metodoPago === 'EFECTIVO' ? 'Efectivo' : pedido.metodoPago}
-        </span>
-        <span className="font-bold text-[#1A1A1A]">{formatearPrecio(pedido.total)}</span>
-      </div>
+        {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
 
-      {/* Pedir de nuevo */}
-      {['ENTREGADO'].includes(pedido.estado) && pedido.configExpress && (
-        <Link
-          href={`/express/${pedido.configExpress.comercio.nombre ? pedido.comercioId ?? '' : ''}`}
-          className="mt-3 block text-center text-xs font-semibold text-green-700 border border-green-300 rounded-xl py-2 hover:bg-green-50 transition-colors"
+        <button
+          onClick={enviar}
+          disabled={enviando || estrellas === 0}
+          className="mt-4 w-full bg-[#1B4332] text-white rounded-2xl py-3 font-bold text-sm disabled:opacity-40"
         >
-          Pedir de nuevo →
-        </Link>
-      )}
+          {enviando ? 'Enviando...' : 'Publicar resena'}
+        </button>
+      </div>
     </div>
+  )
+}
+
+function TarjetaPedido({
+  pedido,
+  onActualizar,
+}: {
+  pedido: PedidoExpress
+  onActualizar: () => void
+}) {
+  const info = ESTADO_INFO[pedido.estado] ?? { label: pedido.estado, color: 'bg-gray-100 text-gray-600', paso: -1 }
+  const activo = !['ENTREGADO', 'CANCELADO', 'RECHAZADO'].includes(pedido.estado)
+  const [expandido, setExpandido] = useState(activo)
+  const [mostrarReview, setMostrarReview] = useState(false)
+  const yaResenado = !!(pedido as any).review
+
+  const modalidadLabel =
+    pedido.modalidad === 'DOMICILIO' ? 'Domicilio' :
+    pedido.modalidad === 'MESA' ? 'Mesa' : 'Recoger'
+
+  return (
+    <>
+      <div className={`bg-white rounded-2xl shadow-sm border-l-4 transition-all ${
+        activo ? 'border-green-500' : 'border-gray-200'
+      }`}>
+        {/* Cabecera siempre visible */}
+        <button
+          className="w-full text-left p-4"
+          onClick={() => setExpandido(v => !v)}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-bold text-[#1A1A1A] truncate">
+                {pedido.configExpress?.comercio.nombre ?? `Pedido #${pedido.id}`}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {new Date(pedido.creadoAt).toLocaleDateString('es-CO', {
+                  day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                })}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${info.color}`}>
+                {info.label}
+              </span>
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                className={`text-gray-400 transition-transform ${expandido ? 'rotate-180' : ''}`}
+              >
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </div>
+          </div>
+
+          {/* Resumen compacto cuando cerrado */}
+          {!expandido && (
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-sm text-gray-500">
+                {pedido.items.length} producto{pedido.items.length !== 1 ? 's' : ''}
+              </span>
+              <span className="font-bold text-[#1A1A1A]">{formatearPrecio(Number(pedido.total))}</span>
+            </div>
+          )}
+        </button>
+
+        {/* Detalle expandido */}
+        {expandido && (
+          <div className="px-4 pb-4 space-y-3">
+            {/* Barra de progreso */}
+            {activo && <BarraProgreso estado={pedido.estado} />}
+
+            {/* Modalidad + dirección */}
+            {pedido.direccionTexto && (
+              <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+                Entrega en: {pedido.direccionTexto}
+              </p>
+            )}
+
+            {/* Items con complementos */}
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
+              <div className="divide-y divide-gray-50">
+                {pedido.items.map(item => {
+                  const extras: Array<{ nombre: string; precio: number }> =
+                    Array.isArray(item.complementos)
+                      ? (item.complementos as Array<{ nombre: string; precio: number }>)
+                      : []
+                  return (
+                    <div key={item.id} className="px-3 py-2.5">
+                      <div className="flex justify-between items-baseline gap-2">
+                        <p className="text-sm font-medium text-gray-800">
+                          {item.cantidad}x {item.producto?.nombre ?? `Producto #${item.productoId}`}
+                        </p>
+                        <span className="text-sm text-gray-700 flex-shrink-0">
+                          {formatearPrecio(Number(item.subtotal))}
+                        </span>
+                      </div>
+                      {extras.length > 0 && (
+                        <div className="mt-1 space-y-0.5 pl-3">
+                          {extras.map((c, ci) => (
+                            <div key={ci} className="flex justify-between text-xs text-gray-400">
+                              <span>+ {c.nombre}</span>
+                              {Number(c.precio) > 0 && (
+                                <span>+{formatearPrecio(Number(c.precio))}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="px-3 py-2.5 bg-gray-50 border-t border-gray-100 flex justify-between text-sm font-bold text-[#1B4332]">
+                <span>Total</span>
+                <span>{formatearPrecio(Number(pedido.total))}</span>
+              </div>
+            </div>
+
+            {/* Metodo y modalidad */}
+            <p className="text-xs text-gray-400 text-right">
+              {modalidadLabel} &middot; {pedido.metodoPago === 'EFECTIVO' ? 'Efectivo' : pedido.metodoPago}
+            </p>
+
+            {/* Nota del cliente */}
+            {pedido.notaCliente && (
+              <p className="text-xs text-gray-500 bg-yellow-50 border border-yellow-100 rounded-lg px-3 py-2">
+                Nota: {pedido.notaCliente}
+              </p>
+            )}
+
+            {/* Acciones post-entrega */}
+            {pedido.estado === 'ENTREGADO' && (
+              <div className="flex gap-2 pt-1">
+                {!yaResenado && (
+                  <button
+                    onClick={() => setMostrarReview(true)}
+                    className="flex-1 text-center text-xs font-semibold text-[#1B4332] border border-[#2D6A4F] rounded-xl py-2 hover:bg-[#2D6A4F]/5 transition-colors"
+                  >
+                    Calificar pedido
+                  </button>
+                )}
+                {yaResenado && (
+                  <p className="flex-1 text-center text-xs text-green-600 font-medium py-2">
+                    Ya calificaste este pedido
+                  </p>
+                )}
+                {pedido.configExpress && (
+                  <Link
+                    href={`/express/${pedido.comercioId ?? ''}`}
+                    className="flex-1 text-center text-xs font-semibold text-gray-600 border border-gray-200 rounded-xl py-2 hover:bg-gray-50 transition-colors"
+                  >
+                    Pedir de nuevo
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {mostrarReview && (
+        <ModalReview
+          pedidoId={pedido.id}
+          restaurante={pedido.configExpress?.comercio.nombre ?? 'Restaurante'}
+          onGuardado={() => { setMostrarReview(false); onActualizar() }}
+          onCerrar={() => setMostrarReview(false)}
+        />
+      )}
+    </>
   )
 }
 
@@ -126,36 +314,28 @@ export default function MisPedidosExpressPage() {
 
   useEffect(() => {
     if (cargandoAuth) return
-    if (!autenticado) { router.push('/login'); return }
+    if (!autenticado) { router.push('/ingresar'); return }
     cargar()
   }, [autenticado, cargandoAuth, router])
 
-  // SSE: actualizar pedidos en tiempo real cuando cambia el estado
   useEffect(() => {
     if (!autenticado) return
     const token = obtenerToken()
     if (!token) return
-
     const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
-    const url = `${API}/notificaciones/stream?token=${encodeURIComponent(token)}`
-    const es = new EventSource(url)
+    const es = new EventSource(`${API}/notificaciones/stream?token=${encodeURIComponent(token)}`)
     sseRef.current = es
-
     es.addEventListener('notificacion', (e) => {
       try {
         const notif = JSON.parse((e as MessageEvent).data)
-        // Si la notif es sobre un pedido Express, recargar
-        if (notif?.tipo?.startsWith('EXPRESS_') || notif?.url?.includes('mis-pedidos')) {
-          cargar()
-        }
+        if (notif?.tipo?.startsWith('EXPRESS_') || notif?.url?.includes('mis-pedidos')) cargar()
       } catch {}
     })
-
     return () => { es.close(); sseRef.current = null }
   }, [autenticado])
 
-  const activos = pedidos.filter(p => !['ENTREGADO','CANCELADO','RECHAZADO'].includes(p.estado))
-  const anteriores = pedidos.filter(p => ['ENTREGADO','CANCELADO','RECHAZADO'].includes(p.estado))
+  const activos = pedidos.filter(p => !['ENTREGADO', 'CANCELADO', 'RECHAZADO'].includes(p.estado))
+  const anteriores = pedidos.filter(p => ['ENTREGADO', 'CANCELADO', 'RECHAZADO'].includes(p.estado))
 
   if (cargando) {
     return (
@@ -187,7 +367,7 @@ export default function MisPedidosExpressPage() {
         {pedidos.length === 0 ? (
           <div className="text-center py-16 text-[#999]">
             <p className="text-4xl mb-3">🛵</p>
-            <p className="font-medium">Aún no tienes pedidos Express</p>
+            <p className="font-medium">Aun no tienes pedidos Express</p>
             <Link href="/express" className="mt-4 inline-block text-[#2D6A4F] underline text-sm">
               Ver restaurantes
             </Link>

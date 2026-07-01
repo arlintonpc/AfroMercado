@@ -60,9 +60,12 @@ export async function apiFetch<T>(
   options: ApiFetchOptions = {},
 ): Promise<T> {
   const { body, auth = true, headers, ...rest } = options
+  const esFormData = typeof FormData !== 'undefined' && body instanceof FormData
 
   const finalHeaders = new Headers(headers)
-  finalHeaders.set('Content-Type', 'application/json')
+  if (!esFormData) {
+    finalHeaders.set('Content-Type', 'application/json')
+  }
 
   if (auth) {
     const token = obtenerToken()
@@ -78,7 +81,7 @@ export async function apiFetch<T>(
     response = await fetch(url, {
       ...rest,
       headers: finalHeaders,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? (esFormData ? body : JSON.stringify(body)) : undefined,
     })
   } catch {
     // Error de red / backend caído.

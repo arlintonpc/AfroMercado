@@ -36,6 +36,7 @@ export interface ItemPedidoExpress {
   precioUnitario: number
   subtotal: number
   nota: string | null
+  complementos?: Array<{ nombre: string; precio: number }> | null
   producto?: { nombre: string; fotoUrl: string | null }
 }
 
@@ -108,6 +109,14 @@ export interface MenuComercioExpress extends ComercioExpress {
     categoria: { id: number; nombre: string } | null
     menuSeccionId: number | null
     menuSeccion?: { id: number; nombre: string; icono: string } | null
+    gruposComplemento?: Array<{
+      id: number
+      nombre: string
+      minimo: number
+      maximo: number
+      requerido: boolean
+      items: Array<{ id: number; nombre: string; icono: string | null; imagenUrl: string | null; precio: number }>
+    }>
   }>
 }
 
@@ -128,7 +137,7 @@ export async function crearPedidoExpress(body: {
   comercioId: number
   modalidad: ModalidadExpress
   metodoPago: MetodoPagoExpress
-  items: { productoId: number; cantidad: number; nota?: string }[]
+  items: { productoId: number; cantidad: number; nota?: string; complementos?: Array<{ nombre: string; precio: number }> }[]
   notaCliente?: string
   direccionTexto?: string
   municipioEntrega?: string
@@ -332,4 +341,97 @@ export async function quitarVideoExpress(): Promise<void> {
 
 export async function guardarVideoLinkExpress(videoUrl: string): Promise<void> {
   await apiFetch('/express/config/video-link', { method: 'PATCH', body: { videoUrl } as any })
+}
+
+// ── COMPLEMENTOS EXPRESS ──────────────────────────────────────
+
+export interface ItemComplemento {
+  id: number
+  grupoComplementoId: number
+  nombre: string
+  icono: string | null
+  imagenUrl: string | null
+  precio: number
+  disponible: boolean
+  orden: number
+}
+
+export async function subirImagenItemComplemento(itemId: number, file: File): Promise<ItemComplemento> {
+  const form = new FormData()
+  form.append('imagen', file)
+  const r = await apiFetch<{ ok: boolean; data: ItemComplemento }>(`/express/complementos/items/${itemId}/imagen`, {
+    method: 'POST',
+    body: form,
+  })
+  return r.data
+}
+
+export interface GrupoComplemento {
+  id: number
+  productoId: number
+  nombre: string
+  minimo: number
+  maximo: number
+  requerido: boolean
+  orden: number
+  activo: boolean
+  items: ItemComplemento[]
+}
+
+export async function listarComplementos(productoId: number): Promise<GrupoComplemento[]> {
+  const r = await apiFetch<{ ok: boolean; data: GrupoComplemento[] }>(`/express/complementos/${productoId}`)
+  return r.data ?? []
+}
+
+export async function crearGrupoComplemento(
+  productoId: number,
+  datos: { nombre: string; minimo?: number; maximo?: number; requerido?: boolean; orden?: number }
+): Promise<GrupoComplemento> {
+  const r = await apiFetch<{ ok: boolean; data: GrupoComplemento }>(`/express/complementos/${productoId}/grupos`, {
+    method: 'POST', body: datos,
+  })
+  return r.data
+}
+
+export async function actualizarGrupoComplemento(
+  id: number,
+  datos: Partial<{ nombre: string; minimo: number; maximo: number; requerido: boolean; orden: number; activo: boolean }>
+): Promise<GrupoComplemento> {
+  const r = await apiFetch<{ ok: boolean; data: GrupoComplemento }>(`/express/complementos/grupos/${id}`, {
+    method: 'PATCH', body: datos,
+  })
+  return r.data
+}
+
+export async function eliminarGrupoComplemento(id: number): Promise<void> {
+  await apiFetch(`/express/complementos/grupos/${id}`, { method: 'DELETE' })
+}
+
+export async function crearItemComplemento(
+  grupoId: number,
+  datos: { nombre: string; icono?: string; precio?: number; disponible?: boolean; orden?: number }
+): Promise<ItemComplemento> {
+  const r = await apiFetch<{ ok: boolean; data: ItemComplemento }>(`/express/complementos/grupos/${grupoId}/items`, {
+    method: 'POST', body: datos,
+  })
+  return r.data
+}
+
+export async function actualizarItemComplemento(
+  id: number,
+  datos: Partial<{ nombre: string; icono: string | null; precio: number; disponible: boolean; orden: number }>
+): Promise<ItemComplemento> {
+  const r = await apiFetch<{ ok: boolean; data: ItemComplemento }>(`/express/complementos/items/${id}`, {
+    method: 'PATCH', body: datos,
+  })
+  return r.data
+}
+
+export async function eliminarItemComplemento(id: number): Promise<void> {
+  await apiFetch(`/express/complementos/items/${id}`, { method: 'DELETE' })
+}
+
+export async function copiarGrupoATodos(grupoId: number): Promise<{ productosActualizados: number }> {
+  const r = await apiFetch<{ ok: boolean; data: { productosActualizados: number } }>(`/express/complementos/${grupoId}/copiar-a-todos`, { method: 'POST' })
+  return r.data
 }

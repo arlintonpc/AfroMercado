@@ -20,6 +20,7 @@ import { reviewsExpress, crearReviewExpress, type ReviewExpress } from '@/lib/ap
 import SeccionReviews, { type ReviewItem } from '@/components/ui/SeccionReviews'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
+import ModalComplementos from '@/components/express/ModalComplementos'
 
 interface ItemCarrito {
   productoId: number
@@ -28,23 +29,26 @@ interface ItemCarrito {
   cantidad: number
   nota: string
   fotoUrl: string | null
+  complementos?: Array<{ nombre: string; precio: number }>
 }
 
 type Paso = 'menu' | 'checkout' | 'confirmado'
 
 function TarjetaProducto({
-  p, cantidadItem, agregar, quitar
+  p, cantidadItem, agregar, quitar, cerrado
 }: {
   p: MenuComercioExpress['productos'][0]
   cantidadItem: (id: number) => number
   agregar: (p: any) => void
   quitar: (id: number) => void
+  cerrado?: boolean
 }) {
   const disponible = Math.max(0, p.stock - (p.stockReservado ?? 0))
   const agotado = disponible === 0
+  const bloqueado = agotado || !!cerrado
   const cant = cantidadItem(p.id)
   return (
-    <div className={`bg-white rounded-2xl shadow-sm flex gap-3 p-3 ${agotado ? 'opacity-50' : ''}`}>
+    <div className={`bg-white rounded-2xl shadow-sm flex gap-3 p-3 ${bloqueado ? 'opacity-50' : ''}`}>
       {p.fotoUrl ? (
         <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
           <Image src={p.fotoUrl} alt={p.nombre} fill className="object-cover" />
@@ -62,6 +66,8 @@ function TarjetaProducto({
           </div>
           {agotado ? (
             <span className="text-xs text-[#999]">Agotado</span>
+          ) : cerrado ? (
+            <span className="text-xs text-[#721C24] bg-[#F8D7DA] px-2 py-1 rounded-lg">Cerrado</span>
           ) : cant === 0 ? (
             <button
               onClick={() => agregar(p)}
@@ -101,6 +107,7 @@ export default function MenuExpressPage() {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pedidoId, setPedidoId] = useState<number | null>(null)
+  const [productoComplemento, setProductoComplemento] = useState<MenuComercioExpress['productos'][0] | null>(null)
   const [reviews, setReviews] = useState<ReviewExpress[]>([])
   const [cargandoReviews, setCargandoRev] = useState(true)
   const [pedidoElegibleId, setPedidoElegibleId] = useState<number | undefined>()
@@ -156,14 +163,26 @@ export default function MenuExpressPage() {
   }, [menu?.comercio?.nombre])
 
   function agregar(p: MenuComercioExpress['productos'][0]) {
+    if ((p.gruposComplemento?.length ?? 0) > 0) {
+      setProductoComplemento(p)
+      return
+    }
+    agregarAlCarrito(p, [], Number(p.precio))
+  }
+
+  function agregarAlCarrito(
+    p: MenuComercioExpress['productos'][0],
+    complementos: Array<{ nombre: string; precio: number }>,
+    precioTotal: number
+  ) {
     setCarrito(prev => {
       const idx = prev.findIndex(i => i.productoId === p.id)
-      if (idx >= 0) {
+      if (idx >= 0 && (complementos?.length ?? 0) === 0) {
         const copia = [...prev]
         copia[idx] = { ...copia[idx], cantidad: copia[idx].cantidad + 1 }
         return copia
       }
-      return [...prev, { productoId: p.id, nombre: p.nombre, precio: Number(p.precio), cantidad: 1, nota: '', fotoUrl: p.fotoUrl }]
+      return [...prev, { productoId: p.id, nombre: p.nombre, precio: precioTotal, cantidad: 1, nota: '', fotoUrl: p.fotoUrl, complementos }]
     })
   }
 
@@ -202,7 +221,7 @@ export default function MenuExpressPage() {
   }
 
   async function confirmarPedido() {
-    if (!autenticado) { router.push('/login'); return }
+    if (!autenticado) { router.push('/ingresar'); return }
     if (carrito.length === 0) return
     if (modalidad === 'DOMICILIO') {
       if (!direccion.trim()) { setError('Ingresa la dirección de entrega.'); return }
@@ -219,7 +238,7 @@ export default function MenuExpressPage() {
         comercioId,
         modalidad,
         metodoPago,
-        items: carrito.map(i => ({ productoId: i.productoId, cantidad: i.cantidad, nota: i.nota || undefined })),
+        items: carrito.map(i => ({ productoId: i.productoId, cantidad: i.cantidad, nota: i.nota || undefined, complementos: i.complementos?.length ? i.complementos : undefined })),
         notaCliente: notaCliente || undefined,
         direccionTexto: direccionFinal,
         municipioEntrega: menu?.comercio.municipio,
@@ -296,45 +315,97 @@ export default function MenuExpressPage() {
     : menu.productos.filter(p => p.menuSeccionId === tabActiva)
 
   // ── CHECKOUT ───────────────────────────────────────────────
+  // Precio base de cada ítem (sin complementos)
+  const precioBaseProducto = (item: ItemCarrito) => {
+    const prod = menu?.productos.find(p => p.id === item.productoId)
+    return prod ? Number(prod.precio) : item.precio
+  }
+  const costoEnvio = modalidad === 'DOMICILIO' ? Number(menu?.costoEnvioBase ?? 0) : 0
+  const totalFinal = cuponAplicado
+    ? Number(cuponAplicado.subtotalConDescuento) + costoEnvio
+    : totalPrecio + costoEnvio
+
   if (paso === 'checkout') {
     return (
       <div className="min-h-screen bg-[#FAF8F5]">
-        <header className="sticky top-0 z-10 bg-white border-b border-[#E8DCC8] px-4 py-3 flex items-center gap-3">
+        <header className="sticky top-0 z-10 bg-white border-b border-[#E8DCC8] px-4 py-4 flex items-center gap-3">
           <button onClick={() => setPaso('menu')} className="text-[#2D6A4F] p-1">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           </button>
-          <p className="font-bold text-[#1A1A1A]">Confirmar pedido</p>
+          <div>
+            <p className="font-bold text-[#1A1A1A] text-lg">Confirmar pedido</p>
+            <p className="text-xs text-gray-500">{menu?.comercio?.nombre}</p>
+          </div>
         </header>
 
-        <div className="max-w-lg mx-auto p-4 space-y-5 pb-36">
-          {/* Resumen */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <p className="font-semibold text-[#1A1A1A] mb-3">Tu pedido</p>
-            {carrito.map(i => (
-              <div key={i.productoId} className="flex justify-between text-sm py-1.5 border-b border-[#F0EBE3] last:border-0">
-                <span className="text-[#1A1A1A]">{i.cantidad}× {i.nombre}</span>
-                <span className="text-[#1A1A1A] font-medium">{formatearPrecio(i.precio * i.cantidad)}</span>
-              </div>
-            ))}
-            <div className="flex justify-between font-bold text-[#1A1A1A] mt-3 pt-2 border-t border-[#E8DCC8]">
-              <span>Total</span>
-              <span>{formatearPrecio(totalPrecio + (modalidad === 'DOMICILIO' ? (menu.costoEnvioBase ?? 0) : 0))}</span>
+        <div className="max-w-lg mx-auto p-4 space-y-4 pb-36">
+
+          {/* ── RESUMEN DETALLADO ── */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#F0EBE3] flex items-center justify-between">
+              <p className="font-bold text-[#1A1A1A] text-base">🧾 Tu pedido</p>
+              <span className="text-xs text-gray-400">{carrito.reduce((s, i) => s + i.cantidad, 0)} ítem{carrito.reduce((s, i) => s + i.cantidad, 0) !== 1 ? 's' : ''}</span>
             </div>
-            {modalidad === 'DOMICILIO' && menu.costoEnvioBase > 0 && (
-              <p className="text-xs text-[#999] mt-1">Incluye domicilio: {formatearPrecio(menu.costoEnvioBase)}</p>
-            )}
-            {cuponAplicado && (
-              <>
-                <div className="flex justify-between text-sm py-1 text-green-700">
-                  <span>Descuento ({cuponAplicado.cupon.codigo})</span>
+
+            <div className="divide-y divide-[#F0EBE3]">
+              {carrito.map((item, idx) => {
+                const precioBase = precioBaseProducto(item)
+                const extras = item.complementos ?? []
+                const precioExtrasTotal = extras.reduce((s, c) => s + Number(c.precio), 0)
+                return (
+                  <div key={`${item.productoId}-${idx}`} className="px-5 py-4">
+                    {/* Fila principal */}
+                    <div className="flex items-start gap-3">
+                      {item.fotoUrl && (
+                        <img src={item.fotoUrl} alt={item.nombre}
+                          className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border border-gray-100" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-baseline gap-2">
+                          <p className="font-semibold text-[#1A1A1A] text-sm">{item.cantidad}× {item.nombre}</p>
+                          <p className="font-semibold text-[#1A1A1A] text-sm flex-shrink-0">{formatearPrecio((precioBase + precioExtrasTotal) * item.cantidad)}</p>
+                        </div>
+                        {/* Complementos con precio individual */}
+                        {extras.length > 0 && (
+                          <div className="mt-1.5 space-y-0.5">
+                            {extras.map((c, ci) => (
+                              <div key={ci} className="flex justify-between text-xs text-gray-500">
+                                <span>+ {c.nombre}</span>
+                                <span>{Number(c.precio) > 0 ? `+${formatearPrecio(Number(c.precio))}` : 'Gratis'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Totales */}
+            <div className="px-5 py-4 bg-[#F8F5F0] space-y-2">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Subtotal</span>
+                <span>{formatearPrecio(totalPrecio)}</span>
+              </div>
+              {costoEnvio > 0 && (
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>🛵 Domicilio</span>
+                  <span>{formatearPrecio(costoEnvio)}</span>
+                </div>
+              )}
+              {cuponAplicado && (
+                <div className="flex justify-between text-sm text-green-600 font-medium">
+                  <span>🏷️ Descuento ({cuponAplicado.cupon.codigo})</span>
                   <span>-{formatearPrecio(cuponAplicado.descuento)}</span>
                 </div>
-                <div className="flex justify-between font-bold text-[#1A1A1A] mt-1 pt-2 border-t border-[#E8DCC8]">
-                  <span>Total con descuento</span>
-                  <span>{formatearPrecio(cuponAplicado.subtotalConDescuento + (modalidad === 'DOMICILIO' ? (menu?.costoEnvioBase ?? 0) : 0))}</span>
-                </div>
-              </>
-            )}
+              )}
+              <div className="flex justify-between font-bold text-[#1A1A1A] text-base pt-2 border-t border-[#E8DCC8]">
+                <span>Total a pagar</span>
+                <span className="text-[#2D6A4F]">{formatearPrecio(totalFinal)}</span>
+              </div>
+            </div>
           </div>
 
           {/* Modalidad */}
@@ -480,7 +551,7 @@ export default function MenuExpressPage() {
             disabled={enviando}
             className="w-full max-w-lg mx-auto block rounded-2xl bg-[#2D6A4F] text-white py-4 font-bold text-lg disabled:opacity-60 transition-opacity"
           >
-            {enviando ? 'Enviando...' : `Pedir ahora · ${formatearPrecio(totalPrecio)}`}
+            {enviando ? 'Enviando...' : `Pedir ahora · ${formatearPrecio(totalFinal)}`}
           </button>
         </div>
       </div>
@@ -593,7 +664,7 @@ export default function MenuExpressPage() {
               ) : null
             })()}
             <div className="space-y-3">
-              {productosFiltrados.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} />)}
+              {productosFiltrados.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} cerrado={!menu.abiertoAhora} />)}
             </div>
           </section>
         ) : hayTabs ? (
@@ -605,7 +676,7 @@ export default function MenuExpressPage() {
                   {seccion.icono} {seccion.nombre}
                 </h2>
                 <div className="space-y-3">
-                  {prods.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} />)}
+                  {prods.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} cerrado={!menu.abiertoAhora} />)}
                 </div>
               </section>
             ))}
@@ -613,7 +684,7 @@ export default function MenuExpressPage() {
               <section>
                 <h2 className="font-bold text-[#1A1A1A] text-base mb-3 pb-1 border-b border-[#E8DCC8]">Otros</h2>
                 <div className="space-y-3">
-                  {sinSeccion.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} />)}
+                  {sinSeccion.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} cerrado={!menu.abiertoAhora} />)}
                 </div>
               </section>
             )}
@@ -631,7 +702,7 @@ export default function MenuExpressPage() {
               <section key={cat}>
                 <h2 className="font-bold text-[#1A1A1A] text-base mb-3 pb-1 border-b border-[#E8DCC8]">{cat}</h2>
                 <div className="space-y-3">
-                  {prods.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} />)}
+                  {prods.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} cerrado={!menu.abiertoAhora} />)}
                 </div>
               </section>
             ))
@@ -662,17 +733,22 @@ export default function MenuExpressPage() {
             ) : (
               <>
                 <div className="space-y-2">
-                  {carrito.map(i => (
-                    <div key={i.productoId} className="flex justify-between items-center text-sm">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => quitar(i.productoId)} className="w-6 h-6 rounded-full bg-[#F0EBE3] flex items-center justify-center text-[#2D6A4F] font-bold">−</button>
-                          <span className="w-5 text-center font-semibold">{i.cantidad}</span>
-                          <button onClick={() => agregar({ id: i.productoId, nombre: i.nombre, precio: i.precio, fotoUrl: i.fotoUrl, stock: 999, stockReservado: 0, descripcion: '', unidad: 'und', menuSeccionId: null } as any)} className="w-6 h-6 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center font-bold">+</button>
+                  {carrito.map((i, idx) => (
+                    <div key={`${i.productoId}-${idx}`} className="text-sm">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => quitar(i.productoId)} className="w-6 h-6 rounded-full bg-[#F0EBE3] flex items-center justify-center text-[#2D6A4F] font-bold">−</button>
+                            <span className="w-5 text-center font-semibold">{i.cantidad}</span>
+                            <button onClick={() => setCarrito(prev => prev.map((x, xi) => xi === idx ? { ...x, cantidad: x.cantidad + 1 } : x))} className="w-6 h-6 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center font-bold">+</button>
+                          </div>
+                          <span className="truncate text-[#1A1A1A]">{i.nombre}</span>
                         </div>
-                        <span className="truncate text-[#1A1A1A]">{i.nombre}</span>
+                        <span className="text-[#1A1A1A] font-medium ml-2 flex-shrink-0">{formatearPrecio(i.precio * i.cantidad)}</span>
                       </div>
-                      <span className="text-[#1A1A1A] font-medium ml-2 flex-shrink-0">{formatearPrecio(i.precio * i.cantidad)}</span>
+                      {i.complementos && i.complementos.length > 0 && (
+                        <p className="text-xs text-gray-400 pl-16 mt-0.5 truncate">+ {i.complementos.map(c => c.nombre).join(', ')}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -682,7 +758,7 @@ export default function MenuExpressPage() {
                 </div>
                 <button
                   onClick={() => {
-                    if (!autenticado) { router.push('/login'); return }
+                    if (!autenticado) { router.push('/ingresar'); return }
                     if (!menu.abiertoAhora) return
                     setPaso('checkout')
                   }}
@@ -704,7 +780,7 @@ export default function MenuExpressPage() {
           <div className="max-w-lg mx-auto">
             <button
               onClick={() => {
-                if (!autenticado) { router.push('/login'); return }
+                if (!autenticado) { router.push('/ingresar'); return }
                 if (!menu.abiertoAhora) return
                 setPaso('checkout')
               }}
@@ -717,6 +793,18 @@ export default function MenuExpressPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Modal de complementos */}
+      {productoComplemento && (
+        <ModalComplementos
+          producto={productoComplemento}
+          onConfirmar={(complementos, precioTotal) => {
+            agregarAlCarrito(productoComplemento, complementos, precioTotal)
+            setProductoComplemento(null)
+          }}
+          onCerrar={() => setProductoComplemento(null)}
+        />
       )}
     </div>
   )

@@ -3,21 +3,19 @@
 import { useEffect, useState, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import Image from 'next/image'
 import { listarComerciosExpress, type ComercioExpress } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import { optimizarImagenPequena } from '@/lib/cloudinary'
 
-// Leaflet no funciona en SSR — carga sólo en cliente
 const MapaExpress = dynamic(() => import('@/components/express/MapaExpress'), {
   ssr: false,
   loading: () => (
     <div className="rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center" style={{ height: 420 }}>
-      <div className="w-7 h-7 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+      <div className="w-7 h-7 border-2 border-[#1B4332] border-t-transparent rounded-full animate-spin" />
     </div>
   ),
 })
 
-// Fórmula Haversine: distancia en km entre dos coordenadas
 function distanciaKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -28,6 +26,112 @@ function distanciaKm(lat1: number, lon1: number, lat2: number, lon2: number) {
 
 function formatearDistancia(km: number) {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`
+}
+
+function SkeletonCard() {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse shadow-sm">
+      <div className="h-48 bg-gray-200" />
+      <div className="p-4 space-y-2">
+        <div className="h-4 bg-gray-200 rounded w-3/4" />
+        <div className="h-3 bg-gray-100 rounded w-1/2" />
+        <div className="h-3 bg-gray-100 rounded w-2/3 mt-1" />
+      </div>
+    </div>
+  )
+}
+
+function TarjetaRestaurante({ cfg, userLat, userLon }: { cfg: ComercioExpress; userLat: number | null; userLon: number | null }) {
+  const dist = userLat && userLon && cfg.comercio.latitud && cfg.comercio.longitud
+    ? distanciaKm(userLat, userLon, cfg.comercio.latitud, cfg.comercio.longitud)
+    : null
+  const inicial = cfg.comercio.nombre.charAt(0).toUpperCase()
+  const foto = cfg.comercio.logoUrl ? optimizarImagenPequena(cfg.comercio.logoUrl) : null
+
+  return (
+    <Link href={`/express/${cfg.comercio.id}`}
+      className="group block rounded-2xl overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 bg-white border border-gray-100/80 shadow-sm">
+
+      {/* Imagen hero */}
+      <div className="relative h-48 overflow-hidden bg-[#1B4332]">
+        {foto ? (
+          <img src={foto} alt={cfg.comercio.nombre}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-[#1B4332] via-[#2D6A4F] to-[#52B788] flex items-center justify-center">
+            <span className="text-7xl opacity-20">🍽️</span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+
+        {/* Badge abierto/cerrado */}
+        <div className="absolute top-3 left-3">
+          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm ${
+            cfg.abierto
+              ? 'bg-emerald-500/90 text-white'
+              : 'bg-black/50 text-white/80'
+          }`}>
+            {cfg.abierto ? '● Abierto' : '○ Cerrado'}
+          </span>
+        </div>
+
+        {/* Tiempo entrega */}
+        <div className="absolute top-3 right-3">
+          <div className="bg-white/95 backdrop-blur-sm rounded-xl px-3 py-1.5 shadow-lg">
+            <p className="text-[9px] text-gray-400 font-medium leading-none mb-0.5">entrega</p>
+            <p className="text-[#1B4332] font-black text-sm leading-none">~{cfg.tiempoPrepMinutos} min</p>
+          </div>
+        </div>
+
+        {/* Nombre + ubicación */}
+        <div className="absolute bottom-0 left-0 right-0 p-4">
+          <div className="flex items-end justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="text-white font-bold text-base leading-snug line-clamp-1">{cfg.comercio.nombre}</h3>
+              <div className="flex items-center gap-1.5 mt-1">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" className="opacity-70 flex-shrink-0"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span className="text-white/75 text-xs">{cfg.comercio.municipio}</span>
+              </div>
+            </div>
+            {dist !== null && (
+              <span className="text-white/65 text-[10px] flex-shrink-0 bg-black/20 px-2 py-0.5 rounded-full">
+                {formatearDistancia(dist)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="px-4 py-3 flex items-center gap-3">
+        {/* Avatar */}
+        <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-[#2D6A4F] to-[#1B4332] flex items-center justify-center shadow-sm">
+          <span className="text-white text-xs font-bold">{inicial}</span>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          {cfg.comercio.calificacion > 0 && (
+            <div className="flex items-center gap-1">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              <span className="text-xs font-semibold text-gray-800">{Number(cfg.comercio.calificacion).toFixed(1)}</span>
+            </div>
+          )}
+          <div className="flex gap-2 mt-0.5">
+            {cfg.modalidades.includes('DOMICILIO') && (
+              <span className="text-[11px] text-gray-500">🛵 {formatearPrecio(Number(cfg.costoEnvioBase))}</span>
+            )}
+            {cfg.modalidades.includes('RECOGER') && (
+              <span className="text-[11px] text-gray-500">🏃 Recoger</span>
+            )}
+          </div>
+        </div>
+
+        <svg className="w-4 h-4 text-gray-300 flex-shrink-0 group-hover:text-[#2D6A4F] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+    </Link>
+  )
 }
 
 export default function ExpressPage() {
@@ -60,11 +164,9 @@ export default function ExpressPage() {
     return () => clearInterval(interval)
   }, [])
 
-  // Municipios únicos de los comercios reales
   const municipios = Array.from(new Set(todos.map(c => c.comercio.municipio).filter(Boolean)))
-
-  // Filtro: búsqueda de texto y toggle abiertos
   const termino = busqueda.trim().toLowerCase()
+
   const filtrados = todos
     .filter(c => !soloAbiertos || c.abierto)
     .filter(c => !termino ||
@@ -72,48 +174,27 @@ export default function ExpressPage() {
       (c.comercio.municipio ?? '').toLowerCase().includes(termino)
     )
 
-  // Si el usuario tiene GPS y los comercios tienen coordenadas, ordenar por distancia
   const comercios = userLat && userLon
     ? [...filtrados].sort((a, b) => {
-        const dA = a.comercio.latitud && a.comercio.longitud
-          ? distanciaKm(userLat!, userLon!, a.comercio.latitud, a.comercio.longitud)
-          : Infinity
-        const dB = b.comercio.latitud && b.comercio.longitud
-          ? distanciaKm(userLat!, userLon!, b.comercio.latitud, b.comercio.longitud)
-          : Infinity
+        const dA = a.comercio.latitud && a.comercio.longitud ? distanciaKm(userLat!, userLon!, a.comercio.latitud, a.comercio.longitud) : Infinity
+        const dB = b.comercio.latitud && b.comercio.longitud ? distanciaKm(userLat!, userLon!, b.comercio.latitud, b.comercio.longitud) : Infinity
         return dA - dB
       })
     : filtrados
 
   async function usarUbicacion() {
-    if (!navigator.geolocation) {
-      setGpsEstado('error')
-      return
-    }
+    if (!navigator.geolocation) { setGpsEstado('error'); return }
     setGpsEstado('buscando')
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
-        setUserLat(coords.latitude)
-        setUserLon(coords.longitude)
+        setUserLat(coords.latitude); setUserLon(coords.longitude)
         try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json&accept-language=es`,
-            { headers: { 'User-Agent': 'AfroMercado/1.0' } }
-          )
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json&accept-language=es`, { headers: { 'User-Agent': 'AfroMercado/1.0' } })
           const json = await res.json()
-          const raw =
-            json.address?.city ||
-            json.address?.town ||
-            json.address?.village ||
-            json.address?.municipality ||
-            ''
-          // Solo mostramos la ciudad en el botón, NO filtramos por ella
-          const ciudad = raw.replace(/^(Perímetro Urbano|Municipio de|Corregimiento de)\s+/i, '').trim()
-          setGpsCiudad(ciudad)
+          const raw = json.address?.city || json.address?.town || json.address?.village || json.address?.municipality || ''
+          setGpsCiudad(raw.replace(/^(Perímetro Urbano|Municipio de|Corregimiento de)\s+/i, '').trim())
           setGpsEstado('ok')
-        } catch {
-          setGpsEstado('ok')
-        }
+        } catch { setGpsEstado('ok') }
       },
       () => setGpsEstado('error'),
       { timeout: 8000 }
@@ -121,237 +202,187 @@ export default function ExpressPage() {
   }
 
   function limpiar() {
-    setBusqueda('')
-    setGpsCiudad('')
-    setGpsEstado('idle')
+    setBusqueda(''); setGpsCiudad(''); setGpsEstado('idle')
     inputRef.current?.focus()
   }
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-5">
+  const abiertosCount = todos.filter(c => c.abierto).length
 
-      {/* Encabezado */}
-      <div className="flex items-center gap-3">
-        <Link href="/" className="text-gray-400 hover:text-[#2D6A4F] transition-colors p-1 -ml-1">
-          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 5l-7 7 7 7"/>
-          </svg>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold">🍽️ Express</h1>
-          <p className="text-sm text-gray-500">Pide comida y recíbela en minutos</p>
+  return (
+    <div className="min-h-screen bg-[#F7F5F2]">
+
+      {/* ── HERO ─────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden" style={{ backgroundImage: "linear-gradient(135deg, rgba(13,43,29,0.88) 0%, rgba(27,67,50,0.80) 50%, rgba(45,106,79,0.75) 100%), url('https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1600&q=80')", backgroundSize: 'cover', backgroundPosition: 'center' }}>
+        <div className="absolute -top-16 -right-16 w-72 h-72 bg-white/5 rounded-full" />
+        <div className="absolute top-12 -left-10 w-40 h-40 bg-[#D4A017]/10 rounded-full" />
+        <div className="absolute bottom-0 right-1/3 w-96 h-32 bg-[#52B788]/10 rounded-full blur-2xl" />
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
+          <Link href="/" className="inline-flex items-center gap-1.5 text-white/60 hover:text-white text-sm mb-6 transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+            Inicio
+          </Link>
+
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="bg-[#D4A017]/20 border border-[#D4A017]/30 text-[#D4A017] text-xs font-semibold px-3 py-1 rounded-full">
+                  🍽️ Gastronomía local
+                </span>
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight">
+                Sabores del<br />
+                <span className="text-[#52B788]">Chocó</span>
+              </h1>
+              <p className="text-white/55 text-sm mt-2.5 max-w-sm">
+                Pide comida de restaurantes y comercios locales — entrega a domicilio o recoge en el lugar
+              </p>
+            </div>
+            <div className="flex gap-4 sm:gap-6">
+              <div className="text-center">
+                <p className="text-2xl font-black text-white">{todos.length > 0 ? todos.length : '–'}</p>
+                <p className="text-white/50 text-xs">Restaurantes</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-black text-emerald-400">{abiertosCount}</p>
+                <p className="text-white/50 text-xs">Abiertos ahora</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Barra de búsqueda */}
+          <div className="mt-6 bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-2 flex gap-2">
+            <div className="flex-1 relative">
+              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input ref={inputRef} value={busqueda}
+                onChange={e => { setBusqueda(e.target.value); setGpsCiudad(''); setGpsEstado('idle') }}
+                placeholder="Ciudad o restaurante…"
+                className="w-full pl-10 pr-4 py-2.5 bg-transparent text-white placeholder-white/40 text-sm focus:outline-none" />
+            </div>
+            <button onClick={usarUbicacion} disabled={gpsEstado === 'buscando'}
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                gpsEstado === 'ok' ? 'bg-blue-500/80 text-white' : 'bg-white/10 hover:bg-white/20 text-white/70'
+              }`}>
+              {gpsEstado === 'buscando' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              )}
+              {gpsEstado === 'ok' ? gpsCiudad : gpsEstado === 'error' ? 'Sin permiso' : 'Cerca de mí'}
+            </button>
+          </div>
+
+          {/* Chips municipios */}
+          {municipios.length > 0 && (
+            <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+              <button onClick={limpiar}
+                className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                  !busqueda ? 'bg-white text-[#1B4332] border-white' : 'bg-white/10 text-white/70 border-white/20 hover:bg-white/20'
+                }`}>
+                Todos
+              </button>
+              {municipios.map(m => (
+                <button key={m} onClick={() => setBusqueda(m)}
+                  className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                    busqueda.toLowerCase() === m.toLowerCase()
+                      ? 'bg-white text-[#1B4332] border-white'
+                      : 'bg-white/10 text-white/70 border-white/20 hover:bg-white/20'
+                  }`}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Buscador + GPS */}
-      <div className="space-y-2">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
-            </svg>
-            <input
-              ref={inputRef}
-              type="text"
-              value={busqueda}
-              onChange={e => { setBusqueda(e.target.value); setGpsCiudad(''); setGpsEstado('idle') }}
-              placeholder="Busca por ciudad o restaurante..."
-              className="w-full pl-9 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-green-400 bg-white"
-            />
-            {busqueda && (
-              <button onClick={limpiar} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-                </svg>
+      {/* ── TOOLBAR ───────────────────────────────────────────── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-gray-500">
+              {cargando ? 'Buscando…' : (
+                <><span className="font-semibold text-gray-800">{comercios.length}</span> {comercios.length !== 1 ? 'restaurantes' : 'restaurante'}{userLat ? <span className="text-[#2D6A4F]"> · por cercanía</span> : ''}</>
+              )}
+            </p>
+            <button onClick={() => setSoloAbiertos(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                soloAbiertos ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+              }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${soloAbiertos ? 'bg-white' : 'bg-emerald-500'}`} />
+              Solo abiertos
+            </button>
+          </div>
+          <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <button onClick={() => setVista('lista')} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${vista === 'lista' ? 'bg-[#1B4332] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              Lista
+            </button>
+            <button onClick={() => setVista('mapa')} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${vista === 'mapa' ? 'bg-[#1B4332] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+              Mapa
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── CONTENIDO ─────────────────────────────────────────── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+
+        {error && (
+          <div className="bg-red-50 text-red-700 border border-red-200 rounded-xl px-4 py-3 text-sm mb-4">{error}</div>
+        )}
+
+        {vista === 'mapa' && !cargando && (
+          <div className="mb-6 rounded-2xl overflow-hidden shadow-md">
+            <MapaExpress comercios={comercios} userLat={userLat} userLon={userLon} />
+          </div>
+        )}
+
+        {cargando ? (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : vista === 'mapa' ? null : comercios.length === 0 ? (
+          <div className="text-center py-24">
+            <div className="w-20 h-20 bg-[#1B4332]/8 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-4xl">🍳</span>
+            </div>
+            <p className="font-semibold text-gray-700 text-lg">
+              {termino ? `Sin resultados para "${busqueda}"` : 'Ningún restaurante disponible'}
+            </p>
+            <p className="text-sm text-gray-400 mt-1">
+              {termino ? 'Prueba con otra ciudad o nombre' : 'Vuelve más tarde'}
+            </p>
+            {termino && (
+              <button onClick={limpiar} className="mt-4 px-5 py-2 bg-[#1B4332] text-white text-sm rounded-full font-medium">
+                Limpiar búsqueda
               </button>
             )}
           </div>
-
-          {/* Botón GPS */}
-          <button
-            onClick={usarUbicacion}
-            disabled={gpsEstado === 'buscando'}
-            title="Usar mi ubicación"
-            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap ${
-              gpsEstado === 'ok'
-                ? 'bg-green-600 text-white border-green-600'
-                : gpsEstado === 'error'
-                ? 'bg-red-50 text-red-600 border-red-200'
-                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            {gpsEstado === 'buscando' ? (
-              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/>
-              </svg>
-            )}
-            <span className="hidden sm:inline">
-              {gpsEstado === 'ok' ? gpsCiudad : gpsEstado === 'error' ? 'Sin permiso' : 'Mi ubicación'}
-            </span>
-          </button>
-        </div>
-
-        {/* Chips municipios con comercios reales */}
-        {municipios.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-            <button
-              onClick={limpiar}
-              className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                !busqueda ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              Todos
-            </button>
-            {municipios.map(m => (
-              <button
-                key={m}
-                onClick={() => setBusqueda(m)}
-                className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  busqueda.toLowerCase() === m.toLowerCase()
-                    ? 'bg-green-600 text-white border-green-600'
-                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                {m}
-              </button>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {comercios.map(cfg => (
+              <TarjetaRestaurante key={cfg.id} cfg={cfg} userLat={userLat} userLon={userLon} />
             ))}
           </div>
         )}
-      </div>
 
-      {/* Filtros: solo abiertos + lista/mapa */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <button
-          onClick={() => setSoloAbiertos(v => !v)}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${
-            soloAbiertos ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-          }`}
-        >
-          <span className={`w-2 h-2 rounded-full ${soloAbiertos ? 'bg-white' : 'bg-green-500'}`} />
-          Solo abiertos
-          {soloAbiertos && <span className="ml-1 bg-white/20 rounded-full px-1.5 text-xs">{filtrados.length}</span>}
-        </button>
-
-      {/* Toggle Lista / Mapa */}
-      <div className="flex rounded-xl border border-gray-200 overflow-hidden w-fit">
-        <button
-          onClick={() => setVista('lista')}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors ${
-            vista === 'lista' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-          </svg>
-          Lista
-        </button>
-        <button
-          onClick={() => setVista('mapa')}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors border-l border-gray-200 ${
-            vista === 'mapa' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-          </svg>
-          Mapa
-        </button>
-      </div>
-      </div>{/* fin filtros */}
-
-      {error && (
-        <div className="bg-red-50 text-red-700 border border-red-200 rounded-xl px-4 py-3 text-sm">{error}</div>
-      )}
-
-      {/* Vista Mapa */}
-      {vista === 'mapa' && !cargando && (
-        <MapaExpress comercios={comercios} userLat={userLat} userLon={userLon} />
-      )}
-
-      {/* Vista Lista */}
-      {cargando && vista === 'lista' && (
-        <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
-
-      {!cargando && vista === 'lista' && comercios.length === 0 && (
-        <div className="text-center py-16 text-gray-400">
-          <div className="text-4xl mb-3">🍳</div>
-          <p className="font-medium">
-            {termino ? `Sin restaurantes en "${busqueda}"` : 'Ningún comercio Express disponible'}
-          </p>
-          <p className="text-sm mt-1">
-            {termino ? 'Prueba con otra ciudad o nombre' : 'Vuelve más tarde'}
-          </p>
-        </div>
-      )}
-
-      <div className={`${vista === 'mapa' ? 'hidden' : ''} grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4`}>
-        {comercios.map(cfg => (
-          <Link
-            key={cfg.id}
-            href={`/express/${cfg.comercio.id}`}
-            className="flex items-center gap-4 bg-white border border-gray-200 rounded-2xl p-4 hover:border-green-300 hover:shadow-sm transition-all"
-          >
-            {cfg.comercio.logoUrl ? (
-              <Image
-                src={cfg.comercio.logoUrl}
-                alt={cfg.comercio.nombre}
-                width={56} height={56}
-                className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
-              />
-            ) : (
-              <div className="w-14 h-14 rounded-xl bg-green-100 flex items-center justify-center text-2xl flex-shrink-0">
-                🍽️
-              </div>
-            )}
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="font-semibold text-gray-900 truncate">{cfg.comercio.nombre}</h2>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                  cfg.abierto ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
-                }`}>
-                  {cfg.abierto ? 'ABIERTO' : 'CERRADO'}
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 mt-0.5">
-                📍 {cfg.comercio.municipio}
-                {cfg.comercio.calificacion > 0 && ` · ⭐ ${Number(cfg.comercio.calificacion).toFixed(1)}`}
-                {userLat && userLon && cfg.comercio.latitud && cfg.comercio.longitud && (
-                  <span className="ml-1 text-green-600 font-medium">
-                    · 📏 {formatearDistancia(distanciaKm(userLat, userLon, cfg.comercio.latitud, cfg.comercio.longitud))}
-                  </span>
-                )}
-              </p>
-              <div className="flex gap-3 mt-1 text-xs text-gray-500">
-                <span>⏱ ~{cfg.tiempoPrepMinutos} min</span>
-                {cfg.modalidades.includes('DOMICILIO') && (
-                  <span>🛵 Envío {formatearPrecio(Number(cfg.costoEnvioBase))}</span>
-                )}
-                {cfg.modalidades.includes('RECOGER') && <span>🏃 Recoger</span>}
-              </div>
+        {/* Mis pedidos */}
+        <Link href="/express/mis-pedidos"
+          className="flex items-center justify-between mt-8 bg-white border border-gray-200 rounded-2xl px-5 py-4 text-sm text-gray-700 hover:shadow-md hover:border-[#2D6A4F]/30 transition-all group">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-[#1B4332]/8 rounded-xl flex items-center justify-center">
+              <span className="text-lg">📦</span>
             </div>
-
-            <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-        ))}
-      </div>
-
-      <Link
-        href="/express/mis-pedidos"
-        className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-      >
-        <span>📦 Mis pedidos Express</span>
-        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </Link>
+            <div>
+              <p className="font-semibold text-gray-800">Mis pedidos</p>
+              <p className="text-xs text-gray-400">Revisa el estado de tus órdenes</p>
+            </div>
+          </div>
+          <svg className="w-4 h-4 text-gray-300 group-hover:text-[#2D6A4F] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      </main>
     </div>
   )
 }

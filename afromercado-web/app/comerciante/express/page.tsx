@@ -18,6 +18,7 @@ import { obtenerMiComercio } from '@/components/comerciante/api'
 import { Switch } from '@/components/ui'
 import { MUNICIPIOS_POR_DEPARTAMENTO } from '@/components/comerciante/constantes'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
+import GestorComplementos from '@/components/comerciante/GestorComplementos'
 import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
 
 const DIAS: { dia: DiaSemana; label: string }[] = [
@@ -101,6 +102,7 @@ export default function ExpressComerciante() {
   const [editandoSeccion, setEditandoSeccion] = useState<number | null>(null)
   const [editSeccionNombre, setEditSeccionNombre] = useState('')
   const [editSeccionIcono, setEditSeccionIcono]   = useState('')
+  const [complementoProducto, setComplementoProducto] = useState<{ id: number; nombre: string } | null>(null)
   const [cupones, setCupones]           = useState<CuponExpress[]>([])
   const [estadisticas, setEstadisticas] = useState<EstadisticasExpress | null>(null)
   const [cargandoStats, setCargandoStats] = useState(false)
@@ -577,6 +579,13 @@ export default function ExpressComerciante() {
                       <div className="w-10 h-10 rounded-lg bg-[#F0EBE3] flex items-center justify-center text-sm flex-shrink-0">🥘</div>
                     )}
                     <p className="flex-1 text-sm font-medium text-gray-800 truncate">{p.nombre}</p>
+                    <button
+                      onClick={() => setComplementoProducto({ id: p.id, nombre: p.nombre })}
+                      className="text-xs border border-[#2D6A4F] text-[#2D6A4F] rounded-lg px-2 py-1.5 hover:bg-[#2D6A4F]/10 transition flex-shrink-0"
+                      title="Gestionar complementos"
+                    >
+                      ➕ Extras
+                    </button>
                     <select
                       value={p.menuSeccionId ?? ''}
                       onChange={async e => {
@@ -1158,6 +1167,15 @@ export default function ExpressComerciante() {
           </button>
         </div>
       )}
+
+      {/* Modal gestión de complementos */}
+      {complementoProducto && (
+        <GestorComplementos
+          productoId={complementoProducto.id}
+          nombreProducto={complementoProducto.nombre}
+          onClose={() => setComplementoProducto(null)}
+        />
+      )}
     </div>
   )
 }
@@ -1223,15 +1241,38 @@ function TarjetaPedido({
         </p>
       )}
 
-      <div className="space-y-1">
-        {pedido.items.map(item => (
-          <div key={item.id} className="flex justify-between text-sm">
-            <span>{item.cantidad}× {item.producto?.nombre ?? `Producto #${item.productoId}`}</span>
-            <span className="text-gray-500">{formatearPrecio(Number(item.subtotal))}</span>
-          </div>
-        ))}
-        <div className="flex justify-between text-sm font-semibold border-t border-gray-100 pt-1 mt-1">
-          <span>Total</span>
+      {/* Detalle de ítems con complementos */}
+      <div className="border border-gray-100 rounded-xl overflow-hidden">
+        <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
+          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">🧾 Detalle del pedido</p>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {pedido.items.map(item => {
+            const extras: Array<{ nombre: string; precio: number }> =
+              Array.isArray(item.complementos) ? (item.complementos as Array<{ nombre: string; precio: number }>) : []
+            const precioBase = (Number(item.subtotal) - extras.reduce((s, c) => s + Number(c.precio), 0) * item.cantidad) / item.cantidad
+            return (
+              <div key={item.id} className="px-3 py-2.5">
+                <div className="flex justify-between items-baseline text-sm">
+                  <span className="font-semibold text-gray-800">{item.cantidad}× {item.producto?.nombre ?? `Producto #${item.productoId}`}</span>
+                  <span className="text-gray-700 font-medium ml-2 flex-shrink-0">{formatearPrecio(Number(item.subtotal))}</span>
+                </div>
+                {extras.length > 0 && (
+                  <div className="mt-1 space-y-0.5 pl-3">
+                    {extras.map((c, ci) => (
+                      <div key={ci} className="flex justify-between text-xs text-gray-500">
+                        <span>+ {c.nombre}</span>
+                        <span className="flex-shrink-0 ml-2">{c.precio > 0 ? `+${formatearPrecio(c.precio)}` : 'Gratis'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        <div className="px-3 py-2.5 bg-gray-50 border-t border-gray-200 flex justify-between font-bold text-sm text-[#1B4332]">
+          <span>Total a cobrar</span>
           <span>{formatearPrecio(Number(pedido.total))}</span>
         </div>
       </div>

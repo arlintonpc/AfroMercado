@@ -96,3 +96,43 @@ export function subirFotoEntrega(id: number, file: File): Promise<string> {
 export function subirDocumentoSolicitud(file: File): Promise<string> {
   return subirImagen('/repartidor/solicitud/foto', file)
 }
+
+export interface EstadisticasRepartidor {
+  totalEntregas: number
+  totalEntregadas: number
+  totalFallidas: number
+  totalGanado: number
+  gananciasMes: number
+  promedioPorEntrega: number
+  tasaExito: number
+  porMes: Array<{ mes: string; entregas: number; ganancias: number }>
+}
+
+export async function estadisticasRepartidor(): Promise<EstadisticasRepartidor> {
+  const r = await apiFetch<{ ok: boolean; data: EstadisticasRepartidor }>('/repartidor/estadisticas')
+  return r.data
+}
+
+export interface PerfilRepartidor {
+  vehiculoTipo?: string
+  vehiculoMarca?: string
+  vehiculoModelo?: string
+  vehiculoColor?: string
+  vehiculoPlaca?: string
+  vehiculoAnio?: number
+  municipioBase?: string
+  municipiosExtra?: string[]
+}
+
+export async function actualizarPerfilRepartidor(datos: PerfilRepartidor): Promise<void> {
+  await apiFetch('/repartidor/perfil', { method: 'PATCH', body: datos as any })
+}
+
+export async function miSolicitudRepartidor(): Promise<PerfilRepartidor & { estado: string } | null> {
+  try {
+    const r = await apiFetch<{ ok: boolean; data: any }>('/repartidor/mi-solicitud')
+    return r.data
+  } catch {
+    return null
+  }
+}

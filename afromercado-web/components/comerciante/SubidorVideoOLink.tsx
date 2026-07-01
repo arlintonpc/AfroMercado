@@ -11,6 +11,7 @@ interface Props {
   onEliminar: () => Promise<VideoEstado>
   onGuardarLink: (url: string) => Promise<VideoEstado>
   titulo?: string
+  compacto?: boolean
 }
 
 type Modo = 'link' | 'subir'
@@ -20,7 +21,7 @@ function esLinkExterno(url: string | null | undefined): boolean {
   return url.startsWith('http') && !url.includes('cloudinary.com') && !url.includes('res.cloudinary')
 }
 
-export default function SubidorVideoOLink({ estadoInicial, onSubir, onEliminar, onGuardarLink, titulo = 'Video' }: Props) {
+export default function SubidorVideoOLink({ estadoInicial, onSubir, onEliminar, onGuardarLink, titulo = 'Video', compacto = false }: Props) {
   const inicialEsLink = esLinkExterno(estadoInicial.videoUrl)
   const [modo, setModo] = useState<Modo>(inicialEsLink ? 'link' : 'subir')
   const [linkInput, setLinkInput] = useState(inicialEsLink ? (estadoInicial.videoUrl ?? '') : '')
@@ -104,6 +105,8 @@ export default function SubidorVideoOLink({ estadoInicial, onSubir, onEliminar, 
           estadoInicial={esLinkExterno(estadoInicial.videoUrl) ? { videoUrl: null, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null } : estadoInicial}
           onSubir={onSubir}
           onEliminar={onEliminar}
+          compacto={compacto}
+          ocultarEncabezado={compacto}
         />
       )}
     </div>

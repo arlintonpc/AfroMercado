@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { obtenerTransporte, verificarDisponibilidadTransporte, crearReservaTransporte, misReservasTransporte, type ConfigTransporte, type RutaTransporte } from '@/lib/api/transporte'
+import { obtenerTransporte, verificarDisponibilidadTransporte, crearReservaTransporte, misReservasTransporte, toggleFavoritoTransporte, type ConfigTransporte, type RutaTransporte } from '@/lib/api/transporte'
 import { reviewsTransporte, crearReviewTransporte, type ReviewTransporte } from '@/lib/api/review'
 import SeccionReviews, { type ReviewItem } from '@/components/ui/SeccionReviews'
 import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
@@ -228,7 +228,7 @@ function WidgetReservaTransporte({ transporte, rutas, onReservar, autenticado, r
       </div>
 
       <button
-        onClick={() => { if (!autenticado) { router.push('/login'); return }; onReservar(ruta) }}
+        onClick={() => { if (!autenticado) { router.push('/ingresar'); return }; onReservar(ruta) }}
         className="w-full bg-[#1B4332] hover:bg-[#15362A] text-white font-bold py-4 rounded-xl text-base transition-all active:scale-[0.98] shadow-md mb-4">
         Reservar ahora
       </button>
@@ -371,6 +371,8 @@ export default function TransporteDetallePage() {
 
   const [transporte, setTransporte]       = useState<ConfigTransporte | null>(null)
   const [cargando, setCargando]           = useState(true)
+  const [esFavorito, setEsFavorito]       = useState(false)
+  const [togglingFav, setTogglingFav]     = useState(false)
   const [rutaSeleccionada, setRutaSel]    = useState<RutaTransporte | null>(null)
   const [reservado, setReservado]         = useState(false)
   const [lightbox, setLightbox]           = useState<{ fotos: string[]; idx: number } | null>(null)
@@ -424,6 +426,17 @@ export default function TransporteDetallePage() {
   const rutas = transporte.rutas.filter(r => r.activo)
   const precioDesde = rutas.length > 0 ? Math.min(...rutas.map(r => Number(r.precioAsiento))) : null
 
+  async function toggleFav() {
+    if (!autenticado) { router.push('/ingresar'); return }
+    setTogglingFav(true)
+    try {
+      const r = await toggleFavoritoTransporte(transporte!.id)
+      setEsFavorito(r.favorito)
+    } finally {
+      setTogglingFav(false)
+    }
+  }
+
   async function handleShare() {
     const url = window.location.href
     if (navigator.share) { try { await navigator.share({ title: transporte!.nombre, url }) } catch {} }
@@ -445,6 +458,13 @@ export default function TransporteDetallePage() {
             {autenticado && (
               <Link href="/transportes/mis-reservas" className="hidden sm:block text-sm text-gray-500 hover:text-gray-800 transition-colors">Mis reservas</Link>
             )}
+            <button
+              onClick={toggleFav}
+              disabled={togglingFav}
+              className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-full px-3 py-1.5 hover:border-gray-300 transition-all disabled:opacity-50"
+              title={esFavorito ? 'Quitar de favoritos' : 'Guardar en favoritos'}>
+              {esFavorito ? '❤️' : '🤍'}
+            </button>
             <button onClick={handleShare}
               className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-full px-3 py-1.5 hover:border-gray-300 transition-all">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
@@ -457,12 +477,12 @@ export default function TransporteDetallePage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* GALERÍA */}
         <GaleriaHero fotos={transporte.fotos} nombre={transporte.nombre} tipo={transporte.tipo}
-          videoUrl={(transporte as any).videoUrl} onOpen={i => setLightbox({ fotos: transporte.fotos, idx: i })} />
+          videoUrl={transporte.videoUrl} onOpen={i => setLightbox({ fotos: transporte.fotos, idx: i })} />
 
         {/* VIDEO */}
-        {(transporte as any).videoUrl && (
+        {transporte.videoUrl && (
           <section id="seccion-video" className="mt-4 pb-4">
-            <ReproductorVideo url={(transporte as any).videoUrl} />
+            <ReproductorVideo url={transporte.videoUrl} />
           </section>
         )}
 
@@ -530,7 +550,7 @@ export default function TransporteDetallePage() {
                 <div className="space-y-4">
                   {rutas.map(ruta => (
                     <TarjetaRuta key={ruta.id} ruta={ruta}
-                      onReservar={r => { if (!autenticado) { router.push('/login'); return }; setRutaSel(r) }} />
+                      onReservar={r => { if (!autenticado) { router.push('/ingresar'); return }; setRutaSel(r) }} />
                   ))}
                 </div>
               )}
@@ -600,7 +620,7 @@ export default function TransporteDetallePage() {
           ) : (
             <button
               onClick={() => {
-                if (!autenticado) { router.push('/login'); return }
+                if (!autenticado) { router.push('/ingresar'); return }
                 if (rutas.length === 1) { setRutaSel(rutas[0]); return }
                 document.querySelector('[data-rutas]')?.scrollIntoView({ behavior: 'smooth' })
               }}

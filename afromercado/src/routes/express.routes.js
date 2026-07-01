@@ -50,6 +50,17 @@ router.post(  "/config/video",      ...soloComercio, ExpressController.uploadVid
 router.delete("/config/video",      ...soloComercio, ExpressController.quitarVideoExpress);
 router.patch( "/config/video-link", ...soloComercio, ExpressController.guardarVideoLinkExpress);
 
+// Complementos (add-ons) por producto
+router.get(   "/complementos/:productoId",              ...soloComercio, ExpressController.listarComplementos);
+router.post(  "/complementos/:productoId/grupos",       ...soloComercio, ExpressController.crearGrupoComplemento);
+router.patch( "/complementos/grupos/:id",               ...soloComercio, ExpressController.actualizarGrupoComplemento);
+router.delete("/complementos/grupos/:id",               ...soloComercio, ExpressController.eliminarGrupoComplemento);
+router.post(  "/complementos/grupos/:grupoId/items",    ...soloComercio, ExpressController.crearItemComplemento);
+router.patch( "/complementos/items/:id",                ...soloComercio, ExpressController.actualizarItemComplemento);
+router.delete("/complementos/items/:id",                ...soloComercio, ExpressController.eliminarItemComplemento);
+router.post(  "/complementos/items/:itemId/imagen",     ...soloComercio, ExpressController.uploadItemComplementoImagen, ExpressController.subirImagenItemComplemento);
+router.post(  "/complementos/:grupoId/copiar-a-todos",  ...soloComercio, ExpressController.copiarGrupoATodos);
+
 // ── REVIEWS ──────────────────────────────────────────────────
 router.get( "/comercios/:id/reviews",        ReviewController.reviewsExpress);
 router.post("/pedidos/:id/review", ...soloAuth, ReviewController.crearReviewExpress);

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { Suspense, useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
@@ -9,12 +9,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Toast, useToast } from '@/components/ui/Toast'
 
 const ESTADO_INFO: Record<string, { label: string; color: string; paso: number }> = {
-  PENDIENTE:  { label: '⏳ Esperando confirmación', color: 'bg-amber-100 text-amber-700',  paso: 0 },
-  CONFIRMADA: { label: '✅ Confirmada',              color: 'bg-blue-100 text-blue-700',   paso: 1 },
-  CHECKIN:    { label: '🏨 En estadía',              color: 'bg-green-100 text-green-700', paso: 2 },
-  CHECKOUT:   { label: '👋 Check-out realizado',     color: 'bg-green-100 text-green-700', paso: 3 },
-  CANCELADA:  { label: '❌ Cancelada',               color: 'bg-red-100 text-red-600',     paso: -1 },
-  RECHAZADA:  { label: '🚫 Rechazada',               color: 'bg-red-100 text-red-600',     paso: -1 },
+  PENDIENTE:  { label: 'â³ Esperando confirmaciÃ³n', color: 'bg-amber-100 text-amber-700',  paso: 0 },
+  CONFIRMADA: { label: 'âœ… Confirmada',              color: 'bg-blue-100 text-blue-700',   paso: 1 },
+  CHECKIN:    { label: 'ðŸ¨ En estadÃ­a',              color: 'bg-green-100 text-green-700', paso: 2 },
+  CHECKOUT:   { label: 'ðŸ‘‹ Check-out realizado',     color: 'bg-green-100 text-green-700', paso: 3 },
+  CANCELADA:  { label: 'âŒ Cancelada',               color: 'bg-red-100 text-red-600',     paso: -1 },
+  RECHAZADA:  { label: 'ðŸš« Rechazada',               color: 'bg-red-100 text-red-600',     paso: -1 },
 }
 
 const PASOS = ['Solicitada', 'Confirmada', 'Check-in', 'Check-out']
@@ -99,7 +99,7 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
             </span>
             <button
               onClick={copiarCodigo}
-              title="Copiar código"
+              title="Copiar cÃ³digo"
               className="flex items-center justify-center w-6 h-6 rounded-md bg-gray-100 hover:bg-gray-200 transition-colors flex-shrink-0">
               {copiado
                 ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -127,15 +127,15 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
       </div>
 
       <div className="mt-3 space-y-1 text-sm">
-        <p className="text-gray-600">🛏️ {reserva.habitacionTipo?.nombre} · {noches} noche{noches !== 1 ? 's' : ''}</p>
-        <p className="text-gray-600">👤 {reserva.huespedes} huésped{reserva.huespedes !== 1 ? 'es' : ''}</p>
+        <p className="text-gray-600">ðŸ›ï¸ {reserva.habitacionTipo?.nombre} Â· {noches} noche{noches !== 1 ? 's' : ''}</p>
+        <p className="text-gray-600">ðŸ‘¤ {reserva.huespedes} huÃ©sped{reserva.huespedes !== 1 ? 'es' : ''}</p>
       </div>
 
-      {/* Info penalización/reembolso para canceladas */}
+      {/* Info penalizaciÃ³n/reembolso para canceladas */}
       {reserva.estado === 'CANCELADA' && (reserva.montoPenalidad != null || reserva.montoReembolso != null) && (
         <div className="mt-3 bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-xs space-y-0.5">
           {reserva.montoPenalidad != null && reserva.montoPenalidad > 0 && (
-            <p className="text-red-600 font-medium">Penalización: <span className="font-bold">{formatearPrecio(Number(reserva.montoPenalidad))}</span></p>
+            <p className="text-red-600 font-medium">PenalizaciÃ³n: <span className="font-bold">{formatearPrecio(Number(reserva.montoPenalidad))}</span></p>
           )}
           {reserva.montoReembolso != null && (
             <p className="text-gray-600">Reembolso: <span className="font-bold text-gray-800">{formatearPrecio(Number(reserva.montoReembolso))}</span></p>
@@ -147,7 +147,7 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
         <span className="text-xs text-gray-400">{reserva.metodoPago}</span>
         <div className="text-right">
           {reserva.codigoCupon && (
-            <p className="text-xs text-emerald-600 font-medium">Cupón: {reserva.codigoCupon}</p>
+            <p className="text-xs text-emerald-600 font-medium">CupÃ³n: {reserva.codigoCupon}</p>
           )}
           {reserva.montoDescuento != null && reserva.montoDescuento > 0 && (
             <p className="text-xs text-emerald-600">Ahorraste {formatearPrecio(Number(reserva.montoDescuento))}</p>
@@ -166,22 +166,22 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
       {mostrarCheckin && (
         <button onClick={iniciarCheckin} disabled={generandoToken}
           className="mt-3 w-full py-2 text-sm font-medium bg-[#1B4332] text-white rounded-xl disabled:opacity-50 hover:bg-[#2D6A4F] transition-colors">
-          {generandoToken ? 'Preparando...' : '✓ Hacer check-in online'}
+          {generandoToken ? 'Preparando...' : 'âœ“ Hacer check-in online'}
         </button>
       )}
       {reserva.checkinOnlineAt && (
         <div className="mt-3 flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 rounded-xl px-3 py-2">
-          <span>✓</span>
-          <span>Check-in realizado · {new Date(reserva.checkinOnlineAt).toLocaleDateString('es-CO')}</span>
+          <span>âœ“</span>
+          <span>Check-in realizado Â· {new Date(reserva.checkinOnlineAt).toLocaleDateString('es-CO')}</span>
         </div>
       )}
 
-      {/* Modal confirmación cancelación */}
+      {/* Modal confirmaciÃ³n cancelaciÃ³n */}
       {modalCancelar && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setModalCancelar(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="font-bold text-lg text-gray-900 mb-1">¿Cancelar reserva?</h3>
-            <p className="text-xs text-gray-500 mb-4">Código: <span className="font-mono font-semibold">{reserva.codigo}</span></p>
+            <h3 className="font-bold text-lg text-gray-900 mb-1">Â¿Cancelar reserva?</h3>
+            <p className="text-xs text-gray-500 mb-4">CÃ³digo: <span className="font-mono font-semibold">{reserva.codigo}</span></p>
 
             {cargandoPolitica ? (
               <div className="flex items-center justify-center py-6">
@@ -191,24 +191,24 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
               <div className={`rounded-xl p-4 mb-4 ${politica.dentroPlazoGratuito ? 'bg-emerald-50 border border-emerald-100' : 'bg-amber-50 border border-amber-100'}`}>
                 {politica.dentroPlazoGratuito ? (
                   <>
-                    <p className="font-bold text-emerald-700 text-sm">✓ Cancelación gratuita</p>
+                    <p className="font-bold text-emerald-700 text-sm">âœ“ CancelaciÃ³n gratuita</p>
                     <p className="text-xs text-emerald-600 mt-1">Recibes reembolso completo de <strong>{formatearPrecio(politica.montoReembolso)}</strong></p>
                   </>
                 ) : (
                   <>
-                    <p className="font-bold text-amber-700 text-sm">⚠️ Cancelación con penalización</p>
+                    <p className="font-bold text-amber-700 text-sm">âš ï¸ CancelaciÃ³n con penalizaciÃ³n</p>
                     <p className="text-xs text-amber-600 mt-1">Faltan menos de {politica.horasRestantes < 1 ? 'una hora' : `${Math.round(politica.horasRestantes)}h`} para tu check-in.</p>
                     <div className="mt-3 space-y-1 text-xs">
                       <div className="flex justify-between text-gray-600"><span>Total pagado</span><span>{formatearPrecio(Number(reserva.total))}</span></div>
-                      <div className="flex justify-between text-red-600 font-medium"><span>Penalización ({politica.penalizacionPct}%)</span><span>− {formatearPrecio(politica.montoPenalidad)}</span></div>
+                      <div className="flex justify-between text-red-600 font-medium"><span>PenalizaciÃ³n ({politica.penalizacionPct}%)</span><span>âˆ’ {formatearPrecio(politica.montoPenalidad)}</span></div>
                       <div className="flex justify-between text-gray-900 font-bold border-t border-amber-200 pt-1"><span>Te devolvemos</span><span>{formatearPrecio(politica.montoReembolso)}</span></div>
                     </div>
-                    {politica.montoReembolso === 0 && <p className="text-xs text-red-600 font-semibold mt-2">Sin reembolso — ya no hay tiempo de reasignar la habitación.</p>}
+                    {politica.montoReembolso === 0 && <p className="text-xs text-red-600 font-semibold mt-2">Sin reembolso â€” ya no hay tiempo de reasignar la habitaciÃ³n.</p>}
                   </>
                 )}
               </div>
             ) : (
-              <div className="bg-gray-50 rounded-xl p-4 mb-4 text-xs text-gray-500 text-center">No se pudo consultar la política. Puedes cancelar igual.</div>
+              <div className="bg-gray-50 rounded-xl p-4 mb-4 text-xs text-gray-500 text-center">No se pudo consultar la polÃ­tica. Puedes cancelar igual.</div>
             )}
 
             <div className="flex gap-3">
@@ -218,7 +218,7 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
               </button>
               <button onClick={confirmarCancelacion} disabled={cancelando}
                 className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl py-2.5 text-sm font-bold transition-colors disabled:opacity-50">
-                {cancelando ? 'Cancelando…' : 'Sí, cancelar'}
+                {cancelando ? 'Cancelandoâ€¦' : 'SÃ­, cancelar'}
               </button>
             </div>
           </div>
@@ -277,7 +277,7 @@ function MisReservasHotelContent() {
   const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
-    if (pagoOk) mostrarToast('¡Pago recibido! Tu reserva está siendo confirmada.')
+    if (pagoOk) mostrarToast('Â¡Pago recibido! Tu reserva estÃ¡ siendo confirmada.')
   }, [pagoOk])
 
   async function cargar() {
@@ -288,7 +288,7 @@ function MisReservasHotelContent() {
 
   useEffect(() => {
     if (cargandoAuth) return
-    if (!autenticado) { router.push('/login'); return }
+    if (!autenticado) { router.push('/ingresar'); return }
     cargar()
   }, [autenticado, cargandoAuth])
 
@@ -317,8 +317,8 @@ function MisReservasHotelContent() {
       <main className="max-w-lg mx-auto p-4 space-y-4 pb-10">
         {reservas.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
-            <p className="text-4xl mb-3">🏨</p>
-            <p className="font-medium">Aún no tienes reservas</p>
+            <p className="text-4xl mb-3">ðŸ¨</p>
+            <p className="font-medium">AÃºn no tienes reservas</p>
             <Link href="/hoteles" className="mt-4 inline-block text-[#2D6A4F] underline text-sm">Ver hoteles</Link>
           </div>
         ) : (
@@ -349,3 +349,4 @@ export default function MisReservasHotelPage() {
     </Suspense>
   )
 }
+

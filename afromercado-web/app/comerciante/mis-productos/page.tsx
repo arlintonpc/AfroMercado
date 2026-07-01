@@ -17,6 +17,8 @@ export default function MisProductosPage() {
   const [error, setError]             = useState<string | null>(null)
   const [procesandoId, setProcesando] = useState<number | null>(null)
   const [aviso, setAviso]             = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null)
+  const [editandoStockId, setEditandoStockId] = useState<number | null>(null)
+  const [stockTemporal, setStockTemporal]     = useState<string>('')
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -37,6 +39,23 @@ export default function MisProductosPage() {
     const t = setTimeout(() => setAviso(null), 4000)
     return () => clearTimeout(t)
   }, [aviso])
+
+  async function guardarStock(p: ProductoComerciante) {
+    const nuevo = parseInt(stockTemporal, 10)
+    if (isNaN(nuevo) || nuevo < 0) { setEditandoStockId(null); return }
+    if (nuevo === p.stock) { setEditandoStockId(null); return }
+    setProcesando(p.id)
+    try {
+      await apiFetch(`/productos/${p.id}`, { method: 'PATCH', body: { stock: nuevo } })
+      setProductos(prev => prev.map(x => x.id === p.id ? { ...x, stock: nuevo } : x))
+      setAviso({ tipo: 'exito', texto: `Stock de "${p.nombre}" actualizado a ${nuevo}.` })
+    } catch (err) {
+      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo actualizar.' })
+    } finally {
+      setProcesando(null)
+      setEditandoStockId(null)
+    }
+  }
 
   async function toggleActivo(p: ProductoComerciante) {
     const accion = p.activo ? 'desactivar' : 'activar'
@@ -166,19 +185,47 @@ export default function MisProductosPage() {
                       {formatearPrecio(Number(p.precio))}
                     </td>
 
-                    {/* Stock */}
+                    {/* Stock — edición inline al hacer clic */}
                     <td className="px-4 py-3">
-                      <span className={[
-                        'text-sm font-semibold',
-                        p.stock === 0
-                          ? 'text-[#C0392B]'
-                          : p.stock <= 5
-                          ? 'text-[#D4A017]'
-                          : 'text-[#1A1A1A]/70',
-                      ].join(' ')}>
-                        {p.stock}
-                      </span>
-                      <span className="ml-1 text-xs text-[#1A1A1A]/40">{p.unidad}</span>
+                      {editandoStockId === p.id ? (
+                        <form
+                          onSubmit={e => { e.preventDefault(); guardarStock(p) }}
+                          className="flex items-center gap-1"
+                        >
+                          <input
+                            autoFocus
+                            type="number"
+                            min={0}
+                            value={stockTemporal}
+                            onChange={e => setStockTemporal(e.target.value)}
+                            onBlur={() => guardarStock(p)}
+                            onKeyDown={e => { if (e.key === 'Escape') setEditandoStockId(null) }}
+                            className="w-20 rounded-lg border border-[#2D6A4F]/40 bg-white px-2 py-1 text-sm font-semibold text-[#1A1A1A] focus:outline-none focus:border-[#2D6A4F]"
+                            disabled={procesandoId === p.id}
+                          />
+                          <button type="submit" className="text-[#2D6A4F] hover:text-[#1B4332]">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+                          </button>
+                        </form>
+                      ) : (
+                        <button
+                          type="button"
+                          title="Clic para editar stock"
+                          onClick={() => { setEditandoStockId(p.id); setStockTemporal(String(p.stock)) }}
+                          className="group flex items-center gap-1 rounded-lg px-1 -mx-1 hover:bg-[#F8F5F0] transition-colors"
+                        >
+                          <span className={[
+                            'text-sm font-semibold',
+                            p.stock === 0 ? 'text-[#C0392B]' : p.stock <= 5 ? 'text-[#D4A017]' : 'text-[#1A1A1A]/70',
+                          ].join(' ')}>
+                            {p.stock}
+                          </span>
+                          <span className="text-xs text-[#1A1A1A]/40">{p.unidad}</span>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="text-[#1A1A1A]/20 group-hover:text-[#2D6A4F] transition-colors">
+                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                          </svg>
+                        </button>
+                      )}
                     </td>
 
                     {/* Estado */}

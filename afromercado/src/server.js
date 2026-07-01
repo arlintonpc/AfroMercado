@@ -129,6 +129,48 @@ async function aplicarMigraciones() {
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "ConfigTour_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE RESTRICT ON UPDATE CASCADE
     )`,
+    `CREATE TABLE IF NOT EXISTS "TourLugar" (
+      "id" SERIAL PRIMARY KEY,
+      "configTourId" INTEGER NOT NULL,
+      "titulo" TEXT NOT NULL,
+      "descripcion" TEXT,
+      "tipo" TEXT,
+      "orden" INTEGER NOT NULL DEFAULT 0,
+      "duracionMinutos" INTEGER,
+      "recomendaciones" TEXT,
+      "latitud" DOUBLE PRECISION,
+      "longitud" DOUBLE PRECISION,
+      "activo" BOOLEAN NOT NULL DEFAULT true,
+      "destacado" BOOLEAN NOT NULL DEFAULT false,
+      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "TourLugar_configTourId_fkey" FOREIGN KEY ("configTourId") REFERENCES "ConfigTour"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    )`,
+    `CREATE TABLE IF NOT EXISTS "TourLugarMedia" (
+      "id" SERIAL PRIMARY KEY,
+      "tourLugarId" INTEGER NOT NULL,
+      "tipo" TEXT NOT NULL,
+      "url" TEXT NOT NULL,
+      "posterUrl" TEXT,
+      "titulo" TEXT,
+      "descripcion" TEXT,
+      "plataforma" TEXT,
+      "orden" INTEGER NOT NULL DEFAULT 0,
+      "activo" BOOLEAN NOT NULL DEFAULT true,
+      "publicId" TEXT,
+      "duracionSegundos" DOUBLE PRECISION,
+      "bytes" INTEGER,
+      "formato" TEXT,
+      "mimeType" TEXT,
+      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "TourLugarMedia_tourLugarId_fkey" FOREIGN KEY ("tourLugarId") REFERENCES "TourLugar"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    )`,
+    `ALTER TABLE "TourLugar" ADD COLUMN IF NOT EXISTS "rutaNombre" TEXT`,
+    `CREATE INDEX IF NOT EXISTS "TourLugar_configTourId_orden_idx" ON "TourLugar"("configTourId", "orden")`,
+    `CREATE INDEX IF NOT EXISTS "TourLugar_configTourId_activo_idx" ON "TourLugar"("configTourId", "activo")`,
+    `CREATE INDEX IF NOT EXISTS "TourLugarMedia_tourLugarId_orden_idx" ON "TourLugarMedia"("tourLugarId", "orden")`,
+    `CREATE INDEX IF NOT EXISTS "TourLugarMedia_tipo_idx" ON "TourLugarMedia"("tipo")`,
     `DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoReservaTour') THEN
         CREATE TYPE "EstadoReservaTour" AS ENUM ('PENDIENTE','CONFIRMADA','CANCELADA','RECHAZADA','COMPLETADA');
@@ -232,6 +274,18 @@ async function aplicarMigraciones() {
       CONSTRAINT "ReservaTransporte_rutaTransporteId_fkey" FOREIGN KEY ("rutaTransporteId") REFERENCES "RutaTransporte"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
       CONSTRAINT "ReservaTransporte_clienteId_fkey"        FOREIGN KEY ("clienteId")        REFERENCES "Usuario"("id")          ON DELETE RESTRICT ON UPDATE CASCADE
     )`,
+    `ALTER TABLE "ConfigTransporte" ADD COLUMN IF NOT EXISTS "videoUrl" TEXT`,
+    `ALTER TABLE "ConfigTransporte" ADD COLUMN IF NOT EXISTS "videoPosterUrl" TEXT`,
+    `CREATE TABLE IF NOT EXISTS "FavoritoTransporte" (
+      "id"                 SERIAL PRIMARY KEY,
+      "usuarioId"          INTEGER NOT NULL,
+      "configTransporteId" INTEGER NOT NULL,
+      "createdAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "FavoritoTransporte_usuarioId_fkey"          FOREIGN KEY ("usuarioId")          REFERENCES "Usuario"("id")          ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "FavoritoTransporte_configTransporteId_fkey" FOREIGN KEY ("configTransporteId") REFERENCES "ConfigTransporte"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "FavoritoTransporte_usuarioId_configTransporteId_key" UNIQUE ("usuarioId", "configTransporteId")
+    )`,
+    `CREATE INDEX IF NOT EXISTS "FavoritoTransporte_usuarioId_idx" ON "FavoritoTransporte"("usuarioId")`,
   ];
   for (const sql of migraciones) {
     try {

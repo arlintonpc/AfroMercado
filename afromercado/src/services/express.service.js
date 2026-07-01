@@ -162,11 +162,19 @@ const ExpressService = {
     let subtotal = 0;
     const itemsData = items.map(item => {
       const prod = prodMap[item.productoId];
-      const precioUnitario = Number(prod.precio);
+      const precioBase = Number(prod.precio);
+      const precioExtras = item.complementos ? item.complementos.reduce((s, c) => s + Number(c.precio), 0) : 0;
+      const precioUnitario = precioBase + precioExtras;
       const sub = precioUnitario * item.cantidad;
       subtotal += sub;
-      return { productoId: item.productoId, cantidad: item.cantidad,
-               precioUnitario, subtotal: sub, nota: item.nota ?? null };
+      return {
+        productoId: item.productoId,
+        cantidad: item.cantidad,
+        precioUnitario,
+        subtotal: sub,
+        nota: item.nota ?? null,
+        ...(item.complementos?.length ? { complementos: item.complementos } : {}),
+      };
     });
 
     // Aplicar cupón si viene
@@ -346,7 +354,16 @@ const ExpressService = {
     if (!cfg || !cfg.activo) return null;
     const productos = await prisma.producto.findMany({
       where: { comercioId, esExpress: true, activo: true, deletedAt: null },
-      include: { categoria: { select: { id: true, nombre: true } } },
+      include: {
+        categoria: { select: { id: true, nombre: true } },
+        gruposComplemento: {
+          where: { activo: true },
+          orderBy: { orden: 'asc' },
+          include: {
+            items: { where: { disponible: true }, orderBy: { orden: 'asc' } },
+          },
+        },
+      },
       orderBy: [{ menuSeccionId: 'asc' }, { nombre: 'asc' }],
     });
     return {
@@ -709,6 +726,163 @@ const ExpressService = {
 
   async guardarVideoLinkExpress(comercioId, videoUrl) {
     return prisma.configExpress.update({ where: { comercioId }, data: { videoUrl, videoPosterUrl: null } });
+  },
+
+  // ── COMPLEMENTOS ──────────────────────────────────────────────
+
+  async listarComplementos(comercioId, productoId) {
+    const prod = await prisma.producto.findFirst({ where: { id: productoId, comercioId } });
+    if (!prod) throw new ErrorNoEncontrado("Producto no encontrado");
+    return prisma.grupoComplemento.findMany({
+      where: { productoId },
+      include: { items: { orderBy: { orden: 'asc' } } },
+      orderBy: { orden: 'asc' },
+    });
+  },
+
+  async crearGrupoComplemento(comercioId, productoId, { nombre, minimo, maximo, requerido, orden }) {
+    const prod = await prisma.producto.findFirst({ where: { id: productoId, comercioId } });
+    if (!prod) throw new ErrorNoEncontrado("Producto no encontrado");
+    return prisma.grupoComplemento.create({
+      data: {
+        productoId,
+        nombre: nombre.trim(),
+        minimo:   minimo   ?? 0,
+        maximo:   maximo   ?? 1,
+        requerido: requerido ?? false,
+        orden:    orden    ?? 0,
+      },
+      include: { items: true },
+    });
+  },
+
+  async actualizarGrupoComplemento(comercioId, grupoId, datos) {
+    const grupo = await prisma.grupoComplemento.findFirst({
+      where: { id: grupoId },
+      include: { producto: { select: { comercioId: true } } },
+    });
+    if (!grupo || grupo.producto.comercioId !== comercioId) throw new ErrorNoEncontrado("Grupo no encontrado");
+    const { nombre, minimo, maximo, requerido, orden, activo } = datos;
+    return prisma.grupoComplemento.update({
+      where: { id: grupoId },
+      data: {
+        ...(nombre    !== undefined && { nombre: nombre.trim() }),
+        ...(minimo    !== undefined && { minimo }),
+        ...(maximo    !== undefined && { maximo }),
+        ...(requerido !== undefined && { requerido }),
+        ...(orden     !== undefined && { orden }),
+        ...(activo    !== undefined && { activo }),
+      },
+      include: { items: { orderBy: { orden: 'asc' } } },
+    });
+  },
+
+  async eliminarGrupoComplemento(comercioId, grupoId) {
+    const grupo = await prisma.grupoComplemento.findFirst({
+      where: { id: grupoId },
+      include: { producto: { select: { comercioId: true } } },
+    });
+    if (!grupo || grupo.producto.comercioId !== comercioId) throw new ErrorNoEncontrado("Grupo no encontrado");
+    await prisma.grupoComplemento.delete({ where: { id: grupoId } });
+  },
+
+  async crearItemComplemento(comercioId, grupoId, { nombre, icono, precio, disponible, orden }) {
+    const grupo = await prisma.grupoComplemento.findFirst({
+      where: { id: grupoId },
+      include: { producto: { select: { comercioId: true } } },
+    });
+    if (!grupo || grupo.producto.comercioId !== comercioId) throw new ErrorNoEncontrado("Grupo no encontrado");
+    return prisma.itemComplemento.create({
+      data: {
+        grupoComplementoId: grupoId,
+        nombre: nombre.trim(),
+        icono:      icono      ?? null,
+        precio:     precio     ?? 0,
+        disponible: disponible ?? true,
+        orden:      orden      ?? 0,
+      },
+    });
+  },
+
+  async actualizarItemComplemento(comercioId, itemId, datos) {
+    const item = await prisma.itemComplemento.findFirst({
+      where: { id: itemId },
+      include: { grupo: { include: { producto: { select: { comercioId: true } } } } },
+    });
+    if (!item || item.grupo.producto.comercioId !== comercioId) throw new ErrorNoEncontrado("Item no encontrado");
+    const { nombre, icono, precio, disponible, orden } = datos;
+    return prisma.itemComplemento.update({
+      where: { id: itemId },
+      data: {
+        ...(nombre     !== undefined && { nombre: nombre.trim() }),
+        ...(icono      !== undefined && { icono }),
+        ...(precio     !== undefined && { precio }),
+        ...(disponible !== undefined && { disponible }),
+        ...(orden      !== undefined && { orden }),
+      },
+    });
+  },
+
+  async copiarGrupoATodosLosProductos(comercioId, grupoId) {
+    // Cargar el grupo origen con sus ítems
+    const grupoOrigen = await prisma.grupoComplemento.findFirst({
+      where: { id: grupoId },
+      include: {
+        items: true,
+        producto: { select: { comercioId: true, id: true } },
+      },
+    });
+    if (!grupoOrigen || grupoOrigen.producto.comercioId !== comercioId) throw new ErrorNoEncontrado("Grupo no encontrado");
+
+    // Todos los productos Express activos del comercio (excepto el que ya lo tiene)
+    const productos = await prisma.producto.findMany({
+      where: { comercioId, esExpress: true, activo: true, deletedAt: null, id: { not: grupoOrigen.productoId } },
+      select: { id: true },
+    });
+
+    let creados = 0;
+    for (const prod of productos) {
+      // Verificar que no exista ya un grupo con el mismo nombre en ese producto
+      const existe = await prisma.grupoComplemento.findFirst({
+        where: { productoId: prod.id, nombre: grupoOrigen.nombre },
+      });
+      if (existe) continue;
+      const nuevoGrupo = await prisma.grupoComplemento.create({
+        data: {
+          productoId: prod.id,
+          nombre:    grupoOrigen.nombre,
+          minimo:    grupoOrigen.minimo,
+          maximo:    grupoOrigen.maximo,
+          requerido: grupoOrigen.requerido,
+          orden:     grupoOrigen.orden,
+          activo:    grupoOrigen.activo,
+        },
+      });
+      if (grupoOrigen.items.length) {
+        await prisma.itemComplemento.createMany({
+          data: grupoOrigen.items.map(i => ({
+            grupoComplementoId: nuevoGrupo.id,
+            nombre:     i.nombre,
+            icono:      i.icono,
+            imagenUrl:  i.imagenUrl ?? null,
+            precio:     i.precio,
+            disponible: i.disponible,
+            orden:      i.orden,
+          })),
+        });
+      }
+      creados++;
+    }
+    return { productosActualizados: creados };
+  },
+
+  async eliminarItemComplemento(comercioId, itemId) {
+    const item = await prisma.itemComplemento.findFirst({
+      where: { id: itemId },
+      include: { grupo: { include: { producto: { select: { comercioId: true } } } } },
+    });
+    if (!item || item.grupo.producto.comercioId !== comercioId) throw new ErrorNoEncontrado("Item no encontrado");
+    await prisma.itemComplemento.delete({ where: { id: itemId } });
   },
 };
 

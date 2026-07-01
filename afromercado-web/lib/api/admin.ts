@@ -54,11 +54,26 @@ export async function listarComerciosAdmin(params?: {
   q?: string
 }): Promise<{ comercios: ComercioAdmin[]; total: number; totalPaginas: number }> {
   const qs = new URLSearchParams()
-  if (params?.pagina) qs.set('pagina', String(params.pagina))
   if (params?.estado) qs.set('estado', params.estado)
-  if (params?.modulo) qs.set('modulo', params.modulo)
   if (params?.q) qs.set('q', params.q)
-  return apiFetch(`/admin/comercios?${qs}`)
+  const r = await apiFetch<{ ok: boolean; data: ComercioAdmin[] }>(`/admin/comercios?${qs}`)
+  let lista = r.data ?? []
+  // Filtro por módulo en cliente (el backend no lo soporta aún)
+  if (params?.modulo) {
+    const m = params.modulo
+    lista = lista.filter(c =>
+      (m === 'hotel' && c.configHotel) ||
+      (m === 'tour' && c.configTour) ||
+      (m === 'express' && c.configExpress) ||
+      (m === 'transporte' && c.configTransporte)
+    )
+  }
+  const POR_PAGINA = 20
+  const pagina = params?.pagina ?? 1
+  const total = lista.length
+  const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA))
+  const comercios = lista.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
+  return { comercios, total, totalPaginas }
 }
 
 export async function cambiarEstadoComercio(id: number, activo: boolean): Promise<void> {

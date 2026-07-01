@@ -5,14 +5,42 @@ import {
   obtenerMiTransporte, actualizarMiTransporte, agregarRuta, actualizarRuta, eliminarRuta,
   reservasOperadorTransporte, cambiarEstadoReservaTransporte, subirFotosTransporte,
   subirVideoTransporte, quitarVideoTransporte, guardarVideoLinkTransporte,
-  type ConfigTransporte, type RutaTransporte, type ReservaTransporte, type EstadoReservaTransporte,
+  estadisticasTransporte,
+  type ConfigTransporte, type RutaTransporte, type ReservaTransporte, type EstadoReservaTransporte, type EstadisticasTransporte,
 } from '@/lib/api/transporte'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
 
-const TIPO_OPCIONES = ['LANCHA', 'BOTE', 'CHALUPA', 'CANOA']
-const TIPO_ICONO: Record<string, string> = { LANCHA: '🛥️', BOTE: '⛵', CHALUPA: '🚤', CANOA: '🛶' }
+const TIPO_OPCIONES = [
+  // Fluvial
+  'LANCHA', 'BOTE', 'CHALUPA', 'CANOA', 'PIRAGUA', 'FERRY',
+  // Terrestre
+  'BUS', 'CHIVA', 'VAN', 'MOTOTAXI', 'RAPIMOTO', 'PICKUP',
+  // Turístico
+  'TOUR_FLUVIAL', 'PAQUETE_MIXTO',
+]
+
+const TIPO_ICONO: Record<string, string> = {
+  // Fluvial
+  LANCHA: '🛥️', BOTE: '⛵', CHALUPA: '🚤', CANOA: '🛶', PIRAGUA: '🚣', FERRY: '⛴️',
+  // Terrestre
+  BUS: '🚌', CHIVA: '🚐', VAN: '🚐', MOTOTAXI: '🏍️', RAPIMOTO: '🏍️', PICKUP: '🛻',
+  // Turístico
+  TOUR_FLUVIAL: '🌊', PAQUETE_MIXTO: '🗺️',
+}
+
+const TIPO_CATEGORIA: Record<string, string> = {
+  LANCHA: 'Fluvial', BOTE: 'Fluvial', CHALUPA: 'Fluvial', CANOA: 'Fluvial', PIRAGUA: 'Fluvial', FERRY: 'Fluvial',
+  BUS: 'Terrestre', CHIVA: 'Terrestre', VAN: 'Terrestre', MOTOTAXI: 'Terrestre', RAPIMOTO: 'Terrestre', PICKUP: 'Terrestre',
+  TOUR_FLUVIAL: 'Turístico', PAQUETE_MIXTO: 'Turístico',
+}
+
+const TIPO_LABEL: Record<string, string> = {
+  LANCHA: 'Lancha', BOTE: 'Bote de motor', CHALUPA: 'Chalupa', CANOA: 'Canoa', PIRAGUA: 'Piragua', FERRY: 'Ferry',
+  BUS: 'Bus intermunicipal', CHIVA: 'Chiva', VAN: 'Van / Buseta', MOTOTAXI: 'Mototaxi', RAPIMOTO: 'Rapimoto', PICKUP: 'Pickup / Camioneta',
+  TOUR_FLUVIAL: 'Tour fluvial guiado', PAQUETE_MIXTO: 'Paquete turístico mixto',
+}
 const DIAS_SEMANA = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
 const DIAS_LABEL: Record<string, string> = { lunes: 'Lu', martes: 'Ma', miercoles: 'Mi', jueves: 'Ju', viernes: 'Vi', sabado: 'Sá', domingo: 'Do' }
 
@@ -28,7 +56,7 @@ const ACCIONES: Record<string, { label: string; estado: EstadoReservaTransporte 
 const RUTA_VACIA = { origen: '', destino: '', horario: '', diasSemana: [] as string[], capacidad: 10, precioAsiento: 0, activo: true }
 
 export default function ComercianteTransportesPage() {
-  const [tab, setTab] = useState<'reservas' | 'rutas' | 'config'>('reservas')
+  const [tab, setTab] = useState<'reservas' | 'rutas' | 'estadisticas' | 'config'>('reservas')
   const [cfg, setCfg] = useState<ConfigTransporte | null>(null)
   const [reservas, setReservas] = useState<ReservaTransporte[]>([])
   const [cargando, setCargando] = useState(true)
@@ -37,6 +65,8 @@ export default function ComercianteTransportesPage() {
   const [formRuta, setFormRuta] = useState<Partial<RutaTransporte>>(RUTA_VACIA)
   const [editandoRutaId, setEditandoRutaId] = useState<number | null>(null)
   const [mostrarFormRuta, setMostrarFormRuta] = useState(false)
+  const [stats, setStats] = useState<EstadisticasTransporte | null>(null)
+  const [cargandoStats, setCargandoStats] = useState(false)
   const inputFotoRef = useRef<HTMLInputElement>(null)
   const reservasRef = useRef<ReservaTransporte[]>([])
   const [videoEstadoTransporte, setVideoEstadoTransporte] = useState<VideoEstado>({
@@ -50,14 +80,20 @@ export default function ComercianteTransportesPage() {
     Promise.all([obtenerMiTransporte(), reservasOperadorTransporte()]).then(([t, rs]) => {
       setCfg(t); setEditCfg(t); setReservas(rs); reservasRef.current = rs
       setVideoEstadoTransporte({
-        videoUrl: (t as any).videoUrl ?? null,
-        videoPosterUrl: (t as any).videoPosterUrl ?? null,
+        videoUrl: t.videoUrl ?? null,
+        videoPosterUrl: t.videoPosterUrl ?? null,
         videoDuracionSegundos: null,
         videoMimeType: null,
       })
       setCargando(false)
     })
   }, [])
+
+  useEffect(() => {
+    if (tab !== 'estadisticas' || stats) return
+    setCargandoStats(true)
+    estadisticasTransporte().then(s => { setStats(s); setCargandoStats(false) }).catch(() => setCargandoStats(false))
+  }, [tab])
 
   useEffect(() => {
     const iv = setInterval(() => {
@@ -135,9 +171,10 @@ export default function ComercianteTransportesPage() {
 
   const pendientes = reservas.filter(r => r.estado === 'PENDIENTE')
   const TABS = [
-    { key: 'reservas', label: `Reservas${pendientes.length > 0 ? ` (${pendientes.length})` : ''}` },
-    { key: 'rutas',    label: 'Rutas' },
-    { key: 'config',   label: 'Configuración' },
+    { key: 'reservas',     label: `Reservas${pendientes.length > 0 ? ` (${pendientes.length})` : ''}` },
+    { key: 'rutas',        label: 'Rutas' },
+    { key: 'estadisticas', label: 'Estadísticas' },
+    { key: 'config',       label: 'Configuración' },
   ] as const
 
   return (
@@ -292,6 +329,80 @@ export default function ComercianteTransportesPage() {
         </div>
       )}
 
+      {/* ── Estadísticas ── */}
+      {tab === 'estadisticas' && (
+        <div className="p-4 space-y-4">
+          {cargandoStats ? (
+            <div className="flex justify-center py-8"><div className="w-8 h-8 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" /></div>
+          ) : stats ? (
+            <>
+              {/* KPIs principales */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Total reservas', valor: stats.totalReservas, color: 'text-blue-700 bg-blue-50' },
+                  { label: 'Completadas', valor: stats.reservasCompletadas, color: 'text-green-700 bg-green-50' },
+                  { label: 'Ingresos mes', valor: formatearPrecio(stats.ingresoMes), color: 'text-[#1B4332] bg-[#2D6A4F]/10' },
+                  { label: 'Ingresos total', valor: formatearPrecio(stats.ingresoTotal), color: 'text-[#1B4332] bg-[#2D6A4F]/10' },
+                ].map(kpi => (
+                  <div key={kpi.label} className={`rounded-2xl p-4 ${kpi.color}`}>
+                    <p className="text-xs font-medium opacity-70">{kpi.label}</p>
+                    <p className="text-2xl font-bold mt-1">{kpi.valor}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Ocupación promedio */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Ocupación promedio</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 bg-gray-100 rounded-full h-3">
+                    <div className="bg-[#2D6A4F] h-3 rounded-full transition-all" style={{ width: `${stats.ocupacionPromedio}%` }} />
+                  </div>
+                  <span className="text-sm font-bold text-[#1B4332]">{stats.ocupacionPromedio}%</span>
+                </div>
+              </div>
+
+              {/* Rutas más populares */}
+              {stats.rutasPopulares.length > 0 && (
+                <div className="bg-white rounded-2xl p-4 shadow-sm">
+                  <p className="text-sm font-semibold text-gray-700 mb-3">Rutas más solicitadas</p>
+                  <div className="space-y-2">
+                    {stats.rutasPopulares.map((r, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">{r.origen} → {r.destino}</span>
+                        <span className="font-semibold text-[#2D6A4F]">{r.total} reservas</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Historial por mes */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <p className="text-sm font-semibold text-gray-700 mb-3">Últimos 6 meses</p>
+                <div className="space-y-2">
+                  {stats.reservasPorMes.map(m => (
+                    <div key={m.mes} className="flex items-center gap-3 text-sm">
+                      <span className="w-14 text-gray-400 text-xs flex-shrink-0">{m.mes}</span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-2">
+                        <div
+                          className="bg-[#2D6A4F] h-2 rounded-full"
+                          style={{ width: `${stats.reservasPorMes.length > 0 ? (m.total / Math.max(...stats.reservasPorMes.map(x => x.total), 1)) * 100 : 0}%` }}
+                        />
+                      </div>
+                      <span className="w-8 text-right text-gray-600 text-xs">{m.total}</span>
+                      <span className="w-24 text-right text-[#2D6A4F] text-xs font-medium">{formatearPrecio(m.ingresos)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-center text-gray-400 py-8">No hay datos disponibles</p>
+          )}
+        </div>
+      )}
+
       {/* ── Configuración ── */}
       {tab === 'config' && (
         <div className="space-y-4">
@@ -311,15 +422,29 @@ export default function ComercianteTransportesPage() {
                 className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#023E8A]" />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Tipo de embarcación</label>
-              <div className="flex flex-wrap gap-2">
-                {TIPO_OPCIONES.map(tipo => (
-                  <button key={tipo} onClick={() => setEditCfg(p => ({ ...p, tipo }))}
-                    className={`px-3 py-1.5 rounded-full text-xs border font-medium transition-colors ${editCfg.tipo === tipo ? 'bg-[#023E8A] text-white border-[#023E8A]' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                    {TIPO_ICONO[tipo]} {tipo}
-                  </button>
-                ))}
-              </div>
+              <label className="block text-xs text-gray-500 mb-2">Tipo de transporte</label>
+              {['Fluvial', 'Terrestre', 'Turístico'].map(cat => (
+                <div key={cat}>
+                  <p className="text-xs font-semibold text-gray-400 uppercase mb-1.5">{cat}</p>
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {TIPO_OPCIONES.filter(t => TIPO_CATEGORIA[t] === cat).map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setEditCfg(p => ({ ...p, tipo: t }))}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+                          editCfg.tipo === t
+                            ? 'bg-[#2D6A4F] text-white border-[#2D6A4F]'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-[#2D6A4F]'
+                        }`}
+                      >
+                        <span>{TIPO_ICONO[t]}</span>
+                        <span>{TIPO_LABEL[t]}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Descripción</label>

@@ -10,8 +10,11 @@ import {
   tomarEntrega,
   actualizarEstadoEntrega,
   subirFotoEntrega,
+  estadisticasRepartidor,
   type EntregaDetalle,
+  type EstadisticasRepartidor,
 } from '@/lib/api/repartidor'
+import Link from 'next/link'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
 // ── Utilidades ────────────────────────────────────────────────
@@ -249,7 +252,8 @@ export default function PanelRepartidorPage() {
   const router = useRouter()
   const { usuario, cargando: cargandoAuth } = useAuth()
 
-  const [tab, setTab] = useState<'mis' | 'disponibles' | 'historial'>('mis')
+  const [tab, setTab] = useState<'mis' | 'disponibles' | 'historial' | 'stats'>('mis')
+  const [stats, setStats] = useState<EstadisticasRepartidor | null>(null)
   const [misEntregasList, setMisEntregasList] = useState<EntregaDetalle[]>([])
   const [disponiblesList, setDisponiblesList] = useState<EntregaDetalle[]>([])
   const [historialList, setHistorialList] = useState<EntregaDetalle[]>([])
@@ -279,7 +283,6 @@ export default function PanelRepartidorPage() {
         entregasDisponibles(verTodasZonas),
         historialEntregas(),
       ])
-      // misEntregas devuelve todas; filtramos activas vs historial
       setMisEntregasList(mis.filter((e) => estaActiva(e.estado)))
       setDisponiblesList(disp.items)
       setMunicipioBase(disp.municipioBase)
@@ -290,6 +293,12 @@ export default function PanelRepartidorPage() {
       setCargando(false)
     }
   }, [verTodasZonas])
+
+  useEffect(() => {
+    if (tab === 'stats' && stats === null && usuario?.rol === 'REPARTIDOR') {
+      estadisticasRepartidor().then(setStats).catch(() => {})
+    }
+  }, [tab, stats, usuario])
 
   useEffect(() => {
     if (!usuario || usuario.rol !== 'REPARTIDOR') return
@@ -487,6 +496,16 @@ export default function PanelRepartidorPage() {
           >
             Historial
           </button>
+          <button
+            onClick={() => setTab('stats')}
+            className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
+              tab === 'stats'
+                ? 'bg-[#2D6A4F] text-white'
+                : 'text-[#1A1A1A]/60 hover:text-[#1A1A1A]'
+            }`}
+          >
+            Mis ganancias
+          </button>
         </div>
 
         {/* Barra de zona (solo en Disponibles) */}
@@ -510,8 +529,88 @@ export default function PanelRepartidorPage() {
           </div>
         )}
 
-        {/* Contenido */}
-        {cargando ? (
+        {/* Contenido — tab Estadísticas */}
+        {tab === 'stats' && (
+          stats === null ? (
+            <div className="flex justify-center py-16">
+              <div className="w-8 h-8 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-5">
+              {/* KPIs */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Ganancias totales', val: formatearPrecio(stats.totalGanado), color: 'text-[#2D6A4F]', bg: 'bg-[#52B788]/8 border-[#52B788]/25' },
+                  { label: 'Este mes', val: formatearPrecio(stats.gananciasMes), color: 'text-[#9B7300]', bg: 'bg-[#D4A017]/8 border-[#D4A017]/25' },
+                  { label: 'Promedio por entrega', val: formatearPrecio(stats.promedioPorEntrega), color: 'text-blue-600', bg: 'bg-blue-50 border-blue-100' },
+                  { label: 'Tasa de éxito', val: `${stats.tasaExito}%`, color: stats.tasaExito >= 90 ? 'text-[#2D6A4F]' : 'text-amber-600', bg: 'bg-white border-gray-100' },
+                ].map(k => (
+                  <div key={k.label} className={`rounded-2xl border ${k.bg} px-4 py-4 text-center`}>
+                    <p className={`text-xl font-bold ${k.color}`}>{k.val}</p>
+                    <p className="mt-0.5 text-xs font-medium text-[#1A1A1A]/50">{k.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Entregas totales */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-2xl border border-[#1A1A1A]/8 bg-white px-3 py-4 text-center">
+                  <p className="text-2xl font-bold text-[#1A1A1A]">{stats.totalEntregas}</p>
+                  <p className="mt-0.5 text-xs text-[#1A1A1A]/50">Total</p>
+                </div>
+                <div className="rounded-2xl border border-[#52B788]/25 bg-[#52B788]/8 px-3 py-4 text-center">
+                  <p className="text-2xl font-bold text-[#2D6A4F]">{stats.totalEntregadas}</p>
+                  <p className="mt-0.5 text-xs text-[#2D6A4F]/70">Entregadas</p>
+                </div>
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-4 text-center">
+                  <p className="text-2xl font-bold text-red-600">{stats.totalFallidas}</p>
+                  <p className="mt-0.5 text-xs text-red-400">Fallidas</p>
+                </div>
+              </div>
+
+              {/* Grafico barras ultimos 6 meses */}
+              <div className="rounded-2xl border border-[#1A1A1A]/8 bg-white p-4">
+                <p className="text-xs font-semibold text-[#1A1A1A]/50 uppercase tracking-wide mb-4">Ganancias por mes</p>
+                {(() => {
+                  const max = Math.max(...stats.porMes.map(m => m.ganancias), 1)
+                  return (
+                    <div className="flex items-end gap-2 h-28">
+                      {stats.porMes.map(m => (
+                        <div key={m.mes} className="flex-1 flex flex-col items-center gap-1">
+                          <span className="text-[9px] font-semibold text-[#2D6A4F]">
+                            {m.ganancias > 0 ? formatearPrecio(m.ganancias).replace('$', '').replace('.000', 'k') : ''}
+                          </span>
+                          <div
+                            className="w-full rounded-t-md bg-[#52B788]/70 transition-all"
+                            style={{ height: `${Math.max(4, (m.ganancias / max) * 80)}px` }}
+                          />
+                          <span className="text-[9px] text-[#1A1A1A]/40 capitalize">{m.mes}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
+
+              {/* Link a perfil */}
+              <Link
+                href="/repartidor/perfil"
+                className="flex items-center justify-between rounded-2xl border border-[#1A1A1A]/8 bg-white px-4 py-4 hover:border-[#2D6A4F]/30 transition-colors"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-[#1A1A1A]">Mi perfil de repartidor</p>
+                  <p className="text-xs text-[#1A1A1A]/50 mt-0.5">Editar vehiculo, municipio de operacion</p>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-[#1A1A1A]/30">
+                  <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </Link>
+            </div>
+          )
+        )}
+
+        {/* Contenido — tabs de entregas */}
+        {tab !== 'stats' && cargando ? (
           <div className="flex flex-col gap-3">
             {[1, 2].map((i) => (
               <div

@@ -23,6 +23,8 @@ export interface ConfigTransporte {
   descripcion?: string | null
   tipo: string
   fotos: string[]
+  videoUrl?: string | null
+  videoPosterUrl?: string | null
   creadoAt: string
   updatedAt: string
   rutas: RutaTransporte[]
@@ -194,4 +196,41 @@ export async function quitarVideoTransporte(): Promise<void> {
 
 export async function guardarVideoLinkTransporte(videoUrl: string): Promise<void> {
   await apiFetch('/transportes/mi-transporte/config/video-link', { method: 'PATCH', body: { videoUrl } as any })
+}
+
+export async function toggleFavoritoTransporte(configTransporteId: number): Promise<{ favorito: boolean }> {
+  const r = await apiFetch<{ ok: boolean; data: { favorito: boolean } }>(`/transportes/favoritos/${configTransporteId}/toggle`, { method: 'POST' })
+  return r.data
+}
+
+export async function esFavoritoTransporte(configTransporteId: number): Promise<{ favorito: boolean }> {
+  const r = await apiFetch<{ ok: boolean; data: { favorito: boolean } }>(`/transportes/favoritos/${configTransporteId}`)
+  return r.data
+}
+
+export async function misTransportesFavoritos(): Promise<ConfigTransporte[]> {
+  const r = await apiFetch<{ ok: boolean; data: ConfigTransporte[] }>('/transportes/favoritos/mis')
+  return r.data
+}
+
+export interface EstadisticasTransporte {
+  totalReservas: number
+  reservasConfirmadas: number
+  reservasCompletadas: number
+  reservasCanceladas: number
+  ingresoTotal: number
+  ingresoMes: number
+  reservasPorMes: Array<{ mes: string; total: number; ingresos: number }>
+  rutasPopulares: Array<{ origen: string; destino: string; total: number }>
+  ocupacionPromedio: number
+}
+
+export async function estadisticasTransporte(): Promise<EstadisticasTransporte> {
+  const r = await apiFetch<{ ok: boolean; data: EstadisticasTransporte }>('/transportes/mi-transporte/estadisticas')
+  return r.data
+}
+
+export async function adminReservasTransporte(configId: number): Promise<ReservaTransporte[]> {
+  const r = await apiFetch<{ ok: boolean; data: ReservaTransporte[] }>(`/transportes/admin/${configId}/reservas`)
+  return r.data
 }

@@ -215,6 +215,7 @@ model Usuario {
   cuponesHotelUsos          CuponHotelUso[]
   cuponesExpressUsos        CuponExpressUso[]
   favoritosTour             FavoritoTour[]
+  favoritosTransporte       FavoritoTransporte[]
   cuponesTourUsos           CuponTourUso[]
 }
 
@@ -342,6 +343,7 @@ model Producto {
   solicitudesPublicidad SolicitudPublicidad[]
   itemsExpress          ItemPedidoExpress[]
   menuSeccion      MenuSeccion?       @relation("ProductoMenuSeccion", fields: [menuSeccionId], references: [id], onDelete: SetNull)
+  gruposComplemento GrupoComplemento[]
 
   @@index([comercioId, activo])
   @@index([categoriaId, activo])
@@ -1287,11 +1289,43 @@ model ItemPedidoExpress {
   precioUnitario  Decimal       @db.Decimal(12, 2)
   subtotal        Decimal       @db.Decimal(12, 2)
   nota            String?
+  complementos    Json?
 
   pedidoExpress   PedidoExpress @relation(fields: [pedidoExpressId], references: [id])
   producto        Producto      @relation(fields: [productoId],      references: [id])
 
   @@index([pedidoExpressId])
+}
+
+model GrupoComplemento {
+  id         Int      @id @default(autoincrement())
+  productoId Int
+  nombre     String
+  minimo     Int      @default(0)
+  maximo     Int      @default(1)
+  requerido  Boolean  @default(false)
+  orden      Int      @default(0)
+  activo     Boolean  @default(true)
+
+  producto Producto          @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  items    ItemComplemento[]
+
+  @@index([productoId])
+}
+
+model ItemComplemento {
+  id                 Int     @id @default(autoincrement())
+  grupoComplementoId Int
+  nombre             String
+  icono              String?
+  imagenUrl          String?
+  precio             Decimal @default(0) @db.Decimal(12, 2)
+  disponible         Boolean @default(true)
+  orden              Int     @default(0)
+
+  grupo GrupoComplemento @relation(fields: [grupoComplementoId], references: [id], onDelete: Cascade)
+
+  @@index([grupoComplementoId])
 }
 
 // ─── MÓDULO HOTELERÍA ─────────────────────────────────────────
@@ -1471,12 +1505,62 @@ model ConfigTour {
   updatedAt           DateTime @updatedAt
 
   comercio  Comercio       @relation(fields: [comercioId], references: [id])
+  lugares   TourLugar[]
   reservas  ReservaTour[]
   reviews   ReviewTour[]
   cupones   CuponTour[]
   favoritos FavoritoTour[]
 
   @@index([activo])
+}
+
+model TourLugar {
+  id              Int      @id @default(autoincrement())
+  configTourId    Int
+  titulo          String
+  descripcion     String?
+  tipo            String?
+  rutaNombre      String?
+  orden           Int      @default(0)
+  duracionMinutos Int?
+  recomendaciones String?
+  latitud         Float?
+  longitud        Float?
+  activo          Boolean  @default(true)
+  destacado       Boolean  @default(false)
+  creadoAt        DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  configTour ConfigTour       @relation(fields: [configTourId], references: [id], onDelete: Cascade)
+  media      TourLugarMedia[]
+
+  @@index([configTourId, orden])
+  @@index([configTourId, activo])
+}
+
+model TourLugarMedia {
+  id              Int      @id @default(autoincrement())
+  tourLugarId     Int
+  tipo            String
+  url             String
+  posterUrl       String?
+  titulo          String?
+  descripcion     String?
+  plataforma      String?
+  orden           Int      @default(0)
+  activo          Boolean  @default(true)
+  publicId        String?
+  duracionSegundos Float?
+  bytes           Int?
+  formato         String?
+  mimeType        String?
+  creadoAt        DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tourLugar TourLugar @relation(fields: [tourLugarId], references: [id], onDelete: Cascade)
+
+  @@index([tourLugarId, orden])
+  @@index([tipo])
 }
 
 model ReservaTour {
@@ -1518,13 +1602,16 @@ model ConfigTransporte {
   nombre      String   @default("Mi Servicio")
   descripcion String?
   tipo        String   @default("LANCHA")
-  fotos       String[]
-  creadoAt    DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  fotos          String[]
+  videoUrl       String?
+  videoPosterUrl String?
+  creadoAt       DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  comercio Comercio         @relation(fields: [comercioId], references: [id])
-  rutas    RutaTransporte[]
-  reviews  ReviewTransporte[]
+  comercio   Comercio            @relation(fields: [comercioId], references: [id])
+  rutas      RutaTransporte[]
+  reviews    ReviewTransporte[]
+  favoritos  FavoritoTransporte[]
 
   @@index([activo])
 }
@@ -1803,5 +1890,18 @@ model FavoritoTour {
   configTour ConfigTour @relation(fields: [configTourId], references: [id])
 
   @@unique([usuarioId, configTourId])
+  @@index([usuarioId])
+}
+
+model FavoritoTransporte {
+  id                 Int      @id @default(autoincrement())
+  usuarioId          Int
+  configTransporteId Int
+  createdAt          DateTime @default(now())
+
+  usuario          Usuario          @relation(fields: [usuarioId],          references: [id])
+  configTransporte ConfigTransporte @relation(fields: [configTransporteId], references: [id])
+
+  @@unique([usuarioId, configTransporteId])
   @@index([usuarioId])
 }

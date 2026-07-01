@@ -35,6 +35,131 @@ const TOUR_INCLUDE = {
   },
 };
 
+const TOUR_LUGAR_INCLUDE = {
+  media: {
+    where: { activo: true },
+    orderBy: [{ orden: "asc" }, { id: "asc" }],
+  },
+};
+
+const TOUR_DETAIL_INCLUDE = {
+  ...TOUR_INCLUDE,
+  lugares: {
+    where: { activo: true },
+    orderBy: [{ orden: "asc" }, { id: "asc" }],
+    include: TOUR_LUGAR_INCLUDE,
+  },
+};
+
+function textoLimpio(valor, max = 180) {
+  if (valor === undefined) return undefined;
+  if (valor === null) return null;
+  return String(valor).trim().slice(0, max);
+}
+
+function numeroONull(valor) {
+  if (valor === undefined) return undefined;
+  if (valor === null || valor === "") return null;
+  const num = Number(valor);
+  return Number.isFinite(num) ? num : null;
+}
+
+function boolOpcional(valor) {
+  if (valor === undefined) return undefined;
+  if (typeof valor === "boolean") return valor;
+  return ["true", "1", "si", "sí", "on"].includes(String(valor).toLowerCase());
+}
+
+function camposLugar(datos = {}) {
+  const campos = {
+    titulo: textoLimpio(datos.titulo, 120),
+    descripcion: textoLimpio(datos.descripcion, 1000),
+    tipo: textoLimpio(datos.tipo, 60),
+    orden: datos.orden === undefined ? undefined : Number(datos.orden),
+    duracionMinutos: numeroONull(datos.duracionMinutos),
+    recomendaciones: textoLimpio(datos.recomendaciones, 700),
+    latitud: numeroONull(datos.latitud),
+    longitud: numeroONull(datos.longitud),
+    destacado: boolOpcional(datos.destacado),
+  };
+  // rutaNombre: solo incluir si fue enviado explícitamente
+  // Prisma rechaza campos desconocidos si el cliente no fue regenerado aún
+  if ("rutaNombre" in datos) {
+    campos.rutaNombre = textoLimpio(datos.rutaNombre, 80) ?? null;
+  }
+  return campos;
+}
+
+function camposConfigTour(datos = {}) {
+  const data = {
+    activo: boolOpcional(datos.activo),
+    nombre: textoLimpio(datos.nombre, 140),
+    descripcion: textoLimpio(datos.descripcion, 4000),
+    duracionHoras: numeroONull(datos.duracionHoras),
+    precioPersona: numeroONull(datos.precioPersona),
+    maxParticipantes: numeroONull(datos.maxParticipantes),
+    puntoEncuentro: textoLimpio(datos.puntoEncuentro, 500),
+    confirmacionAuto: boolOpcional(datos.confirmacionAuto),
+    horasLimiteConfirm: numeroONull(datos.horasLimiteConfirm),
+    politicaCancelacion: textoLimpio(datos.politicaCancelacion, 1200),
+    videoUrl: textoLimpio(datos.videoUrl, 1000),
+    videoPosterUrl: textoLimpio(datos.videoPosterUrl, 1000),
+  };
+
+  if (Array.isArray(datos.fotos)) data.fotos = datos.fotos;
+  if (Array.isArray(datos.servicios)) data.servicios = datos.servicios;
+  if (Array.isArray(datos.idiomas)) data.idiomas = datos.idiomas;
+
+  return limpiarUndefined(data);
+}
+
+function limpiarUndefined(obj) {
+  return Object.fromEntries(Object.entries(obj).filter(([, valor]) => valor !== undefined));
+}
+
+function validarUrlPublica(url) {
+  if (!url || !String(url).trim()) throw new ErrorValidacion("La URL del video es requerida");
+  let parsed;
+  try {
+    parsed = new URL(String(url).trim());
+  } catch (_) {
+    throw new ErrorValidacion("La URL del video no es valida");
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new ErrorValidacion("Solo se permiten enlaces http o https");
+  }
+  return parsed.toString();
+}
+
+function detectarPlataforma(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    if (host.includes("youtube.com") || host === "youtu.be") return "YOUTUBE";
+    if (host.includes("instagram.com")) return "INSTAGRAM";
+    if (host.includes("tiktok.com")) return "TIKTOK";
+    if (host.includes("facebook.com") || host === "fb.watch") return "FACEBOOK";
+    if (host.includes("vimeo.com")) return "VIMEO";
+    return "WEB";
+  } catch (_) {
+    return "WEB";
+  }
+}
+
+async function obtenerTourComercio(comercioId) {
+  const tour = await prisma.configTour.findUnique({ where: { comercioId } });
+  if (!tour) throw new ErrorNoEncontrado("Tour no encontrado");
+  return tour;
+}
+
+async function obtenerLugarDelComercio(comercioId, lugarId) {
+  const lugar = await prisma.tourLugar.findFirst({
+    where: { id: Number(lugarId), activo: true, configTour: { comercioId } },
+    include: { configTour: true },
+  });
+  if (!lugar) throw new ErrorNoEncontrado("Lugar del tour no encontrado");
+  return lugar;
+}
+
 const TourService = {
   async listarTours({ municipio, departamento } = {}) {
     const comercioWhere = { verificado: true };
@@ -43,7 +168,7 @@ const TourService = {
 
     return prisma.configTour.findMany({
       where: { activo: true, comercio: comercioWhere },
-      include: TOUR_INCLUDE,
+      include: TOUR_DETAIL_INCLUDE,
       orderBy: { creadoAt: "desc" },
     });
   },
@@ -51,7 +176,7 @@ const TourService = {
   async obtenerTour(id) {
     const tour = await prisma.configTour.findUnique({
       where: { id },
-      include: TOUR_INCLUDE,
+      include: TOUR_DETAIL_INCLUDE,
     });
     if (!tour) throw new ErrorNoEncontrado("Tour no encontrado");
     return tour;
@@ -185,18 +310,19 @@ const TourService = {
 
   // Operador
   async miTour(comercioId) {
-    const tour = await prisma.configTour.findUnique({ where: { comercioId }, include: TOUR_INCLUDE });
+    const tour = await prisma.configTour.findUnique({ where: { comercioId }, include: TOUR_DETAIL_INCLUDE });
     if (!tour) {
       return prisma.configTour.create({
         data: { comercioId, nombre: "Mi Tour", precioPersona: 0, fotos: [], servicios: [], idiomas: [] },
-        include: TOUR_INCLUDE,
+        include: TOUR_DETAIL_INCLUDE,
       });
     }
     return tour;
   },
 
   async actualizarTour(comercioId, datos) {
-    return prisma.configTour.update({ where: { comercioId }, data: { ...datos, updatedAt: new Date() } });
+    const data = camposConfigTour(datos);
+    return prisma.configTour.update({ where: { comercioId }, data: { ...data, updatedAt: new Date() } });
   },
 
   async reservasOperador(comercioId, estado) {
@@ -247,10 +373,182 @@ const TourService = {
   async agregarFotos(comercioId, urls) {
     const tour = await prisma.configTour.findUnique({ where: { comercioId } });
     if (!tour) throw new ErrorNoEncontrado("Tour no encontrado");
+    const fotosActuales = Array.isArray(tour.fotos) ? tour.fotos : [];
     return prisma.configTour.update({
       where: { comercioId },
-      data: { fotos: [...tour.fotos, ...urls], updatedAt: new Date() },
+      data: { fotos: [...fotosActuales, ...urls], updatedAt: new Date() },
     });
+  },
+
+  // Ruta / lugares del tour
+  async lugaresTour(comercioId) {
+    const tour = await obtenerTourComercio(comercioId);
+    return prisma.tourLugar.findMany({
+      where: { configTourId: tour.id, activo: true },
+      include: TOUR_LUGAR_INCLUDE,
+      orderBy: [{ orden: "asc" }, { id: "asc" }],
+    });
+  },
+
+  async crearLugarTour(comercioId, datos) {
+    const tour = await obtenerTourComercio(comercioId);
+    const total = await prisma.tourLugar.count({ where: { configTourId: tour.id, activo: true } });
+    if (total >= 30) throw new ErrorValidacion("Puedes publicar hasta 30 lugares por tour");
+
+    const data = limpiarUndefined(camposLugar(datos));
+    if (!data.titulo) throw new ErrorValidacion("El nombre del lugar es requerido");
+
+    const ultimo = await prisma.tourLugar.findFirst({
+      where: { configTourId: tour.id },
+      orderBy: { orden: "desc" },
+      select: { orden: true },
+    });
+
+    return prisma.tourLugar.create({
+      data: {
+        ...data,
+        orden: Number.isFinite(data.orden) ? data.orden : (ultimo?.orden ?? -1) + 1,
+        configTourId: tour.id,
+      },
+      include: TOUR_LUGAR_INCLUDE,
+    });
+  },
+
+  async actualizarLugarTour(comercioId, lugarId, datos) {
+    await obtenerLugarDelComercio(comercioId, lugarId);
+    const data = limpiarUndefined(camposLugar(datos));
+    if (data.titulo !== undefined && !data.titulo) {
+      throw new ErrorValidacion("El nombre del lugar es requerido");
+    }
+    return prisma.tourLugar.update({
+      where: { id: Number(lugarId) },
+      data: { ...data, updatedAt: new Date() },
+      include: TOUR_LUGAR_INCLUDE,
+    });
+  },
+
+  async eliminarLugarTour(comercioId, lugarId) {
+    await obtenerLugarDelComercio(comercioId, lugarId);
+    return prisma.$transaction(async (tx) => {
+      await tx.tourLugarMedia.updateMany({
+        where: { tourLugarId: Number(lugarId) },
+        data: { activo: false, updatedAt: new Date() },
+      });
+      return tx.tourLugar.update({
+        where: { id: Number(lugarId) },
+        data: { activo: false, updatedAt: new Date() },
+      });
+    });
+  },
+
+  async reordenarLugaresTour(comercioId, ids = []) {
+    const tour = await obtenerTourComercio(comercioId);
+    const lugarIds = ids.map((id) => Number(id)).filter(Boolean);
+    if (!lugarIds.length) throw new ErrorValidacion("Debes enviar el orden de los lugares");
+
+    const existentes = await prisma.tourLugar.findMany({
+      where: { configTourId: tour.id, activo: true, id: { in: lugarIds } },
+      select: { id: true },
+    });
+    if (existentes.length !== lugarIds.length) {
+      throw new ErrorValidacion("El orden incluye lugares invalidos");
+    }
+
+    await prisma.$transaction(
+      lugarIds.map((id, index) => prisma.tourLugar.update({ where: { id }, data: { orden: index } })),
+    );
+    return TourService.lugaresTour(comercioId);
+  },
+
+  async agregarFotosLugar(comercioId, lugarId, urls) {
+    const lugar = await obtenerLugarDelComercio(comercioId, lugarId);
+    const actuales = await prisma.tourLugarMedia.count({
+      where: { tourLugarId: lugar.id, tipo: "FOTO", activo: true },
+    });
+    if (actuales + urls.length > 24) throw new ErrorValidacion("Cada lugar puede tener hasta 24 fotos");
+
+    await prisma.tourLugarMedia.createMany({
+      data: urls.map((url, index) => ({
+        tourLugarId: lugar.id,
+        tipo: "FOTO",
+        url,
+        orden: actuales + index,
+      })),
+    });
+
+    return prisma.tourLugar.findUnique({ where: { id: lugar.id }, include: TOUR_LUGAR_INCLUDE });
+  },
+
+  async eliminarMediaLugar(comercioId, lugarId, mediaId) {
+    const lugar = await obtenerLugarDelComercio(comercioId, lugarId);
+    const media = await prisma.tourLugarMedia.findFirst({
+      where: { id: Number(mediaId), tourLugarId: lugar.id, activo: true },
+    });
+    if (!media) throw new ErrorNoEncontrado("Media del lugar no encontrada");
+    await prisma.tourLugarMedia.update({
+      where: { id: media.id },
+      data: { activo: false, updatedAt: new Date() },
+    });
+    return prisma.tourLugar.findUnique({ where: { id: lugar.id }, include: TOUR_LUGAR_INCLUDE });
+  },
+
+  async subirVideoLugar(comercioId, lugarId, video) {
+    const lugar = await obtenerLugarDelComercio(comercioId, lugarId);
+    const orden = await prisma.tourLugarMedia.count({ where: { tourLugarId: lugar.id, activo: true } });
+    return prisma.$transaction(async (tx) => {
+      await tx.tourLugarMedia.updateMany({
+        where: { tourLugarId: lugar.id, tipo: "VIDEO", activo: true },
+        data: { activo: false, updatedAt: new Date() },
+      });
+      await tx.tourLugarMedia.create({
+        data: {
+          tourLugarId: lugar.id,
+          tipo: "VIDEO",
+          url: video.videoUrl,
+          posterUrl: video.posterUrl || null,
+          titulo: textoLimpio(video.titulo, 120),
+          descripcion: textoLimpio(video.descripcion, 500),
+          orden,
+          publicId: video.publicId || null,
+          duracionSegundos: numeroONull(video.duracion),
+          bytes: video.bytes ? Number(video.bytes) : null,
+          formato: video.formato || null,
+          mimeType: video.mimeType || null,
+        },
+      });
+      return tx.tourLugar.findUnique({ where: { id: lugar.id }, include: TOUR_LUGAR_INCLUDE });
+    });
+  },
+
+  async quitarVideoLugar(comercioId, lugarId) {
+    const lugar = await obtenerLugarDelComercio(comercioId, lugarId);
+    await prisma.tourLugarMedia.updateMany({
+      where: { tourLugarId: lugar.id, tipo: "VIDEO", activo: true },
+      data: { activo: false, updatedAt: new Date() },
+    });
+    return prisma.tourLugar.findUnique({ where: { id: lugar.id }, include: TOUR_LUGAR_INCLUDE });
+  },
+
+  async guardarVideoLinkLugar(comercioId, lugarId, datos) {
+    const lugar = await obtenerLugarDelComercio(comercioId, lugarId);
+    const url = validarUrlPublica(datos.url || datos.videoUrl);
+    const enlaces = await prisma.tourLugarMedia.count({
+      where: { tourLugarId: lugar.id, tipo: "VIDEO_LINK", activo: true },
+    });
+    if (enlaces >= 8) throw new ErrorValidacion("Cada lugar puede tener hasta 8 enlaces de video");
+
+    await prisma.tourLugarMedia.create({
+      data: {
+        tourLugarId: lugar.id,
+        tipo: "VIDEO_LINK",
+        url,
+        titulo: textoLimpio(datos.titulo, 120),
+        descripcion: textoLimpio(datos.descripcion, 500),
+        plataforma: textoLimpio(datos.plataforma, 40) || detectarPlataforma(url),
+        orden: await prisma.tourLugarMedia.count({ where: { tourLugarId: lugar.id, activo: true } }),
+      },
+    });
+    return prisma.tourLugar.findUnique({ where: { id: lugar.id }, include: TOUR_LUGAR_INCLUDE });
   },
 
   // Admin

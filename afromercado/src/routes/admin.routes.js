@@ -35,7 +35,15 @@ router.post("/whatsapp/conectar", ...soloAdmin, AdminController.conectarWhatsApp
 // Búsqueda de comercios, productos y usuarios (para formularios admin)
 router.get("/comercios/buscar", ...soloAdmin, AdminController.buscarComercios);
 router.get("/productos/buscar", ...soloAdmin, AdminController.buscarProductos);
-router.get("/usuarios/buscar", ...soloAdmin, AdminController.buscarUsuarios);
+router.get("/usuarios/buscar",  ...soloAdmin, AdminController.buscarUsuarios);
+
+// Gestión de productos del marketplace
+router.get("/productos",                   ...soloAdmin, AdminController.listarProductosAdmin);
+router.patch("/productos/:id/activo",      ...soloAdmin, AdminController.toggleActivoProducto);
+
+// Moderación de reviews
+router.get("/reviews",        ...soloAdmin, AdminController.listarReviews);
+router.delete("/reviews/:id", ...soloAdmin, AdminController.eliminarReview);
 
 // Visibilidad pagada (publicidad)
 router.post("/visibilidad", ...soloAdmin, VisibilidadController.crear);

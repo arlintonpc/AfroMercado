@@ -41,11 +41,9 @@ export function Switch({ activo, onChange, disabled = false, size = 'md' }: Swit
 /** Fila de configuración con etiqueta + Switch */
 export default function Toggle({ activo, onChange, etiqueta, descripcion, disabled = false, size = 'md' }: ToggleProps) {
   return (
-    <button
-      type="button"
+    <div
       role="switch"
       aria-checked={activo}
-      disabled={disabled}
       onClick={() => !disabled && onChange(!activo)}
       className={`group w-full flex items-center justify-between gap-4 rounded-2xl border px-5 py-4 text-left transition-all duration-200 ${
         activo ? 'border-[#2D6A4F]/30 bg-[#2D6A4F]/5' : 'border-gray-200 bg-white'
@@ -56,6 +54,6 @@ export default function Toggle({ activo, onChange, etiqueta, descripcion, disabl
         {descripcion && <span className="block text-xs text-gray-500 mt-0.5">{descripcion}</span>}
       </span>
       <Switch activo={activo} onChange={onChange} disabled={disabled} size={size} />
-    </button>
+    </div>
   )
 }

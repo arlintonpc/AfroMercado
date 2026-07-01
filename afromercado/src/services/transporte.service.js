@@ -250,6 +250,111 @@ const TransporteService = {
   async guardarVideoLinkTransporte(comercioId, videoUrl) {
     return prisma.configTransporte.update({ where: { comercioId }, data: { videoUrl, videoPosterUrl: null } });
   },
+
+  async estadisticas(comercioId) {
+    const cfg = await prisma.configTransporte.findUnique({ where: { comercioId } });
+    if (!cfg) throw new Error('No tienes transporte configurado');
+
+    const ahora = new Date();
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+
+    const reservas = await prisma.reservaTransporte.findMany({
+      where: { ruta: { configTransporteId: cfg.id } },
+      include: { ruta: { select: { origen: true, destino: true, capacidad: true } } },
+      orderBy: { creadoAt: 'desc' },
+    });
+
+    const confirmadas = reservas.filter(r => r.estado === 'CONFIRMADA').length;
+    const completadas = reservas.filter(r => r.estado === 'COMPLETADA').length;
+    const canceladas = reservas.filter(r => ['CANCELADA','RECHAZADA'].includes(r.estado)).length;
+    const ingresoTotal = reservas
+      .filter(r => ['CONFIRMADA','COMPLETADA'].includes(r.estado))
+      .reduce((s, r) => s + Number(r.total), 0);
+    const ingresoMes = reservas
+      .filter(r => ['CONFIRMADA','COMPLETADA'].includes(r.estado) && new Date(r.creadoAt) >= inicioMes)
+      .reduce((s, r) => s + Number(r.total), 0);
+
+    // Reservas por mes (últimos 6 meses)
+    const reservasPorMes = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1);
+      const fin = new Date(ahora.getFullYear(), ahora.getMonth() - i + 1, 1);
+      const del_mes = reservas.filter(r => {
+        const f = new Date(r.creadoAt);
+        return f >= d && f < fin;
+      });
+      reservasPorMes.push({
+        mes: d.toLocaleDateString('es-CO', { month: 'short', year: '2-digit' }),
+        total: del_mes.length,
+        ingresos: del_mes.filter(r => ['CONFIRMADA','COMPLETADA'].includes(r.estado)).reduce((s,r) => s + Number(r.total), 0),
+      });
+    }
+
+    // Rutas más populares
+    const rutaCount = {};
+    for (const r of reservas) {
+      const key = `${r.ruta.origen}→${r.ruta.destino}`;
+      if (!rutaCount[key]) rutaCount[key] = { origen: r.ruta.origen, destino: r.ruta.destino, total: 0 };
+      rutaCount[key].total++;
+    }
+    const rutasPopulares = Object.values(rutaCount).sort((a,b) => b.total - a.total).slice(0,5);
+
+    // Ocupación promedio (asientos reservados / capacidad)
+    const activas = reservas.filter(r => ['CONFIRMADA','COMPLETADA'].includes(r.estado));
+    const ocupacion = activas.length > 0
+      ? activas.reduce((s,r) => s + (r.asientos / r.ruta.capacidad), 0) / activas.length * 100
+      : 0;
+
+    return {
+      totalReservas: reservas.length,
+      reservasConfirmadas: confirmadas,
+      reservasCompletadas: completadas,
+      reservasCanceladas: canceladas,
+      ingresoTotal,
+      ingresoMes,
+      reservasPorMes,
+      rutasPopulares,
+      ocupacionPromedio: Math.round(ocupacion),
+    };
+  },
+
+  // ── FAVORITOS ─────────────────────────────────────────────────
+
+  async toggleFavorito(usuarioId, configTransporteId) {
+    const existe = await prisma.favoritoTransporte.findUnique({
+      where: { usuarioId_configTransporteId: { usuarioId, configTransporteId } },
+    });
+    if (existe) {
+      await prisma.favoritoTransporte.delete({ where: { id: existe.id } });
+      return { favorito: false };
+    } else {
+      await prisma.favoritoTransporte.create({ data: { usuarioId, configTransporteId } });
+      return { favorito: true };
+    }
+  },
+
+  async misFavoritosTransporte(usuarioId) {
+    const favs = await prisma.favoritoTransporte.findMany({
+      where: { usuarioId },
+      include: {
+        configTransporte: {
+          include: {
+            ...TRANSPORTE_INCLUDE,
+            rutas: { where: { activo: true }, orderBy: { horario: 'asc' } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return favs.map(f => f.configTransporte);
+  },
+
+  async esFavoritoTransporte(usuarioId, configTransporteId) {
+    const existe = await prisma.favoritoTransporte.findUnique({
+      where: { usuarioId_configTransporteId: { usuarioId, configTransporteId } },
+    });
+    return { favorito: !!existe };
+  },
 };
 
 module.exports = TransporteService;

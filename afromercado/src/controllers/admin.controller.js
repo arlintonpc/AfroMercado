@@ -202,6 +202,102 @@ const AdminController = {
     } catch (e) { next(e); }
   },
 
+  // GET /admin/productos?q=&activo=&page=
+  async listarProductosAdmin(req, res, next) {
+    try {
+      const pagina = Math.max(1, parseInt(req.query.page || '1', 10));
+      const limite = 30;
+      const q      = req.query.q?.trim() || undefined;
+      const activo = req.query.activo === 'false' ? false : req.query.activo === 'true' ? true : undefined;
+
+      const where = { deletedAt: null };
+      if (activo !== undefined) where.activo = activo;
+      if (q) where.nombre = { contains: q, mode: 'insensitive' };
+
+      const [total, items] = await Promise.all([
+        prisma.producto.count({ where }),
+        prisma.producto.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip: (pagina - 1) * limite,
+          take: limite,
+          select: {
+            id: true, nombre: true, precio: true, stock: true,
+            activo: true, fotoUrl: true, unidad: true,
+            comercio: { select: { id: true, nombre: true, municipio: true } },
+          },
+        }),
+      ]);
+      res.json({ ok: true, data: items, total, pagina, limite });
+    } catch (e) { next(e); }
+  },
+
+  // PATCH /admin/productos/:id/activo
+  async toggleActivoProducto(req, res, next) {
+    try {
+      const { activo } = req.body;
+      const p = await prisma.producto.update({
+        where: { id: Number(req.params.id) },
+        data: { activo: Boolean(activo) },
+        select: { id: true, activo: true },
+      });
+      res.json({ ok: true, data: p });
+    } catch (e) { next(e); }
+  },
+
+  // GET /admin/reviews?tipo=producto|tienda&page=
+  async listarReviews(req, res, next) {
+    try {
+      const pagina = Math.max(1, parseInt(req.query.page || '1', 10));
+      const limite = 30;
+      const tipo   = req.query.tipo || 'producto';
+
+      if (tipo === 'tienda') {
+        const [total, items] = await Promise.all([
+          prisma.review.count(),
+          prisma.review.findMany({
+            orderBy: { createdAt: 'desc' },
+            skip: (pagina - 1) * limite,
+            take: limite,
+            include: {
+              comprador: { select: { id: true, nombre: true, email: true } },
+              comercio:  { select: { id: true, nombre: true } },
+            },
+          }),
+        ]);
+        return res.json({ ok: true, data: items.map(r => ({ ...r, estrellas: r.calificacion, autor: r.comprador })), total, pagina, limite });
+      }
+
+      const [total, items] = await Promise.all([
+        prisma.reviewProducto.count(),
+        prisma.reviewProducto.findMany({
+          orderBy: { createdAt: 'desc' },
+          skip: (pagina - 1) * limite,
+          take: limite,
+          include: {
+            comprador: { select: { id: true, nombre: true, email: true } },
+            producto:  { select: { id: true, nombre: true } },
+          },
+        }),
+      ]);
+      res.json({ ok: true, data: items.map(r => ({ ...r, estrellas: r.calificacion, autor: r.comprador })), total, pagina, limite });
+    } catch (e) { next(e); }
+  },
+
+  // DELETE /admin/reviews/:id?tipo=producto|tienda
+  async eliminarReview(req, res, next) {
+    try {
+      const id   = Number(req.params.id);
+      const tipo = req.query.tipo || 'producto';
+      if (tipo === 'tienda') {
+        await prisma.review.delete({ where: { id } });
+      } else {
+        await prisma.reviewProducto.delete({ where: { id } });
+      }
+      res.json({ ok: true });
+    } catch (e) { next(e); }
+  },
+
   // GET /admin/productos/buscar?q=texto&comercioId=X — para autocomplete en formularios admin
   async buscarProductos(req, res, next) {
     try {

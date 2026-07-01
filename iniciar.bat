@@ -12,6 +12,11 @@ echo Deteniendo procesos anteriores...
 taskkill /F /IM node.exe /T >nul 2>&1
 timeout /t 3 /nobreak >nul
 
+echo Regenerando cliente Prisma...
+cd /d D:\AfroMercado\afromercado
+call npm run build
+cd /d D:\AfroMercado
+
 echo Iniciando backend...
 start "AfroMercado API" cmd /k "cd /d D:\AfroMercado\afromercado && npm run dev"
 timeout /t 5 /nobreak >nul

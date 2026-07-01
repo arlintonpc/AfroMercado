@@ -1,7 +1,11 @@
 const path            = require("path");
 const ExpressService  = require("../services/express.service");
 const prisma          = require("../config/prisma");
-const { subirVideoACloudinary, construirUrlVideoOptimizada, construirPosterVideo } = require("../utils/cloudinary");
+const { subirVideoACloudinary, construirUrlVideoOptimizada, construirPosterVideo, subirACloudinary } = require("../utils/cloudinary");
+const multer = require("multer");
+const fs = require("fs");
+const os = require("os");
+const _uploadItemImagen = multer({ dest: os.tmpdir(), limits: { fileSize: 3 * 1024 * 1024 }, fileFilter: (_, f, cb) => cb(null, f.mimetype.startsWith('image/')) });
 const {
   crearUploadVideo,
   extraerVideoMeta,
@@ -307,6 +311,105 @@ async function guardarVideoLinkExpress(req, res, next) {
     res.json({ ok: true, data: result });
   } catch (err) { next(err); }
 }
+
+// ── COMPLEMENTOS ──────────────────────────────────────────────
+
+ExpressController.listarComplementos = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const data = await ExpressService.listarComplementos(comercioId, Number(req.params.productoId));
+    res.json({ ok: true, data });
+  } catch (err) { next(err); }
+};
+
+ExpressController.crearGrupoComplemento = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const data = await ExpressService.crearGrupoComplemento(comercioId, Number(req.params.productoId), req.body);
+    res.status(201).json({ ok: true, data });
+  } catch (err) { next(err); }
+};
+
+ExpressController.actualizarGrupoComplemento = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const data = await ExpressService.actualizarGrupoComplemento(comercioId, Number(req.params.id), req.body);
+    res.json({ ok: true, data });
+  } catch (err) { next(err); }
+};
+
+ExpressController.eliminarGrupoComplemento = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    await ExpressService.eliminarGrupoComplemento(comercioId, Number(req.params.id));
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+};
+
+ExpressController.crearItemComplemento = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const data = await ExpressService.crearItemComplemento(comercioId, Number(req.params.grupoId), req.body);
+    res.status(201).json({ ok: true, data });
+  } catch (err) { next(err); }
+};
+
+ExpressController.actualizarItemComplemento = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const data = await ExpressService.actualizarItemComplemento(comercioId, Number(req.params.id), req.body);
+    res.json({ ok: true, data });
+  } catch (err) { next(err); }
+};
+
+ExpressController.eliminarItemComplemento = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    await ExpressService.eliminarItemComplemento(comercioId, Number(req.params.id));
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+};
+
+// ── IMAGEN ÍTEM COMPLEMENTO ───────────────────────────────────
+
+async function uploadItemComplementoImagen(req, res, next) {
+  _uploadItemImagen.single('imagen')(req, res, err => { if (err) return next(err); next(); });
+}
+
+async function subirImagenItemComplemento(req, res, next) {
+  const filePath = req.file?.path;
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    if (!req.file) return res.status(400).json({ ok: false, error: 'No se recibió imagen' });
+    const itemId = Number(req.params.itemId);
+    // Verificar ownership
+    const item = await prisma.itemComplemento.findFirst({
+      where: { id: itemId },
+      include: { grupo: { include: { producto: { select: { comercioId: true } } } } },
+    });
+    if (!item || item.grupo.producto.comercioId !== comercioId) {
+      return res.status(404).json({ ok: false, error: 'Ítem no encontrado' });
+    }
+    const cloudUrl = await subirACloudinary(filePath, 'afromercado/complementos');
+    const imagenUrl = cloudUrl ?? null;
+    const updated = await prisma.itemComplemento.update({ where: { id: itemId }, data: { imagenUrl } });
+    res.json({ ok: true, data: updated });
+  } catch (err) { next(err); } finally {
+    if (filePath) fs.unlink(filePath, () => {});
+  }
+}
+
+ExpressController.copiarGrupoATodos = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const grupoId = Number(req.params.grupoId);
+    const data = await ExpressService.copiarGrupoATodosLosProductos(comercioId, grupoId);
+    res.json({ ok: true, data });
+  } catch (err) { next(err); }
+};
+
+ExpressController.uploadItemComplementoImagen = uploadItemComplementoImagen;
+ExpressController.subirImagenItemComplemento  = subirImagenItemComplemento;
 
 ExpressController.uploadVideoExpress      = uploadVideoExpress;
 ExpressController.subirVideoExpress       = subirVideoExpress;

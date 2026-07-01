@@ -43,6 +43,18 @@ router.get(  "/favoritos/:id",          ...soloAuth, TourController.esFavorito);
 // Estadísticas
 router.get(  "/mi-tour/estadisticas",   ...soloComercio, TourController.estadisticas);
 
+// Ruta / lugares del tour
+router.get(   "/mi-tour/lugares",                 ...soloComercio, TourController.lugaresTour);
+router.post(  "/mi-tour/lugares",                 ...soloComercio, TourController.crearLugarTour);
+router.patch( "/mi-tour/lugares/orden",           ...soloComercio, TourController.reordenarLugaresTour);
+router.patch( "/mi-tour/lugares/:id",             ...soloComercio, TourController.actualizarLugarTour);
+router.delete("/mi-tour/lugares/:id",             ...soloComercio, TourController.eliminarLugarTour);
+router.post(  "/mi-tour/lugares/:id/fotos",       ...soloComercio, uploadFotos, TourController.subirFotosLugar);
+router.post(  "/mi-tour/lugares/:id/video",       ...soloComercio, TourController.uploadVideoLugar, TourController.subirVideoLugar);
+router.delete("/mi-tour/lugares/:id/video",       ...soloComercio, TourController.quitarVideoLugar);
+router.post(  "/mi-tour/lugares/:id/video-link",  ...soloComercio, TourController.guardarVideoLinkLugar);
+router.delete("/mi-tour/lugares/:id/media/:mediaId", ...soloComercio, TourController.eliminarMediaLugar);
+
 // Video
 router.post(  "/mi-tour/config/video",      ...soloComercio, TourController.uploadVideoTour, TourController.subirVideoTour);
 router.delete("/mi-tour/config/video",      ...soloComercio, TourController.quitarVideoTour);
@@ -67,7 +79,19 @@ router.get( "/:id/reviews",        ReviewController.reviewsTour);
 router.post("/reservas/:id/review",...soloAuth, ReviewController.crearReviewTour);
 
 // ── ADMIN ─────────────────────────────────────────────────────
-router.get(  "/admin/todos",       ...soloAdmin, TourController.adminListar);
-router.patch("/admin/:id/estado",  ...soloAdmin, TourController.adminCambiarEstado);
+router.get(  "/admin/todos",          ...soloAdmin, TourController.adminListar);
+router.patch("/admin/:id/estado",     ...soloAdmin, TourController.adminCambiarEstado);
+router.get(  "/admin/:id/reservas",   ...soloAdmin, async (req, res, next) => {
+  try {
+    const prisma = require("../config/prisma");
+    const data = await prisma.reservaTour.findMany({
+      where: { configTourId: Number(req.params.id) },
+      include: { cliente: { select: { nombre: true, email: true } } },
+      orderBy: { creadoAt: "desc" },
+      take: 100,
+    });
+    res.json({ ok: true, data });
+  } catch(e) { next(e); }
+});
 
 module.exports = router;

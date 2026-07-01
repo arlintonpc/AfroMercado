@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { obtenerMiTour, actualizarMiTour, reservasOperadorTour, cambiarEstadoReservaTour, subirFotosTour, subirVideoTour, quitarVideoTour, guardarVideoLinkTour, listarCuponesTour, crearCuponTour, eliminarCuponTour, obtenerEstadisticasTour, type ConfigTour, type ReservaTour, type EstadoReservaTour, type CuponTour, type EstadisticasTour } from '@/lib/api/tour'
+import { obtenerMiTour, actualizarMiTour, reservasOperadorTour, cambiarEstadoReservaTour, subirFotosTour, subirVideoTour, quitarVideoTour, guardarVideoLinkTour, listarCuponesTour, crearCuponTour, eliminarCuponTour, obtenerEstadisticasTour, crearLugarTour, actualizarLugarTour, eliminarLugarTour, reordenarLugaresTour, subirFotosLugarTour, eliminarMediaLugarTour, subirVideoLugarTour, quitarVideoLugarTour, guardarVideoLinkLugarTour, type ConfigTour, type ReservaTour, type EstadoReservaTour, type CuponTour, type EstadisticasTour, type TourLugar, type TourLugarMedia } from '@/lib/api/tour'
 import { Switch } from '@/components/ui'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
@@ -19,6 +19,7 @@ const SERVICIOS_OPCIONES = [
 ]
 
 const IDIOMAS_OPCIONES = ['Español', 'English', 'Français', 'Português', 'Deutsch']
+const IMAGEN_MAX_BYTES = 8 * 1024 * 1024
 
 const ESTADO_COLOR: Record<string, string> = {
   PENDIENTE:  'bg-amber-100 text-amber-700',
@@ -33,8 +34,10 @@ const ACCIONES: Record<string, { label: string; estado: EstadoReservaTour }[]> =
   CONFIRMADA: [{ label: '🎉 Completar', estado: 'COMPLETADA' }, { label: '❌ Cancelar', estado: 'CANCELADA' }],
 }
 
+type TourTab = 'reservas' | 'ruta' | 'config' | 'cupones' | 'estadisticas'
+
 export default function ComercianteTourPage() {
-  const [tab, setTab] = useState<'reservas' | 'config' | 'cupones' | 'estadisticas'>('reservas')
+  const [tab, setTab] = useState<TourTab>('reservas')
   const [tour, setTour] = useState<ConfigTour | null>(null)
   const [reservas, setReservas] = useState<ReservaTour[]>([])
   const [cargando, setCargando] = useState(true)
@@ -43,6 +46,12 @@ export default function ComercianteTourPage() {
   const [editConfig, setEditConfig] = useState<Partial<ConfigTour>>({})
   const reservasRef = useRef<ReservaTour[]>([])
   const inputFotoRef = useRef<HTMLInputElement>(null)
+  const inputFotosLugarRefs = useRef<Record<number, HTMLInputElement | null>>({})
+  const [lugares, setLugares] = useState<TourLugar[]>([])
+  const [lugarAbiertoId, setLugarAbiertoId] = useState<number | null>(null)
+  const [guardandoLugarId, setGuardandoLugarId] = useState<number | null>(null)
+  const [subiendoLugarId, setSubiendoLugarId] = useState<number | null>(null)
+  const [errorLugar, setErrorLugar] = useState('')
   const [cupones, setCupones]             = useState<CuponTour[]>([])
   const [estadisticas, setEstadisticas]   = useState<EstadisticasTour | null>(null)
   const [cargandoStats, setCargandoStats] = useState(false)
@@ -67,6 +76,7 @@ export default function ComercianteTourPage() {
     Promise.all([obtenerMiTour(), reservasOperadorTour()]).then(([t, rs]) => {
       setTour(t)
       setEditConfig(t)
+      setLugares(t.lugares ?? [])
       setReservas(rs)
       reservasRef.current = rs
       setVideoEstadoTour({
@@ -114,15 +124,37 @@ export default function ComercianteTourPage() {
     }
   }
 
+  async function eliminarFotoTour(url: string) {
+    if (!tour) return
+    const fotosAntes = tour.fotos
+    const nuevasFotos = fotosAntes.filter(f => f !== url)
+    setTour(prev => prev ? { ...prev, fotos: nuevasFotos } : prev)
+    setEditConfig(prev => ({ ...prev, fotos: nuevasFotos }))
+    try {
+      await actualizarMiTour({ fotos: nuevasFotos } as any)
+    } catch (e: any) {
+      setTour(prev => prev ? { ...prev, fotos: fotosAntes } : prev)
+      setEditConfig(prev => ({ ...prev, fotos: fotosAntes }))
+      alert(e.message)
+    }
+  }
+
   async function subirFotos(archivos: FileList) {
+    const files = Array.from(archivos)
     setSubiendoFotos(true)
     try {
+      const noImagen = files.find(file => !file.type.startsWith('image/'))
+      if (noImagen) throw new Error('Solo puedes subir imagenes.')
+      const pesada = files.find(file => file.size > IMAGEN_MAX_BYTES)
+      if (pesada) throw new Error(`"${pesada.name}" supera 8 MB. Usa una imagen mas liviana.`)
       const t = await subirFotosTour(archivos)
       setTour(t)
+      setEditConfig(prev => ({ ...prev, fotos: t.fotos }))
     } catch (e: any) {
       alert(e.message)
     } finally {
       setSubiendoFotos(false)
+      if (inputFotoRef.current) inputFotoRef.current.value = ''
     }
   }
 
@@ -142,6 +174,7 @@ export default function ComercianteTourPage() {
     const r = await subirVideoTour(file, meta)
     const nuevo: VideoEstado = { videoUrl: r.videoUrl, videoPosterUrl: r.videoPosterUrl ?? null, videoDuracionSegundos: meta.duracionSegundos, videoMimeType: file.type }
     setVideoEstadoTour(nuevo)
+    setEditConfig(prev => ({ ...prev, videoUrl: r.videoUrl as any, videoPosterUrl: (r.videoPosterUrl ?? null) as any }))
     return nuevo
   }
 
@@ -149,6 +182,7 @@ export default function ComercianteTourPage() {
     await quitarVideoTour()
     const vacio: VideoEstado = { videoUrl: null, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
     setVideoEstadoTour(vacio)
+    setEditConfig(prev => ({ ...prev, videoUrl: undefined, videoPosterUrl: undefined }))
     return vacio
   }
 
@@ -156,7 +190,169 @@ export default function ComercianteTourPage() {
     await guardarVideoLinkTour(url)
     const nuevo: VideoEstado = { videoUrl: url, videoPosterUrl: null, videoDuracionSegundos: null, videoMimeType: null }
     setVideoEstadoTour(nuevo)
+    setEditConfig(prev => ({ ...prev, videoUrl: url as any, videoPosterUrl: undefined }))
     return nuevo
+  }
+
+  function reemplazarLugares(nuevos: TourLugar[]) {
+    setLugares(nuevos)
+    setTour(prev => prev ? { ...prev, lugares: nuevos } : prev)
+  }
+
+  function actualizarLugarLocal(lugar: TourLugar) {
+    reemplazarLugares(lugares.map(item => item.id === lugar.id ? lugar : item))
+  }
+
+  function mediaLugar(lugar: TourLugar, tipo: TourLugarMedia['tipo']) {
+    return (lugar.media ?? []).filter(m => m.tipo === tipo)
+  }
+
+  function videoEstadoLugar(lugar: TourLugar): VideoEstado {
+    const video = mediaLugar(lugar, 'VIDEO')[0]
+    if (video) {
+      return {
+        videoUrl: video.url,
+        videoPosterUrl: video.posterUrl ?? null,
+        videoDuracionSegundos: video.duracionSegundos ?? null,
+        videoMimeType: video.mimeType ?? null,
+      }
+    }
+    // fallback: primer VIDEO_LINK (guardado desde tab "Pegar link")
+    const link = mediaLugar(lugar, 'VIDEO_LINK')[0]
+    return {
+      videoUrl: link?.url ?? null,
+      videoPosterUrl: null,
+      videoDuracionSegundos: null,
+      videoMimeType: null,
+    }
+  }
+
+  async function handleCrearLugar() {
+    setGuardandoLugarId(-1)
+    setErrorLugar('')
+    try {
+      const lugar = await crearLugarTour({ titulo: `Parada ${lugares.length + 1}`, orden: lugares.length })
+      reemplazarLugares([...lugares, lugar])
+      setLugarAbiertoId(lugar.id)
+    } catch (e: any) {
+      setErrorLugar(e?.message ?? 'No se pudo crear el lugar')
+    } finally {
+      setGuardandoLugarId(null)
+    }
+  }
+
+  async function handleGuardarLugar(lugar: TourLugar) {
+    setGuardandoLugarId(lugar.id)
+    setErrorLugar('')
+    try {
+      const actualizado = await actualizarLugarTour(lugar.id, lugar)
+      actualizarLugarLocal(actualizado)
+    } catch (e: any) {
+      setErrorLugar(e?.message ?? 'No se pudo guardar el lugar')
+    } finally {
+      setGuardandoLugarId(null)
+    }
+  }
+
+  async function handleEliminarLugar(lugar: TourLugar) {
+    if (!confirm(`Eliminar "${lugar.titulo}" de la ruta?`)) return
+    setGuardandoLugarId(lugar.id)
+    setErrorLugar('')
+    try {
+      await eliminarLugarTour(lugar.id)
+      reemplazarLugares(lugares.filter(item => item.id !== lugar.id))
+      if (lugarAbiertoId === lugar.id) setLugarAbiertoId(null)
+    } catch (e: any) {
+      setErrorLugar(e?.message ?? 'No se pudo eliminar el lugar')
+    } finally {
+      setGuardandoLugarId(null)
+    }
+  }
+
+  async function handleMoverLugar(index: number, direccion: -1 | 1) {
+    const destino = index + direccion
+    if (destino < 0 || destino >= lugares.length) return
+    const nuevos = [...lugares]
+    const [movido] = nuevos.splice(index, 1)
+    nuevos.splice(destino, 0, movido)
+    reemplazarLugares(nuevos.map((l, orden) => ({ ...l, orden })))
+    try {
+      const ordenados = await reordenarLugaresTour(nuevos.map(l => l.id))
+      reemplazarLugares(ordenados)
+    } catch (e: any) {
+      setErrorLugar(e?.message ?? 'No se pudo reordenar la ruta')
+    }
+  }
+
+  async function handleSubirFotosLugar(lugarId: number, archivos: FileList | null) {
+    const files = Array.from(archivos ?? [])
+    if (!files.length) return
+    setSubiendoLugarId(lugarId)
+    setErrorLugar('')
+    try {
+      const noImagen = files.find(file => !file.type.startsWith('image/'))
+      if (noImagen) {
+        throw new Error('Solo puedes subir imagenes JPG, PNG, WEBP o similares.')
+      }
+      const pesada = files.find(file => file.size > IMAGEN_MAX_BYTES)
+      if (pesada) {
+        throw new Error(`"${pesada.name}" supera 8 MB. Usa una imagen mas liviana.`)
+      }
+      actualizarLugarLocal(await subirFotosLugarTour(lugarId, files))
+    } catch (e: any) {
+      const mensaje = e?.message ?? 'No se pudieron subir las fotos'
+      setErrorLugar(mensaje)
+      alert(mensaje)
+    } finally {
+      setSubiendoLugarId(null)
+      const input = inputFotosLugarRefs.current[lugarId]
+      if (input) input.value = ''
+    }
+  }
+
+  async function handleEliminarMediaLugar(lugarId: number, mediaId: number) {
+    setSubiendoLugarId(lugarId)
+    setErrorLugar('')
+    try {
+      actualizarLugarLocal(await eliminarMediaLugarTour(lugarId, mediaId))
+    } catch (e: any) {
+      setErrorLugar(e?.message ?? 'No se pudo eliminar el archivo')
+    } finally {
+      setSubiendoLugarId(null)
+    }
+  }
+
+  async function handleSubirVideoLugar(lugar: TourLugar, file: File, meta: VideoMetaCaptura): Promise<VideoEstado> {
+    setSubiendoLugarId(lugar.id)
+    try {
+      const actualizado = await subirVideoLugarTour(lugar.id, file, meta)
+      actualizarLugarLocal(actualizado)
+      return videoEstadoLugar(actualizado)
+    } finally {
+      setSubiendoLugarId(null)
+    }
+  }
+
+  async function handleQuitarVideoLugar(lugar: TourLugar): Promise<VideoEstado> {
+    const video = mediaLugar(lugar, 'VIDEO')[0]
+    const link = mediaLugar(lugar, 'VIDEO_LINK')[0]
+    if (video) {
+      const actualizado = await quitarVideoLugarTour(lugar.id)
+      actualizarLugarLocal(actualizado)
+      return videoEstadoLugar(actualizado)
+    } else if (link) {
+      // Era un VIDEO_LINK guardado desde "Pegar link" — eliminar solo ese entry
+      const actualizado = await eliminarMediaLugarTour(lugar.id, link.id)
+      actualizarLugarLocal(actualizado)
+      return videoEstadoLugar(actualizado)
+    }
+    return videoEstadoLugar(lugar)
+  }
+
+  async function handleGuardarVideoLinkLugar(lugar: TourLugar, url: string): Promise<VideoEstado> {
+    const actualizado = await guardarVideoLinkLugarTour(lugar.id, { url })
+    actualizarLugarLocal(actualizado)
+    return videoEstadoLugar(actualizado)
   }
 
   if (cargando) return (
@@ -166,7 +362,7 @@ export default function ComercianteTourPage() {
   )
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-5 pb-12">
+    <div className="max-w-5xl mx-auto px-4 py-5 pb-12">
       <div className="mb-5">
         <h1 className="text-xl font-bold text-[#1A1A1A]">🗺️ {tour?.nombre ?? 'Mi Tour'}</h1>
         <div className="flex items-center gap-2 mt-1">
@@ -179,6 +375,7 @@ export default function ComercianteTourPage() {
       <div className="flex border-b border-gray-200 gap-1 overflow-x-auto mb-5">
         {([
           ['reservas', `Reservas (${reservas.length})`],
+          ['ruta', `Ruta (${lugares.length})`],
           ['estadisticas', '📊 Stats'],
           ['cupones', '🎟️ Cupones'],
           ['config', 'Configuración'],
@@ -448,6 +645,314 @@ export default function ComercianteTourPage() {
       )}
 
       {/* ── Config ── */}
+      {tab === 'ruta' && (
+        <div className="space-y-5">
+          <div className="bg-gradient-to-br from-[#163F31] via-[#2D6A4F] to-[#9A6A21] rounded-3xl p-5 text-white shadow-sm overflow-hidden relative">
+            <div className="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-white/10" />
+            <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.25em] text-white/70">Historia del recorrido</p>
+                <h2 className="text-2xl font-bold mt-1">Ruta y lugares del tour</h2>
+                <p className="text-sm text-white/80 mt-2 max-w-2xl">
+                  Ordena las paradas, muestra fotos reales, sube un video corto y agrega enlaces de tus redes sociales.
+                </p>
+              </div>
+              <button
+                onClick={handleCrearLugar}
+                disabled={guardandoLugarId === -1}
+                className="bg-white text-[#1B4332] px-5 py-3 rounded-2xl font-bold text-sm shadow-sm hover:bg-[#F6F1E8] disabled:opacity-60"
+              >
+                {guardandoLugarId === -1 ? 'Creando...' : '+ Agregar lugar'}
+              </button>
+            </div>
+          </div>
+
+          {errorLugar && (
+            <div className="bg-red-50 border border-red-100 text-red-700 rounded-2xl px-4 py-3 text-sm">{errorLugar}</div>
+          )}
+
+          {lugares.length === 0 ? (
+            <div className="bg-white border border-dashed border-gray-200 rounded-3xl p-10 text-center">
+              <p className="text-3xl mb-2">Ruta</p>
+              <h3 className="font-bold text-gray-800">Aun no tienes lugares en este tour</h3>
+              <p className="text-sm text-gray-500 mt-2">Agrega la primera parada para que los viajeros entiendan que van a vivir.</p>
+              <button onClick={handleCrearLugar} className="mt-5 bg-[#2D6A4F] text-white px-5 py-3 rounded-2xl font-bold text-sm">
+                Crear primera parada
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {(() => {
+                const tieneRutas = lugares.some(l => l.rutaNombre)
+                let rutaAnterior: string | null | undefined = undefined
+                return lugares.map((lugar, index) => {
+                const abierto = lugarAbiertoId === lugar.id
+                const fotos = mediaLugar(lugar, 'FOTO')
+                const video = mediaLugar(lugar, 'VIDEO')[0]
+                const links = mediaLugar(lugar, 'VIDEO_LINK')
+                const portada = fotos[0]?.url ?? video?.posterUrl ?? video?.url
+                const mostrarCabezaRuta = tieneRutas && lugar.rutaNombre !== rutaAnterior
+                rutaAnterior = lugar.rutaNombre
+
+                return (
+                  <div key={lugar.id}>
+                  {mostrarCabezaRuta && (
+                    <div className={`flex items-center gap-3 mt-2 mb-1 ${index > 0 ? 'pt-2 border-t border-dashed border-gray-200' : ''}`}>
+                      <span className="text-xs font-black uppercase tracking-widest text-[#B7791F]">
+                        {lugar.rutaNombre ? `Ruta: ${lugar.rutaNombre}` : 'Sin ruta asignada'}
+                      </span>
+                      <div className="flex-1 h-px bg-[#E8DCC8]" />
+                    </div>
+                  )}
+                  <section className="bg-white border border-gray-100 rounded-3xl shadow-sm overflow-hidden">
+                    <div className="p-4 md:p-5 flex flex-col md:flex-row gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setLugarAbiertoId(abierto ? null : lugar.id)}
+                        className="w-full md:w-44 h-32 rounded-2xl overflow-hidden bg-[#F6F1E8] border border-gray-100 flex-shrink-0 text-left"
+                      >
+                        {portada ? (
+                          <img src={portada} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-sm text-gray-400">Sin media</div>
+                        )}
+                      </button>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="bg-[#1B4332] text-white text-xs font-bold px-2.5 py-1 rounded-full">#{index + 1}</span>
+                              {lugar.destacado && <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full">Destacado</span>}
+                              {lugar.tipo && <span className="bg-gray-100 text-gray-600 text-xs font-medium px-2.5 py-1 rounded-full">{lugar.tipo}</span>}
+                            </div>
+                            <h3 className="font-bold text-lg text-gray-900 mt-2">{lugar.titulo}</h3>
+                            <p className="text-sm text-gray-500 line-clamp-2 mt-1">{lugar.descripcion || 'Describe que vera el viajero en esta parada.'}</p>
+                            <div className="flex flex-wrap gap-2 mt-3 text-xs text-gray-500">
+                              <span>{fotos.length} fotos</span>
+                              <span>{video ? '1 video propio' : 'Sin video propio'}</span>
+                              <span>{links.length} links</span>
+                              {lugar.duracionMinutos ? <span>{lugar.duracionMinutos} min</span> : null}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap md:justify-end">
+                            <button onClick={() => handleMoverLugar(index, -1)} disabled={index === 0}
+                              className="px-3 py-2 rounded-xl border border-gray-200 text-sm disabled:opacity-40">Subir</button>
+                            <button onClick={() => handleMoverLugar(index, 1)} disabled={index === lugares.length - 1}
+                              className="px-3 py-2 rounded-xl border border-gray-200 text-sm disabled:opacity-40">Bajar</button>
+                            <button onClick={() => setLugarAbiertoId(abierto ? null : lugar.id)}
+                              className="px-4 py-2 rounded-xl bg-[#EEF5F0] text-[#1B4332] font-bold text-sm">
+                              {abierto ? 'Cerrar' : 'Editar'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {abierto && (
+                      <div className="border-t border-gray-100 bg-[#FAF8F3] p-4 md:p-5 space-y-5">
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Nombre del lugar</label>
+                            <input value={lugar.titulo} onChange={e => actualizarLugarLocal({ ...lugar, titulo: e.target.value })}
+                              className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Tipo</label>
+                            <input value={lugar.tipo ?? ''} onChange={e => actualizarLugarLocal({ ...lugar, tipo: e.target.value })}
+                              placeholder="Cascada, finca, playa, mirador..."
+                              className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Ruta / Itinerario (opcional)</label>
+                            <input
+                              value={lugar.rutaNombre ?? ''}
+                              onChange={e => actualizarLugarLocal({ ...lugar, rutaNombre: e.target.value || null })}
+                              placeholder="Ej: Ruta Río Quito, Ruta Selva, Día 1..."
+                              list={`rutas-${lugar.id}`}
+                              className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#2D6A4F]"
+                            />
+                            <datalist id={`rutas-${lugar.id}`}>
+                              {Array.from(new Set(lugares.map(l => l.rutaNombre).filter(Boolean))).map(ruta => (
+                                <option key={ruta} value={ruta!} />
+                              ))}
+                            </datalist>
+                            <p className="text-[11px] text-gray-400 mt-1">Agrupa paradas bajo el mismo nombre para crear itinerarios distintos dentro del tour.</p>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Descripcion</label>
+                            <textarea value={lugar.descripcion ?? ''} onChange={e => actualizarLugarLocal({ ...lugar, descripcion: e.target.value })}
+                              rows={3} className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#2D6A4F] resize-none" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Duracion estimada (min)</label>
+                            <input type="number" min={0} value={lugar.duracionMinutos ?? ''}
+                              onChange={e => actualizarLugarLocal({ ...lugar, duracionMinutos: e.target.value ? Number(e.target.value) : null })}
+                              className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+                          </div>
+                          <label className="flex items-center justify-between bg-white rounded-2xl border border-gray-200 px-4 py-3">
+                            <span>
+                              <span className="block text-sm font-bold text-gray-800">Destacar lugar</span>
+                              <span className="block text-xs text-gray-500">Aparecera con mayor fuerza visual.</span>
+                            </span>
+                            <Switch activo={!!lugar.destacado} onChange={v => actualizarLugarLocal({ ...lugar, destacado: v })} />
+                          </label>
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Recomendaciones</label>
+                            <textarea value={lugar.recomendaciones ?? ''} onChange={e => actualizarLugarLocal({ ...lugar, recomendaciones: e.target.value })}
+                              placeholder="Ej: llevar zapatos comodos, bloqueador, botella de agua..."
+                              rows={2} className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#2D6A4F] resize-none" />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3">
+                          <button onClick={() => handleGuardarLugar(lugar)} disabled={guardandoLugarId === lugar.id}
+                            className="bg-[#2D6A4F] text-white px-5 py-3 rounded-2xl font-bold text-sm disabled:opacity-60">
+                            {guardandoLugarId === lugar.id ? 'Guardando...' : 'Guardar lugar'}
+                          </button>
+                          <button onClick={() => handleEliminarLugar(lugar)}
+                            className="border border-red-200 text-red-600 px-5 py-3 rounded-2xl font-bold text-sm">
+                            Eliminar
+                          </button>
+                        </div>
+
+                        <div className="space-y-4">
+                          {/* Fotos */}
+                          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <h4 className="font-semibold text-gray-900 text-sm">📷 Fotos del lugar</h4>
+                                <p className="text-xs text-gray-400 mt-0.5">{fotos.length > 0 ? `${fotos.length} foto${fotos.length > 1 ? 's' : ''} · ` : ''}JPG, PNG o WEBP · máx. 8 MB por imagen</p>
+                              </div>
+                              {fotos.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => inputFotosLugarRefs.current[lugar.id]?.click()}
+                                  disabled={subiendoLugarId === lugar.id}
+                                  className="bg-[#EEF5F0] text-[#1B4332] px-3 py-1.5 rounded-xl font-bold text-xs disabled:opacity-60 hover:bg-[#DDEDE4] transition-colors"
+                                >
+                                  {subiendoLugarId === lugar.id ? 'Subiendo...' : '+ Agregar'}
+                                </button>
+                              )}
+                              <input
+                                ref={el => { inputFotosLugarRefs.current[lugar.id] = el }}
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                className="hidden"
+                                onChange={e => handleSubirFotosLugar(lugar.id, e.target.files)}
+                              />
+                            </div>
+                            {fotos.length > 0 ? (
+                              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                                {fotos.map(foto => (
+                                  <div key={foto.id} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100">
+                                    <img src={foto.url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors" />
+                                    <button
+                                      onClick={() => handleEliminarMediaLugar(lugar.id, foto.id)}
+                                      className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-lg">Quitar</span>
+                                    </button>
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => inputFotosLugarRefs.current[lugar.id]?.click()}
+                                  disabled={subiendoLugarId === lugar.id}
+                                  className="aspect-square rounded-xl border-2 border-dashed border-gray-200 hover:border-[#2D6A4F] transition-colors flex flex-col items-center justify-center gap-1 text-gray-400 hover:text-[#2D6A4F] disabled:opacity-50"
+                                >
+                                  <span className="text-xl leading-none">+</span>
+                                  <span className="text-[10px] font-semibold">Más</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => inputFotosLugarRefs.current[lugar.id]?.click()}
+                                disabled={subiendoLugarId === lugar.id}
+                                className="w-full py-10 border-2 border-dashed border-gray-200 rounded-2xl hover:border-[#2D6A4F] hover:bg-[#F6FAF7] transition-colors flex flex-col items-center gap-2 text-gray-400 hover:text-[#2D6A4F] disabled:opacity-50"
+                              >
+                                <span className="text-3xl">📷</span>
+                                <span className="text-sm font-semibold">{subiendoLugarId === lugar.id ? 'Subiendo...' : 'Sube fotos del lugar'}</span>
+                                <span className="text-xs">Puedes seleccionar varias a la vez</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Video principal */}
+                          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                            <h4 className="font-semibold text-gray-900 text-sm mb-1">🎬 Video de la parada</h4>
+                            <p className="text-xs text-gray-400 mb-3">Sube un clip propio o pega un link de YouTube, TikTok, Instagram, etc.</p>
+                            <SubidorVideoOLink
+                              key={`video-lugar-${lugar.id}-${video?.id ?? links[0]?.id ?? 'sin-video'}`}
+                              titulo="Video corto de la parada"
+                              estadoInicial={videoEstadoLugar(lugar)}
+                              onSubir={(file, meta) => handleSubirVideoLugar(lugar, file, meta)}
+                              onEliminar={() => handleQuitarVideoLugar(lugar)}
+                              onGuardarLink={(url) => handleGuardarVideoLinkLugar(lugar, url)}
+                              compacto
+                            />
+                          </div>
+
+                          {/* Links adicionales */}
+                          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                            <h4 className="font-semibold text-gray-900 text-sm mb-1">🔗 Links adicionales</h4>
+                            <p className="text-xs text-gray-400 mb-3">Agrega más videos o páginas relacionadas con esta parada.</p>
+                            <form className="flex gap-2" onSubmit={async e => {
+                              e.preventDefault()
+                              const form = new FormData(e.currentTarget)
+                              const url = String(form.get('url') || '').trim()
+                              if (!url) return
+                              await handleGuardarVideoLinkLugar(lugar, url)
+                              e.currentTarget.reset()
+                            }}>
+                              <input
+                                name="url"
+                                placeholder="https://instagram.com/p/... · https://tiktok.com/..."
+                                className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]"
+                              />
+                              <button type="submit" className="bg-[#2D6A4F] text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-[#1B4332] transition-colors flex-shrink-0">
+                                Agregar
+                              </button>
+                            </form>
+                            {links.length > 0 && (
+                              <div className="mt-3 space-y-2">
+                                {links.map(link => (
+                                  <div key={link.id} className="flex items-center gap-3 bg-[#F6F1E8] rounded-xl px-3 py-2.5">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-bold text-[#1B4332]">{link.plataforma ?? 'Enlace externo'}</p>
+                                      <a href={link.url} target="_blank" rel="noreferrer"
+                                        className="text-xs text-gray-500 truncate block hover:text-[#2D6A4F]">
+                                        {link.url}
+                                      </a>
+                                    </div>
+                                    <button
+                                      onClick={() => handleEliminarMediaLugar(lugar.id, link.id)}
+                                      className="text-xs text-red-500 font-bold hover:text-red-700 flex-shrink-0"
+                                    >
+                                      Quitar
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                  </div>
+                )
+              })
+              })()}
+            </div>
+          )}
+        </div>
+      )}
+
       {tab === 'config' && editConfig && (
         <div className="space-y-4">
           {/* Activo */}
@@ -561,7 +1066,17 @@ export default function ComercianteTourPage() {
             {(tour?.fotos ?? []).length > 0 && (
               <div className="grid grid-cols-3 gap-2 mb-3">
                 {tour?.fotos.map((f, i) => (
-                  <img key={i} src={f} alt="" className="w-full h-20 object-cover rounded-xl" />
+                  <div key={i} className="relative group">
+                    <img src={f} alt="" className="w-full h-20 object-cover rounded-xl" />
+                    <button
+                      type="button"
+                      onClick={() => eliminarFotoTour(f)}
+                      className="absolute top-1 right-1 w-6 h-6 bg-black/60 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                      title="Eliminar foto"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
