@@ -30,7 +30,7 @@ function Estrellas({ n }: { n: number }) {
 
 export default function AdminReviewsPage() {
   const [tipo, setTipo] = useState<'producto' | 'tienda'>('producto')
-  const [items, setItems]       = useState<ReviewProducto[] | ReviewTienda[]>([])
+  const [items, setItems]       = useState<Array<ReviewProducto | ReviewTienda>>([])
   const [total, setTotal]       = useState(0)
   const [pagina, setPagina]     = useState(1)
   const [cargando, setCargando] = useState(true)
