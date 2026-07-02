@@ -333,6 +333,8 @@ async function aplicarMigraciones() {
       "orden"               INTEGER NOT NULL DEFAULT 0,
       CONSTRAINT "ItemComplemento_grupoComplementoId_fkey" FOREIGN KEY ("grupoComplementoId") REFERENCES "GrupoComplemento"("id") ON DELETE CASCADE ON UPDATE CASCADE
     )`,
+    `ALTER TABLE "ItemComplemento" ADD COLUMN IF NOT EXISTS "icono" TEXT`,
+    `ALTER TABLE "ItemComplemento" ADD COLUMN IF NOT EXISTS "imagenUrl" TEXT`,
     `CREATE INDEX IF NOT EXISTS "ItemComplemento_grupoComplementoId_idx" ON "ItemComplemento"("grupoComplementoId")`,
 
     // ── ReviewTransporte ───────────────────────────────────────────────

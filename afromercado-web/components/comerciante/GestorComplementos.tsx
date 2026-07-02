@@ -15,11 +15,16 @@ interface Props {
   onClose: () => void
 }
 
+function mensajeError(err: unknown, fallback: string) {
+  return err instanceof Error && err.message ? err.message : fallback
+}
+
 export default function GestorComplementos({ productoId, nombreProducto, onClose }: Props) {
   const [grupos, setGrupos] = useState<GrupoComplemento[]>([])
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [subiendoImagen, setSubiendoImagen] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const [nuevoGrupo, setNuevoGrupo] = useState({ nombre: '', minimo: 0, maximo: 1, requerido: false })
   const [mostrarFormGrupo, setMostrarFormGrupo] = useState(false)
@@ -30,44 +35,78 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
 
   useEffect(() => {
-    listarComplementos(productoId).then(g => { setGrupos(g); setCargando(false) })
+    let activo = true
+    setCargando(true)
+    setError(null)
+
+    listarComplementos(productoId)
+      .then(g => {
+        if (!activo) return
+        setGrupos(g)
+      })
+      .catch(err => {
+        if (!activo) return
+        setError(mensajeError(err, 'No se pudieron cargar los complementos.'))
+      })
+      .finally(() => {
+        if (activo) setCargando(false)
+      })
+
+    return () => { activo = false }
   }, [productoId])
 
   async function agregarGrupo() {
     if (!nuevoGrupo.nombre.trim()) return
     setGuardando(true)
+    setError(null)
     try {
       const g = await crearGrupoComplemento(productoId, nuevoGrupo)
       setGrupos(prev => [...prev, g])
       setNuevoGrupo({ nombre: '', minimo: 0, maximo: 1, requerido: false })
       setMostrarFormGrupo(false)
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo crear el grupo de complementos.'))
     } finally { setGuardando(false) }
   }
 
   async function guardarEditGrupo(grupoId: number) {
     setGuardando(true)
+    setError(null)
     try {
       const updated = await actualizarGrupoComplemento(grupoId, editGrupo)
       setGrupos(prev => prev.map(g => g.id === grupoId ? { ...g, ...updated } : g))
       setEditandoGrupo(null)
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo actualizar el grupo.'))
     } finally { setGuardando(false) }
   }
 
   async function toggleActivo(grupo: GrupoComplemento) {
-    const updated = await actualizarGrupoComplemento(grupo.id, { activo: !grupo.activo })
-    setGrupos(prev => prev.map(g => g.id === grupo.id ? updated : g))
+    setError(null)
+    try {
+      const updated = await actualizarGrupoComplemento(grupo.id, { activo: !grupo.activo })
+      setGrupos(prev => prev.map(g => g.id === grupo.id ? updated : g))
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo cambiar el estado del grupo.'))
+    }
   }
 
   async function borrarGrupo(grupoId: number) {
     if (!confirm('¿Eliminar este grupo y todos sus ítems?')) return
-    await eliminarGrupoComplemento(grupoId)
-    setGrupos(prev => prev.filter(g => g.id !== grupoId))
+    setError(null)
+    try {
+      await eliminarGrupoComplemento(grupoId)
+      setGrupos(prev => prev.filter(g => g.id !== grupoId))
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo eliminar el grupo.'))
+    }
   }
 
   async function agregarItem(grupoId: number) {
     const f = nuevoItem[grupoId]
     if (!f?.nombre?.trim()) return
     setGuardando(true)
+    setError(null)
     try {
       const item = await crearItemComplemento(grupoId, {
         nombre: f.nombre.trim(),
@@ -76,33 +115,48 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
       })
       setGrupos(prev => prev.map(g => g.id === grupoId ? { ...g, items: [...g.items, item] } : g))
       setNuevoItem(prev => ({ ...prev, [grupoId]: { nombre: '', precio: '', icono: '' } }))
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo crear el item de complemento.'))
     } finally { setGuardando(false) }
   }
 
   async function toggleItem(grupoId: number, item: ItemComplemento) {
-    const updated = await actualizarItemComplemento(item.id, { disponible: !item.disponible })
-    setGrupos(prev => prev.map(g => g.id === grupoId
-      ? { ...g, items: g.items.map(i => i.id === item.id ? updated : i) }
-      : g
-    ))
+    setError(null)
+    try {
+      const updated = await actualizarItemComplemento(item.id, { disponible: !item.disponible })
+      setGrupos(prev => prev.map(g => g.id === grupoId
+        ? { ...g, items: g.items.map(i => i.id === item.id ? updated : i) }
+        : g
+      ))
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo actualizar el item.'))
+    }
   }
 
   async function borrarItem(grupoId: number, itemId: number) {
-    await eliminarItemComplemento(itemId)
-    setGrupos(prev => prev.map(g => g.id === grupoId
-      ? { ...g, items: g.items.filter(i => i.id !== itemId) }
-      : g
-    ))
+    setError(null)
+    try {
+      await eliminarItemComplemento(itemId)
+      setGrupos(prev => prev.map(g => g.id === grupoId
+        ? { ...g, items: g.items.filter(i => i.id !== itemId) }
+        : g
+      ))
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo eliminar el item.'))
+    }
   }
 
   async function handleImagenItem(grupoId: number, item: ItemComplemento, file: File) {
     setSubiendoImagen(item.id)
+    setError(null)
     try {
       const updated = await subirImagenItemComplemento(item.id, file)
       setGrupos(prev => prev.map(g => g.id === grupoId
         ? { ...g, items: g.items.map(i => i.id === item.id ? { ...i, imagenUrl: updated.imagenUrl } : i) }
         : g
       ))
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo subir la imagen del complemento.'))
     } finally { setSubiendoImagen(null) }
   }
 
@@ -120,6 +174,12 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
 
         {/* Body */}
         <div className="overflow-y-auto flex-1 p-5 space-y-5">
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           {cargando ? (
             <p className="text-center text-gray-400 py-8">Cargando...</p>
           ) : grupos.length === 0 && !mostrarFormGrupo ? (
