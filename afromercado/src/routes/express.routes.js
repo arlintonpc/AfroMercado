@@ -51,6 +51,15 @@ router.delete("/config/video",      ...soloComercio, ExpressController.quitarVid
 router.patch( "/config/video-link", ...soloComercio, ExpressController.guardarVideoLinkExpress);
 
 // Complementos (add-ons) por producto
+router.get(   "/complementos/:productoId/biblioteca",           ...soloComercio, ExpressController.listarBibliotecaComplementos);
+router.post(  "/complementos/biblioteca/grupos",                ...soloComercio, ExpressController.crearGrupoBiblioteca);
+router.patch( "/complementos/biblioteca/grupos/:grupoId",       ...soloComercio, ExpressController.actualizarGrupoBiblioteca);
+router.delete("/complementos/biblioteca/grupos/:grupoId",       ...soloComercio, ExpressController.eliminarGrupoBiblioteca);
+router.post(  "/complementos/biblioteca/grupos/:grupoId/items", ...soloComercio, ExpressController.crearItemBiblioteca);
+router.patch( "/complementos/biblioteca/items/:itemId",         ...soloComercio, ExpressController.actualizarItemBiblioteca);
+router.delete("/complementos/biblioteca/items/:itemId",         ...soloComercio, ExpressController.eliminarItemBiblioteca);
+router.post(  "/complementos/:productoId/biblioteca/:grupoId",  ...soloComercio, ExpressController.vincularGrupoBibliotecaProducto);
+router.delete("/complementos/:productoId/biblioteca/:grupoId",  ...soloComercio, ExpressController.desvincularGrupoBibliotecaProducto);
 router.get(   "/complementos/:productoId",              ...soloComercio, ExpressController.listarComplementos);
 router.post(  "/complementos/:productoId/grupos",       ...soloComercio, ExpressController.crearGrupoComplemento);
 router.patch( "/complementos/grupos/:id",               ...soloComercio, ExpressController.actualizarGrupoComplemento);

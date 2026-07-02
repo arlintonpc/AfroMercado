@@ -314,6 +314,87 @@ async function guardarVideoLinkExpress(req, res, next) {
 
 // ── COMPLEMENTOS ──────────────────────────────────────────────
 
+ExpressController.listarBibliotecaComplementos = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const data = await ExpressService.listarBibliotecaComplementos(comercioId, Number(req.params.productoId));
+    res.json({ ok: true, data });
+  } catch (err) { next(err); }
+};
+
+ExpressController.crearGrupoBiblioteca = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const data = await ExpressService.crearGrupoBiblioteca(comercioId, req.body);
+    res.status(201).json({ ok: true, data });
+  } catch (err) { next(err); }
+};
+
+ExpressController.actualizarGrupoBiblioteca = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const data = await ExpressService.actualizarGrupoBiblioteca(comercioId, Number(req.params.grupoId), req.body);
+    res.json({ ok: true, data });
+  } catch (err) { next(err); }
+};
+
+ExpressController.eliminarGrupoBiblioteca = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    await ExpressService.eliminarGrupoBiblioteca(comercioId, Number(req.params.grupoId));
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+};
+
+ExpressController.crearItemBiblioteca = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const data = await ExpressService.crearItemBiblioteca(comercioId, Number(req.params.grupoId), req.body);
+    res.status(201).json({ ok: true, data });
+  } catch (err) { next(err); }
+};
+
+ExpressController.actualizarItemBiblioteca = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const data = await ExpressService.actualizarItemBiblioteca(comercioId, Number(req.params.itemId), req.body);
+    res.json({ ok: true, data });
+  } catch (err) { next(err); }
+};
+
+ExpressController.eliminarItemBiblioteca = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    await ExpressService.eliminarItemBiblioteca(comercioId, Number(req.params.itemId));
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+};
+
+ExpressController.vincularGrupoBibliotecaProducto = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    const data = await ExpressService.vincularGrupoBibliotecaProducto(
+      comercioId,
+      Number(req.params.productoId),
+      Number(req.params.grupoId),
+      req.body
+    );
+    res.status(201).json({ ok: true, data });
+  } catch (err) { next(err); }
+};
+
+ExpressController.desvincularGrupoBibliotecaProducto = async (req, res, next) => {
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    await ExpressService.desvincularGrupoBibliotecaProducto(
+      comercioId,
+      Number(req.params.productoId),
+      Number(req.params.grupoId)
+    );
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+};
+
 ExpressController.listarComplementos = async (req, res, next) => {
   try {
     const comercioId = await getComercioId(req.usuario.id);

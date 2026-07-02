@@ -282,6 +282,7 @@ model Comercio {
   configHotel           ConfigHotel?
   configTour            ConfigTour?
   configTransporte      ConfigTransporte?
+  gruposComplementoBiblioteca GrupoComplementoBiblioteca[]
 }
 
 model Categoria {
@@ -344,6 +345,7 @@ model Producto {
   itemsExpress          ItemPedidoExpress[]
   menuSeccion      MenuSeccion?       @relation("ProductoMenuSeccion", fields: [menuSeccionId], references: [id], onDelete: SetNull)
   gruposComplemento GrupoComplemento[]
+  gruposComplementoAsignados ProductoGrupoComplemento[]
 
   @@index([comercioId, activo])
   @@index([categoriaId, activo])
@@ -1329,6 +1331,60 @@ model ItemComplemento {
 }
 
 // ─── MÓDULO HOTELERÍA ─────────────────────────────────────────
+
+model GrupoComplementoBiblioteca {
+  id         Int      @id @default(autoincrement())
+  comercioId Int
+  nombre     String
+  minimo     Int      @default(0)
+  maximo     Int      @default(1)
+  requerido  Boolean  @default(false)
+  orden      Int      @default(0)
+  activo     Boolean  @default(true)
+  creadoAt   DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  items    ItemComplementoBiblioteca[]
+  productos ProductoGrupoComplemento[]
+
+  @@unique([comercioId, nombre])
+  @@index([comercioId])
+}
+
+model ItemComplementoBiblioteca {
+  id                 Int     @id @default(autoincrement())
+  grupoBibliotecaId  Int
+  nombre             String
+  icono              String?
+  imagenUrl          String?
+  precio             Decimal @default(0) @db.Decimal(12, 2)
+  disponible         Boolean @default(true)
+  orden              Int     @default(0)
+
+  grupo GrupoComplementoBiblioteca @relation(fields: [grupoBibliotecaId], references: [id], onDelete: Cascade)
+
+  @@index([grupoBibliotecaId])
+}
+
+model ProductoGrupoComplemento {
+  id                 Int      @id @default(autoincrement())
+  productoId         Int
+  grupoBibliotecaId  Int
+  minimoOverride     Int?
+  maximoOverride     Int?
+  requeridoOverride  Boolean?
+  orden              Int      @default(0)
+  activo             Boolean  @default(true)
+  creadoAt           DateTime @default(now())
+
+  producto Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  grupo    GrupoComplementoBiblioteca @relation(fields: [grupoBibliotecaId], references: [id], onDelete: Cascade)
+
+  @@unique([productoId, grupoBibliotecaId])
+  @@index([productoId])
+  @@index([grupoBibliotecaId])
+}
 
 enum EstadoReservaHotel {
   PENDIENTE

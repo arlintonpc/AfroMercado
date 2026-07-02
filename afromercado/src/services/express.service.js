@@ -60,6 +60,34 @@ function generarCodigo() {
   return `EX-${ts}-${rnd}`;
 }
 
+function grupoBibliotecaParaMenu(asignacion) {
+  const grupo = asignacion.grupo;
+  return {
+    id: -asignacion.id,
+    productoId: asignacion.productoId,
+    nombre: grupo.nombre,
+    minimo: asignacion.minimoOverride ?? grupo.minimo,
+    maximo: asignacion.maximoOverride ?? grupo.maximo,
+    requerido: asignacion.requeridoOverride ?? grupo.requerido,
+    orden: asignacion.orden ?? grupo.orden,
+    activo: asignacion.activo && grupo.activo,
+    origen: "BIBLIOTECA",
+    grupoBibliotecaId: grupo.id,
+    items: (grupo.items || []).map((item) => ({
+      id: -item.id,
+      grupoComplementoId: -asignacion.id,
+      nombre: item.nombre,
+      icono: item.icono,
+      imagenUrl: item.imagenUrl,
+      precio: item.precio,
+      disponible: item.disponible,
+      orden: item.orden,
+      origen: "BIBLIOTECA",
+      itemBibliotecaId: item.id,
+    })),
+  };
+}
+
 const ExpressService = {
 
   // ── CONFIG DEL COMERCIO ──────────────────────────────────────
@@ -363,13 +391,33 @@ const ExpressService = {
             items: { where: { disponible: true }, orderBy: { orden: 'asc' } },
           },
         },
+        gruposComplementoAsignados: {
+          where: { activo: true, grupo: { activo: true } },
+          orderBy: { orden: 'asc' },
+          include: {
+            grupo: {
+              include: {
+                items: { where: { disponible: true }, orderBy: { orden: 'asc' } },
+              },
+            },
+          },
+        },
       },
       orderBy: [{ menuSeccionId: 'asc' }, { nombre: 'asc' }],
+    });
+    const productosConComplementos = productos.map((producto) => {
+      const vinculados = (producto.gruposComplementoAsignados || []).map(grupoBibliotecaParaMenu);
+      const { gruposComplementoAsignados, ...resto } = producto;
+      return {
+        ...resto,
+        gruposComplemento: [...(producto.gruposComplemento || []), ...vinculados]
+          .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)),
+      };
     });
     return {
       ...cfg,
       abiertoAhora: cfg.abierto && comercioAbiertoAhora(cfg.horarios),
-      productos,
+      productos: productosConComplementos,
     };
   },
 
@@ -729,6 +777,160 @@ const ExpressService = {
   },
 
   // ── COMPLEMENTOS ──────────────────────────────────────────────
+
+  async listarBibliotecaComplementos(comercioId, productoId) {
+    const prod = await prisma.producto.findFirst({ where: { id: productoId, comercioId } });
+    if (!prod) throw new ErrorNoEncontrado("Producto no encontrado");
+
+    const [grupos, asignaciones] = await Promise.all([
+      prisma.grupoComplementoBiblioteca.findMany({
+        where: { comercioId },
+        orderBy: [{ orden: "asc" }, { nombre: "asc" }],
+        include: { items: { orderBy: { orden: "asc" } } },
+      }),
+      prisma.productoGrupoComplemento.findMany({
+        where: { productoId },
+        orderBy: { orden: "asc" },
+        include: { grupo: { include: { items: { orderBy: { orden: "asc" } } } } },
+      }),
+    ]);
+
+    return { grupos, asignaciones };
+  },
+
+  async crearGrupoBiblioteca(comercioId, { nombre, minimo, maximo, requerido, orden }) {
+    if (!nombre?.trim()) throw new ErrorValidacion("El nombre del grupo es requerido");
+    try {
+      return await prisma.grupoComplementoBiblioteca.create({
+        data: {
+          comercioId,
+          nombre: nombre.trim(),
+          minimo: minimo ?? 0,
+          maximo: maximo ?? 1,
+          requerido: requerido ?? false,
+          orden: orden ?? 0,
+        },
+        include: { items: { orderBy: { orden: "asc" } } },
+      });
+    } catch (err) {
+      if (err.code === "P2002") throw new ErrorValidacion("Ya existe un grupo con ese nombre en tu biblioteca");
+      throw err;
+    }
+  },
+
+  async actualizarGrupoBiblioteca(comercioId, grupoId, datos) {
+    const grupo = await prisma.grupoComplementoBiblioteca.findFirst({ where: { id: grupoId, comercioId } });
+    if (!grupo) throw new ErrorNoEncontrado("Grupo de biblioteca no encontrado");
+    const { nombre, minimo, maximo, requerido, orden, activo } = datos;
+    try {
+      return await prisma.grupoComplementoBiblioteca.update({
+        where: { id: grupoId },
+        data: {
+          ...(nombre !== undefined && { nombre: nombre.trim() }),
+          ...(minimo !== undefined && { minimo }),
+          ...(maximo !== undefined && { maximo }),
+          ...(requerido !== undefined && { requerido }),
+          ...(orden !== undefined && { orden }),
+          ...(activo !== undefined && { activo }),
+        },
+        include: { items: { orderBy: { orden: "asc" } } },
+      });
+    } catch (err) {
+      if (err.code === "P2002") throw new ErrorValidacion("Ya existe un grupo con ese nombre en tu biblioteca");
+      throw err;
+    }
+  },
+
+  async eliminarGrupoBiblioteca(comercioId, grupoId) {
+    const grupo = await prisma.grupoComplementoBiblioteca.findFirst({ where: { id: grupoId, comercioId } });
+    if (!grupo) throw new ErrorNoEncontrado("Grupo de biblioteca no encontrado");
+    await prisma.grupoComplementoBiblioteca.delete({ where: { id: grupoId } });
+  },
+
+  async crearItemBiblioteca(comercioId, grupoId, { nombre, icono, precio, disponible, orden }) {
+    if (!nombre?.trim()) throw new ErrorValidacion("El nombre del item es requerido");
+    const grupo = await prisma.grupoComplementoBiblioteca.findFirst({ where: { id: grupoId, comercioId } });
+    if (!grupo) throw new ErrorNoEncontrado("Grupo de biblioteca no encontrado");
+    return prisma.itemComplementoBiblioteca.create({
+      data: {
+        grupoBibliotecaId: grupoId,
+        nombre: nombre.trim(),
+        icono: icono ?? null,
+        precio: precio ?? 0,
+        disponible: disponible ?? true,
+        orden: orden ?? 0,
+      },
+    });
+  },
+
+  async actualizarItemBiblioteca(comercioId, itemId, datos) {
+    const item = await prisma.itemComplementoBiblioteca.findFirst({
+      where: { id: itemId },
+      include: { grupo: { select: { comercioId: true } } },
+    });
+    if (!item || item.grupo.comercioId !== comercioId) throw new ErrorNoEncontrado("Item de biblioteca no encontrado");
+    const { nombre, icono, precio, disponible, orden } = datos;
+    return prisma.itemComplementoBiblioteca.update({
+      where: { id: itemId },
+      data: {
+        ...(nombre !== undefined && { nombre: nombre.trim() }),
+        ...(icono !== undefined && { icono }),
+        ...(precio !== undefined && { precio }),
+        ...(disponible !== undefined && { disponible }),
+        ...(orden !== undefined && { orden }),
+      },
+    });
+  },
+
+  async eliminarItemBiblioteca(comercioId, itemId) {
+    const item = await prisma.itemComplementoBiblioteca.findFirst({
+      where: { id: itemId },
+      include: { grupo: { select: { comercioId: true } } },
+    });
+    if (!item || item.grupo.comercioId !== comercioId) throw new ErrorNoEncontrado("Item de biblioteca no encontrado");
+    await prisma.itemComplementoBiblioteca.delete({ where: { id: itemId } });
+  },
+
+  async vincularGrupoBibliotecaProducto(comercioId, productoId, grupoId, datos = {}) {
+    const [prod, grupo] = await Promise.all([
+      prisma.producto.findFirst({ where: { id: productoId, comercioId } }),
+      prisma.grupoComplementoBiblioteca.findFirst({ where: { id: grupoId, comercioId } }),
+    ]);
+    if (!prod) throw new ErrorNoEncontrado("Producto no encontrado");
+    if (!grupo) throw new ErrorNoEncontrado("Grupo de biblioteca no encontrado");
+
+    return prisma.productoGrupoComplemento.upsert({
+      where: { productoId_grupoBibliotecaId: { productoId, grupoBibliotecaId: grupoId } },
+      update: {
+        activo: true,
+        ...(datos.minimoOverride !== undefined && { minimoOverride: datos.minimoOverride }),
+        ...(datos.maximoOverride !== undefined && { maximoOverride: datos.maximoOverride }),
+        ...(datos.requeridoOverride !== undefined && { requeridoOverride: datos.requeridoOverride }),
+        ...(datos.orden !== undefined && { orden: datos.orden }),
+      },
+      create: {
+        productoId,
+        grupoBibliotecaId: grupoId,
+        minimoOverride: datos.minimoOverride ?? null,
+        maximoOverride: datos.maximoOverride ?? null,
+        requeridoOverride: datos.requeridoOverride ?? null,
+        orden: datos.orden ?? grupo.orden ?? 0,
+      },
+      include: { grupo: { include: { items: { orderBy: { orden: "asc" } } } } },
+    });
+  },
+
+  async desvincularGrupoBibliotecaProducto(comercioId, productoId, grupoId) {
+    const [prod, grupo] = await Promise.all([
+      prisma.producto.findFirst({ where: { id: productoId, comercioId } }),
+      prisma.grupoComplementoBiblioteca.findFirst({ where: { id: grupoId, comercioId } }),
+    ]);
+    if (!prod) throw new ErrorNoEncontrado("Producto no encontrado");
+    if (!grupo) throw new ErrorNoEncontrado("Grupo de biblioteca no encontrado");
+    await prisma.productoGrupoComplemento.deleteMany({
+      where: { productoId, grupoBibliotecaId: grupoId },
+    });
+  },
 
   async listarComplementos(comercioId, productoId) {
     const prod = await prisma.producto.findFirst({ where: { id: productoId, comercioId } });
