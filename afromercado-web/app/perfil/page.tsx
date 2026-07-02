@@ -8,14 +8,7 @@ import { obtenerPerfil, actualizarPerfil, subirAvatar } from '@/lib/api/usuario'
 import { apiFetch } from '@/lib/api/client'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import type { Usuario, TipoDocumento } from '@/types/usuario'
-
-const DEPARTAMENTOS_COLOMBIA = [
-  'Amazonas','Antioquia','Arauca','Atlántico','Bolívar','Boyacá','Caldas',
-  'Caquetá','Casanare','Cauca','Cesar','Chocó','Córdoba','Cundinamarca',
-  'Bogotá D.C.','Guainía','Guaviare','Huila','La Guajira','Magdalena','Meta',
-  'Nariño','Norte de Santander','Putumayo','Quindío','Risaralda','San Andrés',
-  'Santander','Sucre','Tolima','Valle del Cauca','Vaupés','Vichada',
-]
+import { DEPARTAMENTOS as DEPARTAMENTOS_COLOMBIA } from '@/lib/data/colombia'
 
 const ETIQUETA_ROL: Record<string, string> = {
   COMPRADOR: 'Comprador',
