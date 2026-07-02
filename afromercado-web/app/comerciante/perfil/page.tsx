@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { CampoTexto, CampoArea, CampoSelect } from '@/components/comerciante/Campos'
-import { MUNICIPIOS_CHOCO } from '@/components/comerciante/constantes'
+import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 import { useAuth } from '@/context/AuthContext'
 import {
   obtenerMiComercio,
@@ -627,13 +627,7 @@ export default function PerfilComerciantePage() {
           name="departamento"
           value={departamento}
           onChange={(v) => { setDepartamento(v); setMunicipio('') }}
-          opciones={[
-            'Amazonas','Antioquia','Arauca','Atlántico','Bolívar','Boyacá','Caldas',
-            'Caquetá','Casanare','Cauca','Cesar','Chocó','Córdoba','Cundinamarca',
-            'Bogotá D.C.','Guainía','Guaviare','Huila','La Guajira','Magdalena','Meta',
-            'Nariño','Norte de Santander','Putumayo','Quindío','Risaralda','San Andrés',
-            'Santander','Sucre','Tolima','Valle del Cauca','Vaupés','Vichada',
-          ].map((d) => ({ valor: d, etiqueta: d }))}
+          opciones={DEPARTAMENTOS.map((d) => ({ valor: d, etiqueta: d }))}
           error={errores.departamento}
         />
 
@@ -643,7 +637,7 @@ export default function PerfilComerciantePage() {
             name="municipio"
             value={municipio}
             onChange={setMunicipio}
-            opciones={MUNICIPIOS_CHOCO.map((m) => ({ valor: m, etiqueta: m }))}
+            opciones={municipiosDe('Chocó').map((m) => ({ valor: m, etiqueta: m }))}
             error={errores.municipio}
           />
         ) : (
