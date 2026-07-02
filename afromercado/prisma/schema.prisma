@@ -208,6 +208,7 @@ model Usuario {
   reservasHotel             ReservaHotel[]      @relation("ReservasHotelCliente")
   reservasTour              ReservaTour[]       @relation("ReservasTourCliente")
   reservasTransporte        ReservaTransporte[] @relation("ReservasTransporteCliente")
+  reservasCulturales        ReservaCultural[]   @relation("ReservasCulturalesCliente")
   reviewsHotel              ReviewHotel[]       @relation("ReviewsHotelCliente")
   reviewsTour               ReviewTour[]        @relation("ReviewsTourCliente")
   reviewsTransporte         ReviewTransporte[]  @relation("ReviewsTransporteCliente")
@@ -282,6 +283,7 @@ model Comercio {
   configHotel           ConfigHotel?
   configTour            ConfigTour?
   configTransporte      ConfigTransporte?
+  eventosCulturales     EventoCultural[]  @relation("EventosCulturalesComercio")
 }
 
 model Categoria {
@@ -1904,4 +1906,103 @@ model FavoritoTransporte {
 
   @@unique([usuarioId, configTransporteId])
   @@index([usuarioId])
+}
+
+// ─── MÓDULO CULTURA ───────────────────────────────────────────
+// Agenda cultural del territorio: fiestas y eventos por región/municipio,
+// con boletería opcional. El evento sin entradas es puramente informativo
+// (agenda/patrimonio); con entradas se vuelve transaccional y reutiliza la
+// comisión y dispersión de la plataforma. Sigue el patrón del módulo Tour.
+
+enum EstadoEventoCultural {
+  BORRADOR
+  PUBLICADO
+  FINALIZADO
+  CANCELADO
+}
+
+enum EstadoReservaCultural {
+  PENDIENTE
+  CONFIRMADA
+  CANCELADA
+  RECHAZADA
+  USADA
+}
+
+model EventoCultural {
+  id             Int                  @id @default(autoincrement())
+  comercioId     Int?
+  titulo         String
+  descripcion    String?
+  categoria      String?
+  departamento   String
+  municipio      String
+  lugar          String?
+  latitud        Float?
+  longitud       Float?
+  fechaInicio    DateTime
+  fechaFin       DateTime?
+  portadaUrl     String?
+  fotos          String[]
+  videoUrl       String?
+  patrimonio     Boolean              @default(false)
+  patrimonioNota String?
+  gratuito       Boolean              @default(true)
+  destacado      Boolean              @default(false)
+  estado         EstadoEventoCultural @default(BORRADOR)
+  creadoAt       DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  comercio Comercio?         @relation("EventosCulturalesComercio", fields: [comercioId], references: [id])
+  entradas EntradaCultural[]
+  reservas ReservaCultural[]
+
+  @@index([estado, fechaInicio])
+  @@index([departamento, municipio])
+  @@index([comercioId])
+}
+
+model EntradaCultural {
+  id               Int      @id @default(autoincrement())
+  eventoCulturalId Int
+  nombre           String
+  descripcion      String?
+  precio           Decimal  @db.Decimal(12, 2)
+  cupo             Int?
+  vendidas         Int      @default(0)
+  activa           Boolean  @default(true)
+  orden            Int      @default(0)
+  creadoAt         DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  evento   EventoCultural    @relation(fields: [eventoCulturalId], references: [id], onDelete: Cascade)
+  reservas ReservaCultural[]
+
+  @@index([eventoCulturalId, activa])
+}
+
+model ReservaCultural {
+  id                Int                   @id @default(autoincrement())
+  codigo            String                @unique
+  eventoCulturalId  Int
+  entradaCulturalId Int
+  clienteId         Int
+  cantidad          Int                   @default(1)
+  total             Decimal               @db.Decimal(12, 2)
+  estado            EstadoReservaCultural @default(PENDIENTE)
+  metodoPago        String                @default("EFECTIVO")
+  notasCliente      String?
+  nombreContacto    String
+  telefonoContacto  String
+  comision          Decimal?              @db.Decimal(10, 2)
+  tasaComision      Decimal?              @db.Decimal(5, 4)
+  creadoAt          DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  evento  EventoCultural  @relation(fields: [eventoCulturalId], references: [id])
+  entrada EntradaCultural @relation(fields: [entradaCulturalId], references: [id])
+  cliente Usuario         @relation("ReservasCulturalesCliente", fields: [clienteId], references: [id])
+
+  @@index([eventoCulturalId, estado])
+  @@index([clienteId])
 }

@@ -503,6 +503,84 @@ async function aplicarMigraciones() {
 
     // Desactivar categoría "Turismo" duplicada — reemplazada por "Tours & Experiencias" (slug 'tours')
     `UPDATE "Categoria" SET "activa" = false WHERE "slug" = 'turismo'`,
+
+    // ── Módulo Cultura: eventos culturales, entradas y reservas ──
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoEventoCultural') THEN
+        CREATE TYPE "EstadoEventoCultural" AS ENUM ('BORRADOR','PUBLICADO','FINALIZADO','CANCELADO');
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoReservaCultural') THEN
+        CREATE TYPE "EstadoReservaCultural" AS ENUM ('PENDIENTE','CONFIRMADA','CANCELADA','RECHAZADA','USADA');
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "EventoCultural" (
+      "id" SERIAL PRIMARY KEY,
+      "comercioId" INTEGER,
+      "titulo" TEXT NOT NULL,
+      "descripcion" TEXT,
+      "categoria" TEXT,
+      "departamento" TEXT NOT NULL,
+      "municipio" TEXT NOT NULL,
+      "lugar" TEXT,
+      "latitud" DOUBLE PRECISION,
+      "longitud" DOUBLE PRECISION,
+      "fechaInicio" TIMESTAMP(3) NOT NULL,
+      "fechaFin" TIMESTAMP(3),
+      "portadaUrl" TEXT,
+      "fotos" TEXT[] NOT NULL DEFAULT '{}',
+      "videoUrl" TEXT,
+      "patrimonio" BOOLEAN NOT NULL DEFAULT false,
+      "patrimonioNota" TEXT,
+      "gratuito" BOOLEAN NOT NULL DEFAULT true,
+      "destacado" BOOLEAN NOT NULL DEFAULT false,
+      "estado" "EstadoEventoCultural" NOT NULL DEFAULT 'BORRADOR',
+      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "EventoCultural_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE SET NULL ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "EventoCultural_estado_fechaInicio_idx" ON "EventoCultural"("estado","fechaInicio")`,
+    `CREATE INDEX IF NOT EXISTS "EventoCultural_departamento_municipio_idx" ON "EventoCultural"("departamento","municipio")`,
+    `CREATE INDEX IF NOT EXISTS "EventoCultural_comercioId_idx" ON "EventoCultural"("comercioId")`,
+    `CREATE TABLE IF NOT EXISTS "EntradaCultural" (
+      "id" SERIAL PRIMARY KEY,
+      "eventoCulturalId" INTEGER NOT NULL,
+      "nombre" TEXT NOT NULL,
+      "descripcion" TEXT,
+      "precio" DECIMAL(12,2) NOT NULL,
+      "cupo" INTEGER,
+      "vendidas" INTEGER NOT NULL DEFAULT 0,
+      "activa" BOOLEAN NOT NULL DEFAULT true,
+      "orden" INTEGER NOT NULL DEFAULT 0,
+      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "EntradaCultural_eventoCulturalId_fkey" FOREIGN KEY ("eventoCulturalId") REFERENCES "EventoCultural"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "EntradaCultural_eventoCulturalId_activa_idx" ON "EntradaCultural"("eventoCulturalId","activa")`,
+    `CREATE TABLE IF NOT EXISTS "ReservaCultural" (
+      "id" SERIAL PRIMARY KEY,
+      "codigo" TEXT NOT NULL UNIQUE,
+      "eventoCulturalId" INTEGER NOT NULL,
+      "entradaCulturalId" INTEGER NOT NULL,
+      "clienteId" INTEGER NOT NULL,
+      "cantidad" INTEGER NOT NULL DEFAULT 1,
+      "total" DECIMAL(12,2) NOT NULL,
+      "estado" "EstadoReservaCultural" NOT NULL DEFAULT 'PENDIENTE',
+      "metodoPago" TEXT NOT NULL DEFAULT 'EFECTIVO',
+      "notasCliente" TEXT,
+      "nombreContacto" TEXT NOT NULL,
+      "telefonoContacto" TEXT NOT NULL,
+      "comision" DECIMAL(10,2),
+      "tasaComision" DECIMAL(5,4),
+      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ReservaCultural_eventoCulturalId_fkey" FOREIGN KEY ("eventoCulturalId") REFERENCES "EventoCultural"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "ReservaCultural_entradaCulturalId_fkey" FOREIGN KEY ("entradaCulturalId") REFERENCES "EntradaCultural"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "ReservaCultural_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "ReservaCultural_eventoCulturalId_estado_idx" ON "ReservaCultural"("eventoCulturalId","estado")`,
+    `CREATE INDEX IF NOT EXISTS "ReservaCultural_clienteId_idx" ON "ReservaCultural"("clienteId")`,
   ];
   for (const sql of migraciones) {
     try {
