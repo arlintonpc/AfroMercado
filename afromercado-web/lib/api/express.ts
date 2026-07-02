@@ -111,11 +111,23 @@ export interface MenuComercioExpress extends ComercioExpress {
     menuSeccion?: { id: number; nombre: string; icono: string } | null
     gruposComplemento?: Array<{
       id: number
+      productoId?: number
       nombre: string
       minimo: number
       maximo: number
       requerido: boolean
-      items: Array<{ id: number; nombre: string; icono: string | null; imagenUrl: string | null; precio: number }>
+      orden?: number
+      origen?: 'PRODUCTO' | 'BIBLIOTECA'
+      grupoBibliotecaId?: number
+      items: Array<{
+        id: number
+        nombre: string
+        icono: string | null
+        imagenUrl: string | null
+        precio: number
+        origen?: 'PRODUCTO' | 'BIBLIOTECA'
+        itemBibliotecaId?: number
+      }>
     }>
   }>
 }
@@ -376,6 +388,83 @@ export interface GrupoComplemento {
   orden: number
   activo: boolean
   items: ItemComplemento[]
+}
+
+export interface GrupoComplementoBiblioteca {
+  id: number
+  comercioId: number
+  nombre: string
+  minimo: number
+  maximo: number
+  requerido: boolean
+  orden: number
+  activo: boolean
+  items: ItemComplementoBiblioteca[]
+}
+
+export interface ItemComplementoBiblioteca {
+  id: number
+  grupoBibliotecaId: number
+  nombre: string
+  icono: string | null
+  imagenUrl: string | null
+  precio: number
+  disponible: boolean
+  orden: number
+}
+
+export interface ProductoGrupoComplemento {
+  id: number
+  productoId: number
+  grupoBibliotecaId: number
+  minimoOverride: number | null
+  maximoOverride: number | null
+  requeridoOverride: boolean | null
+  orden: number
+  activo: boolean
+  grupo: GrupoComplementoBiblioteca
+}
+
+export async function listarBibliotecaComplementos(productoId: number): Promise<{
+  grupos: GrupoComplementoBiblioteca[]
+  asignaciones: ProductoGrupoComplemento[]
+}> {
+  const r = await apiFetch<{ ok: boolean; data: { grupos: GrupoComplementoBiblioteca[]; asignaciones: ProductoGrupoComplemento[] } }>(
+    `/express/complementos/${productoId}/biblioteca`
+  )
+  return r.data ?? { grupos: [], asignaciones: [] }
+}
+
+export async function crearGrupoBiblioteca(
+  datos: { nombre: string; minimo?: number; maximo?: number; requerido?: boolean; orden?: number }
+): Promise<GrupoComplementoBiblioteca> {
+  const r = await apiFetch<{ ok: boolean; data: GrupoComplementoBiblioteca }>('/express/complementos/biblioteca/grupos', {
+    method: 'POST',
+    body: datos,
+  })
+  return r.data
+}
+
+export async function crearItemBiblioteca(
+  grupoId: number,
+  datos: { nombre: string; icono?: string; precio?: number; disponible?: boolean; orden?: number }
+): Promise<ItemComplementoBiblioteca> {
+  const r = await apiFetch<{ ok: boolean; data: ItemComplementoBiblioteca }>(`/express/complementos/biblioteca/grupos/${grupoId}/items`, {
+    method: 'POST',
+    body: datos,
+  })
+  return r.data
+}
+
+export async function vincularGrupoBiblioteca(productoId: number, grupoId: number): Promise<ProductoGrupoComplemento> {
+  const r = await apiFetch<{ ok: boolean; data: ProductoGrupoComplemento }>(`/express/complementos/${productoId}/biblioteca/${grupoId}`, {
+    method: 'POST',
+  })
+  return r.data
+}
+
+export async function desvincularGrupoBiblioteca(productoId: number, grupoId: number): Promise<void> {
+  await apiFetch(`/express/complementos/${productoId}/biblioteca/${grupoId}`, { method: 'DELETE' })
 }
 
 export async function listarComplementos(productoId: number): Promise<GrupoComplemento[]> {

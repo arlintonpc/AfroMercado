@@ -5,7 +5,10 @@ import {
   listarComplementos, crearGrupoComplemento, actualizarGrupoComplemento,
   eliminarGrupoComplemento, crearItemComplemento, actualizarItemComplemento,
   eliminarItemComplemento, subirImagenItemComplemento, copiarGrupoATodos,
+  listarBibliotecaComplementos, crearGrupoBiblioteca, crearItemBiblioteca,
+  vincularGrupoBiblioteca, desvincularGrupoBiblioteca,
   type GrupoComplemento, type ItemComplemento,
+  type GrupoComplementoBiblioteca, type ProductoGrupoComplemento,
 } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
@@ -25,10 +28,15 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
   const [guardando, setGuardando] = useState(false)
   const [subiendoImagen, setSubiendoImagen] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [biblioteca, setBiblioteca] = useState<GrupoComplementoBiblioteca[]>([])
+  const [asignaciones, setAsignaciones] = useState<ProductoGrupoComplemento[]>([])
 
   const [nuevoGrupo, setNuevoGrupo] = useState({ nombre: '', minimo: 0, maximo: 1, requerido: false })
+  const [nuevoGrupoBiblioteca, setNuevoGrupoBiblioteca] = useState({ nombre: '', minimo: 0, maximo: 1, requerido: false })
   const [mostrarFormGrupo, setMostrarFormGrupo] = useState(false)
+  const [mostrarFormBiblioteca, setMostrarFormBiblioteca] = useState(false)
   const [nuevoItem, setNuevoItem] = useState<Record<number, { nombre: string; precio: string; icono: string }>>({})
+  const [nuevoItemBiblioteca, setNuevoItemBiblioteca] = useState<Record<number, { nombre: string; precio: string; icono: string }>>({})
   const [editandoGrupo, setEditandoGrupo] = useState<number | null>(null)
   const [editGrupo, setEditGrupo] = useState({ nombre: '', minimo: 0, maximo: 1, requerido: false })
 
@@ -39,10 +47,12 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
     setCargando(true)
     setError(null)
 
-    listarComplementos(productoId)
-      .then(g => {
+    Promise.all([listarComplementos(productoId), listarBibliotecaComplementos(productoId)])
+      .then(([g, b]) => {
         if (!activo) return
         setGrupos(g)
+        setBiblioteca(b.grupos)
+        setAsignaciones(b.asignaciones)
       })
       .catch(err => {
         if (!activo) return
@@ -54,6 +64,66 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
 
     return () => { activo = false }
   }, [productoId])
+
+  async function agregarGrupoReutilizable() {
+    if (!nuevoGrupoBiblioteca.nombre.trim()) return
+    setGuardando(true)
+    setError(null)
+    try {
+      const grupo = await crearGrupoBiblioteca(nuevoGrupoBiblioteca)
+      setBiblioteca(prev => [...prev, grupo])
+      const asignacion = await vincularGrupoBiblioteca(productoId, grupo.id)
+      setAsignaciones(prev => [...prev, asignacion])
+      setNuevoGrupoBiblioteca({ nombre: '', minimo: 0, maximo: 1, requerido: false })
+      setMostrarFormBiblioteca(false)
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo crear el grupo reutilizable.'))
+    } finally { setGuardando(false) }
+  }
+
+  async function agregarItemReutilizable(grupoId: number) {
+    const f = nuevoItemBiblioteca[grupoId]
+    if (!f?.nombre?.trim()) return
+    setGuardando(true)
+    setError(null)
+    try {
+      const item = await crearItemBiblioteca(grupoId, {
+        nombre: f.nombre.trim(),
+        icono: f.icono?.trim() || undefined,
+        precio: parseFloat(f.precio) || 0,
+      })
+      setBiblioteca(prev => prev.map(g => g.id === grupoId ? { ...g, items: [...g.items, item] } : g))
+      setAsignaciones(prev => prev.map(a => a.grupoBibliotecaId === grupoId
+        ? { ...a, grupo: { ...a.grupo, items: [...a.grupo.items, item] } }
+        : a
+      ))
+      setNuevoItemBiblioteca(prev => ({ ...prev, [grupoId]: { nombre: '', precio: '', icono: '' } }))
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo crear el item reutilizable.'))
+    } finally { setGuardando(false) }
+  }
+
+  async function vincularGrupo(grupoId: number) {
+    setGuardando(true)
+    setError(null)
+    try {
+      const asignacion = await vincularGrupoBiblioteca(productoId, grupoId)
+      setAsignaciones(prev => prev.some(a => a.grupoBibliotecaId === grupoId) ? prev : [...prev, asignacion])
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo vincular el grupo al plato.'))
+    } finally { setGuardando(false) }
+  }
+
+  async function desvincularGrupo(grupoId: number) {
+    setGuardando(true)
+    setError(null)
+    try {
+      await desvincularGrupoBiblioteca(productoId, grupoId)
+      setAsignaciones(prev => prev.filter(a => a.grupoBibliotecaId !== grupoId))
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo quitar el grupo de este plato.'))
+    } finally { setGuardando(false) }
+  }
 
   async function agregarGrupo() {
     if (!nuevoGrupo.nombre.trim()) return
@@ -160,6 +230,9 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
     } finally { setSubiendoImagen(null) }
   }
 
+  const gruposAsignadosIds = new Set(asignaciones.map(a => a.grupoBibliotecaId))
+  const gruposDisponibles = biblioteca.filter(g => !gruposAsignadosIds.has(g.id))
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
@@ -180,10 +253,201 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
             </div>
           )}
 
+          {!cargando && (
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-4">
+              <div>
+                <p className="text-[11px] font-bold tracking-[0.18em] uppercase text-emerald-700">Biblioteca del restaurante</p>
+                <h3 className="text-sm font-bold text-gray-900 mt-1">Grupos reutilizables</h3>
+                <p className="text-xs text-gray-600 mt-1">
+                  {/*
+                  Crea Bebidas, Jugos, Postres o Salsas una sola vez y vincÃºlalos a los platos que quieras.
+                  */}
+                  Crea Bebidas, Jugos, Postres o Salsas una sola vez y vinculalos a los platos que quieras.
+                </p>
+              </div>
+
+              {asignaciones.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-emerald-800">Vinculados a este plato</p>
+                  {asignaciones.map(asignacion => (
+                    <div key={asignacion.id} className="rounded-xl border border-emerald-200 bg-white p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{asignacion.grupo.nombre}</p>
+                          <p className="text-xs text-gray-500">
+                            {/*
+                            {asignacion.grupo.requerido ? 'Requerido' : 'Opcional'} Â· min {asignacion.grupo.minimo} Â· max {asignacion.grupo.maximo}
+                            */}
+                            {asignacion.grupo.requerido ? 'Requerido' : 'Opcional'} - min {asignacion.grupo.minimo} - max {asignacion.grupo.maximo}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => desvincularGrupo(asignacion.grupoBibliotecaId)}
+                          disabled={guardando}
+                          className="text-xs px-3 py-1 rounded-full border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                      {asignacion.grupo.items.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-3">
+                          {asignacion.grupo.items.map(item => (
+                            <span key={item.id} className="text-xs px-2 py-1 rounded-full bg-gray-50 border border-gray-100 text-gray-600">
+                              {item.icono ? `${item.icono} ` : ''}{item.nombre}{Number(item.precio) > 0 ? ` +${formatearPrecio(Number(item.precio))}` : ''}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {gruposDisponibles.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-700">Disponibles para vincular</p>
+                  <div className="grid gap-2">
+                    {gruposDisponibles.map(grupo => (
+                      <div key={grupo.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-800 truncate">{grupo.nombre}</p>
+                          <p className="text-xs text-gray-500">{grupo.items.length} opciones</p>
+                        </div>
+                        <button
+                          onClick={() => vincularGrupo(grupo.id)}
+                          disabled={guardando}
+                          className="text-xs px-3 py-1.5 rounded-full bg-[#1B4332] text-white font-semibold hover:bg-[#2D6A4F] disabled:opacity-50"
+                        >
+                          Vincular
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {biblioteca.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-gray-700">Editar biblioteca</p>
+                  {biblioteca.map(grupo => (
+                    <div key={grupo.id} className="rounded-xl border border-gray-200 bg-white p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">{grupo.nombre}</p>
+                          <p className="text-xs text-gray-500">{grupo.items.length} opciones guardadas</p>
+                        </div>
+                        {gruposAsignadosIds.has(grupo.id) && (
+                          <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 font-semibold">Vinculado</span>
+                        )}
+                      </div>
+
+                      {grupo.items.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {grupo.items.map(item => (
+                            <span key={item.id} className="text-xs px-2 py-1 rounded-full bg-gray-50 border border-gray-100 text-gray-600">
+                              {item.icono ? `${item.icono} ` : ''}{item.nombre}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-[48px_1fr_92px_36px] gap-2">
+                        <input
+                          className="border rounded-lg px-2 py-1.5 text-center text-lg"
+                          placeholder="🥤"
+                          maxLength={2}
+                          value={nuevoItemBiblioteca[grupo.id]?.icono ?? ''}
+                          onChange={e => setNuevoItemBiblioteca(prev => ({ ...prev, [grupo.id]: { ...prev[grupo.id], icono: e.target.value } }))}
+                        />
+                        <input
+                          className="border rounded-lg px-3 py-1.5 text-sm"
+                          placeholder="Ej: Agua, mango, flan..."
+                          value={nuevoItemBiblioteca[grupo.id]?.nombre ?? ''}
+                          onChange={e => setNuevoItemBiblioteca(prev => ({ ...prev, [grupo.id]: { ...prev[grupo.id], nombre: e.target.value } }))}
+                          onKeyDown={e => e.key === 'Enter' && agregarItemReutilizable(grupo.id)}
+                        />
+                        <input
+                          className="border rounded-lg px-2 py-1.5 text-sm"
+                          placeholder="Precio"
+                          type="number"
+                          min="0"
+                          value={nuevoItemBiblioteca[grupo.id]?.precio ?? ''}
+                          onChange={e => setNuevoItemBiblioteca(prev => ({ ...prev, [grupo.id]: { ...prev[grupo.id], precio: e.target.value } }))}
+                          onKeyDown={e => e.key === 'Enter' && agregarItemReutilizable(grupo.id)}
+                        />
+                        <button
+                          onClick={() => agregarItemReutilizable(grupo.id)}
+                          disabled={guardando}
+                          className="rounded-lg bg-[#2D6A4F] text-white text-sm font-bold disabled:opacity-50"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {mostrarFormBiblioteca ? (
+                <div className="border-2 border-dashed border-emerald-500 rounded-xl p-4 space-y-3 bg-white">
+                  <h3 className="font-semibold text-sm text-gray-800">Nuevo grupo reutilizable</h3>
+                  <input
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                    placeholder="Ej: Bebidas, Jugos, Postres"
+                    value={nuevoGrupoBiblioteca.nombre}
+                    onChange={e => setNuevoGrupoBiblioteca(prev => ({ ...prev, nombre: e.target.value }))}
+                  />
+                  <div className="flex gap-3">
+                    <label className="flex-1 text-xs text-gray-600">
+                      Minimo
+                      <input type="number" min="0" className="mt-1 w-full border rounded-lg px-3 py-1.5 text-sm"
+                        value={nuevoGrupoBiblioteca.minimo}
+                        onChange={e => setNuevoGrupoBiblioteca(prev => ({ ...prev, minimo: parseInt(e.target.value) || 0 }))} />
+                    </label>
+                    <label className="flex-1 text-xs text-gray-600">
+                      Maximo
+                      <input type="number" min="1" className="mt-1 w-full border rounded-lg px-3 py-1.5 text-sm"
+                        value={nuevoGrupoBiblioteca.maximo}
+                        onChange={e => setNuevoGrupoBiblioteca(prev => ({ ...prev, maximo: parseInt(e.target.value) || 1 }))} />
+                    </label>
+                    <label className="flex items-end gap-2 pb-1.5 text-xs text-gray-600 cursor-pointer">
+                      <input type="checkbox" className="w-4 h-4"
+                        checked={nuevoGrupoBiblioteca.requerido}
+                        onChange={e => setNuevoGrupoBiblioteca(prev => ({ ...prev, requerido: e.target.checked }))} />
+                      Requerido
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setMostrarFormBiblioteca(false)} className="flex-1 border rounded-lg py-2 text-sm text-gray-600">Cancelar</button>
+                    <button onClick={agregarGrupoReutilizable} disabled={guardando || !nuevoGrupoBiblioteca.nombre.trim()}
+                      className="flex-1 bg-[#1B4332] text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50">
+                      Crear y vincular
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setMostrarFormBiblioteca(true)}
+                  className="w-full border-2 border-dashed border-emerald-600 text-emerald-700 rounded-xl py-3 text-sm font-semibold hover:bg-emerald-50 transition"
+                >
+                  + Crear grupo reutilizable
+                </button>
+              )}
+            </div>
+          )}
+
+          {!cargando && (
+            <div className="space-y-1">
+              <p className="text-[11px] font-bold tracking-[0.18em] uppercase text-gray-500">Solo este plato</p>
+              <h3 className="text-sm font-bold text-gray-900">Grupos propios</h3>
+              <p className="text-xs text-gray-500">Usa esto solo para excepciones que no quieras reutilizar en otros platos.</p>
+            </div>
+          )}
+
           {cargando ? (
             <p className="text-center text-gray-400 py-8">Cargando...</p>
           ) : grupos.length === 0 && !mostrarFormGrupo ? (
-            <p className="text-center text-gray-400 py-8">Sin grupos de complementos aún.</p>
+            <p className="text-center text-gray-400 py-6">Sin grupos propios para este plato.</p>
           ) : (
             grupos.map(grupo => (
               <div key={grupo.id} className="border rounded-xl overflow-hidden">
@@ -397,7 +661,7 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
             disabled={mostrarFormGrupo}
             className="w-full border-2 border-dashed border-[#2D6A4F] text-[#2D6A4F] rounded-xl py-3 text-sm font-semibold disabled:opacity-40 hover:bg-[#2D6A4F]/5 transition"
           >
-            + Agregar grupo de complementos
+            + Crear grupo solo para este plato
           </button>
         </div>
       </div>
