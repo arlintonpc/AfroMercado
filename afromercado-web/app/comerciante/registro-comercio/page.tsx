@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { CampoTexto, CampoArea, CampoSelect } from '@/components/comerciante/Campos'
-import { MUNICIPIOS_CHOCO } from '@/components/comerciante/constantes'
+import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 import { crearComercio, obtenerMiComercio, type TipoDocumento } from '@/components/comerciante/api'
 
 const TIPOS_DOCUMENTO: { valor: TipoDocumento; etiqueta: string }[] = [
@@ -22,6 +22,7 @@ export default function RegistroComercioPage() {
   const [verificando, setVerificando] = useState(true)
 
   const [nombre, setNombre] = useState('')
+  const [departamento, setDepartamento] = useState('')
   const [municipio, setMunicipio] = useState('')
   const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento | ''>('')
   const [numeroDocumento, setNumeroDocumento] = useState('')
@@ -52,6 +53,7 @@ export default function RegistroComercioPage() {
   function validar(): boolean {
     const e: Record<string, string> = {}
     if (!nombre.trim()) e.nombre = 'Escribe el nombre de tu negocio.'
+    if (!departamento) e.departamento = 'Elige tu departamento.'
     if (!municipio) e.municipio = 'Elige tu municipio.'
     if (!tipoDocumento) e.tipoDocumento = 'Elige el tipo de documento.'
     if (!numeroDocumento.trim()) e.numeroDocumento = 'Escribe tu número de documento.'
@@ -75,6 +77,7 @@ export default function RegistroComercioPage() {
     try {
       await crearComercio({
         nombre: nombre.trim(),
+        departamento,
         municipio,
         tipoDocumento: tipoDocumento as TipoDocumento,
         numeroDocumento: numeroDocumento.trim(),
@@ -130,12 +133,25 @@ export default function RegistroComercioPage() {
         />
 
         <CampoSelect
+          label="¿En qué departamento estás?"
+          name="departamento"
+          placeholder="Elige tu departamento"
+          value={departamento}
+          onChange={(v) => {
+            setDepartamento(v)
+            setMunicipio('')
+          }}
+          opciones={DEPARTAMENTOS.map((d) => ({ valor: d, etiqueta: d }))}
+          error={errores.departamento}
+        />
+
+        <CampoSelect
           label="¿En qué municipio estás?"
           name="municipio"
-          placeholder="Elige tu municipio"
+          placeholder={departamento ? 'Elige tu municipio' : 'Primero elige el departamento'}
           value={municipio}
           onChange={setMunicipio}
-          opciones={MUNICIPIOS_CHOCO.map((m) => ({ valor: m, etiqueta: m }))}
+          opciones={municipiosDe(departamento).map((m) => ({ valor: m, etiqueta: m }))}
           error={errores.municipio}
         />
 

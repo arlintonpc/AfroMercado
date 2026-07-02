@@ -85,6 +85,7 @@ const ComercioService = {
     });
 
     const comercio = await ComercioRepository.crear({ usuarioId, nombre, municipio,
+      departamento: datos.departamento?.trim() ?? null,
       descripcion: datos.descripcion ?? null,
       historia: datos.historia ?? null,
       whatsapp: datos.whatsapp ?? null,
