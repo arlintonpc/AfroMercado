@@ -105,3 +105,59 @@ export function precioDesde(evento: EventoCultural): number | null {
   if (activas.length === 0) return null
   return Math.min(...activas.map((e) => Number(e.precio)))
 }
+
+// ── Organizador (comercio) ───────────────────────────────────
+
+export interface EventoInput {
+  titulo: string
+  departamento: string
+  municipio: string
+  fechaInicio: string
+  descripcion?: string
+  categoria?: string
+  lugar?: string
+  fechaFin?: string
+  portadaUrl?: string
+  gratuito?: boolean
+  patrimonio?: boolean
+  patrimonioNota?: string
+  estado?: EstadoEventoCultural
+}
+
+export interface EntradaInput {
+  nombre: string
+  precio: number
+  descripcion?: string
+  cupo?: number | null
+  activa?: boolean
+  orden?: number
+}
+
+export async function misEventosCultura(): Promise<EventoCultural[]> {
+  const r = await apiFetch<{ ok: boolean; data: EventoCultural[] }>('/cultura/mis-eventos')
+  return r.data
+}
+
+export async function crearEventoCultura(datos: EventoInput): Promise<EventoCultural> {
+  const r = await apiFetch<{ ok: boolean; data: EventoCultural }>('/cultura/mis-eventos', { method: 'POST', body: datos })
+  return r.data
+}
+
+export async function actualizarEventoCultura(id: number, datos: Partial<EventoInput>): Promise<EventoCultural> {
+  const r = await apiFetch<{ ok: boolean; data: EventoCultural }>(`/cultura/mis-eventos/${id}`, { method: 'PATCH', body: datos })
+  return r.data
+}
+
+export async function crearEntradaCultura(eventoId: number, datos: EntradaInput): Promise<EntradaCultural> {
+  const r = await apiFetch<{ ok: boolean; data: EntradaCultural }>(`/cultura/mis-eventos/${eventoId}/entradas`, { method: 'POST', body: datos })
+  return r.data
+}
+
+export async function actualizarEntradaCultura(entradaId: number, datos: Partial<EntradaInput>): Promise<EntradaCultural> {
+  const r = await apiFetch<{ ok: boolean; data: EntradaCultural }>(`/cultura/entradas/${entradaId}`, { method: 'PATCH', body: datos })
+  return r.data
+}
+
+export async function eliminarEntradaCultura(entradaId: number): Promise<void> {
+  await apiFetch<{ ok: boolean }>(`/cultura/entradas/${entradaId}`, { method: 'DELETE' })
+}
