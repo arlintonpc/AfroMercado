@@ -5,7 +5,7 @@
 // ============================================================
 const ComercioRepository = require("../repositories/comercio.repository");
 const CuentaDispersionService = require("./cuenta-dispersion.service");
-const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
+const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
 const prisma = require("../config/prisma");
 const { eliminarDeCloudinary } = require("../utils/cloudinary");
 const { eliminarArchivoLocalDesdeUrl } = require("../utils/video-media");
@@ -57,8 +57,38 @@ async function leerEnvioGratis(comercioId) {
   return row && row.valor ? Number(row.valor) : null;
 }
 
+/**
+ * Alianzas comerciales publicadas y vigentes en las que este comercio es
+ * socio aceptado y activo. Se usa para mostrar el badge cruzado "Participa
+ * en: [alianza]" en el perfil público del comercio (ver alianza.service.js
+ * para las reglas completas de una alianza — aquí solo se necesita nombre +
+ * código para el link a /alianzas/[codigo]).
+ */
+async function alianzasActivasDeComercio(comercioId) {
+  const ahora = new Date();
+  const socios = await prisma.alianzaSocio.findMany({
+    where: {
+      comercioId: Number(comercioId),
+      aceptado: true,
+      activo: true,
+      alianza: { estado: "PUBLICADA", inicio: { lte: ahora }, fin: { gte: ahora } },
+    },
+    select: {
+      alianza: { select: { id: true, nombre: true, codigoCompartido: true } },
+    },
+  });
+  return socios.map((s) => s.alianza);
+}
+
 const ComercioService = {
-  async registrar(usuarioId, datos) {
+  // Cualquier COMPRADOR autenticado puede abrir su tienda con la misma cuenta
+  // (se convierte en COMERCIANTE, mismo patrón ya usado al aprobar un repartidor).
+  // ADMIN nunca puede registrar un comercio para sí mismo: separación de privilegios.
+  async registrar(usuarioId, datos, rolActual) {
+    if (rolActual === "ADMIN") {
+      throw new ErrorProhibido("Una cuenta de administrador no puede registrar un comercio.");
+    }
+
     const { nombre, municipio } = datos;
 
     if (!nombre || !municipio) {
@@ -76,24 +106,28 @@ const ComercioService = {
       throw new ErrorValidacion("Este usuario ya tiene un comercio registrado");
     }
 
-    await prisma.usuario.update({
-      where: { id: usuarioId },
-      data: {
-        tipoDocumento: datos.tipoDocumento,
-        numeroDocumento: datos.numeroDocumento.trim(),
-      },
-    });
-
-    const comercio = await ComercioRepository.crear({ usuarioId, nombre, municipio,
-      departamento: datos.departamento?.trim() ?? null,
-      descripcion: datos.descripcion ?? null,
-      historia: datos.historia ?? null,
-      whatsapp: datos.whatsapp ?? null,
-      vereda: datos.vereda?.trim() ?? null,
-      fotoDocumentoUrl: datos.fotoDocumentoUrl ?? null,
-      fotoDocumentoFrenteUrl: datos.fotoDocumentoFrenteUrl ?? datos.fotoDocumentoUrl ?? null,
-      fotoDocumentoReversoUrl: datos.fotoDocumentoReversoUrl ?? null,
-    });
+    const [, comercio] = await prisma.$transaction([
+      prisma.usuario.update({
+        where: { id: usuarioId },
+        data: {
+          tipoDocumento: datos.tipoDocumento,
+          numeroDocumento: datos.numeroDocumento.trim(),
+          rol: "COMERCIANTE",
+        },
+      }),
+      prisma.comercio.create({
+        data: { usuarioId, nombre, municipio,
+          departamento: datos.departamento?.trim() ?? null,
+          descripcion: datos.descripcion ?? null,
+          historia: datos.historia ?? null,
+          whatsapp: datos.whatsapp ?? null,
+          vereda: datos.vereda?.trim() ?? null,
+          fotoDocumentoUrl: datos.fotoDocumentoUrl ?? null,
+          fotoDocumentoFrenteUrl: datos.fotoDocumentoFrenteUrl ?? datos.fotoDocumentoUrl ?? null,
+          fotoDocumentoReversoUrl: datos.fotoDocumentoReversoUrl ?? null,
+        },
+      }),
+    ]);
 
     // N-A-03: alertar a los admins del nuevo comercio pendiente de verificación
     setImmediate(async () => {
@@ -140,7 +174,8 @@ const ComercioService = {
     if (!comercio) {
       throw new ErrorNoEncontrado("Comercio no encontrado");
     }
-    return comercio;
+    const alianzasActivas = await alianzasActivasDeComercio(comercio.id);
+    return { ...comercio, alianzasActivas };
   },
 
   async actualizar(usuarioId, datos) {
@@ -228,6 +263,32 @@ const ComercioService = {
 
     const actualizado = await ComercioRepository.actualizar(comercio.id, {
       videoUrl: null,
+      videoPosterUrl: null,
+      videoPublicId: null,
+      videoDuracionSegundos: null,
+      videoDuracionOriginalSegundos: null,
+      videoRecorteInicioSegundos: null,
+      videoRecorteFinSegundos: null,
+      videoAncho: null,
+      videoAlto: null,
+      videoBytes: null,
+      videoFormato: null,
+      videoMimeType: null,
+    });
+
+    return { ...actualizado, envioGratisDesde: await leerEnvioGratis(comercio.id) };
+  },
+
+  async guardarVideoLink(usuarioId, videoUrl) {
+    const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
+    if (!comercio) {
+      throw new ErrorNoEncontrado("No tienes un comercio registrado");
+    }
+
+    await limpiarVideoAnterior(comercio);
+
+    const actualizado = await ComercioRepository.actualizar(comercio.id, {
+      videoUrl,
       videoPosterUrl: null,
       videoPublicId: null,
       videoDuracionSegundos: null,

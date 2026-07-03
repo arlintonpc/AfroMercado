@@ -7,6 +7,7 @@ const { enviarPushAUsuario } = require("../utils/push");
 const { enviarEmail } = require("../utils/email");
 const emailHotel = require("../utils/templates/email-hotel");
 const { notificarReservaHotel, notificarClienteReserva } = require("../utils/notificaciones");
+const AlianzaService = require("./alianza.service");
 
 function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -274,7 +275,7 @@ async function buscarHabitacionFisicaDisponible(db, reserva) {
   return null;
 }
 
-async function validarCuponHotelInterno(db, codigo, configHotelId, noches, clienteId, totalOriginal, { bloquear = false } = {}) {
+async function validarCuponHotelInterno(db, codigo, configHotelId, noches, clienteId, totalOriginal, { bloquear = false, comercioId = null } = {}) {
   const ahora = new Date();
   const codigoNormalizado = String(codigo || "").trim().toUpperCase();
   let cupon = await db.cuponHotel.findFirst({
@@ -290,7 +291,25 @@ async function validarCuponHotelInterno(db, codigo, configHotelId, noches, clien
     },
   });
 
-  if (!cupon) throw new ErrorValidacion("Cupon no valido o expirado");
+  if (!cupon) {
+    // Fallback: no es un CuponHotel propio, ¿es un código de alianza
+    // comercial vigente para este comercio en el módulo HOTEL?
+    if (comercioId) {
+      const alianza = await AlianzaService.validarCodigoAlianza(codigoNormalizado, comercioId, "HOTEL");
+      if (alianza) {
+        const descuentoAlianza = alianza.tipoDescuento === "PORCENTAJE"
+          ? Math.round(totalOriginal * Number(alianza.valorDescuento) / 100 * 100) / 100
+          : Math.min(Number(alianza.valorDescuento), totalOriginal);
+        return {
+          cupon: { codigo: codigoNormalizado },
+          descuento: descuentoAlianza,
+          totalConDescuento: totalOriginal - descuentoAlianza,
+          esAlianza: true,
+        };
+      }
+    }
+    throw new ErrorValidacion("Cupon no valido o expirado");
+  }
   if (bloquear) {
     await db.$queryRaw`SELECT id FROM "CuponHotel" WHERE id = ${cupon.id} FOR UPDATE`;
     cupon = await db.cuponHotel.findUnique({ where: { id: cupon.id } });
@@ -438,6 +457,7 @@ const HotelService = {
 
       let montoDescuento = 0;
       let cuponValidado = null;
+      let cuponEsAlianza = false;
       if (codigoCupon) {
         const cuponResultado = await validarCuponHotelInterno(
           tx,
@@ -446,10 +466,11 @@ const HotelService = {
           modalidad === "HORAS" ? 1 : noches,
           clienteId,
           totalOriginal,
-          { bloquear: true }
+          { bloquear: true, comercioId: tipo.configHotel.comercioId }
         );
         montoDescuento = cuponResultado.descuento;
         cuponValidado = cuponResultado.cupon;
+        cuponEsAlianza = !!cuponResultado.esAlianza;
       }
 
       const totalFinal = totalOriginal - montoDescuento;
@@ -485,7 +506,9 @@ const HotelService = {
         },
       });
 
-      if (cuponValidado) {
+      // Un descuento de alianza no tiene fila CuponHotel propia que actualizar
+      // (su "un uso por comercio" ya lo garantiza AlianzaSocio).
+      if (cuponValidado && !cuponEsAlianza) {
         await tx.cuponHotelUso.create({
           data: {
             cuponHotelId:   cuponValidado.id,
@@ -553,6 +576,256 @@ const HotelService = {
     });
 
     return reserva;
+  },
+
+  // Reserva múltiple: varias habitaciones (mismo o distinto tipo) en una sola
+  // transacción, agrupadas por un grupoReservaId común. Si CUALQUIERA de las
+  // habitaciones pedidas no tiene disponibilidad, toda la operación falla.
+  async crearReservaMultiple(clienteId, datos) {
+    const { habitaciones, metodoPago, notasCliente, nombreHuesped, telefonoHuesped, codigoCupon } = datos;
+    if (!Array.isArray(habitaciones) || habitaciones.length === 0) {
+      throw new ErrorValidacion("Debes indicar al menos una habitación para reservar");
+    }
+    if (habitaciones.length === 1) {
+      // Camino simple: delegar en crearReserva para no duplicar lógica.
+      return HotelService.crearReserva(clienteId, {
+        ...datos,
+        habitacionTipoId: habitaciones[0].habitacionTipoId,
+        huespedes: habitaciones[0].huespedes,
+      });
+    }
+
+    const { modalidad, entrada, salida, noches, duracionHoras } = prepararRangoReservaHotel(datos);
+
+    const limitePasado = modalidad === "HORAS" ? new Date() : new Date(new Date().toDateString());
+    if (entrada < limitePasado) {
+      throw new ErrorValidacion("La fecha de entrada no puede ser en el pasado");
+    }
+
+    const metodoPagoFinal = metodoPago || "EFECTIVO";
+    const pagoOnline = String(metodoPagoFinal).startsWith("WOMPI");
+    const grupoReservaId = crypto.randomUUID();
+
+    const resultado = await prisma.$transaction(async (tx) => {
+      let configHotelId = null;
+      let configHotelDatos = null;
+      const tiposPreparados = [];
+
+      // 1) Verificar disponibilidad de CADA habitación pedida antes de crear nada.
+      for (const item of habitaciones) {
+        const { habitacionTipoId, huespedes: huespedesItem } = item;
+        if (!habitacionTipoId) throw new ErrorValidacion("Falta habitacionTipoId en una de las habitaciones");
+
+        const { disponibles, tipo } = await verificarDisponibilidadInterna(tx, habitacionTipoId, entrada, salida, {
+          bloquearTipo: true,
+          modalidad,
+        });
+        if (disponibles <= 0) {
+          throw new ErrorValidacion(`No hay disponibilidad para "${tipo.nombre}" en ese rango`);
+        }
+        if (!tipo.configHotel?.activo) throw new ErrorValidacion("Este hotel no esta activo para recibir reservas");
+
+        if (configHotelId === null) {
+          configHotelId = tipo.configHotelId;
+          configHotelDatos = tipo.configHotel;
+        } else if (configHotelId !== tipo.configHotelId) {
+          throw new ErrorValidacion("Todas las habitaciones deben pertenecer al mismo hotel");
+        }
+
+        if (modalidad === "HORAS") {
+          if (!tipo.configHotel.permiteReservasPorHora || !tipo.permitePorHoras) {
+            throw new ErrorValidacion(`"${tipo.nombre}" no permite reservas por horas`);
+          }
+          const minimoHoras = Number(tipo.duracionMinHoras) || 1;
+          const maximoHoras = tipo.duracionMaxHoras ? Number(tipo.duracionMaxHoras) : null;
+          if (duracionHoras < minimoHoras) {
+            throw new ErrorValidacion(`La reserva por horas debe ser de minimo ${minimoHoras} hora(s)`);
+          }
+          if (maximoHoras && duracionHoras > maximoHoras) {
+            throw new ErrorValidacion(`La reserva por horas no puede superar ${maximoHoras} hora(s)`);
+          }
+        }
+
+        let precioUnitario;
+        if (modalidad === "HORAS") {
+          precioUnitario = Math.round(Number(tipo.precioPorHora) * Number(duracionHoras) * 100) / 100;
+        } else {
+          const temporadaHab = await tx.temporadaHotel.findFirst({
+            where: {
+              activo: true,
+              habitacionTipoId: Number(habitacionTipoId),
+              inicio: { lte: salida },
+              fin:   { gte: entrada },
+            },
+          });
+          const temporadaHotel = !temporadaHab ? await tx.temporadaHotel.findFirst({
+            where: {
+              activo: true,
+              habitacionTipoId: null,
+              configHotelId: tipo.configHotelId,
+              inicio: { lte: salida },
+              fin:   { gte: entrada },
+            },
+          }) : null;
+          const temporada = temporadaHab || temporadaHotel;
+          const precioPorNoche = temporada ? Number(temporada.precioPorNoche) : Number(tipo.precioPorNoche);
+          precioUnitario = precioPorNoche * noches;
+        }
+
+        tiposPreparados.push({ tipo, huespedes: Number(huespedesItem) || 1, precioUnitario });
+      }
+
+      if (metodoPagoFinal === "EFECTIVO" && configHotelDatos.permitePagarAlLlegar === false) {
+        throw new ErrorValidacion("Este hotel no acepta pago al llegar");
+      }
+      if (pagoOnline && configHotelDatos.permiteDeposito30 === false) {
+        throw new ErrorValidacion("Este hotel no acepta deposito online por ahora");
+      }
+
+      // 2) Cupón y comisión se calculan una sola vez sobre el total combinado.
+      const totalOriginalCombinado = tiposPreparados.reduce((acc, t) => acc + t.precioUnitario, 0);
+
+      let montoDescuentoCombinado = 0;
+      let cuponValidado = null;
+      let cuponEsAlianza = false;
+      if (codigoCupon) {
+        const cuponResultado = await validarCuponHotelInterno(
+          tx,
+          codigoCupon,
+          configHotelId,
+          modalidad === "HORAS" ? 1 : noches,
+          clienteId,
+          totalOriginalCombinado,
+          { bloquear: true, comercioId: configHotelDatos.comercioId }
+        );
+        montoDescuentoCombinado = cuponResultado.descuento;
+        cuponValidado = cuponResultado.cupon;
+        cuponEsAlianza = !!cuponResultado.esAlianza;
+      }
+
+      const tasaComision = 0.1;
+      const estadoInicial = pagoOnline ? "PENDIENTE" : (configHotelDatos.confirmacionAuto ? "CONFIRMADA" : "PENDIENTE");
+
+      // 3) Prorratear el descuento del cupón entre las habitaciones según su peso
+      // en el total, para que la suma de los `total` individuales cuadre con el
+      // total combinado con descuento (evita duplicar la lógica de comisión).
+      const reservasCreadas = [];
+      let descuentoAsignado = 0;
+      for (let i = 0; i < tiposPreparados.length; i++) {
+        const { tipo, huespedes: huespedesItem, precioUnitario } = tiposPreparados[i];
+        const esUltima = i === tiposPreparados.length - 1;
+        const descuentoItem = esUltima
+          ? Math.round((montoDescuentoCombinado - descuentoAsignado) * 100) / 100
+          : Math.round((precioUnitario / totalOriginalCombinado) * montoDescuentoCombinado * 100) / 100;
+        descuentoAsignado += descuentoItem;
+
+        const totalItem = precioUnitario - descuentoItem;
+        const comisionItem = Math.round(totalItem * tasaComision * 100) / 100;
+
+        const reserva = await tx.reservaHotel.create({
+          data: {
+            codigo: generarCodigo(),
+            configHotelId: tipo.configHotelId,
+            habitacionTipoId: Number(tipo.id),
+            clienteId,
+            fechaEntrada: entrada,
+            fechaSalida:  salida,
+            modalidad,
+            duracionHoras: modalidad === "HORAS" ? duracionHoras : null,
+            huespedes:    huespedesItem,
+            total:        totalItem,
+            estado:       estadoInicial,
+            metodoPago:   metodoPagoFinal,
+            notasCliente: notasCliente || null,
+            nombreHuesped,
+            telefonoHuesped,
+            montoDescuento: descuentoItem || null,
+            codigoCupon:    codigoCupon || null,
+            comision:       comisionItem,
+            tasaComision,
+            grupoReservaId,
+          },
+          include: {
+            habitacionTipo: true,
+            configHotel: { include: { comercio: { include: { usuario: { select: { email: true, nombre: true } } } } } },
+          },
+        });
+        reservasCreadas.push(reserva);
+      }
+
+      // Un descuento de alianza no tiene fila CuponHotel propia que actualizar.
+      if (cuponValidado && !cuponEsAlianza) {
+        // El uso del cupón se registra una sola vez, contra la primera reserva del grupo.
+        await tx.cuponHotelUso.create({
+          data: {
+            cuponHotelId:   cuponValidado.id,
+            clienteId,
+            reservaHotelId: reservasCreadas[0].id,
+          },
+        });
+        await tx.cuponHotel.update({
+          where: { id: cuponValidado.id },
+          data:  { usosActuales: { increment: 1 } },
+        });
+      }
+
+      const totalFinalCombinado = totalOriginalCombinado - montoDescuentoCombinado;
+      return { reservasCreadas, totalFinalCombinado, estadoInicial, grupoReservaId };
+    });
+
+    const { reservasCreadas, totalFinalCombinado, estadoInicial } = resultado;
+    const primeraReserva = reservasCreadas[0];
+    const resumenTiempo = modalidad === "HORAS" ? `${duracionHoras} hora(s)` : `${noches} noche(s)`;
+    const nombresHabitaciones = reservasCreadas.map(r => r.habitacionTipo.nombre).join(", ");
+
+    // Notificar al hotelero (una sola notificación resumen del grupo)
+    const hoteleroId = primeraReserva.configHotel.comercio.usuarioId;
+    await notifHotel(
+      hoteleroId,
+      estadoInicial === "CONFIRMADA" ? "Nueva reserva grupal confirmada" : "Nueva solicitud de reserva grupal",
+      `${nombreHuesped} - ${reservasCreadas.length} habitaciones (${nombresHabitaciones}) - ${resumenTiempo}`,
+      "/comerciante/hoteles"
+    );
+
+    // Email al hotelero (fire and forget) — reutiliza la misma plantilla, una vez por habitación
+    const emailHotelero = primeraReserva.configHotel.comercio.usuario?.email;
+    if (emailHotelero) {
+      setImmediate(() => {
+        enviarEmail({
+          to: emailHotelero,
+          subject: `Nueva reserva grupal - ${nombreHuesped} - ${reservasCreadas.length} habitaciones - AfroMercado`,
+          html: emailHotel.reservaNueva({
+            nombreHotelero: primeraReserva.configHotel.comercio.usuario.nombre || "Hotelero",
+            nombreHuesped,
+            habitacion: nombresHabitaciones,
+            fechaEntrada: entrada,
+            fechaSalida:  salida,
+            noches,
+            total: totalFinalCombinado,
+          }),
+        }).catch((err) => console.error("[EMAIL-HOTEL]", err.message));
+      });
+    }
+
+    setImmediate(() => {
+      notificarReservaHotel({
+        hotelWhatsapp: primeraReserva.configHotel.comercio.whatsapp,
+        reserva: primeraReserva,
+        habitacion: { nombre: nombresHabitaciones },
+        comercioNombre: primeraReserva.configHotel.comercio.nombre,
+      }).catch(e => console.error('[WhatsApp]', e?.message ?? e));
+    });
+
+    setImmediate(() => {
+      notificarClienteReserva({
+        telefonoCliente: telefonoHuesped,
+        reserva: primeraReserva,
+        habitacion: { nombre: nombresHabitaciones },
+        comercioNombre: primeraReserva.configHotel.comercio.nombre,
+      }).catch(e => console.error('[WhatsApp]', e?.message ?? e));
+    });
+
+    return { reservas: reservasCreadas, grupoReservaId: resultado.grupoReservaId, total: totalFinalCombinado };
   },
 
   async misReservas(clienteId) {

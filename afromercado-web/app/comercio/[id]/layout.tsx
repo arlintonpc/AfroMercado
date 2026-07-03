@@ -10,8 +10,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     const json = await res.json()
     const c = json.data ?? json
     const nombre = c.nombre ?? 'Tienda'
-    const municipio = c.municipio ?? 'Chocó'
-    const desc = c.descripcion ?? `Productos artesanales y culturales de ${nombre} en ${municipio}, Chocó.`
+    const municipio = c.municipio ?? 'Colombia'
+    const desc = c.descripcion ?? `Productos artesanales y culturales de ${nombre} en ${municipio}.`
     const img = c.logoUrl ?? c.bannerUrl ?? null
     return {
       title: `${nombre} — AfroMercado`,

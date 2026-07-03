@@ -4,21 +4,25 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { miSolicitudRepartidor, actualizarPerfilRepartidor, type PerfilRepartidor } from '@/lib/api/repartidor'
+import { DEPARTAMENTOS, MUNICIPIOS_POR_DEPARTAMENTO, municipiosDe } from '@/lib/data/colombia'
 
 const TIPOS_VEHICULO = [
   'Moto', 'Bicicleta', 'Carro', 'Camioneta',
   'Lancha', 'Bote', 'Canoa', 'Chalupa', 'A pie',
 ]
 
-const MUNICIPIOS_CHOCO = [
-  'Quibdo', 'Istmina', 'Condoto', 'Tado', 'Certegui',
-  'Novita', 'Sipi', 'Jurado', 'Bahia Solano', 'Nuqui',
-  'Acandi', 'Unguia', 'Carmen del Darien', 'Riosucio',
-  'Bojaya', 'Medio Atrato', 'Atrato', 'Carmen de Atrato',
-  'Rio Quito', 'Lloro', 'Bagado', 'El Canton del San Pablo',
-  'El Carmen de Atrato', 'San Jose del Palmar', 'Bajo Baudo',
-  'Medio Baudo', 'Alto Baudo',
-]
+function normalizar(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+}
+
+/** Deriva el departamento de un municipio ya guardado (datos históricos no lo tenían). */
+function departamentoDeMunicipio(municipio: string): string {
+  if (!municipio) return ''
+  const norm = normalizar(municipio)
+  const encontrado = Object.entries(MUNICIPIOS_POR_DEPARTAMENTO)
+    .find(([, municipios]) => municipios.some(m => normalizar(m) === norm))
+  return encontrado?.[0] ?? ''
+}
 
 export default function PerfilRepartidorPage() {
   const router = useRouter()
@@ -34,6 +38,7 @@ export default function PerfilRepartidorPage() {
     municipioBase: '',
     municipiosExtra: [],
   })
+  const [departamentoBase, setDepartamentoBase] = useState('')
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [exito, setExito] = useState(false)
@@ -56,6 +61,7 @@ export default function PerfilRepartidorPage() {
           municipioBase: sol.municipioBase ?? '',
           municipiosExtra: sol.municipiosExtra ?? [],
         })
+        setDepartamentoBase(departamentoDeMunicipio(sol.municipioBase ?? ''))
       }
       setCargando(false)
     }).catch(() => setCargando(false))
@@ -177,21 +183,34 @@ export default function PerfilRepartidorPage() {
           <p className="text-xs font-semibold text-[#1A1A1A]/50 uppercase tracking-wide">Zona de operacion</p>
 
           <div>
+            <label className="block text-xs font-semibold text-[#1A1A1A]/60 mb-1">Departamento</label>
+            <select
+              value={departamentoBase}
+              onChange={e => { setDepartamentoBase(e.target.value); set('municipioBase', ''); set('municipiosExtra', []) }}
+              className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F]"
+            >
+              <option value="">Seleccionar...</option>
+              {DEPARTAMENTOS.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+
+          <div>
             <label className="block text-xs font-semibold text-[#1A1A1A]/60 mb-1">Municipio principal</label>
             <select
               value={form.municipioBase}
               onChange={e => set('municipioBase', e.target.value)}
-              className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F]"
+              disabled={!departamentoBase}
+              className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F] disabled:opacity-50"
             >
-              <option value="">Seleccionar...</option>
-              {MUNICIPIOS_CHOCO.map(m => <option key={m} value={m}>{m}</option>)}
+              <option value="">{departamentoBase ? 'Seleccionar...' : 'Primero elige el departamento'}</option>
+              {municipiosDe(departamentoBase).map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-[#1A1A1A]/60 mb-2">Municipios adicionales (opcional)</label>
             <div className="flex flex-wrap gap-2">
-              {MUNICIPIOS_CHOCO.filter(m => m !== form.municipioBase).map(m => {
+              {municipiosDe(departamentoBase).filter(m => m !== form.municipioBase).map(m => {
                 const sel = (form.municipiosExtra ?? []).includes(m)
                 return (
                   <button

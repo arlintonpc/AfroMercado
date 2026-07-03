@@ -69,7 +69,7 @@ export default function MapaTransportes({ transportes, userLat, userLon }: { tra
   }, [userLat, userLon])
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: 400 }}>
+    <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm h-[50vh] min-h-[280px] max-h-[400px]">
       <MapContainer center={userLat && userLon ? [userLat, userLon] : centro} zoom={6} style={{ height: '100%', width: '100%' }} scrollWheelZoom={false}>
         <TileLayer attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <AjustarVista transportes={transportes} userLat={userLat} userLon={userLon} />

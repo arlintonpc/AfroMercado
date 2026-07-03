@@ -103,7 +103,7 @@ export default function ComercianteCulturaPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [titulo, setTitulo] = useState('')
-  const [departamento, setDepartamento] = useState('Chocó')
+  const [departamento, setDepartamento] = useState('')
   const [municipio, setMunicipio] = useState('')
   const [categoria, setCategoria] = useState('')
   const [fechaInicio, setFechaInicio] = useState('')
@@ -161,6 +161,23 @@ export default function ComercianteCulturaPage() {
   async function togglePublicar(evento: EventoCultural) {
     const nuevo = evento.estado === 'PUBLICADO' ? 'BORRADOR' : 'PUBLICADO'
     await actualizarEventoCultura(evento.id, { estado: nuevo })
+    await cargar()
+  }
+
+  async function posponerEvento(evento: EventoCultural) {
+    if (!window.confirm(`¿Posponer "${evento.titulo}"? Avisaremos a los compradores con reserva activa.`)) return
+    await actualizarEventoCultura(evento.id, { estado: 'POSPUESTO' })
+    await cargar()
+  }
+
+  async function cancelarEvento(evento: EventoCultural) {
+    if (!window.confirm(`¿Cancelar "${evento.titulo}"? Avisaremos a los compradores con reserva activa.`)) return
+    await actualizarEventoCultura(evento.id, { estado: 'CANCELADO' })
+    await cargar()
+  }
+
+  async function reactivarEvento(evento: EventoCultural) {
+    await actualizarEventoCultura(evento.id, { estado: 'PUBLICADO' })
     await cargar()
   }
 
@@ -231,18 +248,52 @@ export default function ComercianteCulturaPage() {
                     {fmtFecha(ev.fechaInicio)} · {ev.municipio}, {ev.departamento}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <span className={`rounded-full px-2 py-1 text-xs ${
-                    ev.estado === 'PUBLICADO' ? 'bg-[#EAF3DE] text-[#3B6D11]' : 'bg-[#1A1A1A]/8 text-[#1A1A1A]/60'
+                    ev.estado === 'PUBLICADO' ? 'bg-[#EAF3DE] text-[#3B6D11]'
+                    : ev.estado === 'POSPUESTO' ? 'bg-[#FCEFCB] text-[#8A5A00]'
+                    : ev.estado === 'CANCELADO' ? 'bg-[#F8D7DA] text-[#842029]'
+                    : 'bg-[#1A1A1A]/8 text-[#1A1A1A]/60'
                   }`}>
-                    {ev.estado === 'PUBLICADO' ? 'Publicado' : ev.estado === 'BORRADOR' ? 'Borrador' : ev.estado}
+                    {ev.estado === 'PUBLICADO' ? 'Publicado'
+                      : ev.estado === 'BORRADOR' ? 'Borrador'
+                      : ev.estado === 'POSPUESTO' ? 'Pospuesto'
+                      : ev.estado === 'CANCELADO' ? 'Cancelado'
+                      : ev.estado === 'FINALIZADO' ? 'Finalizado'
+                      : ev.estado}
                   </span>
-                  <button
-                    onClick={() => togglePublicar(ev)}
-                    className="rounded-full border border-[#2D6A4F] px-3 py-1 text-xs text-[#2D6A4F] hover:bg-[#2D6A4F]/10"
-                  >
-                    {ev.estado === 'PUBLICADO' ? 'Despublicar' : 'Publicar'}
-                  </button>
+                  {(ev.estado === 'BORRADOR' || ev.estado === 'PUBLICADO') && (
+                    <button
+                      onClick={() => togglePublicar(ev)}
+                      className="rounded-full border border-[#2D6A4F] px-3 py-1 text-xs text-[#2D6A4F] hover:bg-[#2D6A4F]/10"
+                    >
+                      {ev.estado === 'PUBLICADO' ? 'Despublicar' : 'Publicar'}
+                    </button>
+                  )}
+                  {ev.estado === 'PUBLICADO' && (
+                    <button
+                      onClick={() => posponerEvento(ev)}
+                      className="rounded-full border border-[#8A5A00] px-3 py-1 text-xs text-[#8A5A00] hover:bg-[#FCEFCB]"
+                    >
+                      Posponer
+                    </button>
+                  )}
+                  {ev.estado === 'POSPUESTO' && (
+                    <button
+                      onClick={() => reactivarEvento(ev)}
+                      className="rounded-full border border-[#2D6A4F] px-3 py-1 text-xs text-[#2D6A4F] hover:bg-[#2D6A4F]/10"
+                    >
+                      Reactivar
+                    </button>
+                  )}
+                  {(ev.estado === 'BORRADOR' || ev.estado === 'PUBLICADO' || ev.estado === 'POSPUESTO') && (
+                    <button
+                      onClick={() => cancelarEvento(ev)}
+                      className="rounded-full border border-[#842029] px-3 py-1 text-xs text-[#842029] hover:bg-[#F8D7DA]"
+                    >
+                      Cancelar
+                    </button>
+                  )}
                 </div>
               </div>
               <GestionEntradas evento={ev} onCambio={cargar} />

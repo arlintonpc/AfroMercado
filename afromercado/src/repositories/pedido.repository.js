@@ -73,7 +73,11 @@ const PedidoRepository = {
         notas: notas ?? null,
         expiresAt,
         codigo: generarCodigoPedido(),
-        ...(cuponId != null ? { cuponId, cuponDescuento: cuponDescuento ?? null } : {}),
+        // cuponId solo existe para cupones propios del marketplace; cuponDescuento
+        // se guarda independiente porque también aplica a descuentos de alianza
+        // comercial (fallback sin fila Cupon propia — ver AlianzaService).
+        ...(cuponId != null ? { cuponId } : {}),
+        ...(cuponDescuento != null ? { cuponDescuento } : {}),
         estado: "PENDIENTE_PAGO",
         subPedidos: {
           create: subPedidos.map((sp) => ({

@@ -3,6 +3,7 @@ const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const sseManager = require("../utils/sse-manager");
 const { enviarPushAUsuario } = require("../utils/push");
 const { notificarWhatsApp } = require("../utils/notificaciones");
+const AlianzaService = require("./alianza.service");
 
 const TASA_COMISION_TOUR = 0.10;
 
@@ -160,6 +161,28 @@ async function obtenerLugarDelComercio(comercioId, lugarId) {
   return lugar;
 }
 
+// Acepta tanto el cliente prisma normal como un `tx` de prisma.$transaction,
+// para poder reutilizarla dentro de crearReserva sin duplicar la lógica de conteo.
+async function verificarDisponibilidadInterna(cliente, configTourId, fecha) {
+  const tour = await cliente.configTour.findUnique({ where: { id: configTourId } });
+  if (!tour) throw new ErrorNoEncontrado("Tour no encontrado");
+
+  const fechaD = new Date(fecha);
+  const inicio = new Date(fechaD); inicio.setHours(0, 0, 0, 0);
+  const fin    = new Date(fechaD); fin.setHours(23, 59, 59, 999);
+
+  const totalParticipantes = await cliente.reservaTour.aggregate({
+    where: {
+      configTourId,
+      fechaTour: { gte: inicio, lte: fin },
+      estado: { in: ["PENDIENTE", "CONFIRMADA"] },
+    },
+    _sum: { participantes: true },
+  });
+  const ocupados = totalParticipantes._sum.participantes ?? 0;
+  return { disponibles: Math.max(0, tour.maxParticipantes - ocupados), maxParticipantes: tour.maxParticipantes };
+}
+
 const TourService = {
   async listarTours({ municipio, departamento } = {}) {
     const comercioWhere = { verificado: true };
@@ -183,78 +206,83 @@ const TourService = {
   },
 
   async verificarDisponibilidad(configTourId, fecha) {
-    const tour = await prisma.configTour.findUnique({ where: { id: configTourId } });
-    if (!tour) throw new ErrorNoEncontrado("Tour no encontrado");
-
-    const fechaD = new Date(fecha);
-    const inicio = new Date(fechaD); inicio.setHours(0, 0, 0, 0);
-    const fin    = new Date(fechaD); fin.setHours(23, 59, 59, 999);
-
-    const totalParticipantes = await prisma.reservaTour.aggregate({
-      where: {
-        configTourId,
-        fechaTour: { gte: inicio, lte: fin },
-        estado: { in: ["PENDIENTE", "CONFIRMADA"] },
-      },
-      _sum: { participantes: true },
-    });
-    const ocupados = totalParticipantes._sum.participantes ?? 0;
-    return { disponibles: Math.max(0, tour.maxParticipantes - ocupados), maxParticipantes: tour.maxParticipantes };
+    return verificarDisponibilidadInterna(prisma, configTourId, fecha);
   },
 
   async crearReserva(clienteId, { configTourId, fechaTour, participantes, metodoPago, notasCliente, nombreContacto, telefonoContacto, codigoCupon }) {
-    const tour = await prisma.configTour.findUnique({ where: { id: configTourId }, include: TOUR_INCLUDE });
-    if (!tour || !tour.activo) throw new ErrorValidacion("Tour no disponible");
-
-    const disp = await TourService.verificarDisponibilidad(configTourId, fechaTour);
-    if (disp.disponibles < participantes) throw new ErrorValidacion("No hay suficientes cupos disponibles");
-
-    const total = Number(tour.precioPersona) * participantes;
-
-    let montoDescuento = 0;
-    let cuponAplicado = null;
-    if (codigoCupon) {
-      try {
-        const validacion = await TourService.validarCuponTour(codigoCupon, tour.id, participantes, clienteId);
-        montoDescuento = validacion.descuento;
-        cuponAplicado = validacion.cupon;
-      } catch (e) { /* cupón inválido, ignorar */ }
+    const cantidadParticipantes = Number(participantes);
+    if (!Number.isFinite(cantidadParticipantes) || cantidadParticipantes < 1) {
+      throw new ErrorValidacion("La cantidad de participantes no es válida");
     }
-    const totalFinal = Number(total) - montoDescuento;
-    const comision = Math.round(totalFinal * TASA_COMISION_TOUR);
 
-    const estado = tour.confirmacionAuto ? "CONFIRMADA" : "PENDIENTE";
+    const { reserva, tour, cuponAplicado } = await prisma.$transaction(async (tx) => {
+      // bloquea la fila del tour para serializar reservas concurrentes sobre el mismo cupo
+      await tx.$queryRaw`SELECT id FROM "ConfigTour" WHERE id = ${configTourId} FOR UPDATE`;
 
-    const reserva = await prisma.reservaTour.create({
-      data: {
-        codigo: generarCodigo(),
-        configTourId,
-        clienteId,
-        fechaTour: new Date(fechaTour),
-        participantes,
-        total: totalFinal,
-        comision,
-        tasaComision: TASA_COMISION_TOUR,
-        montoDescuento: montoDescuento > 0 ? montoDescuento : null,
-        codigoCupon: cuponAplicado?.codigo ?? null,
-        estado,
-        metodoPago,
-        notasCliente: notasCliente || null,
-        nombreContacto,
-        telefonoContacto,
-      },
-      include: { configTour: { include: TOUR_INCLUDE } },
+      const tour = await tx.configTour.findUnique({ where: { id: configTourId }, include: TOUR_INCLUDE });
+      if (!tour || !tour.activo) throw new ErrorValidacion("Tour no disponible");
+
+      const disp = await verificarDisponibilidadInterna(tx, configTourId, fechaTour);
+      if (disp.disponibles < cantidadParticipantes) {
+        throw new ErrorValidacion(
+          disp.disponibles > 0
+            ? `Solo quedan ${disp.disponibles} cupo(s) disponibles para esta fecha`
+            : "No quedan cupos disponibles para esta fecha"
+        );
+      }
+
+      const total = Number(tour.precioPersona) * cantidadParticipantes;
+
+      let montoDescuento = 0;
+      let cuponAplicado = null;
+      let cuponEsAlianza = false;
+      if (codigoCupon) {
+        try {
+          const validacion = await TourService.validarCuponTour(codigoCupon, tour.id, cantidadParticipantes, clienteId, tour.comercioId);
+          montoDescuento = validacion.descuento;
+          cuponAplicado = validacion.cupon;
+          cuponEsAlianza = !!validacion.esAlianza;
+        } catch (e) { /* cupón inválido, ignorar */ }
+      }
+      const totalFinal = Number(total) - montoDescuento;
+      const comision = Math.round(totalFinal * TASA_COMISION_TOUR);
+
+      const estado = tour.confirmacionAuto ? "CONFIRMADA" : "PENDIENTE";
+
+      const reserva = await tx.reservaTour.create({
+        data: {
+          codigo: generarCodigo(),
+          configTourId,
+          clienteId,
+          fechaTour: new Date(fechaTour),
+          participantes: cantidadParticipantes,
+          total: totalFinal,
+          comision,
+          tasaComision: TASA_COMISION_TOUR,
+          montoDescuento: montoDescuento > 0 ? montoDescuento : null,
+          codigoCupon: cuponAplicado?.codigo ?? null,
+          estado,
+          metodoPago,
+          notasCliente: notasCliente || null,
+          nombreContacto,
+          telefonoContacto,
+        },
+        include: { configTour: { include: TOUR_INCLUDE } },
+      });
+
+      // Un descuento de alianza no tiene fila CuponTour propia que actualizar.
+      if (cuponAplicado && !cuponEsAlianza) {
+        await tx.cuponTourUso.create({
+          data: { cuponTourId: cuponAplicado.id, clienteId, reservaTourId: reserva.id },
+        });
+        await tx.cuponTour.update({
+          where: { id: cuponAplicado.id },
+          data: { usosActuales: { increment: 1 } },
+        });
+      }
+
+      return { reserva, tour, cuponAplicado };
     });
-
-    if (cuponAplicado) {
-      await prisma.cuponTourUso.create({
-        data: { cuponTourId: cuponAplicado.id, clienteId, reservaTourId: reserva.id },
-      });
-      await prisma.cuponTour.update({
-        where: { id: cuponAplicado.id },
-        data: { usosActuales: { increment: 1 } },
-      });
-    }
 
     // Notificar al operador del tour
     const operadorId = await prisma.comercio.findUnique({
@@ -262,9 +290,9 @@ const TourService = {
     }).then(c => c?.usuarioId);
 
     if (operadorId) {
-      await notifTour(operadorId, "🗺️ Nueva reserva de tour", `${nombreContacto} reservó ${participantes} cupo(s) para ${tour.nombre}`, "/comerciante/tours");
+      await notifTour(operadorId, "🗺️ Nueva reserva de tour", `${nombreContacto} reservó ${reserva.participantes} cupo(s) para ${tour.nombre}`, "/comerciante/tours");
     }
-    if (estado === "CONFIRMADA") {
+    if (reserva.estado === "CONFIRMADA") {
       await notifTour(clienteId, "✅ Tour confirmado", `Tu reserva para ${tour.nombre} está confirmada`, "/tours/mis-reservas");
     }
 
@@ -278,8 +306,8 @@ const TourService = {
             `Código: *${reserva.codigo}*\n` +
             `Tour: ${tour.nombre}\n` +
             `Fecha: ${new Date(fechaTour).toLocaleDateString('es-CO')}\n` +
-            `Participantes: ${participantes}\n` +
-            `Total: $${Number(totalFinal).toLocaleString('es-CO')}\n` +
+            `Participantes: ${reserva.participantes}\n` +
+            `Total: $${Number(reserva.total).toLocaleString('es-CO')}\n` +
             `Contacto: ${nombreContacto} · ${telefonoContacto}`
           );
         }
@@ -568,7 +596,7 @@ const TourService = {
 
   // ── CUPONES TOUR ─────────────────────────────────────────────
 
-  async validarCuponTour(codigo, configTourId, participantes, clienteId) {
+  async validarCuponTour(codigo, configTourId, participantes, clienteId, comercioId) {
     const cupon = await prisma.cuponTour.findFirst({
       where: {
         codigo: codigo.trim().toUpperCase(),
@@ -578,7 +606,27 @@ const TourService = {
         OR: [{ configTourId: null }, { configTourId }],
       },
     });
-    if (!cupon) throw new ErrorValidacion("Cupón inválido o expirado");
+    if (!cupon) {
+      // Fallback: no es un CuponTour propio, ¿es un código de alianza
+      // comercial vigente para este comercio en el módulo TOUR?
+      if (comercioId) {
+        const alianza = await AlianzaService.validarCodigoAlianza(codigo, comercioId, "TOUR");
+        if (alianza) {
+          const tourAlianza = await prisma.configTour.findUnique({ where: { id: configTourId } });
+          const subtotalAlianza = Number(tourAlianza.precioPersona) * participantes;
+          const descuentoAlianza = alianza.tipoDescuento === "PORCENTAJE"
+            ? Math.round(subtotalAlianza * Number(alianza.valorDescuento) / 100)
+            : Math.min(Number(alianza.valorDescuento), subtotalAlianza);
+          return {
+            cupon: { codigo: String(codigo).trim().toUpperCase() },
+            descuento: descuentoAlianza,
+            subtotalConDescuento: subtotalAlianza - descuentoAlianza,
+            esAlianza: true,
+          };
+        }
+      }
+      throw new ErrorValidacion("Cupón inválido o expirado");
+    }
     if (cupon.usosMaximos && cupon.usosActuales >= cupon.usosMaximos) {
       throw new ErrorValidacion("Este cupón ya alcanzó su límite de usos");
     }

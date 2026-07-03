@@ -1,9 +1,9 @@
 export const metadata = {
-  title: 'Hoteles y alojamientos en el Chocó | AfroMercado',
-  description: 'Encuentra y reserva hoteles, posadas y alojamientos en el Chocó afrocolombianos. Reserva directamente con los dueños.',
+  title: 'Hoteles y alojamientos en Colombia | AfroMercado',
+  description: 'Encuentra y reserva hoteles, posadas y alojamientos comunitarios en toda Colombia. Reserva directamente con los dueños.',
   openGraph: {
-    title: 'Hoteles en el Chocó | AfroMercado',
-    description: 'Alojamientos con cultura afrocolombiana en el Chocó',
+    title: 'Hoteles en Colombia | AfroMercado',
+    description: 'Alojamientos con identidad y cultura local en cada región de Colombia',
     type: 'website',
   },
 }

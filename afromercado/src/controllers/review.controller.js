@@ -33,6 +33,19 @@ const ReviewController = {
     } catch (e) { next(e); }
   },
 
+  // ── CULTURA ─────────────────────────────────────────────────
+  async crearReviewCultura(req, res, next) {
+    try {
+      res.status(201).json({ ok: true, data: await ReviewService.crearReviewCultura(req.usuario.id, req.body) });
+    } catch (e) { next(e); }
+  },
+
+  async reviewsCultura(req, res, next) {
+    try {
+      res.json({ ok: true, data: await ReviewService.reviewsCultura(Number(req.params.id)) });
+    } catch (e) { next(e); }
+  },
+
   // ── TRANSPORTE ──────────────────────────────────────────────
   async crearReviewTransporte(req, res, next) {
     try {

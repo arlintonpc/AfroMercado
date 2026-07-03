@@ -7,6 +7,7 @@ export interface DatosActualizarPerfil {
   nombre?: string
   telefono?: string
   municipio?: string
+  departamento?: string
   tipoDocumento?: TipoDocumento
   numeroDocumento?: string
 }

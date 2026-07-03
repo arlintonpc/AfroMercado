@@ -368,7 +368,7 @@ export default function PaginaProducto({
           <p className="text-xs text-[#1A1A1A]/40 truncate">
             <Link href="/" className="hover:text-[#2D6A4F] transition-colors">AfroMercado</Link>
             {' / '}
-            <Link href="/" className="hover:text-[#2D6A4F] transition-colors">Productos del Chocó</Link>
+            <Link href="/" className="hover:text-[#2D6A4F] transition-colors">Catálogo</Link>
             {' / '}
             <span className="text-[#1A1A1A]/60">{producto.nombre}</span>
           </p>
@@ -597,9 +597,16 @@ export default function PaginaProducto({
               El productor
             </h2>
 
-            {/* Badge verificado */}
-            {producto.comercio.verificado && (
-              <BadgeProductorCertificado size="md" />
+            {/* Badges de certificación */}
+            {(producto.comercio.verificado || producto.comercio.verificadoEtnico) && (
+              <div className="flex flex-wrap gap-2">
+                {producto.comercio.verificado && (
+                  <BadgeProductorCertificado size="md" variante="base" />
+                )}
+                {producto.comercio.verificadoEtnico && (
+                  <BadgeProductorCertificado size="md" variante="etnico" />
+                )}
+              </div>
             )}
 
             {/* Nombre y municipio */}

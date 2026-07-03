@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     ].filter(Boolean).join(' '),
     openGraph: {
       title: `${data.nombre} — ${data.comercio.municipio}`,
-      description: data.descripcion?.slice(0, 160) ?? `Tour en ${data.comercio.municipio}, Chocó`,
+      description: data.descripcion?.slice(0, 160) ?? `Tour en ${data.comercio.municipio}`,
       images: foto ? [{ url: foto, width: 800, height: 600 }] : [],
       type: 'website',
     },

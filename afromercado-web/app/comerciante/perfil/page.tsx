@@ -14,6 +14,7 @@ import {
   subirDocumentoComercio,
   subirVideoComercio,
   quitarVideoComercio,
+  guardarVideoLinkComercio,
   type Comercio,
   type CuentaDispersion,
   type LadoDocumento,
@@ -21,7 +22,7 @@ import {
   type TipoCuentaDispersion,
 } from '@/components/comerciante/api'
 import { obtenerReglasPublicas } from '@/lib/api/config'
-import SubidorVideo from '@/components/comerciante/SubidorVideo'
+import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 
 const BANCOS_DISPERSION = [
   { valor: 'BANCOLOMBIA', etiqueta: 'Bancolombia' },
@@ -222,7 +223,7 @@ export default function PerfilComerciantePage() {
   const [cargando, setCargando] = useState(true)
 
   const [nombre, setNombre] = useState('')
-  const [departamento, setDepartamento] = useState('Chocó')
+  const [departamento, setDepartamento] = useState('')
   const [municipio, setMunicipio] = useState('')
   const [latitud, setLatitud] = useState<number | null>(null)
   const [longitud, setLongitud] = useState<number | null>(null)
@@ -631,25 +632,14 @@ export default function PerfilComerciantePage() {
           error={errores.departamento}
         />
 
-        {departamento === 'Chocó' ? (
-          <CampoSelect
-            label="Municipio"
-            name="municipio"
-            value={municipio}
-            onChange={setMunicipio}
-            opciones={municipiosDe('Chocó').map((m) => ({ valor: m, etiqueta: m }))}
-            error={errores.municipio}
-          />
-        ) : (
-          <CampoTexto
-            label="Municipio / Ciudad"
-            name="municipio"
-            placeholder="Ej: Medellín, Bogotá, Cali…"
-            value={municipio}
-            onChange={setMunicipio}
-            error={errores.municipio}
-          />
-        )}
+        <CampoSelect
+          label="Municipio"
+          name="municipio"
+          value={municipio}
+          onChange={setMunicipio}
+          opciones={municipiosDe(departamento).map((m) => ({ valor: m, etiqueta: m }))}
+          error={errores.municipio}
+        />
 
         <CampoTexto
           label="Vereda o barrio"
@@ -752,18 +742,26 @@ export default function PerfilComerciantePage() {
       </form>
 
       {comercio && (
-        <SubidorVideo
-          titulo="Video de la tienda"
-          descripcion="Cuenta la historia de tu comercio, muestra tu finca, tu cocina, tu proceso o aquello que quieres que el cliente recuerde."
-          estadoInicial={{
-            videoUrl: comercio.videoUrl ?? null,
-            videoPosterUrl: comercio.videoPosterUrl ?? null,
-            videoDuracionSegundos: comercio.videoDuracionSegundos ?? null,
-            videoMimeType: comercio.videoMimeType ?? null,
-          }}
-          onSubir={(file, meta) => subirVideoComercio(file, meta)}
-          onEliminar={() => quitarVideoComercio()}
-        />
+        <div className="rounded-2xl border border-[#1A1A1A]/5 bg-white p-5 sm:p-6 shadow-sm">
+          <div className="mb-4">
+            <h2 className="text-base font-bold text-[#1A1A1A]">Video de la tienda</h2>
+            <p className="mt-1 text-sm text-[#1A1A1A]/60 leading-relaxed">
+              Cuenta la historia de tu comercio, muestra tu finca, tu cocina, tu proceso o aquello que quieres que el cliente recuerde. Puedes subir un clip o pegar el link de un video que ya tengas en YouTube, Facebook u otra plataforma.
+            </p>
+          </div>
+          <SubidorVideoOLink
+            titulo="Video de la tienda"
+            estadoInicial={{
+              videoUrl: comercio.videoUrl ?? null,
+              videoPosterUrl: comercio.videoPosterUrl ?? null,
+              videoDuracionSegundos: comercio.videoDuracionSegundos ?? null,
+              videoMimeType: comercio.videoMimeType ?? null,
+            }}
+            onSubir={(file, meta) => subirVideoComercio(file, meta)}
+            onEliminar={() => quitarVideoComercio()}
+            onGuardarLink={(url) => guardarVideoLinkComercio(url)}
+          />
+        </div>
       )}
 
       {/* Sección de documento */}

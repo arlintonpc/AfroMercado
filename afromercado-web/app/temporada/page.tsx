@@ -60,7 +60,7 @@ export default function PaginaTemporada() {
                   Temporada AfroMercado
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm md:text-base text-[#1A1A1A]/60 leading-relaxed">
-                  Productos con precio especial por tiempo limitado, publicados por productores del Chocó.
+                  Productos con precio especial por tiempo limitado, publicados por productores de todo el país.
                 </p>
               </div>
               <Link href="/" className="self-start md:self-auto text-sm font-semibold text-[#2D6A4F] hover:underline">

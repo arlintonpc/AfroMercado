@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { obtenerTransporte, verificarDisponibilidadTransporte, crearReservaTransporte, misReservasTransporte, toggleFavoritoTransporte, type ConfigTransporte, type RutaTransporte } from '@/lib/api/transporte'
+import { obtenerTransporte, verificarDisponibilidadTransporte, crearReservaTransporte, misReservasTransporte, toggleFavoritoTransporte, validarCuponTransporte, type ConfigTransporte, type RutaTransporte, type ValidacionCuponTransporte } from '@/lib/api/transporte'
 import { reviewsTransporte, crearReviewTransporte, type ReviewTransporte } from '@/lib/api/review'
 import SeccionReviews, { type ReviewItem } from '@/components/ui/SeccionReviews'
 import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
@@ -263,6 +263,11 @@ function FormReservaTransporte({ transporte, ruta, onClose, onSuccess }: {
   const [disponibilidad, setD]      = useState<{ disponibles: number; capacidad: number } | null>(null)
   const [cargando, setCargando]     = useState(false)
   const [error, setError]           = useState('')
+  const [codigoCupon, setCodigoCupon] = useState('')
+  const [cuponAplicado, setCuponAplicado] = useState<ValidacionCuponTransporte | null>(null)
+  const [cuponError, setCuponError] = useState('')
+  const [aplicandoCupon, setAplicandoCupon] = useState(false)
+  const [mostrarCupon, setMostrarCupon] = useState(false)
 
   const total = Number(ruta.precioAsiento) * asientos
 
@@ -271,11 +276,39 @@ function FormReservaTransporte({ transporte, ruta, onClose, onSuccess }: {
     verificarDisponibilidadTransporte(ruta.id, fecha).then(setD).catch(() => setD(null))
   }, [fecha, ruta.id])
 
+  async function aplicarCupon() {
+    if (!codigoCupon.trim()) return
+    setAplicandoCupon(true)
+    setCuponError('')
+    setCuponAplicado(null)
+    try {
+      const resultado = await validarCuponTransporte({
+        codigo: codigoCupon.trim().toUpperCase(),
+        rutaTransporteId: ruta.id,
+        asientos,
+      })
+      setCuponAplicado(resultado)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Cupón inválido o expirado'
+      setCuponError(msg)
+    }
+    setAplicandoCupon(false)
+  }
+
   async function handleReservar() {
     if (!nombre.trim() || !telefono.trim()) { setError('Completa nombre y teléfono'); return }
     setError(''); setCargando(true)
     try {
-      await crearReservaTransporte({ rutaTransporteId: ruta.id, fechaViaje: fecha, asientos, metodoPago, notasCliente: notas || undefined, nombreContacto: nombre.trim(), telefonoContacto: telefono.trim() })
+      await crearReservaTransporte({
+        rutaTransporteId: ruta.id,
+        fechaViaje: fecha,
+        asientos,
+        metodoPago,
+        notasCliente: notas || undefined,
+        nombreContacto: nombre.trim(),
+        telefonoContacto: telefono.trim(),
+        codigoCupon: cuponAplicado?.cupon?.codigo || undefined,
+      })
       onSuccess()
     } catch (e: any) { setError(e.message) } finally { setCargando(false) }
   }
@@ -295,7 +328,7 @@ function FormReservaTransporte({ transporte, ruta, onClose, onSuccess }: {
         <div className="px-6 pt-5 pb-8 space-y-5">
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Fecha del viaje</label>
-            <input type="date" min={manana} value={fecha} onChange={e => setFecha(e.target.value)}
+            <input type="date" min={manana} value={fecha} onChange={e => { setFecha(e.target.value); setCuponAplicado(null) }}
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#1B4332] focus:ring-2 focus:ring-[#1B4332]/10" />
           </div>
 
@@ -307,16 +340,24 @@ function FormReservaTransporte({ transporte, ruta, onClose, onSuccess }: {
                   ? `✓ ${disponibilidad.disponibles} asiento${disponibilidad.disponibles !== 1 ? 's' : ''} disponible${disponibilidad.disponibles !== 1 ? 's' : ''}`
                   : '✗ Sin asientos disponibles'}
               </p>
-              <p className="font-black text-2xl text-gray-900">{formatearPrecio(total)}</p>
+              {cuponAplicado ? (
+                <div className="text-right">
+                  <p className="text-xs text-gray-400 line-through">{formatearPrecio(total)}</p>
+                  <p className="font-black text-2xl text-[#1B4332]">{formatearPrecio(cuponAplicado.totalConDescuento)}</p>
+                  <p className="text-xs text-emerald-600">Ahorras {formatearPrecio(cuponAplicado.descuento)}</p>
+                </div>
+              ) : (
+                <p className="font-black text-2xl text-gray-900">{formatearPrecio(total)}</p>
+              )}
             </div>
           )}
 
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Asientos (máx. {ruta.capacidad})</label>
             <div className="flex items-center gap-4 border border-gray-200 rounded-xl px-4 py-3">
-              <button onClick={() => setAsientos(a => Math.max(1, a - 1))} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-600 hover:bg-gray-200 transition-colors">−</button>
+              <button onClick={() => setAsientos(a => { setCuponAplicado(null); return Math.max(1, a - 1) })} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-600 hover:bg-gray-200 transition-colors">−</button>
               <span className="flex-1 text-center font-bold text-lg">{asientos}</span>
-              <button onClick={() => setAsientos(a => Math.min(ruta.capacidad, disponibilidad?.disponibles ?? ruta.capacidad, a + 1))} className="w-9 h-9 rounded-full bg-[#ECFDF5] flex items-center justify-center font-bold text-[#16A34A] hover:bg-[#D1FAE5] transition-colors">+</button>
+              <button onClick={() => setAsientos(a => { setCuponAplicado(null); return Math.min(ruta.capacidad, disponibilidad?.disponibles ?? ruta.capacidad, a + 1) })} className="w-9 h-9 rounded-full bg-[#ECFDF5] flex items-center justify-center font-bold text-[#16A34A] hover:bg-[#D1FAE5] transition-colors">+</button>
             </div>
           </div>
 
@@ -348,6 +389,52 @@ function FormReservaTransporte({ transporte, ruta, onClose, onSuccess }: {
             <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2}
               placeholder="Equipaje especial, necesidades…"
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#1B4332] resize-none" />
+          </div>
+
+          {/* Cupón de descuento */}
+          <div className="mt-4">
+            {cuponAplicado ? (
+              <>
+                <div className="flex gap-2 mt-1.5">
+                  <input
+                    type="text"
+                    value={codigoCupon}
+                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl uppercase bg-gray-50"
+                    disabled
+                  />
+                  <button type="button" onClick={() => { setCuponAplicado(null); setCodigoCupon(''); setMostrarCupon(false) }}
+                    className="px-3 py-2 text-xs font-medium text-red-500 border border-red-200 rounded-xl hover:bg-red-50">
+                    Quitar
+                  </button>
+                </div>
+                <div className="mt-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                  <p className="text-xs font-semibold text-emerald-700">
+                    ✓ Cupón {cuponAplicado.cupon.codigo} aplicado — descuento {formatearPrecio(cuponAplicado.descuento)}
+                  </p>
+                </div>
+              </>
+            ) : !mostrarCupon ? (
+              <button onClick={() => setMostrarCupon(true)}
+                className="text-xs text-[#2D6A4F] underline hover:text-[#1B4332] text-left">
+                ¿Tienes un código de descuento?
+              </button>
+            ) : (
+              <div className="flex gap-2 mt-1.5">
+                <input
+                  type="text"
+                  value={codigoCupon}
+                  onChange={e => { setCodigoCupon(e.target.value.toUpperCase()); setCuponAplicado(null); setCuponError('') }}
+                  placeholder="Ej: AFRO20"
+                  autoFocus
+                  className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 uppercase"
+                />
+                <button type="button" onClick={aplicarCupon} disabled={!codigoCupon.trim() || aplicandoCupon}
+                  className="px-3 py-2 text-xs font-medium bg-[#2D6A4F] text-white rounded-xl disabled:opacity-50 hover:bg-[#1B4332] transition-colors">
+                  {aplicandoCupon ? '...' : 'Aplicar'}
+                </button>
+              </div>
+            )}
+            {cuponError && <p className="text-xs text-red-500 mt-1">{cuponError}</p>}
           </div>
 
           {error && <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>}

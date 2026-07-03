@@ -6,9 +6,9 @@ import {
   eliminarGrupoComplemento, crearItemComplemento, actualizarItemComplemento,
   eliminarItemComplemento, subirImagenItemComplemento, copiarGrupoATodos,
   listarBibliotecaComplementos, crearGrupoBiblioteca, crearItemBiblioteca,
-  vincularGrupoBiblioteca, desvincularGrupoBiblioteca,
+  vincularGrupoBiblioteca, desvincularGrupoBiblioteca, subirImagenItemBiblioteca,
   type GrupoComplemento, type ItemComplemento,
-  type GrupoComplementoBiblioteca, type ProductoGrupoComplemento,
+  type GrupoComplementoBiblioteca, type ItemComplementoBiblioteca, type ProductoGrupoComplemento,
 } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
@@ -27,6 +27,7 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [subiendoImagen, setSubiendoImagen] = useState<number | null>(null)
+  const [subiendoImagenBiblioteca, setSubiendoImagenBiblioteca] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [biblioteca, setBiblioteca] = useState<GrupoComplementoBiblioteca[]>([])
   const [asignaciones, setAsignaciones] = useState<ProductoGrupoComplemento[]>([])
@@ -41,6 +42,7 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
   const [editGrupo, setEditGrupo] = useState({ nombre: '', minimo: 0, maximo: 1, requerido: false })
 
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
+  const fileInputRefsBiblioteca = useRef<Record<number, HTMLInputElement | null>>({})
 
   useEffect(() => {
     let activo = true
@@ -230,6 +232,24 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
     } finally { setSubiendoImagen(null) }
   }
 
+  async function handleImagenItemBiblioteca(grupoId: number, item: ItemComplementoBiblioteca, file: File) {
+    setSubiendoImagenBiblioteca(item.id)
+    setError(null)
+    try {
+      const updated = await subirImagenItemBiblioteca(item.id, file)
+      setBiblioteca(prev => prev.map(g => g.id === grupoId
+        ? { ...g, items: g.items.map(i => i.id === item.id ? { ...i, imagenUrl: updated.imagenUrl } : i) }
+        : g
+      ))
+      setAsignaciones(prev => prev.map(a => a.grupoBibliotecaId === grupoId
+        ? { ...a, grupo: { ...a.grupo, items: a.grupo.items.map(i => i.id === item.id ? { ...i, imagenUrl: updated.imagenUrl } : i) } }
+        : a
+      ))
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo subir la imagen del complemento.'))
+    } finally { setSubiendoImagenBiblioteca(null) }
+  }
+
   const gruposAsignadosIds = new Set(asignaciones.map(a => a.grupoBibliotecaId))
   const gruposDisponibles = biblioteca.filter(g => !gruposAsignadosIds.has(g.id))
 
@@ -292,8 +312,13 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
                       {asignacion.grupo.items.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-3">
                           {asignacion.grupo.items.map(item => (
-                            <span key={item.id} className="text-xs px-2 py-1 rounded-full bg-gray-50 border border-gray-100 text-gray-600">
-                              {item.icono ? `${item.icono} ` : ''}{item.nombre}{Number(item.precio) > 0 ? ` +${formatearPrecio(Number(item.precio))}` : ''}
+                            <span key={item.id} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-gray-50 border border-gray-100 text-gray-600">
+                              {item.imagenUrl ? (
+                                <img src={item.imagenUrl} alt={item.nombre} className="w-4 h-4 rounded-full object-cover" />
+                              ) : item.icono ? (
+                                <span>{item.icono}</span>
+                              ) : null}
+                              {item.nombre}{Number(item.precio) > 0 ? ` +${formatearPrecio(Number(item.precio))}` : ''}
                             </span>
                           ))}
                         </div>
@@ -342,11 +367,49 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
                       </div>
 
                       {grupo.items.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="divide-y">
                           {grupo.items.map(item => (
-                            <span key={item.id} className="text-xs px-2 py-1 rounded-full bg-gray-50 border border-gray-100 text-gray-600">
-                              {item.icono ? `${item.icono} ` : ''}{item.nombre}
-                            </span>
+                            <div key={item.id} className="flex items-center gap-3 py-2">
+                              {/* Miniatura con botón de cambio */}
+                              <div className="relative flex-shrink-0">
+                                <button
+                                  onClick={() => fileInputRefsBiblioteca.current[item.id]?.click()}
+                                  className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 flex items-center justify-center bg-gray-50 hover:border-[#2D6A4F] transition group"
+                                  title="Cambiar imagen"
+                                >
+                                  {subiendoImagenBiblioteca === item.id ? (
+                                    <div className="w-4 h-4 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />
+                                  ) : item.imagenUrl ? (
+                                    <img src={item.imagenUrl} alt={item.nombre} className="w-full h-full object-cover" />
+                                  ) : item.icono ? (
+                                    <span className="text-xl">{item.icono}</span>
+                                  ) : (
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round">
+                                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                                    </svg>
+                                  )}
+                                </button>
+                                {/* overlay cámara */}
+                                {!subiendoImagenBiblioteca && (
+                                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#2D6A4F] rounded-full flex items-center justify-center pointer-events-none">
+                                    <svg width="8" height="8" viewBox="0 0 24 24" fill="white"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                  </div>
+                                )}
+                                <input
+                                  ref={el => { fileInputRefsBiblioteca.current[item.id] = el }}
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={e => {
+                                    const f = e.target.files?.[0]
+                                    if (f) handleImagenItemBiblioteca(grupo.id, item, f)
+                                    e.target.value = ''
+                                  }}
+                                />
+                              </div>
+
+                              <span className="flex-1 text-sm text-gray-800">{item.nombre}</span>
+                            </div>
                           ))}
                         </div>
                       )}

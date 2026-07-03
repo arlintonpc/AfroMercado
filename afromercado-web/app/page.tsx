@@ -6,12 +6,14 @@ import Image from 'next/image'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import HeroBanner from '@/components/catalogo/HeroBanner'
+import BannerCarrusel from '@/components/publicidad/BannerCarrusel'
 import FiltrosHorizontales from '@/components/catalogo/FiltrosHorizontales'
 import TarjetaProducto from '@/components/catalogo/TarjetaProducto'
 import { SkeletonCard, EmptyState } from '@/components/ui'
 import { listarProductos, listarCategorias } from '@/lib/api/productos'
-import { apiFetch } from '@/lib/api/client'
+import { API_URL, apiFetch } from '@/lib/api/client'
 import { useAuth } from '@/context/AuthContext'
+import { useRegion } from '@/context/RegionContext'
 import { mapearProductos, type ProductoCrudo } from '@/lib/mapearProducto'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { precioVigente } from '@/lib/precioProducto'
@@ -52,10 +54,53 @@ interface VisibilidadActiva {
   producto?: ProductoCrudo | null
 }
 
+const PRODUCTOS_POR_PAGINA = 24
+
 function visibilidadConProducto(
   v: VisibilidadActiva,
 ): v is VisibilidadActiva & { producto: ProductoCrudo } {
   return Boolean(v.producto)
+}
+
+interface VisibilidadesInicio {
+  home: Producto[]
+  homeEtiquetas: Map<string, string>
+  catalogoEtiquetas: Map<string, string>
+}
+
+async function obtenerVisibilidadesInicio(departamento?: string | null): Promise<VisibilidadesInicio> {
+  const qs = departamento ? `?departamento=${encodeURIComponent(departamento)}` : ''
+  const r = await fetch(`${API_URL}/productos/destacados${qs}`)
+  if (!r.ok) throw new Error('No se pudieron cargar los productos destacados.')
+
+  const j = await r.json()
+  const visibilidades: VisibilidadActiva[] = Array.isArray(j.items) ? j.items : []
+  const homeVisibilidades = visibilidades.filter(
+    (v): v is VisibilidadActiva & { producto: ProductoCrudo } => (
+      v.tipo === 'HOME_DESTACADO' && visibilidadConProducto(v)
+    ),
+  )
+  const catalogoVisibilidades = visibilidades.filter(
+    (v): v is VisibilidadActiva & { producto: ProductoCrudo } => (
+      v.tipo === 'CATALOGO' && visibilidadConProducto(v)
+    ),
+  )
+
+  return {
+    home: mapearProductos(homeVisibilidades.map(v => v.producto)),
+    homeEtiquetas: new Map(
+      homeVisibilidades.map(v => [
+        String(v.producto.id),
+        v.etiqueta?.trim() || 'Patrocinado',
+      ] as [string, string]),
+    ),
+    catalogoEtiquetas: new Map(
+      catalogoVisibilidades.map(v => [
+        String(v.producto.id),
+        v.etiqueta?.trim() || 'Patrocinado',
+      ] as [string, string]),
+    ),
+  }
 }
 
 /* ─── Componente SeccionHoteles ──────────────────────────────────── */
@@ -75,33 +120,36 @@ function SeccionHoteles({ hoteles }: { hoteles: ConfigHotel[] }) {
             Ver todos →
           </Link>
         </div>
-        <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-          {hoteles.slice(0, 6).map(h => {
-            const desde = h.habitaciones.length > 0
-              ? Math.min(...h.habitaciones.map(hab => Number(hab.precioPorNoche)))
-              : null
-            const foto = h.habitaciones[0]?.fotos[0]
-            return (
-              <Link key={h.id} href={`/hoteles/${h.id}`}
-                className="flex-shrink-0 w-52 bg-[#F8F5F0] rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
-                <div className="h-32 bg-gradient-to-br from-[#2D6A4F] to-[#40916C] flex items-center justify-center overflow-hidden">
-                  {foto
-                    ? <img src={optimizarImagenPequena(foto)} alt={h.comercio.nombre} className="w-full h-full object-cover" />
-                    : <span className="text-4xl">🏨</span>
-                  }
-                </div>
-                <div className="p-3">
-                  <p className="font-semibold text-[#1A1A1A] text-sm truncate">{h.comercio.nombre}</p>
-                  <p className="text-xs text-gray-500 truncate">📍 {h.comercio.municipio}</p>
-                  {desde !== null && (
-                    <p className="text-xs text-[#2D6A4F] font-bold mt-1">
-                      Desde {formatearPrecio(desde)}<span className="font-normal text-gray-400">/noche</span>
-                    </p>
-                  )}
-                </div>
-              </Link>
-            )
-          })}
+        <div className="relative">
+          <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+            {hoteles.slice(0, 6).map(h => {
+              const desde = h.habitaciones.length > 0
+                ? Math.min(...h.habitaciones.map(hab => Number(hab.precioPorNoche)))
+                : null
+              const foto = h.habitaciones[0]?.fotos[0]
+              return (
+                <Link key={h.id} href={`/hoteles/${h.id}`}
+                  className="flex-shrink-0 w-40 sm:w-48 md:w-52 bg-[#F8F5F0] rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
+                  <div className="h-32 bg-gradient-to-br from-[#2D6A4F] to-[#40916C] flex items-center justify-center overflow-hidden">
+                    {foto
+                      ? <img src={optimizarImagenPequena(foto)} alt={h.comercio.nombre} className="w-full h-full object-cover" />
+                      : <span className="text-4xl">🏨</span>
+                    }
+                  </div>
+                  <div className="p-3">
+                    <p className="font-semibold text-[#1A1A1A] text-sm truncate">{h.comercio.nombre}</p>
+                    <p className="text-xs text-gray-500 truncate">📍 {h.comercio.municipio}</p>
+                    {desde !== null && (
+                      <p className="text-xs text-[#2D6A4F] font-bold mt-1">
+                        Desde {formatearPrecio(desde)}<span className="font-normal text-gray-400">/noche</span>
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent md:hidden" />
         </div>
       </div>
     </section>
@@ -123,25 +171,28 @@ function SeccionTours({ tours }: { tours: ConfigTour[] }) {
           </div>
           <Link href="/tours" className="text-sm font-semibold text-[#2D6A4F] hover:underline whitespace-nowrap">Ver todos →</Link>
         </div>
-        <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-          {tours.slice(0, 6).map(t => (
-            <Link key={t.id} href={`/tours/${t.id}`}
-              className="flex-shrink-0 w-52 bg-white rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
-              <div className="h-32 bg-gradient-to-br from-[#40916C] to-[#74C69D] flex items-center justify-center overflow-hidden">
-                {t.fotos[0]
-                  ? <img src={optimizarImagenPequena(t.fotos[0])} alt={t.nombre} className="w-full h-full object-cover" />
-                  : <span className="text-4xl">🗺️</span>}
-              </div>
-              <div className="p-3">
-                <p className="font-semibold text-[#1A1A1A] text-sm truncate">{t.nombre}</p>
-                <p className="text-xs text-gray-500 truncate">📍 {t.comercio.municipio}</p>
-                <div className="flex items-center justify-between mt-1">
-                  <p className="text-xs text-[#2D6A4F] font-bold">{formatearPrecio(Number(t.precioPersona))}<span className="font-normal text-gray-400">/pers.</span></p>
-                  <p className="text-xs text-gray-400">⏱️ {t.duracionHoras}h</p>
+        <div className="relative">
+          <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+            {tours.slice(0, 6).map(t => (
+              <Link key={t.id} href={`/tours/${t.id}`}
+                className="flex-shrink-0 w-40 sm:w-48 md:w-52 bg-white rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
+                <div className="h-32 bg-gradient-to-br from-[#40916C] to-[#74C69D] flex items-center justify-center overflow-hidden">
+                  {t.fotos[0]
+                    ? <img src={optimizarImagenPequena(t.fotos[0])} alt={t.nombre} className="w-full h-full object-cover" />
+                    : <span className="text-4xl">🗺️</span>}
                 </div>
-              </div>
-            </Link>
-          ))}
+                <div className="p-3">
+                  <p className="font-semibold text-[#1A1A1A] text-sm truncate">{t.nombre}</p>
+                  <p className="text-xs text-gray-500 truncate">📍 {t.comercio.municipio}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-xs text-[#2D6A4F] font-bold">{formatearPrecio(Number(t.precioPersona))}<span className="font-normal text-gray-400">/pers.</span></p>
+                    <p className="text-xs text-gray-400">⏱️ {t.duracionHoras}h</p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#F8F5F0] to-transparent md:hidden" />
         </div>
       </div>
     </section>
@@ -160,33 +211,36 @@ function SeccionTransporte({ transportes }: { transportes: ConfigTransporte[] })
           <div>
             <p className="text-[#023E8A] text-xs font-semibold tracking-widest uppercase mb-1">Fluvial</p>
             <h2 className="text-2xl md:text-3xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif)' }}>
-              Transporte Fluvial
+              Transporte
             </h2>
           </div>
           <Link href="/transportes" className="text-sm font-semibold text-[#023E8A] hover:underline whitespace-nowrap">Ver todos →</Link>
         </div>
-        <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-          {transportes.slice(0, 6).map(t => {
-            const precioMin = t.rutas.length > 0 ? Math.min(...t.rutas.map(r => Number(r.precioAsiento))) : null
-            return (
-              <Link key={t.id} href={`/transportes/${t.id}`}
-                className="flex-shrink-0 w-52 bg-[#F8F5F0] rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
-                <div className="h-32 bg-gradient-to-br from-[#023E8A] to-[#0077B6] flex items-center justify-center overflow-hidden">
-                  {t.fotos[0]
-                    ? <img src={optimizarImagenPequena(t.fotos[0])} alt={t.nombre} className="w-full h-full object-cover" />
-                    : <span className="text-4xl">{TIPO_ICONO[t.tipo] ?? '🛥️'}</span>}
-                </div>
-                <div className="p-3">
-                  <p className="font-semibold text-[#1A1A1A] text-sm truncate">{t.nombre}</p>
-                  <p className="text-xs text-gray-500 truncate">📍 {t.comercio.municipio}</p>
-                  {precioMin !== null && (
-                    <p className="text-xs text-[#023E8A] font-bold mt-1">Desde {formatearPrecio(precioMin)}<span className="font-normal text-gray-400">/asiento</span></p>
-                  )}
-                  <p className="text-xs text-gray-400 mt-0.5">{t.rutas.length} ruta{t.rutas.length !== 1 ? 's' : ''}</p>
-                </div>
-              </Link>
-            )
-          })}
+        <div className="relative">
+          <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+            {transportes.slice(0, 6).map(t => {
+              const precioMin = t.rutas.length > 0 ? Math.min(...t.rutas.map(r => Number(r.precioAsiento))) : null
+              return (
+                <Link key={t.id} href={`/transportes/${t.id}`}
+                  className="flex-shrink-0 w-40 sm:w-48 md:w-52 bg-[#F8F5F0] rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
+                  <div className="h-32 bg-gradient-to-br from-[#023E8A] to-[#0077B6] flex items-center justify-center overflow-hidden">
+                    {t.fotos[0]
+                      ? <img src={optimizarImagenPequena(t.fotos[0])} alt={t.nombre} className="w-full h-full object-cover" />
+                      : <span className="text-4xl">{TIPO_ICONO[t.tipo] ?? '🛥️'}</span>}
+                  </div>
+                  <div className="p-3">
+                    <p className="font-semibold text-[#1A1A1A] text-sm truncate">{t.nombre}</p>
+                    <p className="text-xs text-gray-500 truncate">📍 {t.comercio.municipio}</p>
+                    {precioMin !== null && (
+                      <p className="text-xs text-[#023E8A] font-bold mt-1">Desde {formatearPrecio(precioMin)}<span className="font-normal text-gray-400">/asiento</span></p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-0.5">{t.rutas.length} ruta{t.rutas.length !== 1 ? 's' : ''}</p>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent md:hidden" />
         </div>
       </div>
     </section>
@@ -206,39 +260,42 @@ function SeccionCategorias() {
         </h2>
 
         {/* Pills — scroll en mobile, centrados en desktop */}
-        <div
-          className="flex gap-3 overflow-x-auto pb-1 justify-start md:justify-center"
-          style={{ scrollbarWidth: 'none' } as React.CSSProperties}
-        >
-          {CATEGORIAS.map((cat) => {
-            const claseBase = `flex flex-col items-center gap-1.5 px-5 py-4 rounded-2xl transition-all duration-200 min-w-[90px] ${cat.fondo}`
-            const contenido = (
-              <>
-                <span className="text-3xl leading-none">{cat.emoji}</span>
-                <span className={`text-xs font-semibold ${cat.texto} whitespace-nowrap`}>{cat.nombre}</span>
-              </>
-            )
-            const destino = cat.href ?? (cat.slug ? `/buscar?categoria=${cat.slug}` : null)
-            const activa = !cat.proximamente && !!destino
-            return (
-              <div key={cat.nombre} className="relative flex-shrink-0">
-                {activa ? (
-                  <Link href={destino!} className={`${claseBase} hover:scale-105 hover:shadow-md`}>
-                    {contenido}
-                  </Link>
-                ) : (
-                  <button disabled className={`${claseBase} opacity-60 cursor-not-allowed`}>
-                    {contenido}
-                  </button>
-                )}
-                {cat.proximamente && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-[#D4A017] text-[#1A1A1A] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none whitespace-nowrap">
-                    Próximo
-                  </span>
-                )}
-              </div>
-            )
-          })}
+        <div className="relative">
+          <div
+            className="flex gap-3 overflow-x-auto pb-1 justify-start md:justify-center"
+            style={{ scrollbarWidth: 'none' } as React.CSSProperties}
+          >
+            {CATEGORIAS.map((cat) => {
+              const claseBase = `flex flex-col items-center gap-1.5 px-5 py-4 rounded-2xl transition-all duration-200 min-w-[90px] ${cat.fondo}`
+              const contenido = (
+                <>
+                  <span className="text-3xl leading-none">{cat.emoji}</span>
+                  <span className={`text-xs font-semibold ${cat.texto} whitespace-nowrap`}>{cat.nombre}</span>
+                </>
+              )
+              const destino = cat.href ?? (cat.slug ? `/buscar?categoria=${cat.slug}` : null)
+              const activa = !cat.proximamente && !!destino
+              return (
+                <div key={cat.nombre} className="relative flex-shrink-0">
+                  {activa ? (
+                    <Link href={destino!} className={`${claseBase} hover:scale-105 hover:shadow-md`}>
+                      {contenido}
+                    </Link>
+                  ) : (
+                    <button disabled className={`${claseBase} opacity-60 cursor-not-allowed`}>
+                      {contenido}
+                    </button>
+                  )}
+                  {cat.proximamente && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-[#D4A017] text-[#1A1A1A] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none whitespace-nowrap">
+                      Próximo
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent md:hidden" />
         </div>
       </div>
     </section>
@@ -369,49 +426,52 @@ function SeccionOfertas({ productos }: { productos: Producto[] }) {
           </Link>
         </div>
 
-        <div
-          className="flex gap-4 overflow-x-auto pb-2"
-          style={{ scrollbarWidth: 'none' } as React.CSSProperties}
-        >
-          {conOferta.map(p => (
-            <Link
-              key={p.id}
-              href={`/producto/${p.id}`}
-              className="flex-shrink-0 w-48 rounded-2xl border border-[#2D6A4F]/15 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden group"
-            >
-              {/* Imagen */}
-              <div className="relative w-full aspect-square bg-[#F0EBE3] overflow-hidden">
-                {p.fotoUrl ? (
-                  <Image src={p.fotoUrl} alt={p.nombre} fill sizes="192px" className="object-cover group-hover:scale-[1.03] transition-transform duration-300" />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center px-3 text-center">
-                    <span className="text-[#2D6A4F] text-sm font-normal" style={{ fontFamily: 'var(--font-dm-serif)' }}>{p.nombre}</span>
-                  </div>
-                )}
-                <span className="absolute top-2 left-2 bg-[#2D6A4F] text-white text-[10px] font-bold px-2 py-0.5 rounded-full leading-none">
-                  {p.oferta!.tipo === 'PORCENTAJE' ? `-${Math.round(p.oferta!.valor)}%` : 'TEMPORADA'}
-                </span>
-              </div>
-              {/* Info */}
-              <div className="px-3 py-2.5">
-                <p className="text-[10px] text-[#52B788] font-semibold uppercase tracking-wide truncate mb-0.5">{p.comercio.nombre}</p>
-                <p className="text-sm font-semibold text-[#1A1A1A] truncate mb-1">{p.nombre}</p>
-                {p.oferta?.etiqueta && (
-                  <p className="text-[10px] text-[#2D6A4F] font-medium truncate mb-1">{p.oferta.etiqueta}</p>
-                )}
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-base font-bold text-[#2D6A4F]">{formatearPrecio(p.oferta!.precioFinal)}</span>
-                  <span className="text-xs text-[#1A1A1A]/40 line-through">{formatearPrecio(p.precio)}</span>
+        <div className="relative">
+          <div
+            className="flex gap-4 overflow-x-auto pb-2"
+            style={{ scrollbarWidth: 'none' } as React.CSSProperties}
+          >
+            {conOferta.map(p => (
+              <Link
+                key={p.id}
+                href={`/producto/${p.id}`}
+                className="flex-shrink-0 w-36 sm:w-44 md:w-48 rounded-2xl border border-[#2D6A4F]/15 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden group"
+              >
+                {/* Imagen */}
+                <div className="relative w-full aspect-square bg-[#F0EBE3] overflow-hidden">
+                  {p.fotoUrl ? (
+                    <Image src={p.fotoUrl} alt={p.nombre} fill sizes="192px" className="object-cover group-hover:scale-[1.03] transition-transform duration-300" />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center px-3 text-center">
+                      <span className="text-[#2D6A4F] text-sm font-normal" style={{ fontFamily: 'var(--font-dm-serif)' }}>{p.nombre}</span>
+                    </div>
+                  )}
+                  <span className="absolute top-2 left-2 bg-[#2D6A4F] text-white text-[10px] font-bold px-2 py-0.5 rounded-full leading-none">
+                    {p.oferta!.tipo === 'PORCENTAJE' ? `-${Math.round(p.oferta!.valor)}%` : 'TEMPORADA'}
+                  </span>
                 </div>
-                {p.oferta?.fin && (
-                  <p className="text-[9px] text-[#1A1A1A]/35 mt-1 flex items-center gap-0.5">
-                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                    {tiempoRestante(p.oferta.fin)}
-                  </p>
-                )}
-              </div>
-            </Link>
-          ))}
+                {/* Info */}
+                <div className="px-3 py-2.5">
+                  <p className="text-[10px] text-[#52B788] font-semibold uppercase tracking-wide truncate mb-0.5">{p.comercio.nombre}</p>
+                  <p className="text-sm font-semibold text-[#1A1A1A] truncate mb-1">{p.nombre}</p>
+                  {p.oferta?.etiqueta && (
+                    <p className="text-[10px] text-[#2D6A4F] font-medium truncate mb-1">{p.oferta.etiqueta}</p>
+                  )}
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-base font-bold text-[#2D6A4F]">{formatearPrecio(p.oferta!.precioFinal)}</span>
+                    <span className="text-xs text-[#1A1A1A]/40 line-through">{formatearPrecio(p.precio)}</span>
+                  </div>
+                  {p.oferta?.fin && (
+                    <p className="text-[9px] text-[#1A1A1A]/35 mt-1 flex items-center gap-0.5">
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                      {tiempoRestante(p.oferta.fin)}
+                    </p>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent md:hidden" />
         </div>
       </div>
     </section>
@@ -432,6 +492,7 @@ function intercalarDestacados<T>(pagados: T[], organicos: T[]): T[] {
 /* ─── Página principal ───────────────────────────────────────────── */
 export default function Home() {
   const { autenticado } = useAuth()
+  const { regionActiva, elegirRegion } = useRegion()
   const [filtroActivo, setFiltroActivo] = useState<string>('todos')
   const [recomendados, setRecomendados] = useState<Producto[]>([])
   const [cargando, setCargando] = useState<boolean>(true)
@@ -450,14 +511,14 @@ export default function Home() {
   const [hayMas, setHayMas] = useState(false)
   const [cargandoMas, setCargandoMas] = useState(false)
 
-  /** Carga productos según el filtro de categoría activo. */
+  /** Carga productos según el filtro de categoría activo, respetando la región activa. */
   const cargarProductos = useCallback(async (filtro: string) => {
     setCargando(true)
     setError(null)
     setPaginaActual(1)
     try {
       const categoriaId = filtro === 'todos' ? undefined : filtro
-      const resultado = await listarProductos({ categoriaId, porPagina: 24, pagina: 1 })
+      const resultado = await listarProductos({ categoriaId, departamento: regionActiva ?? undefined, porPagina: PRODUCTOS_POR_PAGINA, pagina: 1 })
       setProductos(mapearProductos(resultado.items))
       setHayMas(resultado.pagina < resultado.paginas)
     } catch (e) {
@@ -467,87 +528,23 @@ export default function Home() {
     } finally {
       setCargando(false)
     }
-  }, [])
+  }, [regionActiva])
 
-  // Carga inicial: categorías reales + productos + destacados.
+  // Carga inicial: el catálogo no espera a los bloques secundarios.
+  // Se repite cuando cambia la región activa (el usuario elige otra región o "todo el país").
   useEffect(() => {
     let cancelado = false
+    const departamento = regionActiva ?? undefined
 
-    async function cargarInicial() {
-      // Categorías (no bloquea el catálogo si falla).
-      try {
-        const cats = await listarCategorias()
-        if (!cancelado) setCategorias(cats)
-      } catch {
-        if (!cancelado) setCategorias([])
-      }
+    setCargando(true)
+    setError(null)
 
-      // Todos los productos para la sección de más vendidos
-      try {
-        const { items } = await listarProductos({ porPagina: 50 })
-        if (!cancelado) setDestacados(mapearProductos(items))
-      } catch {
-        if (!cancelado) setDestacados([])
-      }
-
-      // Hoteles activos para la sección de turismo
-      try {
-        const hotelesData = await listarHoteles()
-        if (!cancelado) setHoteles(hotelesData)
-      } catch {
-        if (!cancelado) setHoteles([])
-      }
-
-      // Tours y transporte
-      try {
-        const [toursData, transportesData] = await Promise.all([listarTours(), listarTransportes()])
-        if (!cancelado) { setTours(toursData); setTransportes(transportesData) }
-      } catch {
-        if (!cancelado) { setTours([]); setTransportes([]) }
-      }
-
-      // Visibilidades pagadas activas (HOME_DESTACADO y CATALOGO)
-      try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')
-        const r = await fetch(`${API_URL}/productos/destacados`)
-        if (r.ok) {
-          const j = await r.json()
-          const visibilidades: VisibilidadActiva[] = Array.isArray(j.items) ? j.items : []
-          const homeProds = visibilidades
-            .filter((v): v is VisibilidadActiva & { producto: ProductoCrudo } => (
-              v.tipo === 'HOME_DESTACADO' && visibilidadConProducto(v)
-            ))
-            .map(v => v.producto)
-          const catalogoMap = new Map<string, string>(
-            visibilidades
-              .filter((v): v is VisibilidadActiva & { producto: ProductoCrudo } => (
-                v.tipo === 'CATALOGO' && visibilidadConProducto(v)
-              ))
-              .map(v => [String(v.producto.id), v.etiqueta?.trim() || 'Patrocinado'] as [string, string])
-          )
-          const homeEtiquetas = new Map<string, string>(
-            visibilidades
-              .filter((v): v is VisibilidadActiva & { producto: ProductoCrudo } => (
-                v.tipo === 'HOME_DESTACADO' && visibilidadConProducto(v)
-              ))
-              .map(v => [String(v.producto.id), v.etiqueta?.trim() || 'Patrocinado'] as [string, string])
-          )
-          if (!cancelado) {
-            setDestHome(mapearProductos(homeProds.filter(Boolean) as ProductoCrudo[]))
-            setDestHomeEtiquetas(homeEtiquetas)
-            setDestCatalogo(catalogoMap)
-          }
-        }
-      } catch {
-        if (!cancelado) { setDestHome([]); setDestCatalogo(new Map()) }
-      }
-    }
-
-    cargarInicial()
-    listarProductos({ porPagina: 24, pagina: 1 })
+    listarProductos({ departamento, porPagina: PRODUCTOS_POR_PAGINA, pagina: 1 })
       .then((resultado) => {
         if (!cancelado) {
-          setProductos(mapearProductos(resultado.items))
+          const productosMapeados = mapearProductos(resultado.items)
+          setProductos(productosMapeados)
+          setDestacados(productosMapeados)
           setHayMas(resultado.pagina < resultado.paginas)
         }
       })
@@ -555,15 +552,48 @@ export default function Home() {
         if (!cancelado) {
           setError(e instanceof Error ? e.message : 'No se pudieron cargar los productos.')
           setProductos([])
+          setDestacados([])
           setHayMas(false)
         }
       })
       .finally(() => { if (!cancelado) setCargando(false) })
 
+    listarCategorias()
+      .then(cats => { if (!cancelado) setCategorias(cats) })
+      .catch(() => { if (!cancelado) setCategorias([]) })
+
+    listarHoteles({ departamento })
+      .then(hotelesData => { if (!cancelado) setHoteles(hotelesData) })
+      .catch(() => { if (!cancelado) setHoteles([]) })
+
+    listarTours({ departamento })
+      .then(toursData => { if (!cancelado) setTours(toursData) })
+      .catch(() => { if (!cancelado) setTours([]) })
+
+    listarTransportes({ departamento })
+      .then(transportesData => { if (!cancelado) setTransportes(transportesData) })
+      .catch(() => { if (!cancelado) setTransportes([]) })
+
+    obtenerVisibilidadesInicio(departamento)
+      .then((visibilidades) => {
+        if (!cancelado) {
+          setDestHome(visibilidades.home)
+          setDestHomeEtiquetas(visibilidades.homeEtiquetas)
+          setDestCatalogo(visibilidades.catalogoEtiquetas)
+        }
+      })
+      .catch(() => {
+        if (!cancelado) {
+          setDestHome([])
+          setDestHomeEtiquetas(new Map())
+          setDestCatalogo(new Map())
+        }
+      })
+
     return () => {
       cancelado = true
     }
-  }, [])
+  }, [regionActiva])
 
   // Recomendaciones personalizadas (solo usuarios autenticados)
   useEffect(() => {
@@ -586,7 +616,7 @@ export default function Home() {
     try {
       const nuevaPagina = paginaActual + 1
       const categoriaId = filtroActivo === 'todos' ? undefined : filtroActivo
-      const resultado = await listarProductos({ categoriaId, porPagina: 24, pagina: nuevaPagina })
+      const resultado = await listarProductos({ categoriaId, departamento: regionActiva ?? undefined, porPagina: PRODUCTOS_POR_PAGINA, pagina: nuevaPagina })
       setProductos(prev => [...prev, ...mapearProductos(resultado.items)])
       setPaginaActual(nuevaPagina)
       setHayMas(resultado.pagina < resultado.paginas)
@@ -605,6 +635,9 @@ export default function Home() {
         {/* Hero */}
         <HeroBanner productos={destacados} />
 
+        {/* Banners patrocinados — carrusel */}
+        <BannerCarrusel />
+
         {/* Propuesta de valor */}
         <section className="bg-white border-y border-[#E8DCC8] py-8">
           <div className="max-w-7xl mx-auto px-4 md:px-6">
@@ -613,7 +646,7 @@ export default function Home() {
                 {
                   icono: '🌿',
                   titulo: 'Directo del productor',
-                  desc: 'Sin intermediarios. Tu compra llega directamente a familias del Chocó.',
+                  desc: 'Sin intermediarios. Tu compra llega directamente a las familias productoras.',
                 },
                 {
                   icono: '🤝',
@@ -622,8 +655,8 @@ export default function Home() {
                 },
                 {
                   icono: '📍',
-                  titulo: '100% Chocó',
-                  desc: 'Productos, tours y servicios auténticos de las comunidades afrocolombianas.',
+                  titulo: '100% Colombia',
+                  desc: 'Productos, tours y servicios auténticos de comunidades afro, indígenas y campesinas de todo el país.',
                 },
               ].map((item) => (
                 <div key={item.titulo} className="flex items-start gap-4">
@@ -694,13 +727,27 @@ export default function Home() {
                 className="text-2xl md:text-3xl text-[#1A1A1A]"
                 style={{ fontFamily: 'var(--font-dm-serif)' }}
               >
-                Productos del Chocó
+                Productos de Colombia
               </h2>
             </div>
             <p className="text-[#1A1A1A]/40 text-sm hidden md:block">
               {productos.length} productos
             </p>
           </div>
+
+          {/* Indicador de contexto regional — solo cuando hay una región activa */}
+          {regionActiva && (
+            <p className="text-sm text-[#1A1A1A]/60 -mt-2">
+              Mostrando productos de <span className="font-semibold text-[#2D6A4F]">{regionActiva}</span>.{' '}
+              <button
+                type="button"
+                onClick={() => elegirRegion(null)}
+                className="font-semibold text-[#2D6A4F] hover:underline"
+              >
+                Ver todo el país
+              </button>
+            </p>
+          )}
 
           {/* Filtros — categorías reales de la API */}
           <FiltrosHorizontales
@@ -731,7 +778,7 @@ export default function Home() {
           {!cargando && !error && productos.length === 0 && (
             <EmptyState
               titulo="Aún no hay productos"
-              descripcion="Pronto encontrarás aquí los productos del Chocó. Vuelve a intentarlo en un momento."
+              descripcion="Pronto encontrarás aquí los productos de todo el país. Vuelve a intentarlo en un momento."
               onReintentar={() => cargarProductos(filtroActivo)}
             />
           )}

@@ -12,9 +12,6 @@ export { MUNICIPIOS_POR_DEPARTAMENTO, municipiosDe }
 /** Todos los departamentos de Colombia (fuente única: lib/data/colombia). */
 export const DEPARTAMENTOS_COLOMBIA: string[] = [...DEPARTAMENTOS].sort()
 
-/** Municipios del Chocó — alias de MUNICIPIOS_POR_DEPARTAMENTO['Chocó']. */
-export const MUNICIPIOS_CHOCO: string[] = MUNICIPIOS_POR_DEPARTAMENTO['Chocó']
-
 /** Unidad de venta válida en el backend. */
 export type Unidad = 'KG' | 'UNIDAD' | 'LITRO' | 'PAQUETE' | 'DOCENA' | 'MANOJO'
 

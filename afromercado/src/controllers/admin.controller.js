@@ -359,7 +359,7 @@ const AdminController = {
             <p>Este es un correo de prueba enviado desde el panel de administración de <strong>AfroMercado</strong>.</p>
             <p style="color:#666;font-size:14px">Si recibiste este mensaje, las notificaciones por email están correctamente configuradas.</p>
             <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
-            <p style="color:#999;font-size:12px">AfroMercado — Del Chocó para el mundo</p>
+            <p style="color:#999;font-size:12px">AfroMercado — Del Chocó para toda Colombia</p>
           </div>
         `,
       });
@@ -403,6 +403,25 @@ const AdminController = {
       });
       await prisma.accionModeracion.create({
         data: { adminId: req.usuario.id, targetId: id, targetTipo: "COMERCIO", accion: activo ? "ACTIVAR_WHATSAPP" : "DESACTIVAR_WHATSAPP" },
+      });
+      res.json({ ok: true, data: actualizado });
+    } catch (e) { next(e); }
+  },
+
+  // PATCH /admin/comercios/:id/verificado-etnico
+  async toggleVerificadoEtnico(req, res, next) {
+    try {
+      const id = Number(req.params.id);
+      const comercio = await prisma.comercio.findUnique({ where: { id }, select: { id: true, verificadoEtnico: true } });
+      if (!comercio) throw new ErrorNoEncontrado("Comercio no encontrado");
+      const activo = !comercio.verificadoEtnico;
+      const actualizado = await prisma.comercio.update({
+        where: { id },
+        data: { verificadoEtnico: activo },
+        select: { id: true, nombre: true, verificadoEtnico: true },
+      });
+      await prisma.accionModeracion.create({
+        data: { adminId: req.usuario.id, targetId: id, targetTipo: "COMERCIO", accion: activo ? "ACTIVAR_VERIFICADO_ETNICO" : "DESACTIVAR_VERIFICADO_ETNICO" },
       });
       res.json({ ok: true, data: actualizado });
     } catch (e) { next(e); }

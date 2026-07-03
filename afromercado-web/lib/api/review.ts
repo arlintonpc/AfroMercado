@@ -95,3 +95,27 @@ export async function crearReviewTour(reservaTourId: number, calificacion: numbe
   })
   return r.data
 }
+
+export interface ReviewCultura {
+  id: number
+  eventoCulturalId: number
+  clienteId: number
+  reservaCulturalId: number
+  calificacion: number
+  comentario?: string | null
+  creadoAt: string
+  cliente?: { nombre: string; avatarUrl?: string | null }
+}
+
+export async function reviewsCultura(eventoCulturalId: number): Promise<ReviewCultura[]> {
+  const r = await apiFetch<{ ok: boolean; data: ReviewCultura[] }>(`/cultura/${eventoCulturalId}/reviews`)
+  return r.data
+}
+
+export async function crearReviewCultura(reservaCulturalId: number, calificacion: number, comentario?: string): Promise<ReviewCultura> {
+  const r = await apiFetch<{ ok: boolean; data: ReviewCultura }>(`/cultura/reservas/${reservaCulturalId}/review`, {
+    method: 'POST',
+    body: { reservaCulturalId, calificacion, comentario },
+  })
+  return r.data
+}

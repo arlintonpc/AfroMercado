@@ -366,14 +366,14 @@ export default function HeroBanner({ productos = [] }: { productos?: Producto[] 
           <div className="max-w-xl">
             <div className="inline-flex items-center gap-2 bg-white/5 border border-[#D4A017]/30 backdrop-blur-sm rounded-full px-4 py-1.5 mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-[#D4A017] animate-pulse" />
-              <span className="text-[#D4A017] text-xs font-semibold tracking-widest uppercase">Marketplace del Pacífico</span>
+              <span className="text-[#D4A017] text-xs font-semibold tracking-widest uppercase">Marketplace de Colombia</span>
             </div>
             <h1 className="leading-[0.95] mb-6" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
               <span className="block text-white text-5xl md:text-6xl lg:text-[68px] font-normal">Del Chocó</span>
-              <span className="block text-5xl md:text-6xl lg:text-[68px] font-normal bg-gradient-to-r from-[#D4A017] via-[#F4C842] to-[#D4A017] bg-clip-text text-transparent">para el mundo</span>
+              <span className="block text-5xl md:text-6xl lg:text-[68px] font-normal bg-gradient-to-r from-[#D4A017] via-[#F4C842] to-[#D4A017] bg-clip-text text-transparent">para toda Colombia</span>
             </h1>
             <p className="text-white/65 text-base md:text-lg mb-7 leading-relaxed max-w-md">
-              Productos ancestrales, artesanías y sabores auténticos directo de las comunidades afrocolombianas e indígenas del Chocó.
+              Productos ancestrales, artesanías y sabores auténticos directo de las comunidades afro, indígenas y campesinas de todo el país.
             </p>
             <div className="flex items-center gap-3 mb-8">
               <div className="flex">

@@ -118,8 +118,8 @@ function FormularioIngresar() {
           <Logo />
           <p className="mt-2 text-sm text-[#1A1A1A]/60">
             {modo === 'login'
-              ? 'Bienvenido de vuelta a lo mejor del Chocó'
-              : 'Crea tu cuenta y apoya a los productores del Chocó'}
+              ? 'Bienvenido de vuelta a lo mejor de Colombia'
+              : 'Crea tu cuenta y apoya a los productores locales'}
           </p>
         </div>
 

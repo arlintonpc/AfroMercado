@@ -64,7 +64,7 @@ const DEFAULT_PAQUETES = [
   {
     codigo: "TEMPORADA_REGIONAL",
     nombre: "Temporada Regional",
-    descripcion: "Participa en rutas y vitrinas como Sabores del Pacifico o Artesanias del Choco.",
+    descripcion: "Participa en rutas y vitrinas regionales como Sabores del Pacifico, Artesanias del Choco o Cafe del Eje.",
     ideal: "Para vender por region, cultura o temporada.",
     precioBaseCOP: 60000,
     duracionDias: 14,
@@ -87,13 +87,55 @@ const DEFAULT_PAQUETES = [
     orden: 50,
     color: "from-[#102018] to-[#D4A017]",
   },
+  {
+    codigo: "BANNER_CARRUSEL",
+    nombre: "Banner Carrusel",
+    descripcion: "Banner diseñado a la medida que rota en el carrusel principal del home.",
+    ideal: "Para marcas con una pieza grafica propia lista para destacar.",
+    precioBaseCOP: 40000,
+    duracionDias: 10,
+    cuposSugeridos: 4,
+    activo: true,
+    recomendado: false,
+    orden: 60,
+    color: "from-[#2D6A4F] to-[#1B4332]",
+  },
+  {
+    codigo: "IRRUPTOR_BIENVENIDA",
+    nombre: "Irruptor de Bienvenida",
+    descripcion: "Imagen a pantalla completa que se superpone al abrir la app. Formato premium, un solo cupo nacional a la vez.",
+    ideal: "Para lanzamientos de alto impacto que necesitan maxima visibilidad.",
+    precioBaseCOP: 120000,
+    duracionDias: 7,
+    cuposSugeridos: 1,
+    activo: true,
+    recomendado: false,
+    orden: 70,
+    color: "from-[#7B241C] to-[#1A1A1A]",
+  },
 ];
 
 const PAQUETES = new Set(DEFAULT_PAQUETES.map((p) => p.codigo));
 
 const ESTADOS = new Set(["PENDIENTE", "APROBADA", "RECHAZADA", "CONVERTIDA"]);
 const PAQUETES_VISIBILIDAD = new Set(["IMPULSO_PRODUCTO", "HOME_DESTACADO"]);
+// Paquetes que requieren una imagen diseñada propia (no reusan foto de producto ni logo de comercio).
+const PAQUETES_IMAGEN_PERSONALIZADA = new Set(["BANNER_CARRUSEL", "IRRUPTOR_BIENVENIDA"]);
 const POLITICA_PUBLICIDAD_VERSION = "2026-06-27";
+
+// Alcance geográfico de una pauta: a mayor cobertura, mayor multiplicador sobre el precio base del paquete.
+const ALCANCES = new Set(["MUNICIPIO", "DEPARTAMENTO", "NACIONAL"]);
+const MULTIPLICADOR_ALCANCE = {
+  MUNICIPIO: 1.0,
+  DEPARTAMENTO: 2.3,
+  NACIONAL: 4.5,
+};
+
+function parseAlcance(valor) {
+  const alcance = limpiarTexto(valor, 20).toUpperCase() || "NACIONAL";
+  if (!ALCANCES.has(alcance)) throw new ErrorValidacion("Alcance inválido. Usa MUNICIPIO, DEPARTAMENTO o NACIONAL.");
+  return alcance;
+}
 
 function limpiarTexto(valor, max = 1000) {
   if (valor === undefined || valor === null) return "";
@@ -286,6 +328,9 @@ function selectSolicitud() {
     paquete: true,
     objetivo: true,
     presupuestoCOP: true,
+    alcance: true,
+    departamento: true,
+    municipio: true,
     inicio: true,
     fin: true,
     mensaje: true,
@@ -315,6 +360,7 @@ function selectSolicitud() {
     videoAprobado: true,
     videoNotasRevision: true,
     videoRevisadoAt: true,
+    imagenPersonalizadaUrl: true,
     revisadoAt: true,
     createdAt: true,
     updatedAt: true,
@@ -555,6 +601,7 @@ async function obtenerDatosAfroMedia({ desde = null, hasta = null } = {}) {
   };
 }
 
+
 const PublicidadController = {
   async politicas(req, res, next) {
     try {
@@ -645,7 +692,17 @@ const PublicidadController = {
       const objetivo = limpiarTexto(req.body.objetivo, 160);
       const mensaje = limpiarTexto(req.body.mensaje, 1200);
       const productoId = req.body.productoId ? Number(req.body.productoId) : null;
-      const presupuestoCOP = parseMonto(req.body.presupuestoCOP);
+      const alcance = parseAlcance(req.body.alcance);
+      // El presupuesto final se calcula desde el precio base del paquete y el alcance elegido;
+      // no se confía en un presupuestoCOP enviado por el cliente para evitar manipulación del cobro.
+      let departamento = alcance !== "NACIONAL" ? (limpiarTexto(req.body.departamento, 120) || comercio.departamento || null) : null;
+      let municipio = alcance === "MUNICIPIO" ? (limpiarTexto(req.body.municipio, 120) || comercio.municipio || null) : null;
+      if (alcance === "DEPARTAMENTO" && !departamento) {
+        throw new ErrorValidacion("Selecciona el departamento para una pauta de alcance DEPARTAMENTO.");
+      }
+      if (alcance === "MUNICIPIO" && (!departamento || !municipio)) {
+        throw new ErrorValidacion("Selecciona el municipio (y su departamento) para una pauta de alcance MUNICIPIO.");
+      }
       let inicio = parseFecha(req.body.inicio, "inicio");
       let fin = parseFecha(req.body.fin, "fin");
       const aceptaPoliticas = req.body.aceptaPoliticas === true || req.body.aceptaPoliticas === "true";
@@ -655,6 +712,7 @@ const PublicidadController = {
       const videoUbicacion = limpiarTexto(req.body.videoUbicacion, 80) || null;
       const videoDestino = limpiarTexto(req.body.videoDestino, 400) || null;
       const videoNotasComercio = limpiarTexto(req.body.videoNotasComercio, 1200) || null;
+      const imagenPersonalizadaUrl = limpiarTexto(req.body.imagenPersonalizadaUrl, 800) || null;
 
       if (!PAQUETES.has(paquete)) throw new ErrorValidacion("Selecciona un paquete de publicidad valido.");
       const paquetesActivos = await listarPaquetesConfig({ soloActivos: true });
@@ -681,15 +739,21 @@ const PublicidadController = {
         }
       }
 
+      const multiplicador = MULTIPLICADOR_ALCANCE[alcance];
+      const presupuestoCOP = Math.round(Number(paqueteConfig.precioBaseCOP || 0) * multiplicador);
+
       const solicitud = await prisma.solicitudPublicidad.create({
         data: {
           comercioId: comercio.id,
           productoId,
           paquete,
           objetivo,
-          presupuestoCOP: presupuestoCOP ?? Number(paqueteConfig.precioBaseCOP || 0),
+          presupuestoCOP,
+          alcance,
+          departamento,
+          municipio,
           pagoEstado: "PENDIENTE",
-          pagoMontoCOP: presupuestoCOP ?? Number(paqueteConfig.precioBaseCOP || 0),
+          pagoMontoCOP: presupuestoCOP,
           inicio,
           fin,
           mensaje: mensaje || null,
@@ -703,6 +767,7 @@ const PublicidadController = {
           videoUbicacion,
           videoDestino,
           videoNotasComercio,
+          imagenPersonalizadaUrl,
         },
         select: selectSolicitud(),
       });
@@ -712,7 +777,7 @@ const PublicidadController = {
         entidad: "SolicitudPublicidad",
         entidadId: solicitud.id,
         usuarioId: req.usuario.id,
-        datos: { paquete, objetivo, presupuestoCOP: solicitud.presupuestoCOP },
+        datos: { paquete, objetivo, presupuestoCOP: solicitud.presupuestoCOP, alcance, departamento, municipio },
         ip: limpiarTexto(req.headers["x-forwarded-for"] || req.ip, 120),
       });
 
@@ -893,6 +958,9 @@ const PublicidadController = {
             comercioId: solicitud.comercioId,
             productoId: solicitud.productoId,
             tipo,
+            alcance: solicitud.alcance || "NACIONAL",
+            departamento: solicitud.departamento || null,
+            municipio: solicitud.municipio || null,
             inicio,
             fin,
             montoCOP,
@@ -904,18 +972,30 @@ const PublicidadController = {
         });
         destino = { tipo: "VISIBILIDAD", id: visibilidad.id, subtipo: visibilidad.tipo };
       } else {
-        const imagenUrl = imagenParaCampana(solicitud);
-        if (!imagenUrl) {
-          throw new ErrorValidacion("Para crear una campana necesitas un producto con foto o un logo de comercio.");
+        const esImagenPersonalizada = PAQUETES_IMAGEN_PERSONALIZADA.has(solicitud.paquete);
+        let imagenUrl;
+        if (esImagenPersonalizada) {
+          if (!solicitud.imagenPersonalizadaUrl) {
+            throw new ErrorValidacion(`El paquete ${solicitud.paquete} requiere que el comercio adjunte primero su imagen diseñada (imagenPersonalizadaUrl).`);
+          }
+          imagenUrl = solicitud.imagenPersonalizadaUrl;
+        } else {
+          imagenUrl = imagenParaCampana(solicitud);
+          if (!imagenUrl) {
+            throw new ErrorValidacion("Para crear una campana necesitas un producto con foto o un logo de comercio.");
+          }
         }
         const campana = await prisma.campanaHero.create({
           data: {
-            tipo: "PUBLICIDAD",
+            tipo: esImagenPersonalizada ? solicitud.paquete : "PUBLICIDAD",
             titulo: tituloCampana(solicitud),
             subtitulo: solicitud.objetivo,
             imagenUrl,
             ctaTexto: ctaPorPaquete(solicitud.paquete),
             urlDestino: destinoSolicitud(solicitud),
+            alcance: solicitud.alcance || "NACIONAL",
+            departamento: solicitud.departamento || null,
+            municipio: solicitud.municipio || null,
             inicio,
             fin,
             montoCOP,
@@ -1280,6 +1360,7 @@ const PublicidadController = {
       res.json({ ok: true, data: slots });
     } catch (err) { next(err); }
   },
+
 };
 
 module.exports = PublicidadController;

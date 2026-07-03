@@ -205,6 +205,15 @@ function TarjetaPedido({
               </p>
             )}
 
+            {/* Pedido programado */}
+            {pedido.fechaProgramada && (
+              <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+                🕐 Programado para {new Date(pedido.fechaProgramada).toLocaleString('es-CO', {
+                  day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                })}
+              </p>
+            )}
+
             {/* Items con complementos */}
             <div className="border border-gray-100 rounded-xl overflow-hidden">
               <div className="divide-y divide-gray-50">
@@ -275,7 +284,7 @@ function TarjetaPedido({
                 )}
                 {pedido.configExpress && (
                   <Link
-                    href={`/express/${pedido.comercioId ?? ''}`}
+                    href={`/express/${pedido.comercioId ?? ''}?reorder=${pedido.id}`}
                     className="flex-1 text-center text-xs font-semibold text-gray-600 border border-gray-200 rounded-xl py-2 hover:bg-gray-50 transition-colors"
                   >
                     Pedir de nuevo

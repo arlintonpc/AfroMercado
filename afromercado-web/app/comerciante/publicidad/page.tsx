@@ -15,6 +15,7 @@ import {
   iniciarPagoSolicitudPublicidad,
   listarPaquetesPublicidad,
   listarMisSolicitudesPublicidad,
+  type AlcancePublicidad,
   type PaquetePublicidad,
   type PublicidadPaqueteConfig,
   type SolicitudPublicidad,
@@ -26,6 +27,7 @@ const PAQUETES_FALLBACK: Array<{
   id: PaquetePublicidad
   nombre: string
   precio: string
+  precioBaseCOP: number
   descripcion: string
   ideal: string
   color: string
@@ -34,6 +36,7 @@ const PAQUETES_FALLBACK: Array<{
     id: 'IMPULSO_PRODUCTO',
     nombre: 'Impulso Producto',
     precio: '1 semana',
+    precioBaseCOP: 15000,
     descripcion: 'Aparece como producto patrocinado en catalogo y categorias relevantes.',
     ideal: 'Para vender stock disponible rapido.',
     color: 'from-[#2D6A4F] to-[#52B788]',
@@ -42,6 +45,7 @@ const PAQUETES_FALLBACK: Array<{
     id: 'HOME_DESTACADO',
     nombre: 'Home Destacado',
     precio: '7 dias premium',
+    precioBaseCOP: 35000,
     descripcion: 'Visibilidad fuerte en la portada, con contexto de tienda o producto.',
     ideal: 'Para lanzamientos, temporada o productos estrella.',
     color: 'from-[#9B7300] to-[#D4A017]',
@@ -50,6 +54,7 @@ const PAQUETES_FALLBACK: Array<{
     id: 'VIDEO_HISTORIA',
     nombre: 'Video Historia',
     precio: 'Storytelling',
+    precioBaseCOP: 45000,
     descripcion: 'Destaca un video corto de tu finca, cocina, taller, tienda o producto.',
     ideal: 'Para turismo, gastronomia y productos con historia.',
     color: 'from-[#7B241C] to-[#C0392B]',
@@ -58,6 +63,7 @@ const PAQUETES_FALLBACK: Array<{
     id: 'TEMPORADA_REGIONAL',
     nombre: 'Temporada Regional',
     precio: 'Campana curada',
+    precioBaseCOP: 60000,
     descripcion: 'Participa en rutas y vitrinas como Sabores del Pacifico o Artesanias del Choco.',
     ideal: 'Para vender por region, cultura o temporada.',
     color: 'from-[#1A1A1A] to-[#2D6A4F]',
@@ -66,9 +72,55 @@ const PAQUETES_FALLBACK: Array<{
     id: 'MARCA_ALIADA',
     nombre: 'Marca Aliada',
     precio: 'Alianza premium',
+    precioBaseCOP: 90000,
     descripcion: 'Campana de posicionamiento para aliados, instituciones o marcas con afinidad cultural.',
     ideal: 'Para patrocinios, alianzas y contenido institucional.',
     color: 'from-[#102018] to-[#D4A017]',
+  },
+  {
+    id: 'BANNER_CARRUSEL',
+    nombre: 'Banner Carrusel',
+    precio: '10 dias',
+    precioBaseCOP: 40000,
+    descripcion: 'Banner diseñado a la medida que rota en el carrusel principal del home.',
+    ideal: 'Para marcas con una pieza grafica propia lista para destacar.',
+    color: 'from-[#2D6A4F] to-[#1B4332]',
+  },
+  {
+    id: 'IRRUPTOR_BIENVENIDA',
+    nombre: 'Irruptor de Bienvenida',
+    precio: 'Formato premium',
+    precioBaseCOP: 120000,
+    descripcion: 'Imagen a pantalla completa que se superpone al abrir la app. Un solo cupo nacional a la vez.',
+    ideal: 'Para lanzamientos de alto impacto que necesitan maxima visibilidad.',
+    color: 'from-[#7B241C] to-[#1A1A1A]',
+  },
+]
+
+const PAQUETES_IMAGEN_PERSONALIZADA = new Set<PaquetePublicidad>(['BANNER_CARRUSEL', 'IRRUPTOR_BIENVENIDA'])
+
+// Debe coincidir exactamente con MULTIPLICADOR_ALCANCE en publicidad.controller.js (backend calcula el cobro real).
+const MULTIPLICADOR_ALCANCE: Record<AlcancePublicidad, number> = {
+  MUNICIPIO: 1.0,
+  DEPARTAMENTO: 2.3,
+  NACIONAL: 4.5,
+}
+
+const OPCIONES_ALCANCE: Array<{ id: AlcancePublicidad; label: (comercio: Comercio | null) => string; desc: string }> = [
+  {
+    id: 'MUNICIPIO',
+    label: (c) => `Mi municipio${c?.municipio ? ` (${c.municipio})` : ''}`,
+    desc: 'Solo compradores de tu municipio.',
+  },
+  {
+    id: 'DEPARTAMENTO',
+    label: (c) => `Mi departamento${c?.departamento ? ` (${c.departamento})` : ''}`,
+    desc: 'Compradores de todo tu departamento.',
+  },
+  {
+    id: 'NACIONAL',
+    label: () => 'Todo el país',
+    desc: 'Compradores de cualquier región de Colombia.',
   },
 ]
 
@@ -118,6 +170,7 @@ export default function PublicidadComerciantePage() {
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
   const [form, setForm] = useState({
     paquete: 'IMPULSO_PRODUCTO' as PaquetePublicidad,
+    alcance: 'NACIONAL' as AlcancePublicidad,
     objetivo: '',
     productoId: '',
     presupuestoCOP: '',
@@ -131,6 +184,7 @@ export default function PublicidadComerciantePage() {
     videoUbicacion: '',
     videoDestino: '',
     videoNotasComercio: '',
+    imagenPersonalizadaUrl: '',
   })
 
   const cargar = useCallback(async () => {
@@ -171,6 +225,7 @@ export default function PublicidadComerciantePage() {
         id: p.codigo as PaquetePublicidad,
         nombre: p.nombre,
         precio: `${formatearPrecio(Number(p.precioBaseCOP || 0))} / ${p.duracionDias} dias`,
+        precioBaseCOP: Number(p.precioBaseCOP || 0),
         descripcion: p.descripcion ?? '',
         ideal: p.ideal ?? '',
         color: p.color || 'from-[#2D6A4F] to-[#52B788]',
@@ -184,6 +239,9 @@ export default function PublicidadComerciantePage() {
   const paqueteSeleccionado = paquetes.find((p) => p.id === form.paquete)
   const paqueteDisponible = !paqueteSeleccionado?.cupoLleno
   const puedeSolicitar = Boolean(comercioListo && cuentaLista && paqueteDisponible && form.aceptaPoliticas)
+  const precioFinalCOP = paqueteSeleccionado
+    ? Math.round(paqueteSeleccionado.precioBaseCOP * MULTIPLICADOR_ALCANCE[form.alcance])
+    : null
 
   function actualizar(k: keyof typeof form, v: string | boolean) {
     setForm((actual) => ({ ...actual, [k]: v }))
@@ -199,6 +257,7 @@ export default function PublicidadComerciantePage() {
         objetivo: form.objetivo,
         productoId: form.productoId ? Number(form.productoId) : null,
         presupuestoCOP: form.presupuestoCOP ? Number(form.presupuestoCOP) : null,
+        alcance: form.alcance,
         inicio: form.inicio || null,
         fin: form.fin || null,
         mensaje: form.mensaje,
@@ -211,9 +270,12 @@ export default function PublicidadComerciantePage() {
           videoDestino: form.videoDestino || null,
           videoNotasComercio: form.videoNotasComercio || null,
         }),
+        ...(PAQUETES_IMAGEN_PERSONALIZADA.has(form.paquete) && {
+          imagenPersonalizadaUrl: form.imagenPersonalizadaUrl || null,
+        }),
       })
       setAviso({ tipo: 'ok', texto: 'Solicitud enviada. AfroMedia revisara la pauta; si se aprueba, podras pagarla desde tu historial.' })
-      setForm((actual) => ({ ...actual, objetivo: '', presupuestoCOP: '', inicio: '', fin: '', mensaje: '', aceptaPoliticas: false, videoUrl: '', videoPortadaUrl: '', videoTexto: '', videoUbicacion: '', videoDestino: '', videoNotasComercio: '' }))
+      setForm((actual) => ({ ...actual, alcance: 'NACIONAL', objetivo: '', presupuestoCOP: '', inicio: '', fin: '', mensaje: '', aceptaPoliticas: false, videoUrl: '', videoPortadaUrl: '', videoTexto: '', videoUbicacion: '', videoDestino: '', videoNotasComercio: '', imagenPersonalizadaUrl: '' }))
       setSolicitudes(await listarMisSolicitudesPublicidad())
     } catch (err) {
       setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo crear la solicitud.' })
@@ -378,6 +440,33 @@ export default function PublicidadComerciantePage() {
               </select>
             </label>
 
+            <div className="grid gap-2 text-sm font-bold text-[#1A1A1A]">
+              Alcance geografico de la pauta
+              <div className="grid gap-2 sm:grid-cols-3">
+                {OPCIONES_ALCANCE.map((op) => (
+                  <button
+                    key={op.id}
+                    type="button"
+                    onClick={() => actualizar('alcance', op.id)}
+                    className={`rounded-2xl border px-4 py-3 text-left font-normal transition-colors ${
+                      form.alcance === op.id
+                        ? 'border-[#2D6A4F] bg-[#2D6A4F]/8'
+                        : 'border-[#1A1A1A]/10 bg-[#FDFBF7] hover:border-[#2D6A4F]/40'
+                    }`}
+                  >
+                    <p className="text-sm font-bold text-[#1A1A1A]">{op.label(comercio)}</p>
+                    <p className="mt-0.5 text-xs text-[#1A1A1A]/55">{op.desc}</p>
+                    <p className="mt-1 text-xs font-black text-[#2D6A4F]">x{MULTIPLICADOR_ALCANCE[op.id]}</p>
+                  </button>
+                ))}
+              </div>
+              {precioFinalCOP !== null && (
+                <p className="mt-1 rounded-2xl bg-[#2D6A4F]/8 px-4 py-2 text-sm font-black text-[#2D6A4F]">
+                  Precio de la pauta: {formatearPrecio(precioFinalCOP)}
+                </p>
+              )}
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-3">
               <label className="grid gap-1 text-sm font-bold text-[#1A1A1A]">
                 Presupuesto
@@ -492,6 +581,27 @@ export default function PublicidadComerciantePage() {
                     />
                   </label>
                 </div>
+              </div>
+            )}
+
+            {PAQUETES_IMAGEN_PERSONALIZADA.has(form.paquete) && (
+              <div className="rounded-3xl border border-[#2D6A4F]/20 bg-[#2D6A4F]/5 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#2D6A4F]">Imagen diseñada — Requerida</p>
+                <p className="mt-1 mb-4 text-sm text-[#1A1A1A]/55">
+                  Este formato usa una pieza grafica propia (no la foto del producto ni el logo de tu tienda).
+                  Sube la imagen a Cloudinary, Drive u otro host y pega aqui la URL publica.
+                </p>
+                <label className="grid gap-1 text-sm font-bold text-[#1A1A1A]">
+                  URL de la imagen
+                  <input
+                    required
+                    type="url"
+                    value={form.imagenPersonalizadaUrl}
+                    onChange={(e) => actualizar('imagenPersonalizadaUrl', e.target.value)}
+                    placeholder="https://... (Cloudinary, Drive...)"
+                    className="rounded-2xl border border-[#1A1A1A]/10 bg-[#FDFBF7] px-4 py-3 font-normal focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/25"
+                  />
+                </label>
               </div>
             )}
 

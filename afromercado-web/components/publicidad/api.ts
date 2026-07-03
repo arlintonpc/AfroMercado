@@ -6,12 +6,16 @@ export type PaquetePublicidad =
   | 'VIDEO_HISTORIA'
   | 'TEMPORADA_REGIONAL'
   | 'MARCA_ALIADA'
+  | 'BANNER_CARRUSEL'
+  | 'IRRUPTOR_BIENVENIDA'
 
 export type EstadoSolicitudPublicidad =
   | 'PENDIENTE'
   | 'APROBADA'
   | 'RECHAZADA'
   | 'CONVERTIDA'
+
+export type AlcancePublicidad = 'MUNICIPIO' | 'DEPARTAMENTO' | 'NACIONAL'
 
 export type EstadoPagoPublicidad =
   | 'PENDIENTE'
@@ -27,6 +31,9 @@ export interface SolicitudPublicidad {
   paquete: PaquetePublicidad | string
   objetivo: string
   presupuestoCOP?: number | string | null
+  alcance?: AlcancePublicidad | string
+  departamento?: string | null
+  municipio?: string | null
   inicio?: string | null
   fin?: string | null
   mensaje?: string | null
@@ -56,6 +63,7 @@ export interface SolicitudPublicidad {
   videoAprobado?: boolean | null
   videoNotasRevision?: string | null
   videoRevisadoAt?: string | null
+  imagenPersonalizadaUrl?: string | null
   revisadoAt?: string | null
   createdAt: string
   updatedAt: string
@@ -185,6 +193,9 @@ export interface CrearSolicitudPublicidadInput {
   objetivo: string
   productoId?: number | null
   presupuestoCOP?: number | null
+  alcance?: AlcancePublicidad
+  departamento?: string | null
+  municipio?: string | null
   inicio?: string | null
   fin?: string | null
   mensaje?: string
@@ -195,6 +206,7 @@ export interface CrearSolicitudPublicidadInput {
   videoUbicacion?: string | null
   videoDestino?: string | null
   videoNotasComercio?: string | null
+  imagenPersonalizadaUrl?: string | null
 }
 
 export interface AuditoriaAfroMediaItem {

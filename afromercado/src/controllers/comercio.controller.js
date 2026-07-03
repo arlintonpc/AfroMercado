@@ -7,6 +7,7 @@ const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
 const ComercioService = require("../services/comercio.service");
+const { generarToken } = require("../utils/auth");
 const CuentaDispersionService = require("../services/cuenta-dispersion.service");
 const NotificacionService = require("../services/notificacion.service");
 const {
@@ -82,8 +83,14 @@ function hashDocumentoLocal(url) {
 const ComercioController = {
   async registrar(req, res, next) {
     try {
-      const comercio = await ComercioService.registrar(req.usuario.id, req.body);
-      res.status(201).json({ ok: true, comercio });
+      const comercio = await ComercioService.registrar(req.usuario.id, req.body, req.usuario.rol);
+      // El usuario puede haber pasado de COMPRADOR a COMERCIANTE: devolvemos un
+      // token fresco (firmado con el rol nuevo) para que el frontend actualice
+      // su sesión sin pedirle que cierre sesión y vuelva a entrar. El frontend
+      // debe fusionar `rolNuevo` con su propio objeto de usuario ya cargado,
+      // no reconstruirlo desde aquí (este endpoint no expone email/teléfono).
+      const token = generarToken({ id: req.usuario.id, rol: "COMERCIANTE" });
+      res.status(201).json({ ok: true, comercio, token, rolNuevo: "COMERCIANTE" });
     } catch (e) {
       next(e);
     }
@@ -209,6 +216,19 @@ const ComercioController = {
   async quitarVideo(req, res, next) {
     try {
       const comercio = await ComercioService.quitarVideo(req.usuario.id);
+      res.json({ ok: true, comercio });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async guardarVideoLink(req, res, next) {
+    try {
+      const { videoUrl } = req.body;
+      if (!videoUrl || typeof videoUrl !== "string") {
+        return res.status(400).json({ ok: false, error: "videoUrl requerido" });
+      }
+      const comercio = await ComercioService.guardarVideoLink(req.usuario.id, videoUrl.trim());
       res.json({ ok: true, comercio });
     } catch (e) {
       next(e);

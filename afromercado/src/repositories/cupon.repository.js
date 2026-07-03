@@ -1,4 +1,5 @@
 const prisma = require("../config/prisma");
+const AlianzaService = require("../services/alianza.service");
 
 function normalizarSubtotalesPorComercio(subtotalesPorComercio) {
   if (subtotalesPorComercio instanceof Map) return subtotalesPorComercio;
@@ -24,6 +25,53 @@ function sumarSubtotales(mapa) {
   return total;
 }
 
+/**
+ * Fallback cuando el código no corresponde a un Cupon propio del marketplace:
+ * revisa si es un código de alianza comercial vigente para alguno de los
+ * comercios presentes en el carrito (módulo "PEDIDO"). El descuento de una
+ * alianza solo puede aplicar al subtotal DEL COMERCIO SOCIO (no al carrito
+ * completo), igual que un cupón propio restringido a un comercio.
+ *
+ * Devuelve null si ningún comercio del carrito es socio activo de una
+ * alianza con ese código, para que el llamador conserve el mensaje de error
+ * original ("El cupón no existe").
+ */
+async function intentarFallbackAlianzaPedido(codigo, { comercioIds = [], subtotalesPorComercio = null }) {
+  const subtotalesMapa = normalizarSubtotalesPorComercio(subtotalesPorComercio);
+  const candidatos = subtotalesMapa.size > 0 ? Array.from(subtotalesMapa.keys()) : comercioIds;
+  if (!candidatos.length) return null;
+
+  for (const comercioId of candidatos) {
+    const alianza = await AlianzaService.validarCodigoAlianza(codigo, comercioId, "PEDIDO");
+    if (!alianza) continue;
+
+    const subtotalComercio = subtotalesMapa.size > 0
+      ? Number(subtotalesMapa.get(comercioId) ?? 0)
+      : sumarSubtotales(subtotalesMapa); // sin desglose por comercio: aplica sobre el total disponible
+
+    let descuento;
+    if (alianza.tipoDescuento === "PORCENTAJE") {
+      descuento = Math.min(subtotalComercio * (Number(alianza.valorDescuento) / 100), subtotalComercio);
+    } else {
+      descuento = Math.min(Number(alianza.valorDescuento), subtotalComercio);
+    }
+
+    const subtotalTotal = subtotalesMapa.size > 0 ? sumarSubtotales(subtotalesMapa) : subtotalComercio;
+    const descuentoRedondeado = Math.round(descuento);
+    const subtotalTotalRedondeado = Math.round(subtotalTotal);
+
+    return {
+      esAlianza: true,
+      comercioId,
+      descuento: descuentoRedondeado,
+      subtotalAplicable: Math.round(subtotalComercio),
+      totalConDescuento: Math.max(0, subtotalTotalRedondeado - descuentoRedondeado),
+      comerciosRestringidos: [comercioId],
+    };
+  }
+  return null;
+}
+
 async function validarCuponBase(db, {
   codigo,
   usuarioId,
@@ -42,7 +90,10 @@ async function validarCuponBase(db, {
       WHERE codigo = ${codigo}
       FOR UPDATE
     `;
-    if (!bloqueado) return { error: "El cupón no existe" };
+    if (!bloqueado) {
+      const alianza = await intentarFallbackAlianzaPedido(codigo, { comercioIds, subtotalesPorComercio });
+      return alianza || { error: "El cupón no existe" };
+    }
     cupon = await db.cupon.findUnique({
       where: { id: bloqueado.id },
       include: { comercios: { select: { comercioId: true } } },
@@ -54,7 +105,10 @@ async function validarCuponBase(db, {
     });
   }
 
-  if (!cupon) return { error: "El cupón no existe" };
+  if (!cupon) {
+    const alianza = await intentarFallbackAlianzaPedido(codigo, { comercioIds, subtotalesPorComercio });
+    return alianza || { error: "El cupón no existe" };
+  }
   if (!cupon.activo) return { error: "Este cupón no está activo" };
 
   const ahora = new Date();

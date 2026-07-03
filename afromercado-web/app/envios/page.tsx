@@ -35,7 +35,7 @@ export default function PaginaEnvios() {
             Costos de envío
           </h1>
           <p className="text-sm text-[#1A1A1A]/55 mt-2 max-w-xl">
-            Enviamos desde el corazón del Chocó a todo Colombia. Los costos dependen del departamento de destino y el peso del pedido.
+            Enviamos tu pedido a cualquier parte de Colombia. Los costos dependen del departamento de destino y el peso del pedido.
           </p>
         </div>
 

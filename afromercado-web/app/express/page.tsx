@@ -231,8 +231,8 @@ export default function ExpressPage() {
                 </span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight">
-                Sabores del<br />
-                <span className="text-[#52B788]">Chocó</span>
+                Sabores de<br />
+                <span className="text-[#52B788]">Colombia</span>
               </h1>
               <p className="text-white/55 text-sm mt-2.5 max-w-sm">
                 Pide comida de restaurantes y comercios locales — entrega a domicilio o recoge en el lugar

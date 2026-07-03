@@ -245,6 +245,7 @@ export interface AdminComercio {
   whatsapp?: string | null
   descripcion?: string | null
   verificado: boolean
+  verificadoEtnico: boolean
   estadoRegistro: EstadoComerciante
   motivoRechazo?: string | null
   revisadoAt?: string | null
@@ -295,6 +296,13 @@ export async function verificarComercianteAdmin(
 
 export async function toggleWhatsappAdmin(id: number): Promise<AdminComercio> {
   const res = await apiFetch<RespuestaOk<AdminComercio>>(`/admin/comercios/${id}/whatsapp-visible`, {
+    method: 'PATCH',
+  })
+  return res.data
+}
+
+export async function toggleVerificadoEtnicoAdmin(id: number): Promise<AdminComercio> {
+  const res = await apiFetch<RespuestaOk<AdminComercio>>(`/admin/comercios/${id}/verificado-etnico`, {
     method: 'PATCH',
   })
   return res.data

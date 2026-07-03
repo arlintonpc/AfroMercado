@@ -23,6 +23,7 @@ interface ComercioPublico {
   descripcion?: string | null
   historia?: string | null
   municipio: string
+  departamento?: string | null
   logoUrl?: string | null
   whatsapp?: string | null
   whatsappVisible: boolean
@@ -34,6 +35,7 @@ interface ComercioPublico {
   totalReviews: number
   totalVentas: number
   verificado: boolean
+  alianzasActivas?: { id: number; nombre: string; codigoCompartido: string }[]
 }
 
 async function fetchComercio(id: string): Promise<ComercioPublico | null> {
@@ -114,7 +116,18 @@ function CabeceraComercio({ c, onChatear }: { c: ComercioPublico; onChatear?: ()
               </span>
             )}
           </div>
-          <p className="text-sm text-[#1A1A1A]/55 mt-0.5">📍 {c.municipio}, Chocó</p>
+
+          {c.alianzasActivas && c.alianzasActivas.length > 0 && (
+            <Link
+              href={`/alianzas/${c.alianzasActivas[0].codigoCompartido}`}
+              className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#D4A017]/15 px-3 py-1 text-xs font-semibold text-[#8A6A10] hover:bg-[#D4A017]/25 transition-colors"
+            >
+              🤝 Participa en: {c.alianzasActivas[0].nombre}
+              {c.alianzasActivas.length > 1 && ` +${c.alianzasActivas.length - 1}`}
+            </Link>
+          )}
+
+          <p className="text-sm text-[#1A1A1A]/55 mt-1.5">📍 {c.municipio}{c.departamento ? `, ${c.departamento}` : ''}</p>
 
           {cal > 0 && (
             <div className="flex items-center gap-2 mt-1.5">

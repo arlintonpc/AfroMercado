@@ -309,10 +309,10 @@ export default function HotelesPage() {
               </div>
               <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight">
                 Hoteles y Hospedaje<br />
-                <span className="text-[#52B788]">en el Chocó</span>
+                <span className="text-[#52B788]">de Colombia</span>
               </h1>
               <p className="text-white/55 text-sm mt-2.5 max-w-sm">
-                Alójate con familias y establecimientos locales en el corazón del Pacífico
+                Alójate con familias y establecimientos locales en el corazón de cada territorio
               </p>
             </div>
             <div className="flex gap-4 sm:gap-6">
@@ -321,8 +321,13 @@ export default function HotelesPage() {
                 <p className="text-white/50 text-xs">Alojamientos</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-black text-white">Chocó</p>
-                <p className="text-white/50 text-xs">Región</p>
+                <p className="text-2xl font-black text-white">
+                  {(() => {
+                    const n = new Set(hoteles.map(h => h.comercio?.departamento).filter(Boolean)).size
+                    return n > 0 ? `${n}` : '–'
+                  })()}
+                </p>
+                <p className="text-white/50 text-xs">Regiones</p>
               </div>
             </div>
           </div>
@@ -413,7 +418,7 @@ export default function HotelesPage() {
                 ? `No encontramos hoteles para "${busqueda}"`
                 : filtrosActivos
                 ? 'Ningún hotel cumple los filtros seleccionados'
-                : 'Estamos incorporando hoteles y hospedajes del Chocó. Vuelve pronto.'}
+                : 'Estamos incorporando hoteles y hospedajes de todo el país. Vuelve pronto.'}
             </p>
             {(busqueda || filtrosActivos) && (
               <div className="flex gap-3 mt-5 justify-center">

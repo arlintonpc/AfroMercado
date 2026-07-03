@@ -372,7 +372,7 @@ function Resultados() {
               <>
                 {errorProductos && !cargandoProductos && <EmptyState titulo="No pudimos buscar" descripcion={errorProductos} onReintentar={() => cargarProductos(q, pagina, false)} />}
                 {cargandoProductos && <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}</div>}
-                {sinTerminoNiFiltros && <EmptyState titulo="¿Qué estás buscando?" descripcion="Escribe el nombre de un producto, un sabor o un productor del Chocó, o usa los filtros." />}
+                {sinTerminoNiFiltros && <EmptyState titulo="¿Qué estás buscando?" descripcion="Escribe el nombre de un producto, un sabor o un productor, o usa los filtros." />}
                 {!cargandoProductos && !errorProductos && productos.length === 0 && (q || filtrosActivos > 0) && (
                   <EmptyState titulo={q ? `Sin resultados para «${q}»` : 'Sin resultados'} descripcion="Prueba con otra palabra o ajusta los filtros." />
                 )}

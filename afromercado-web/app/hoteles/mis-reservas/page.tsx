@@ -267,6 +267,46 @@ function ReservasLoading() {
   )
 }
 
+/* ── Agrupamiento visual por reserva grupal (varias habitaciones en una sola solicitud) ── */
+type ItemLista = { tipo: 'individual'; reserva: ReservaHotel } | { tipo: 'grupo'; grupoReservaId: string; reservas: ReservaHotel[] }
+
+function agruparPorGrupoReserva(lista: ReservaHotel[]): ItemLista[] {
+  const items: ItemLista[] = []
+  const gruposVistos = new Map<string, ReservaHotel[]>()
+
+  for (const r of lista) {
+    if (r.grupoReservaId) {
+      if (!gruposVistos.has(r.grupoReservaId)) {
+        const reservasDelGrupo: ReservaHotel[] = []
+        gruposVistos.set(r.grupoReservaId, reservasDelGrupo)
+        items.push({ tipo: 'grupo', grupoReservaId: r.grupoReservaId, reservas: reservasDelGrupo })
+      }
+      gruposVistos.get(r.grupoReservaId)!.push(r)
+    } else {
+      items.push({ tipo: 'individual', reserva: r })
+    }
+  }
+  return items
+}
+
+function GrupoReservas({ reservas, onCancelado }: { reservas: ReservaHotel[]; onCancelado: () => void }) {
+  const totalGrupo = reservas.reduce((a, r) => a + Number(r.total), 0)
+  const nombreHotel = reservas[0]?.configHotel?.comercio.nombre ?? 'Hotel'
+  return (
+    <div className="rounded-2xl border-2 border-dashed border-[#2D6A4F]/30 bg-[#2D6A4F]/[0.03] p-3">
+      <div className="flex items-center justify-between gap-2 mb-3 px-1">
+        <p className="text-xs font-bold text-[#1B4332]">
+          🛏️ Reserva grupal · {reservas.length} habitaciones · {nombreHotel}
+        </p>
+        <span className="text-xs font-bold text-gray-500 flex-shrink-0">{formatearPrecio(totalGrupo)}</span>
+      </div>
+      <div className="space-y-3">
+        {reservas.map(r => <TarjetaReserva key={r.id} reserva={r} onCancelado={onCancelado} />)}
+      </div>
+    </div>
+  )
+}
+
 function MisReservasHotelContent() {
   const { autenticado, cargando: cargandoAuth } = useAuth()
   const router = useRouter()
@@ -292,8 +332,14 @@ function MisReservasHotelContent() {
     cargar()
   }, [autenticado, cargandoAuth])
 
-  const activas   = reservas.filter(r => !['CHECKOUT', 'CANCELADA', 'RECHAZADA'].includes(r.estado))
-  const anteriores = reservas.filter(r => ['CHECKOUT', 'CANCELADA', 'RECHAZADA'].includes(r.estado))
+  const esActiva = (r: ReservaHotel) => !['CHECKOUT', 'CANCELADA', 'RECHAZADA'].includes(r.estado)
+
+  // Agrupar primero (para no partir una reserva grupal entre "activas" y "anteriores"),
+  // y clasificar cada grupo como activo si AL MENOS UNA de sus habitaciones sigue activa.
+  const items = agruparPorGrupoReserva(reservas)
+  const itemsActivos    = items.filter(it => it.tipo === 'individual' ? esActiva(it.reserva) : it.reservas.some(esActiva))
+  const itemsAnteriores = items.filter(it => it.tipo === 'individual' ? !esActiva(it.reserva) : !it.reservas.some(esActiva))
+  const totalActivas = reservas.filter(esActiva).length
 
   if (cargando) return <ReservasLoading />
 
@@ -306,9 +352,9 @@ function MisReservasHotelContent() {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           </Link>
           <h1 className="font-bold text-[#1A1A1A] text-lg">Mis reservas</h1>
-          {activas.length > 0 && (
+          {totalActivas > 0 && (
             <span className="ml-auto bg-[#2D6A4F] text-white text-xs font-bold px-2 py-0.5 rounded-full">
-              {activas.length} activa{activas.length !== 1 ? 's' : ''}
+              {totalActivas} activa{totalActivas !== 1 ? 's' : ''}
             </span>
           )}
         </div>
@@ -323,16 +369,26 @@ function MisReservasHotelContent() {
           </div>
         ) : (
           <>
-            {activas.length > 0 && (
+            {itemsActivos.length > 0 && (
               <section>
                 <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Activas</h2>
-                <div className="space-y-3">{activas.map(r => <TarjetaReserva key={r.id} reserva={r} onCancelado={cargar} />)}</div>
+                <div className="space-y-3">
+                  {itemsActivos.map(it => it.tipo === 'individual'
+                    ? <TarjetaReserva key={it.reserva.id} reserva={it.reserva} onCancelado={cargar} />
+                    : <GrupoReservas key={it.grupoReservaId} reservas={it.reservas} onCancelado={cargar} />
+                  )}
+                </div>
               </section>
             )}
-            {anteriores.length > 0 && (
+            {itemsAnteriores.length > 0 && (
               <section>
                 <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Anteriores</h2>
-                <div className="space-y-3">{anteriores.map(r => <TarjetaReserva key={r.id} reserva={r} onCancelado={cargar} />)}</div>
+                <div className="space-y-3">
+                  {itemsAnteriores.map(it => it.tipo === 'individual'
+                    ? <TarjetaReserva key={it.reserva.id} reserva={it.reserva} onCancelado={cargar} />
+                    : <GrupoReservas key={it.grupoReservaId} reservas={it.reservas} onCancelado={cargar} />
+                  )}
+                </div>
               </section>
             )}
           </>

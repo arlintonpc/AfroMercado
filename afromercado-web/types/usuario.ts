@@ -9,6 +9,7 @@ export interface Usuario {
   telefono?: string | null
   avatarUrl?: string | null
   municipio?: string | null
+  departamento?: string | null
   rol: RolUsuario
   activo: boolean
   tipoDocumento?: TipoDocumento | null

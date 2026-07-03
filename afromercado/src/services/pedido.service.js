@@ -290,7 +290,11 @@ const PedidoService = {
           ...(combinable ? {} : { subtotalesElegibles }),
         });
         if (resultadoCupon.error) throw new ErrorValidacion(resultadoCupon.error);
-        cuponId = resultadoCupon.cupon.id;
+        // Fallback de alianza comercial: no es un Cupon propio, no tiene id ni
+        // se registra en CuponUso (ver AlianzaService.validarCodigoAlianza).
+        if (!resultadoCupon.esAlianza) {
+          cuponId = resultadoCupon.cupon.id;
+        }
         cuponDescuento = resultadoCupon.descuento;
         totalGeneral = resultadoCupon.totalConDescuento + costoEnvioNum;
       }
@@ -328,7 +332,11 @@ const PedidoService = {
           notas,
           expiresAt,
           subPedidos: subPedidosFinal,
-          ...(cuponId !== null ? { cuponId, cuponDescuento } : {}),
+          // cuponId solo aplica a cupones propios del marketplace; el descuento
+          // de una alianza comercial se registra igual (columna independiente)
+          // pero sin cuponId, porque no existe una fila Cupon que referenciar.
+          ...(cuponId !== null ? { cuponId } : {}),
+          ...(cuponDescuento ? { cuponDescuento } : {}),
         },
         tx
       );

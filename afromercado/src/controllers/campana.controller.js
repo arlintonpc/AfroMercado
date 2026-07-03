@@ -2,14 +2,49 @@ const prisma = require("../config/prisma");
 
 const INCLUDE_ADMIN = { admin: { select: { nombre: true } } };
 
+// Formatos que solo deben aparecer cuando se piden explícitamente por ?tipo=
+// (nunca mezclados en la rotación general del hero, para no saturar).
+const TIPOS_EXCLUSIVOS = ["BANNER_CARRUSEL", "IRRUPTOR_BIENVENIDA"];
+
+// Mismo criterio de alcance geográfico que VisibilidadRepository.listarActivas:
+// NACIONAL siempre entra; DEPARTAMENTO/MUNICIPIO solo si coincide el departamento del comprador.
+function filtroAlcanceGeografico(departamento) {
+  return departamento
+    ? {
+        OR: [
+          { alcance: "NACIONAL" },
+          { alcance: "DEPARTAMENTO", departamento },
+          { alcance: "MUNICIPIO", departamento },
+        ],
+      }
+    : {};
+}
+
 const CampanaController = {
-  /* GET /api/campanas/activas — público, usa el hero */
+  /* GET /api/campanas/activas — público, usa el hero.
+     Sin ?tipo=, mantiene el comportamiento de siempre (mezcla PUBLICIDAD/SOCIAL,
+     excluye BANNER_CARRUSEL/IRRUPTOR_BIENVENIDA para no duplicarlos con sus propios
+     componentes). Con ?tipo=, filtra a ese tipo exacto y aplica el cupo correspondiente. */
   async listarActivas(req, res, next) {
     try {
+      const tipo = typeof req.query.tipo === "string" ? req.query.tipo.trim().slice(0, 40) || null : null;
+      const departamento = typeof req.query.departamento === "string" ? req.query.departamento.trim().slice(0, 120) || null : null;
       const ahora = new Date();
+
+      let take;
+      if (tipo === "IRRUPTOR_BIENVENIDA") take = 1;
+      else if (tipo === "BANNER_CARRUSEL") take = 4;
+
       const campanas = await prisma.campanaHero.findMany({
-        where: { activa: true, inicio: { lte: ahora }, fin: { gte: ahora } },
+        where: {
+          activa: true,
+          inicio: { lte: ahora },
+          fin: { gte: ahora },
+          ...(tipo ? { tipo } : { tipo: { notIn: TIPOS_EXCLUSIVOS } }),
+          ...filtroAlcanceGeografico(departamento),
+        },
         orderBy: [{ prioridad: "desc" }, { createdAt: "asc" }],
+        ...(take ? { take } : {}),
         select: {
           id: true, tipo: true, titulo: true, subtitulo: true, imagenUrl: true,
           ctaTexto: true, urlDestino: true, prioridad: true,

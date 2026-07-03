@@ -6,6 +6,7 @@ export interface FiltrosProductos {
   q?: string
   categoriaId?: string
   municipio?: string
+  departamento?: string
   precioMin?: number
   precioMax?: number
   alcance?: 'LOCAL' | 'NACIONAL' | 'AMBOS'

@@ -223,15 +223,15 @@ export default function TransportesPage() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="bg-[#D4A017]/20 border border-[#D4A017]/30 text-[#D4A017] text-xs font-semibold px-3 py-1 rounded-full">
-                  🛥️ Movilidad fluvial
+                  🛥️ Movilidad regional
                 </span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight">
-                Transporte Fluvial<br />
-                <span className="text-[#52B788]">por el Chocó</span>
+                Transporte<br />
+                <span className="text-[#52B788]">de Colombia</span>
               </h1>
               <p className="text-white/55 text-sm mt-2.5 max-w-sm">
-                Lanchas, chalupas y botes — conéctate entre municipios del Pacífico
+                Lanchas, buses, chivas y más — conéctate entre municipios de todo el país
               </p>
             </div>
             <div className="flex gap-4 sm:gap-6">

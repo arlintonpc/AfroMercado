@@ -2,6 +2,7 @@ const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const sseManager = require("../utils/sse-manager");
 const { enviarPushAUsuario } = require("../utils/push");
+const AlianzaService = require("./alianza.service");
 
 function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -29,6 +30,75 @@ const TRANSPORTE_INCLUDE = {
     },
   },
 };
+
+async function validarCuponTransporteInterno(db, codigo, configTransporteId, asientos, clienteId, totalOriginal, { bloquear = false, comercioId = null } = {}) {
+  const ahora = new Date();
+  const codigoNormalizado = String(codigo || "").trim().toUpperCase();
+  let cupon = await db.cuponTransporte.findFirst({
+    where: {
+      codigo: codigoNormalizado,
+      activo: true,
+      inicio: { lte: ahora },
+      fin:    { gte: ahora },
+      OR: [
+        { configTransporteId: null },
+        { configTransporteId },
+      ],
+    },
+  });
+
+  if (!cupon) {
+    // Fallback: no es un CuponTransporte propio, ¿es un código de alianza
+    // comercial vigente para este comercio en el módulo TRANSPORTE?
+    if (comercioId) {
+      const alianza = await AlianzaService.validarCodigoAlianza(codigoNormalizado, comercioId, "TRANSPORTE");
+      if (alianza) {
+        const descuentoAlianza = alianza.tipoDescuento === "PORCENTAJE"
+          ? Math.round(totalOriginal * Number(alianza.valorDescuento) / 100 * 100) / 100
+          : Math.min(Number(alianza.valorDescuento), totalOriginal);
+        return {
+          cupon: { codigo: codigoNormalizado },
+          descuento: descuentoAlianza,
+          totalConDescuento: totalOriginal - descuentoAlianza,
+          esAlianza: true,
+        };
+      }
+    }
+    throw new ErrorValidacion("Cupon no valido o expirado");
+  }
+  if (bloquear) {
+    await db.$queryRaw`SELECT id FROM "CuponTransporte" WHERE id = ${cupon.id} FOR UPDATE`;
+    cupon = await db.cuponTransporte.findUnique({ where: { id: cupon.id } });
+    if (!cupon || !cupon.activo || cupon.inicio > ahora || cupon.fin < ahora) {
+      throw new ErrorValidacion("Cupon no valido o expirado");
+    }
+  }
+
+  if (cupon.minimoAsientos && asientos < cupon.minimoAsientos) {
+    throw new ErrorValidacion(`Este cupon requiere minimo ${cupon.minimoAsientos} asiento(s)`);
+  }
+
+  if (cupon.usosMaximos && cupon.usosActuales >= cupon.usosMaximos) {
+    throw new ErrorValidacion("El cupon ha alcanzado el limite de usos");
+  }
+
+  if (clienteId) {
+    const usoExistente = await db.cuponTransporteUso.findFirst({
+      where: { cuponTransporteId: cupon.id, clienteId },
+    });
+    if (usoExistente) throw new ErrorValidacion("Ya usaste este cupon");
+  }
+
+  let descuento;
+  if (cupon.tipo === "PORCENTAJE") {
+    descuento = Math.round(totalOriginal * Number(cupon.valor) / 100 * 100) / 100;
+  } else {
+    descuento = Math.min(Number(cupon.valor), totalOriginal);
+  }
+
+  const totalConDescuento = totalOriginal - descuento;
+  return { cupon, descuento, totalConDescuento };
+}
 
 const TransporteService = {
   async listar({ municipio, departamento } = {}) {
@@ -68,7 +138,7 @@ const TransporteService = {
     return { disponibles: Math.max(0, ruta.capacidad - ocupados), capacidad: ruta.capacidad };
   },
 
-  async crearReserva(clienteId, { rutaTransporteId, fechaViaje, asientos, metodoPago, notasCliente, nombreContacto, telefonoContacto }) {
+  async crearReserva(clienteId, { rutaTransporteId, fechaViaje, asientos, metodoPago, notasCliente, nombreContacto, telefonoContacto, codigoCupon }) {
     const ruta = await prisma.rutaTransporte.findUnique({
       where: { id: rutaTransporteId },
       include: { configTransporte: { include: TRANSPORTE_INCLUDE } },
@@ -78,23 +148,64 @@ const TransporteService = {
     const disp = await TransporteService.verificarDisponibilidad(rutaTransporteId, fechaViaje);
     if (disp.disponibles < asientos) throw new ErrorValidacion("No hay suficientes asientos disponibles");
 
-    const total = Number(ruta.precioAsiento) * asientos;
+    const totalOriginal = Number(ruta.precioAsiento) * asientos;
 
-    const reserva = await prisma.reservaTransporte.create({
-      data: {
-        codigo: generarCodigo(),
-        rutaTransporteId,
-        clienteId,
-        fechaViaje: new Date(fechaViaje),
-        asientos,
-        total,
-        estado: "PENDIENTE",
-        metodoPago,
-        notasCliente: notasCliente || null,
-        nombreContacto,
-        telefonoContacto,
-      },
-      include: { ruta: { include: { configTransporte: { include: TRANSPORTE_INCLUDE } } } },
+    const { reserva } = await prisma.$transaction(async (tx) => {
+      let montoDescuento = 0;
+      let cuponValidado = null;
+      let cuponEsAlianza = false;
+      if (codigoCupon) {
+        const cuponResultado = await validarCuponTransporteInterno(
+          tx,
+          codigoCupon,
+          ruta.configTransporteId,
+          asientos,
+          clienteId,
+          totalOriginal,
+          { bloquear: true, comercioId: ruta.configTransporte.comercioId }
+        );
+        montoDescuento = cuponResultado.descuento;
+        cuponValidado = cuponResultado.cupon;
+        cuponEsAlianza = !!cuponResultado.esAlianza;
+      }
+
+      const total = totalOriginal - montoDescuento;
+
+      const nuevaReserva = await tx.reservaTransporte.create({
+        data: {
+          codigo: generarCodigo(),
+          rutaTransporteId,
+          clienteId,
+          fechaViaje: new Date(fechaViaje),
+          asientos,
+          total,
+          estado: "PENDIENTE",
+          metodoPago,
+          notasCliente: notasCliente || null,
+          nombreContacto,
+          telefonoContacto,
+          montoDescuento: montoDescuento || null,
+          codigoCupon: codigoCupon || null,
+        },
+        include: { ruta: { include: { configTransporte: { include: TRANSPORTE_INCLUDE } } } },
+      });
+
+      // Un descuento de alianza no tiene fila CuponTransporte propia que actualizar.
+      if (cuponValidado && !cuponEsAlianza) {
+        await tx.cuponTransporteUso.create({
+          data: {
+            cuponTransporteId: cuponValidado.id,
+            clienteId,
+            reservaTransporteId: nuevaReserva.id,
+          },
+        });
+        await tx.cuponTransporte.update({
+          where: { id: cuponValidado.id },
+          data:  { usosActuales: { increment: 1 } },
+        });
+      }
+
+      return { reserva: nuevaReserva };
     });
 
     const operadorId = await prisma.comercio.findUnique({
@@ -354,6 +465,58 @@ const TransporteService = {
       where: { usuarioId_configTransporteId: { usuarioId, configTransporteId } },
     });
     return { favorito: !!existe };
+  },
+
+  // ── CUPONES DE TRANSPORTE ──────────────────────────────────────
+
+  async validarCuponTransporte(codigo, configTransporteId, asientos, clienteId, totalOriginal) {
+    return validarCuponTransporteInterno(prisma, codigo, configTransporteId, asientos, clienteId, totalOriginal);
+  },
+
+  async crearCuponTransporte(comercioId, datos) {
+    const transporte = await prisma.configTransporte.findUnique({ where: { comercioId } });
+    if (!transporte || !transporte.activo) throw new ErrorValidacion("No tienes un servicio de transporte activo");
+
+    const { codigo, tipo = "PORCENTAJE", valor, minimoAsientos, usosMaximos, inicio, fin } = datos;
+    if (!codigo || !valor || !inicio || !fin) throw new ErrorValidacion("Faltan campos requeridos: codigo, valor, inicio, fin");
+
+    return prisma.cuponTransporte.create({
+      data: {
+        codigo:         codigo.trim().toUpperCase(),
+        tipo,
+        valor:          Number(valor),
+        minimoAsientos: minimoAsientos ? Number(minimoAsientos) : null,
+        usosMaximos:    usosMaximos    ? Number(usosMaximos)    : null,
+        inicio:         new Date(inicio),
+        fin:            new Date(fin),
+        configTransporteId: transporte.id,
+      },
+    });
+  },
+
+  async listarCuponesTransporte(comercioId) {
+    const transporte = await prisma.configTransporte.findUnique({ where: { comercioId } });
+    if (!transporte) throw new ErrorNoEncontrado("Servicio de transporte no encontrado");
+
+    return prisma.cuponTransporte.findMany({
+      where:   { configTransporteId: transporte.id },
+      orderBy: { createdAt: "desc" },
+    });
+  },
+
+  async eliminarCuponTransporte(comercioId, cuponId) {
+    const transporte = await prisma.configTransporte.findUnique({ where: { comercioId } });
+    if (!transporte) throw new ErrorNoEncontrado("Servicio de transporte no encontrado");
+
+    const cupon = await prisma.cuponTransporte.findFirst({
+      where: { id: cuponId, configTransporteId: transporte.id },
+    });
+    if (!cupon) throw new ErrorNoEncontrado("Cupón no encontrado");
+
+    return prisma.cuponTransporte.update({
+      where: { id: cuponId },
+      data:  { activo: false },
+    });
   },
 };
 

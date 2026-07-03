@@ -6,6 +6,7 @@ const { autenticar, autorizar } = require("../middlewares/auth");
 const AdminController = require("../controllers/admin.controller");
 const VisibilidadController = require("../controllers/visibilidad.controller");
 const PublicidadController = require("../controllers/publicidad.controller");
+const AlianzaController = require("../controllers/alianza.controller");
 
 const router = express.Router();
 
@@ -76,6 +77,7 @@ router.post("/email/test", ...soloAdmin, AdminController.enviarEmailTest);
 router.get("/comercios",                        ...soloAdmin, AdminController.listarComercios);
 router.patch("/comercios/:id/verificar",        ...soloAdmin, AdminController.verificarComerciante);
 router.patch("/comercios/:id/whatsapp-visible", ...soloAdmin, AdminController.toggleWhatsappVisible);
+router.patch("/comercios/:id/verificado-etnico", ...soloAdmin, AdminController.toggleVerificadoEtnico);
 router.post("/comercios/:id/comision",          ...soloAdmin, AdminController.setComisionComercio);
 
 // Panel de administración — dashboard y gestión avanzada
@@ -118,5 +120,11 @@ router.patch("/categorias/:id/activo",   ...soloAdmin, AdminController.toggleAct
 // Pedidos (vista admin)
 router.get("/pedidos",     ...soloAdmin, AdminController.listarPedidos);
 router.get("/pedidos/:id", ...soloAdmin, AdminController.obtenerPedidoAdmin);
+
+// Alianzas comerciales (cupón compartido entre comercios de distintos módulos)
+router.get(  "/alianzas",                ...soloAdmin, AlianzaController.adminListar);
+router.patch("/alianzas/:id/aprobar",     ...soloAdmin, AlianzaController.adminAprobar);
+router.patch("/alianzas/:id/rechazar",    ...soloAdmin, AlianzaController.adminRechazar);
+router.patch("/alianzas/:id/despublicar", ...soloAdmin, AlianzaController.adminDespublicar);
 
 module.exports = router;

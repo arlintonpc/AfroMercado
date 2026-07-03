@@ -19,14 +19,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const foto = data.fotos?.[0]
   const rutas = data.rutas?.filter((r: any) => r.activo) ?? []
   return {
-    title: `${data.nombre} — Transporte fluvial en ${data.comercio.municipio} | AfroMercado`,
+    title: `${data.nombre} — Transporte en ${data.comercio.municipio} | AfroMercado`,
     description: [
       data.descripcion?.slice(0, 120),
       rutas.length > 0 ? `${rutas.length} ruta${rutas.length !== 1 ? 's' : ''} disponible${rutas.length !== 1 ? 's' : ''}.` : null,
     ].filter(Boolean).join(' '),
     openGraph: {
       title: `${data.nombre} — ${data.comercio.municipio}`,
-      description: data.descripcion?.slice(0, 160) ?? `Transporte fluvial en ${data.comercio.municipio}, Chocó`,
+      description: data.descripcion?.slice(0, 160) ?? `Transporte en ${data.comercio.municipio}`,
       images: foto ? [{ url: foto, width: 800, height: 600 }] : [],
       type: 'website',
     },
@@ -52,7 +52,7 @@ export default async function TransporteLayout({
         '@type': 'LocalBusiness',
         '@id': `${SITE}/transportes/${id}`,
         name: data.nombre,
-        description: data.descripcion ?? `Servicio de transporte fluvial ${data.tipo} en ${data.comercio.municipio}, Chocó.`,
+        description: data.descripcion ?? `Servicio de transporte ${data.tipo} en ${data.comercio.municipio}.`,
         url: `${SITE}/transportes/${id}`,
         image: data.fotos?.[0] ?? undefined,
         address: {

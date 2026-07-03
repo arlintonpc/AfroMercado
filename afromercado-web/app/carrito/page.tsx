@@ -54,7 +54,7 @@ export default function PaginaCarrito() {
           <div className="bg-white rounded-2xl border border-[#1A1A1A]/5 mt-4">
             <EmptyState
               titulo="Tu pedido está vacío"
-              descripcion="Aún no has agregado productos. Descubre lo mejor del Chocó, hecho por sus productores."
+              descripcion="Aún no has agregado productos. Descubre lo mejor de Colombia, hecho por sus productores."
             />
             <div className="flex justify-center pb-10">
               <Link href="/">

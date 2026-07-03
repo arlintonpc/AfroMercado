@@ -18,7 +18,7 @@ function pagoAprobadoComprador({ nombreComprador, pedidoId }) {
     <h2 style="color:#2D6A4F;font-size:20px;margin-top:0;">✅ ¡Pago confirmado!</h2>
     <p style="color:#555;line-height:1.6;">Hola ${nombreComprador}, tu pago del pedido <strong>#${pedidoId}</strong> fue verificado y confirmado exitosamente.</p>
     <p style="color:#555;line-height:1.6;">Los comerciantes ya están preparando tus productos. Te notificaremos cuando estén en camino.</p>
-    <p style="color:#888;font-size:13px;">¡Gracias por apoyar a los comerciantes del Chocó! 🌿</p>`;
+    <p style="color:#888;font-size:13px;">¡Gracias por apoyar a los comerciantes locales! 🌿</p>`;
   return base(contenido, `Pago confirmado — Pedido #${pedidoId} en preparación`);
 }
 

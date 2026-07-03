@@ -315,7 +315,7 @@ const NotificacionService = {
     if (comprador.telefono) {
       await dispararNotificacion(() =>
         enviarMensajeWA(comprador.telefono,
-          `¡Tu pedido está listo! 📦\n\nHola ${primerNombre(comprador.nombre)}, el pedido *#${pedidoId}* ya fue preparado y está esperando por ti.\n\nEl productor coordinará contigo el envío. ¡Gracias por apoyar el Chocó! 🌿`
+          `¡Tu pedido está listo! 📦\n\nHola ${primerNombre(comprador.nombre)}, el pedido *#${pedidoId}* ya fue preparado y está esperando por ti.\n\nEl productor coordinará contigo el envío. ¡Gracias por apoyar a los productores locales! 🌿`
         ), "WA comprador pedido listo");
     }
   },
@@ -339,7 +339,7 @@ const NotificacionService = {
     if (comprador.telefono) {
       await dispararNotificacion(() =>
         enviarMensajeWA(comprador.telefono,
-          `¡Entregado! ✅\n\nHola ${primerNombre(comprador.nombre)}, tu pedido *#${pedidoId}* fue marcado como entregado.\n\n¿Todo llegó bien? Deja tu reseña en AfroMercado y apoya a los productores del Chocó. 🌿`
+          `¡Entregado! ✅\n\nHola ${primerNombre(comprador.nombre)}, tu pedido *#${pedidoId}* fue marcado como entregado.\n\n¿Todo llegó bien? Deja tu reseña en AfroMercado y apoya a los productores locales. 🌿`
         ), "WA comprador pedido entregado");
     }
   },
@@ -412,7 +412,7 @@ const NotificacionService = {
     if (comprador.telefono) {
       await dispararNotificacion(() =>
         enviarMensajeWA(comprador.telefono,
-          `🚴 *¡Tu pedido va en camino!*\n\nHola ${primerNombre(comprador.nombre)}, el repartidor *${repartidorNombre}* está en camino con tu pedido *#${pedidoId}*.\n\nPrepárate para recibirlo en:\n📍 ${direccion || "tu dirección registrada"}\n\n¡Gracias por apoyar el Chocó! 🌿`
+          `🚴 *¡Tu pedido va en camino!*\n\nHola ${primerNombre(comprador.nombre)}, el repartidor *${repartidorNombre}* está en camino con tu pedido *#${pedidoId}*.\n\nPrepárate para recibirlo en:\n📍 ${direccion || "tu dirección registrada"}\n\n¡Gracias por apoyar a los productores locales! 🌿`
         ), "WA comprador entrega en camino");
     }
   },
@@ -599,6 +599,33 @@ const NotificacionService = {
         enviarMensajeWA(usuario.telefono,
           `¡Felicitaciones, ${primerNombre(usuario.nombre)}! 🎉🌿\n\nTu comercio *${comercio.nombre}* fue *verificado* en AfroMercado.\n\nYa puedes publicar tus productos y comenzar a recibir pedidos. ¡Mucho éxito!`
         ), "WA comercio verificado");
+    }
+  },
+
+  // Cultura — evento pospuesto o cancelado: avisa a cada comprador con reserva activa
+  async eventoCulturalCambioEstado({ evento, estado, compradores }) {
+    const titulo = evento.titulo;
+    const esPospuesto = estado === "POSPUESTO";
+    const mensaje = esPospuesto
+      ? `El evento "${titulo}" fue pospuesto. Te avisaremos la nueva fecha.`
+      : `El evento "${titulo}" fue cancelado. Contáctanos para tu reembolso si ya pagaste.`;
+    const mensajeWA = esPospuesto
+      ? `📅 *Evento pospuesto*\n\nHola, el evento *"${titulo}"* fue pospuesto. Te avisaremos la nueva fecha por AfroMercado.`
+      : `⚠️ *Evento cancelado*\n\nHola, el evento *"${titulo}"* fue cancelado.\n\nSi ya pagaste tu entrada, contáctanos para gestionar tu reembolso.`;
+
+    for (const comprador of compradores || []) {
+      if (!comprador?.id) continue;
+      await crearNotificacionDB(comprador.id, {
+        tipo: esPospuesto ? "EVENTO_CULTURAL_POSPUESTO" : "EVENTO_CULTURAL_CANCELADO",
+        titulo: esPospuesto ? "Evento pospuesto" : "Evento cancelado",
+        mensaje,
+        url: `/cultura/${evento.id}`,
+        datos: { eventoCulturalId: evento.id },
+      });
+      if (comprador.telefono) {
+        await dispararNotificacion(() =>
+          enviarMensajeWA(comprador.telefono, mensajeWA), `WA comprador ${comprador.id} evento cultural ${estado.toLowerCase()}`);
+      }
     }
   },
 };

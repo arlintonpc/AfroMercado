@@ -19,6 +19,7 @@ const config = require("./config");
 const { cerrarConexion } = require("./utils/whatsapp");
 const { iniciarCron } = require("./utils/cron");
 const { iniciarJob: iniciarJobHotel } = require("./jobs/expirarReservasHotel");
+const { iniciarJob: iniciarJobRecordatorioTour } = require("./jobs/recordatorioTour");
 const prisma = require("./config/prisma");
 
 // Aplica migraciones DDL pendientes sin usar prisma migrate (Neon pooler)
@@ -624,6 +625,132 @@ async function aplicarMigraciones() {
     )`,
     `CREATE INDEX IF NOT EXISTS "ReservaCultural_eventoCulturalId_estado_idx" ON "ReservaCultural"("eventoCulturalId","estado")`,
     `CREATE INDEX IF NOT EXISTS "ReservaCultural_clienteId_idx" ON "ReservaCultural"("clienteId")`,
+    // Certificación en dos niveles: base nacional + variante de comunidad étnica
+    `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "verificadoEtnico" BOOLEAN NOT NULL DEFAULT false`,
+
+    // ── CuponTransporte / CuponTransporteUso ──────────────────────
+    `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "montoDescuento" DECIMAL(10,2)`,
+    `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "codigoCupon" TEXT`,
+    `CREATE TABLE IF NOT EXISTS "CuponTransporte" (
+      "id"                 SERIAL PRIMARY KEY,
+      "codigo"             TEXT NOT NULL UNIQUE,
+      "tipo"               TEXT NOT NULL DEFAULT 'PORCENTAJE',
+      "valor"              DECIMAL(10,2) NOT NULL,
+      "minimoAsientos"     INTEGER,
+      "usosMaximos"        INTEGER,
+      "usosActuales"       INTEGER NOT NULL DEFAULT 0,
+      "activo"             BOOLEAN NOT NULL DEFAULT true,
+      "inicio"             TIMESTAMP(3) NOT NULL,
+      "fin"                TIMESTAMP(3) NOT NULL,
+      "configTransporteId" INTEGER,
+      "createdAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "CuponTransporte_configTransporteId_fkey" FOREIGN KEY ("configTransporteId") REFERENCES "ConfigTransporte"("id") ON DELETE SET NULL ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "CuponTransporte_codigo_activo_idx"     ON "CuponTransporte"("codigo", "activo")`,
+    `CREATE INDEX IF NOT EXISTS "CuponTransporte_activo_fin_idx"        ON "CuponTransporte"("activo", "fin")`,
+    `CREATE INDEX IF NOT EXISTS "CuponTransporte_configTransporteId_idx" ON "CuponTransporte"("configTransporteId")`,
+    `CREATE TABLE IF NOT EXISTS "CuponTransporteUso" (
+      "id"                  SERIAL PRIMARY KEY,
+      "cuponTransporteId"   INTEGER NOT NULL,
+      "clienteId"           INTEGER NOT NULL,
+      "reservaTransporteId" INTEGER NOT NULL UNIQUE,
+      "createdAt"           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "CuponTransporteUso_cuponTransporteId_fkey"   FOREIGN KEY ("cuponTransporteId")   REFERENCES "CuponTransporte"("id")   ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "CuponTransporteUso_clienteId_fkey"           FOREIGN KEY ("clienteId")           REFERENCES "Usuario"("id")           ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "CuponTransporteUso_reservaTransporteId_fkey" FOREIGN KEY ("reservaTransporteId") REFERENCES "ReservaTransporte"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "CuponTransporteUso_cuponTransporteId_clienteId_idx" ON "CuponTransporteUso"("cuponTransporteId", "clienteId")`,
+
+    // ── ReviewCultura ─────────────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS "ReviewCultura" (
+      "id"                SERIAL PRIMARY KEY,
+      "eventoCulturalId"  INTEGER NOT NULL,
+      "clienteId"         INTEGER NOT NULL,
+      "reservaCulturalId" INTEGER NOT NULL UNIQUE,
+      "calificacion"      INTEGER NOT NULL,
+      "comentario"        TEXT,
+      "creadoAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ReviewCultura_eventoCulturalId_fkey"  FOREIGN KEY ("eventoCulturalId")  REFERENCES "EventoCultural"("id")  ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "ReviewCultura_clienteId_fkey"         FOREIGN KEY ("clienteId")         REFERENCES "Usuario"("id")         ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "ReviewCultura_reservaCulturalId_fkey" FOREIGN KEY ("reservaCulturalId") REFERENCES "ReservaCultural"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS "ReviewCultura_eventoCulturalId_idx" ON "ReviewCultura"("eventoCulturalId")`,
+
+    // ── EstadoEventoCultural: agrega POSPUESTO ──────────────────────────
+    `ALTER TYPE "EstadoEventoCultural" ADD VALUE IF NOT EXISTS 'POSPUESTO'`,
+
+    // ── FavoritoExpress ──────────────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS "FavoritoExpress" (
+      "id"              SERIAL PRIMARY KEY,
+      "usuarioId"       INTEGER NOT NULL,
+      "configExpressId" INTEGER NOT NULL,
+      "createdAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "FavoritoExpress_usuarioId_fkey"       FOREIGN KEY ("usuarioId")       REFERENCES "Usuario"("id")       ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "FavoritoExpress_configExpressId_fkey" FOREIGN KEY ("configExpressId") REFERENCES "ConfigExpress"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "FavoritoExpress_usuarioId_configExpressId_key" UNIQUE ("usuarioId", "configExpressId")
+    )`,
+    `CREATE INDEX IF NOT EXISTS "FavoritoExpress_usuarioId_idx"       ON "FavoritoExpress"("usuarioId")`,
+    `CREATE INDEX IF NOT EXISTS "FavoritoExpress_configExpressId_idx" ON "FavoritoExpress"("configExpressId")`,
+
+    // ── PedidoExpress: pedido programado ("para más tarde") ─────────────
+    `ALTER TABLE "PedidoExpress" ADD COLUMN IF NOT EXISTS "fechaProgramada" TIMESTAMP(3)`,
+
+    // ── ReservaHotel: reserva múltiple (varios tipos de habitación en un solo grupo) ──
+    `ALTER TABLE "ReservaHotel" ADD COLUMN IF NOT EXISTS "grupoReservaId" TEXT`,
+    `CREATE INDEX IF NOT EXISTS "ReservaHotel_grupoReservaId_idx" ON "ReservaHotel"("grupoReservaId")`,
+
+    // ── Publicidad: alcance geográfico (Municipio / Departamento / Nacional) ──
+    // Default 'NACIONAL' preserva el comportamiento actual de las pautas ya existentes.
+    `ALTER TABLE "VisibilidadPagada" ADD COLUMN IF NOT EXISTS "alcance" TEXT NOT NULL DEFAULT 'NACIONAL'`,
+    `ALTER TABLE "VisibilidadPagada" ADD COLUMN IF NOT EXISTS "departamento" TEXT`,
+    `ALTER TABLE "VisibilidadPagada" ADD COLUMN IF NOT EXISTS "municipio" TEXT`,
+    `ALTER TABLE "SolicitudPublicidad" ADD COLUMN IF NOT EXISTS "alcance" TEXT NOT NULL DEFAULT 'NACIONAL'`,
+    `ALTER TABLE "SolicitudPublicidad" ADD COLUMN IF NOT EXISTS "departamento" TEXT`,
+    `ALTER TABLE "SolicitudPublicidad" ADD COLUMN IF NOT EXISTS "municipio" TEXT`,
+
+    // ── Publicidad: BANNER_CARRUSEL / IRRUPTOR_BIENVENIDA (imagen diseñada propia) ──
+    `ALTER TABLE "SolicitudPublicidad" ADD COLUMN IF NOT EXISTS "imagenPersonalizadaUrl" TEXT`,
+    `ALTER TABLE "CampanaHero" ADD COLUMN IF NOT EXISTS "alcance" TEXT NOT NULL DEFAULT 'NACIONAL'`,
+    `ALTER TABLE "CampanaHero" ADD COLUMN IF NOT EXISTS "departamento" TEXT`,
+    `ALTER TABLE "CampanaHero" ADD COLUMN IF NOT EXISTS "municipio" TEXT`,
+
+    // ── Alianzas comerciales (cupón compartido entre comercios de distintos módulos) ──
+    `CREATE TABLE IF NOT EXISTS "AlianzaComercial" (
+      "id"                  SERIAL PRIMARY KEY,
+      "nombre"              TEXT NOT NULL,
+      "descripcion"         TEXT,
+      "departamento"        TEXT,
+      "municipio"           TEXT,
+      "codigoCompartido"    TEXT NOT NULL,
+      "estado"              TEXT NOT NULL DEFAULT 'PENDIENTE_APROBACION',
+      "inicio"              TIMESTAMP(3) NOT NULL,
+      "fin"                 TIMESTAMP(3) NOT NULL,
+      "creadoPorComercioId" INTEGER NOT NULL,
+      "aprobadoPor"         INTEGER,
+      "aprobadoAt"          TIMESTAMP(3),
+      "motivoRechazo"       TEXT,
+      "createdAt"           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "AlianzaComercial_codigoCompartido_key" UNIQUE ("codigoCompartido")
+    )`,
+    `CREATE INDEX IF NOT EXISTS "AlianzaComercial_codigoCompartido_estado_idx" ON "AlianzaComercial"("codigoCompartido","estado")`,
+    `CREATE INDEX IF NOT EXISTS "AlianzaComercial_departamento_municipio_idx" ON "AlianzaComercial"("departamento","municipio")`,
+    `CREATE TABLE IF NOT EXISTS "AlianzaSocio" (
+      "id"             SERIAL PRIMARY KEY,
+      "alianzaId"      INTEGER NOT NULL,
+      "comercioId"     INTEGER NOT NULL,
+      "modulo"         TEXT NOT NULL,
+      "tipoDescuento"  TEXT NOT NULL DEFAULT 'PORCENTAJE',
+      "valorDescuento" DECIMAL(10,2) NOT NULL,
+      "aceptado"       BOOLEAN NOT NULL DEFAULT false,
+      "aceptadoAt"     TIMESTAMP(3),
+      "activo"         BOOLEAN NOT NULL DEFAULT true,
+      "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "AlianzaSocio_alianzaId_fkey"  FOREIGN KEY ("alianzaId")  REFERENCES "AlianzaComercial"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "AlianzaSocio_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id")         ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "AlianzaSocio_alianzaId_comercioId_modulo_key" UNIQUE ("alianzaId", "comercioId", "modulo")
+    )`,
+    `CREATE INDEX IF NOT EXISTS "AlianzaSocio_comercioId_modulo_aceptado_activo_idx" ON "AlianzaSocio"("comercioId","modulo","aceptado","activo")`,
   ];
   for (const sql of migraciones) {
     try {
@@ -663,5 +790,6 @@ aplicarMigraciones().then(() => {
     console.log(`   Entorno: ${config.entorno}`);
     iniciarCron();
     iniciarJobHotel();
+    iniciarJobRecordatorioTour();
   });
 });

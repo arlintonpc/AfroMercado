@@ -125,6 +125,31 @@ const ReviewService = {
       take: 50,
     });
   },
+
+  // ── CULTURA ─────────────────────────────────────────────────
+  async crearReviewCultura(clienteId, { reservaCulturalId, calificacion, comentario }) {
+    const reserva = await prisma.reservaCultural.findFirst({
+      where: { id: reservaCulturalId, clienteId, estado: "USADA" },
+    });
+    if (!reserva) throw new ErrorValidacion("Solo puedes reseñar entradas usadas");
+
+    const existente = await prisma.reviewCultura.findUnique({ where: { reservaCulturalId } });
+    if (existente) throw new ErrorValidacion("Ya dejaste una reseña para esta reserva");
+
+    return prisma.reviewCultura.create({
+      data: { eventoCulturalId: reserva.eventoCulturalId, clienteId, reservaCulturalId, calificacion, comentario: comentario || null },
+      include: { cliente: { select: { nombre: true, avatarUrl: true } } },
+    });
+  },
+
+  async reviewsCultura(eventoCulturalId) {
+    return prisma.reviewCultura.findMany({
+      where: { eventoCulturalId },
+      include: { cliente: { select: { nombre: true, avatarUrl: true } } },
+      orderBy: { creadoAt: "desc" },
+      take: 50,
+    });
+  },
 };
 
 module.exports = ReviewService;

@@ -1,8 +1,9 @@
 const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
+const NotificacionService = require("./notificacion.service");
 
 const TASA_COMISION_CULTURA = 0.10;
-const ESTADOS_EVENTO = ["BORRADOR", "PUBLICADO", "FINALIZADO", "CANCELADO"];
+const ESTADOS_EVENTO = ["BORRADOR", "PUBLICADO", "FINALIZADO", "CANCELADO", "POSPUESTO"];
 
 function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -88,6 +89,22 @@ async function obtenerEventoDelComercio(comercioId, eventoId) {
   return evento;
 }
 
+// Al posponer o cancelar un evento, avisa a todos los compradores con reserva activa
+async function notificarCambioEstadoSiAplica(evento, estado) {
+  if (estado !== "POSPUESTO" && estado !== "CANCELADO") return;
+  try {
+    const reservas = await prisma.reservaCultural.findMany({
+      where: { eventoCulturalId: evento.id, estado: { in: ["PENDIENTE", "CONFIRMADA"] } },
+      include: { cliente: { select: { id: true, nombre: true, telefono: true } } },
+    });
+    const compradores = reservas.map((r) => r.cliente).filter(Boolean);
+    if (compradores.length === 0) return;
+    await NotificacionService.eventoCulturalCambioEstado({ evento, estado, compradores });
+  } catch (e) {
+    console.error("[CULTURA] Error notificando cambio de estado:", e.message);
+  }
+}
+
 const CulturaService = {
   // ── PÚBLICO ──────────────────────────────────────────────────
   async listarAgenda({ departamento, municipio, categoria } = {}) {
@@ -115,7 +132,7 @@ const CulturaService = {
       where: { id: Number(id) },
       include: EVENTO_INCLUDE,
     });
-    if (!evento || evento.estado === "BORRADOR") {
+    if (!evento || evento.estado !== "PUBLICADO") {
       throw new ErrorNoEncontrado("Evento cultural no encontrado");
     }
     return evento;
@@ -174,7 +191,7 @@ const CulturaService = {
   async misReservas(clienteId) {
     return prisma.reservaCultural.findMany({
       where: { clienteId },
-      include: { evento: { include: EVENTO_INCLUDE }, entrada: true },
+      include: { evento: { include: EVENTO_INCLUDE }, entrada: true, review: { select: { id: true } } },
       orderBy: { creadoAt: "desc" },
     });
   },
@@ -224,15 +241,17 @@ const CulturaService = {
   async actualizarEvento(comercioId, eventoId, datos) {
     await obtenerEventoDelComercio(comercioId, eventoId);
     const data = camposEvento(datos);
-    // El organizador solo puede publicar o volver a borrador; no finalizar/cancelar
-    if (datos.estado && ["BORRADOR", "PUBLICADO"].includes(datos.estado)) {
+    // El organizador puede publicar, volver a borrador, posponer o cancelar; no finalizar (solo admin)
+    if (datos.estado && ["BORRADOR", "PUBLICADO", "POSPUESTO", "CANCELADO"].includes(datos.estado)) {
       data.estado = datos.estado;
     }
-    return prisma.eventoCultural.update({
+    const evento = await prisma.eventoCultural.update({
       where: { id: Number(eventoId) },
       data: { ...data, updatedAt: new Date() },
       include: { entradas: { orderBy: { orden: "asc" } } },
     });
+    if (data.estado) await notificarCambioEstadoSiAplica(evento, data.estado);
+    return evento;
   },
 
   async crearEntrada(comercioId, eventoId, datos) {
@@ -310,10 +329,12 @@ const CulturaService = {
 
   async adminCambiarEstado(id, estado) {
     if (!ESTADOS_EVENTO.includes(estado)) throw new ErrorValidacion("Estado inválido");
-    return prisma.eventoCultural.update({
+    const evento = await prisma.eventoCultural.update({
       where: { id: Number(id) },
       data: { estado, updatedAt: new Date() },
     });
+    await notificarCambioEstadoSiAplica(evento, estado);
+    return evento;
   },
 };
 

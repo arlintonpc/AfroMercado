@@ -1,7 +1,7 @@
 const prisma = require("../config/prisma");
 const NotificacionService = require("./notificacion.service");
 
-const ESTADOS_QUE_REQUIEREN_REVISION = new Set(["APROBADO", "RECHAZADO"]);
+const ESTADOS_QUE_REQUIEREN_REVISION = new Set(["APROBADO", "RECHAZADO", "SUSPENDIDO"]);
 
 function debeVolverARevision(comercio) {
   if (!comercio) return false;

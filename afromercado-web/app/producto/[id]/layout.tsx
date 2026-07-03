@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const p = json.producto ?? json.data ?? {}
     const nombre   = p.nombre ?? 'Producto artesanal'
     const comercio = p.comercio?.nombre ?? 'AfroMercado'
-    const municipio = p.comercio?.municipio ?? 'Chocó'
+    const municipio = p.comercio?.municipio ?? 'Colombia'
     const unidadLabel: Record<string, string> = {
       UNIDAD: 'unidad', KG: 'kg', PAQUETE: 'paquete', LITRO: 'litro', GRAMO: 'gramo'
     }
@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const descripcion = (
       descripcionBase
         ? `${precioStr ? precioStr + ' · ' : ''}${descripcionBase}`
-        : `${precioStr ? precioStr + ' · ' : ''}${comercio} · ${municipio}, Chocó · Del Chocó para el mundo`
+        : `${precioStr ? precioStr + ' · ' : ''}${comercio} · ${municipio} · AfroMercado`
     ).slice(0, 160)
 
     const imagenRaw = p.imagenes?.[0]
@@ -82,7 +82,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   } catch {
     return {
       title:       'Producto — AfroMercado',
-      description: 'Descubre productos artesanales del Chocó en AfroMercado.',
+      description: 'Descubre productos artesanales de Colombia en AfroMercado.',
       openGraph: {
         title:    'Producto — AfroMercado',
         siteName: 'AfroMercado',

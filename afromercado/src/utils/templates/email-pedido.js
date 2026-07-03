@@ -35,7 +35,7 @@ function pedidoListo({ nombreComprador, pedidoId }) {
       <tr><td><strong style="color:#2D6A4F;">Pedido #</strong></td><td style="text-align:right;font-weight:700;">${pedidoId}</td></tr>
       <tr><td style="padding-top:8px;">Estado</td><td style="text-align:right;padding-top:8px;font-weight:700;color:#2D6A4F;">Listo para entrega 📦</td></tr>
     </table>
-    <p style="color:#555;line-height:1.6;">Puedes hacer seguimiento desde <strong>Mis pedidos</strong> en la app. ¡Gracias por apoyar a los productores del Chocó! 🌿</p>`;
+    <p style="color:#555;line-height:1.6;">Puedes hacer seguimiento desde <strong>Mis pedidos</strong> en la app. ¡Gracias por apoyar a los productores locales! 🌿</p>`;
   return base(contenido, `Pedido #${pedidoId} listo para entrega — AfroMercado`);
 }
 
@@ -47,7 +47,7 @@ function pedidoEntregado({ nombreComprador, pedidoId }) {
       <tr><td><strong style="color:#2D6A4F;">Pedido #</strong></td><td style="text-align:right;font-weight:700;">${pedidoId}</td></tr>
       <tr><td style="padding-top:8px;">Estado</td><td style="text-align:right;padding-top:8px;font-weight:700;color:#2D6A4F;">Entregado ✅</td></tr>
     </table>
-    <p style="color:#555;line-height:1.6;">¿Quedaste satisfecho? Deja tu reseña en la app y ayuda a otros compradores a descubrir los mejores productos del Chocó. 🌿</p>`;
+    <p style="color:#555;line-height:1.6;">¿Quedaste satisfecho? Deja tu reseña en la app y ayuda a otros compradores a descubrir los mejores productos de Colombia. 🌿</p>`;
   return base(contenido, `Pedido #${pedidoId} entregado — AfroMercado`);
 }
 

@@ -3,13 +3,13 @@ import type { Metadata } from 'next'
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
 
 export const metadata: Metadata = {
-  title: 'Tours culturales y naturales en el Chocó | AfroMercado',
+  title: 'Tours culturales y naturales de Colombia | AfroMercado',
   description:
-    'Descubre tours guiados por el Chocó: selva, ríos, playas y cultura afrocolombiana. Reserva directamente con comunidades locales en Quibdó, Nuquí, Bahía Solano y más.',
+    'Descubre tours guiados por todo el país: selva, ríos, playas, montañas y cultura viva. Reserva directamente con comunidades locales en cada región de Colombia.',
   openGraph: {
-    title: 'Tours en el Chocó | AfroMercado',
+    title: 'Tours en Colombia | AfroMercado',
     description:
-      'Explora el Pacífico colombiano con guías locales. Naturaleza, cultura y aventura en tours auténticos del Chocó.',
+      'Explora el territorio colombiano con guías locales. Naturaleza, cultura y aventura en tours auténticos de cada región.',
     type: 'website',
     url: `${SITE}/tours`,
   },
@@ -22,9 +22,9 @@ const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
   '@id': `${SITE}/tours`,
-  name: 'Tours culturales y naturales en el Chocó',
+  name: 'Tours culturales y naturales de Colombia',
   description:
-    'Catálogo de tours guiados ofrecidos por operadores locales en el departamento del Chocó, Colombia.',
+    'Catálogo de tours guiados ofrecidos por operadores locales en departamentos y municipios de toda Colombia.',
   url: `${SITE}/tours`,
   isPartOf: { '@id': SITE },
   breadcrumb: {

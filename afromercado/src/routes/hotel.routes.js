@@ -35,6 +35,7 @@ router.post("/cupones/validar", HotelController.validarCupon);
 
 // ── CLIENTE ──────────────────────────────────────────────────
 router.post(  "/reservas",                   ...soloAuth, HotelController.reservar);
+router.post(  "/reservas/multiple",          ...soloAuth, HotelController.reservarMultiple);
 router.get(   "/reservas/mis",               ...soloAuth, HotelController.misReservas);
 router.patch( "/reservas/:id/cancelar",           ...soloAuth, HotelController.cancelarReserva);
 router.get(   "/reservas/:id/politica-cancelacion", ...soloAuth, HotelController.politicaCancelacion);

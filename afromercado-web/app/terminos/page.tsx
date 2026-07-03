@@ -44,7 +44,7 @@ export default function PaginaTerminos() {
             </p>
             <p>
               AfroMercado es un <strong>marketplace</strong>: una plataforma que conecta a compradores con productores
-              y comercios del Chocó. Actuamos como intermediarios tecnológicos; la venta se celebra entre el comprador
+              y comercios de toda Colombia. Actuamos como intermediarios tecnológicos; la venta se celebra entre el comprador
               y el comercio que publica cada producto.
             </p>
           </Bloque>

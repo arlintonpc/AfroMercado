@@ -12,7 +12,7 @@ export default function Footer() {
               <span className="text-white">Afro</span>
               <span className="text-[#D4A017]">Mercado</span>
             </p>
-            <p className="text-white/70 text-sm italic">Del Chocó para el mundo</p>
+            <p className="text-white/70 text-sm italic">Del Chocó para toda Colombia</p>
           </div>
 
           {/* Turismo */}
@@ -21,7 +21,7 @@ export default function Footer() {
             <div className="flex flex-col gap-2 text-sm text-white/80">
               <Link href="/hoteles" className="hover:text-white transition-colors">🏨 Hoteles</Link>
               <Link href="/tours" className="hover:text-white transition-colors">🗺️ Tours</Link>
-              <Link href="/transportes" className="hover:text-white transition-colors">🛥️ Transporte fluvial</Link>
+              <Link href="/transportes" className="hover:text-white transition-colors">🛥️ Transporte</Link>
             </div>
           </div>
 
@@ -48,7 +48,7 @@ export default function Footer() {
         </div>
 
         <div className="pt-6 border-t border-white/20 text-center text-xs text-white/50">
-          © 2026 AfroMercado. Hecho con amor en el Chocó.
+          © 2026 AfroMercado. Nacido en el Chocó, hecho para toda Colombia.
         </div>
       </div>
     </footer>

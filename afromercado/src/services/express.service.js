@@ -3,6 +3,7 @@ const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const { diaSemanaEnum, festivosAnio } = require("../utils/festivos-colombia");
 const { enviarPushAUsuario } = require("../utils/push");
 const sseManager = require("../utils/sse-manager");
+const AlianzaService = require("./alianza.service");
 
 const DIAS_ORDEN = ['LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO','DOMINGO','FESTIVO'];
 
@@ -12,20 +13,27 @@ function ahoraEnColombia() {
   return new Date(utcMs - 5 * 60 * 60 * 1000);
 }
 
-function horaActualEnRango(apertura, cierre) {
+// Convierte un instante arbitrario (Date real, no ajustado) a la hora de pared en Colombia.
+function fechaEnColombia(fecha) {
+  return new Date(fecha.getTime() - 5 * 60 * 60 * 1000);
+}
+
+// `momento` es opcional: instante real (Date) a validar; por defecto usa "ahora".
+function horaActualEnRango(apertura, cierre, momento) {
   if (apertura === '00:00' && cierre === '23:59') return true; // 24 horas
-  const ahora = ahoraEnColombia();
-  const hhmm = `${String(ahora.getUTCHours()).padStart(2,'0')}:${String(ahora.getUTCMinutes()).padStart(2,'0')}`;
+  const ref = momento ? fechaEnColombia(momento) : ahoraEnColombia();
+  const hhmm = `${String(ref.getUTCHours()).padStart(2,'0')}:${String(ref.getUTCMinutes()).padStart(2,'0')}`;
   return hhmm >= apertura && hhmm < cierre;
 }
 
-function comercioAbiertoAhora(horarios) {
+// `momento` es opcional: instante real (Date) a validar; por defecto usa "ahora".
+function comercioAbiertoAhora(horarios, momento) {
   if (!horarios || horarios.length === 0) return false;
-  const hoy = ahoraEnColombia();
-  const diaEnum = diaSemanaEnum(hoy);
+  const ref = momento ? fechaEnColombia(momento) : ahoraEnColombia();
+  const diaEnum = diaSemanaEnum(ref);
   const horario = horarios.find(h => h.dia === diaEnum);
   if (!horario || !horario.abierto) return false;
-  return horaActualEnRango(horario.apertura, horario.cierre);
+  return horaActualEnRango(horario.apertura, horario.cierre, momento);
 }
 
 async function notifExpress(usuarioId, titulo, cuerpo, url) {
@@ -150,16 +158,34 @@ const ExpressService = {
 
   // ── CREAR PEDIDO (CLIENTE) ───────────────────────────────────
 
-  async crearPedido({ clienteId, comercioId, modalidad, metodoPago, items, notaCliente, direccionTexto, municipioEntrega, codigoCupon }) {
+  async crearPedido({ clienteId, comercioId, modalidad, metodoPago, items, notaCliente, direccionTexto, municipioEntrega, codigoCupon, fechaProgramada }) {
     const cfg = await prisma.configExpress.findUnique({
       where: { comercioId },
       include: { horarios: true },
     });
     if (!cfg) throw new ErrorNoEncontrado("Este comercio no tiene servicio Express");
     if (!cfg.activo) throw new ErrorValidacion("El servicio Express de este comercio no está activo");
-    // Verificar horario automático + override manual de abierto
-    const abiertoAhora = cfg.abierto && comercioAbiertoAhora(cfg.horarios);
-    if (!abiertoAhora) throw new ErrorValidacion("El comercio está cerrado en este momento");
+
+    // Pedido programado: valida que la hora elegida caiga en un horario de apertura válido.
+    // Pedido inmediato (fechaProgramada null/ausente): se comporta igual que siempre.
+    let fechaProgramadaDate = null;
+    if (fechaProgramada) {
+      fechaProgramadaDate = new Date(fechaProgramada);
+      if (isNaN(fechaProgramadaDate.getTime())) {
+        throw new ErrorValidacion("fechaProgramada inválida");
+      }
+      if (fechaProgramadaDate.getTime() < Date.now()) {
+        throw new ErrorValidacion("La fecha programada debe ser en el futuro");
+      }
+      if (!comercioAbiertoAhora(cfg.horarios, fechaProgramadaDate)) {
+        throw new ErrorValidacion("La hora programada está fuera del horario de apertura del comercio");
+      }
+    } else {
+      // Verificar horario automático + override manual de abierto
+      const abiertoAhora = cfg.abierto && comercioAbiertoAhora(cfg.horarios);
+      if (!abiertoAhora) throw new ErrorValidacion("El comercio está cerrado en este momento");
+    }
+
     if (!cfg.modalidades.includes(modalidad)) {
       throw new ErrorValidacion(`Este comercio no ofrece la modalidad ${modalidad}`);
     }
@@ -208,10 +234,12 @@ const ExpressService = {
     // Aplicar cupón si viene
     let montoDescuento = 0;
     let cuponAplicado = null;
+    let descuentoEsAlianza = false;
     if (codigoCupon) {
-      const validacion = await this.validarCuponExpress(codigoCupon, cfg.id, subtotal, clienteId);
+      const validacion = await this.validarCuponExpress(codigoCupon, cfg.id, subtotal, clienteId, comercioId);
       montoDescuento = validacion.descuento;
       cuponAplicado = validacion.cupon;
+      descuentoEsAlianza = !!validacion.esAlianza;
     }
 
     const costoEnvio = modalidad === "DOMICILIO" ? Number(cfg.costoEnvioBase) : 0;
@@ -236,6 +264,7 @@ const ExpressService = {
         notaCliente,
         direccionTexto,
         municipioEntrega,
+        fechaProgramada: fechaProgramadaDate,
         tiempoEstimadoMin: cfg.tiempoPrepMinutos + (modalidad === "DOMICILIO" ? 15 : 0),
         expiresAt,
         items: { create: itemsData },
@@ -243,8 +272,9 @@ const ExpressService = {
       include: { items: { include: { producto: { select: { nombre: true } } } } },
     });
 
-    // Registrar uso del cupón
-    if (cuponAplicado) {
+    // Registrar uso del cupón (solo cupones propios; una alianza no tiene fila
+    // CuponExpress que actualizar — su "un uso" ya lo garantiza AlianzaSocio)
+    if (cuponAplicado && !descuentoEsAlianza) {
       await prisma.cuponExpressUso.create({
         data: { cuponExpressId: cuponAplicado.id, clienteId, pedidoExpressId: pedido.id },
       });
@@ -461,6 +491,50 @@ const ExpressService = {
     return pedido;
   },
 
+  // ── FAVORITOS ─────────────────────────────────────────────────
+
+  async toggleFavorito(usuarioId, configExpressId) {
+    const existe = await prisma.favoritoExpress.findUnique({
+      where: { usuarioId_configExpressId: { usuarioId, configExpressId } },
+    });
+    if (existe) {
+      await prisma.favoritoExpress.delete({ where: { id: existe.id } });
+      return { favorito: false };
+    } else {
+      await prisma.favoritoExpress.create({ data: { usuarioId, configExpressId } });
+      return { favorito: true };
+    }
+  },
+
+  async misFavoritosExpress(usuarioId) {
+    const favs = await prisma.favoritoExpress.findMany({
+      where: { usuarioId },
+      include: {
+        configExpress: {
+          include: {
+            horarios: true,
+            comercio: {
+              select: { id: true, nombre: true, logoUrl: true, municipio: true,
+                        calificacion: true, totalReviews: true, latitud: true, longitud: true },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return favs.map(f => ({
+      ...f.configExpress,
+      abiertoAhora: f.configExpress.abierto && comercioAbiertoAhora(f.configExpress.horarios),
+    }));
+  },
+
+  async esFavoritoExpress(usuarioId, configExpressId) {
+    const existe = await prisma.favoritoExpress.findUnique({
+      where: { usuarioId_configExpressId: { usuarioId, configExpressId } },
+    });
+    return { favorito: !!existe };
+  },
+
   // ── ADMIN ────────────────────────────────────────────────────
 
   async listarDeudasAdmin() {
@@ -500,7 +574,7 @@ const ExpressService = {
 
   // ── CUPONES EXPRESS ──────────────────────────────────────────
 
-  async validarCuponExpress(codigo, configExpressId, subtotal, clienteId) {
+  async validarCuponExpress(codigo, configExpressId, subtotal, clienteId, comercioId) {
     const cupon = await prisma.cuponExpress.findFirst({
       where: {
         codigo: codigo.trim().toUpperCase(),
@@ -513,7 +587,26 @@ const ExpressService = {
         ],
       },
     });
-    if (!cupon) throw new ErrorValidacion("Cupón inválido o expirado");
+    if (!cupon) {
+      // Fallback: no es un CuponExpress propio, ¿es un código de alianza
+      // comercial vigente para este comercio en el módulo EXPRESS?
+      if (comercioId) {
+        const alianza = await AlianzaService.validarCodigoAlianza(codigo, comercioId, "EXPRESS");
+        if (alianza) {
+          const subtotalNum = Number(subtotal);
+          const descuentoAlianza = alianza.tipoDescuento === "PORCENTAJE"
+            ? Math.round(subtotalNum * Number(alianza.valorDescuento) / 100)
+            : Math.min(Number(alianza.valorDescuento), subtotalNum);
+          return {
+            cupon: { codigo: String(codigo).trim().toUpperCase() },
+            descuento: descuentoAlianza,
+            subtotalConDescuento: subtotalNum - descuentoAlianza,
+            esAlianza: true,
+          };
+        }
+      }
+      throw new ErrorValidacion("Cupón inválido o expirado");
+    }
     if (cupon.usosMaximos && cupon.usosActuales >= cupon.usosMaximos) {
       throw new ErrorValidacion("Este cupón ya alcanzó su límite de usos");
     }
@@ -577,14 +670,15 @@ const ExpressService = {
 
   // ── ESTADÍSTICAS EXPRESS ──────────────────────────────────────
 
-  async estadisticasExpress(comercioId) {
+  async estadisticasExpress(comercioId, { desde, hasta } = {}) {
     const hoy = new Date();
     const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
     const inicioSemana = new Date(inicioHoy);
     inicioSemana.setDate(inicioHoy.getDate() - 6);
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const hace30dias = new Date(Date.now() - 30 * 86400000);
 
-    const [hoyStats, semanaStats, mesStats, porHora, topProductos, ultimosPedidos] = await Promise.all([
+    const [hoyStats, semanaStats, mesStats, porHora, topProductos, ultimosPedidos, itemsComplementos] = await Promise.all([
       // Hoy
       prisma.pedidoExpress.aggregate({
         where: { comercioId, estado: "ENTREGADO", entregadoAt: { gte: inicioHoy } },
@@ -626,6 +720,13 @@ const ExpressService = {
         take: 10,
         select: { id: true, codigo: true, estado: true, total: true, creadoAt: true, modalidad: true },
       }),
+      // Items con complementos (últimos 30 días) — para agregar top complementos en JS
+      prisma.itemPedidoExpress.findMany({
+        where: {
+          pedidoExpress: { comercioId, estado: "ENTREGADO", creadoAt: { gte: hace30dias } },
+        },
+        select: { complementos: true, cantidad: true },
+      }),
     ]);
 
     // Calcular distribución por hora
@@ -643,7 +744,9 @@ const ExpressService = {
     });
     const prodMap = Object.fromEntries(productos.map(p => [p.id, p]));
 
-    return {
+    const topComplementos = this._agregarTopComplementos(itemsComplementos);
+
+    const resultado = {
       hoy: {
         pedidos: hoyStats._count.id,
         ingresos: Number(hoyStats._sum.total ?? 0),
@@ -665,8 +768,78 @@ const ExpressService = {
         cantidad: p._sum.cantidad ?? 0,
         pedidos: p._count.id,
       })),
+      topComplementos,
       ultimosPedidos,
     };
+
+    // Rango de fechas puntual (opcional, para consultas contables)
+    if (desde && hasta) {
+      const inicioRango = new Date(`${desde}T00:00:00-05:00`);
+      const finRango = new Date(`${hasta}T23:59:59-05:00`);
+
+      const [rangoStats, rangoTopProductos, rangoItemsComplementos] = await Promise.all([
+        prisma.pedidoExpress.aggregate({
+          where: { comercioId, estado: "ENTREGADO", entregadoAt: { gte: inicioRango, lte: finRango } },
+          _count: { id: true },
+          _sum: { total: true, comision: true },
+        }),
+        prisma.itemPedidoExpress.groupBy({
+          by: ["productoId"],
+          where: {
+            pedidoExpress: { comercioId, estado: "ENTREGADO", entregadoAt: { gte: inicioRango, lte: finRango } },
+          },
+          _sum: { cantidad: true },
+          _count: { id: true },
+          orderBy: { _sum: { cantidad: "desc" } },
+          take: 5,
+        }),
+        prisma.itemPedidoExpress.findMany({
+          where: {
+            pedidoExpress: { comercioId, estado: "ENTREGADO", entregadoAt: { gte: inicioRango, lte: finRango } },
+          },
+          select: { complementos: true, cantidad: true },
+        }),
+      ]);
+
+      const rangoProductoIds = rangoTopProductos.map(p => p.productoId);
+      const rangoProductos = await prisma.producto.findMany({
+        where: { id: { in: rangoProductoIds } },
+        select: { id: true, nombre: true, fotoUrl: true },
+      });
+      const rangoProdMap = Object.fromEntries(rangoProductos.map(p => [p.id, p]));
+
+      resultado.rango = {
+        pedidos: rangoStats._count.id,
+        ingresos: Number(rangoStats._sum.total ?? 0),
+        comision: Number(rangoStats._sum.comision ?? 0),
+        topProductos: rangoTopProductos.map(p => ({
+          producto: rangoProdMap[p.productoId] ?? { id: p.productoId, nombre: "Desconocido", fotoUrl: null },
+          cantidad: p._sum.cantidad ?? 0,
+          pedidos: p._count.id,
+        })),
+        topComplementos: this._agregarTopComplementos(rangoItemsComplementos),
+        desde,
+        hasta,
+      };
+    }
+
+    return resultado;
+  },
+
+  // Suma cantidades por nombre de complemento a partir de filas { complementos, cantidad } y devuelve el top 5
+  _agregarTopComplementos(items) {
+    const acumulado = {};
+    for (const item of items) {
+      if (!Array.isArray(item.complementos)) continue;
+      for (const c of item.complementos) {
+        if (!c || !c.nombre) continue;
+        acumulado[c.nombre] = (acumulado[c.nombre] ?? 0) + item.cantidad;
+      }
+    }
+    return Object.entries(acumulado)
+      .map(([nombre, cantidad]) => ({ nombre, cantidad }))
+      .sort((a, b) => b.cantidad - a.cantidad)
+      .slice(0, 5);
   },
 
   // ── HELPERS ──────────────────────────────────────────────────

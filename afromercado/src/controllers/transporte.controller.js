@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { subirACloudinary, subirVideoACloudinary, construirUrlVideoOptimizada, construirPosterVideo } = require("../utils/cloudinary");
 const TransporteService = require("../services/transporte.service");
+const prisma = require("../config/prisma");
 const {
   crearUploadVideo,
   extraerVideoMeta,
@@ -121,6 +122,40 @@ const TransporteController = {
   async adminCambiarEstado(req, res, next) {
     try {
       res.json({ ok: true, data: await TransporteService.adminCambiarEstado(Number(req.params.id), req.body.activo) });
+    } catch (e) { next(e); }
+  },
+
+  // ── CUPONES ───────────────────────────────────────────────────
+  async validarCupon(req, res, next) {
+    try {
+      const { codigo, rutaTransporteId, asientos } = req.body;
+      const cantidadAsientos = Number(asientos) || 1;
+      const ruta = await prisma.rutaTransporte.findUnique({ where: { id: Number(rutaTransporteId) } });
+      if (!ruta) return res.status(404).json({ ok: false, error: "Ruta no encontrada" });
+      const totalOriginal = Number(ruta.precioAsiento) * cantidadAsientos;
+      const data = await TransporteService.validarCuponTransporte(codigo, ruta.configTransporteId, cantidadAsientos, req.usuario?.id, totalOriginal);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async listarCupones(req, res, next) {
+    try {
+      const data = await TransporteService.listarCuponesTransporte(req.usuario.comercio.id);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async crearCupon(req, res, next) {
+    try {
+      const data = await TransporteService.crearCuponTransporte(req.usuario.comercio.id, req.body);
+      res.status(201).json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async eliminarCupon(req, res, next) {
+    try {
+      await TransporteService.eliminarCuponTransporte(req.usuario.comercio.id, Number(req.params.id));
+      res.json({ ok: true });
     } catch (e) { next(e); }
   },
 };

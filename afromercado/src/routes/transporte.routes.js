@@ -30,6 +30,9 @@ const uploadFotos = _upload.array("fotos", 10);
 router.get("/",               TransporteController.listar);
 router.get("/disponibilidad", TransporteController.disponibilidad);
 
+// Validación de cupón — auth opcional (clienteId puede ser null)
+router.post("/cupones/validar", TransporteController.validarCupon);
+
 // ── FAVORITOS (antes de /:id para que no lo capture el wildcard) ──
 router.get( "/favoritos/mis",        ...soloAuth, async (req, res, next) => {
   try { res.json({ ok: true, data: await TransporteService.misFavoritosTransporte(req.usuario.id) }); } catch(e) { next(e); }
@@ -58,6 +61,11 @@ router.put(   "/mi-transporte/rutas/:id",           ...soloComercio, TransporteC
 router.delete("/mi-transporte/rutas/:id",           ...soloComercio, TransporteController.eliminarRuta);
 router.get(   "/mi-transporte/reservas",            ...soloComercio, TransporteController.reservasOperador);
 router.patch( "/mi-transporte/reservas/:id/estado", ...soloComercio, TransporteController.cambiarEstado);
+
+// Cupones del servicio de transporte
+router.get(   "/mi-transporte/cupones",     ...soloComercio, TransporteController.listarCupones);
+router.post(  "/mi-transporte/cupones",     ...soloComercio, TransporteController.crearCupon);
+router.delete("/mi-transporte/cupones/:id", ...soloComercio, TransporteController.eliminarCupon);
 router.get(   "/mi-transporte/estadisticas",        ...soloComercio, async (req, res, next) => {
   try {
     const comercioId = req.usuario.comercio?.id;

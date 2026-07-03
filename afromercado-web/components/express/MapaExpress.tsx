@@ -91,7 +91,7 @@ export default function MapaExpress({ comercios, userLat, userLon }: Props) {
   const zoom = 6
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: 420 }}>
+    <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm h-[50vh] min-h-[280px] max-h-[420px]">
       <MapContainer
         center={userLat && userLon ? [userLat, userLon] : centroInicial}
         zoom={zoom}

@@ -1,16 +1,21 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
+import Header from '@/components/layout/Header'
+import Footer from '@/components/layout/Footer'
 import { useAuth } from '@/context/AuthContext'
 import {
   obtenerEvento,
   crearReservaCultural,
+  misReservasCultura,
   type EventoCultural,
   type EntradaCultural,
   type ReservaCultural,
 } from '@/lib/api/cultura'
+import { listarAlianzasPorRegion, type AlianzaResumen } from '@/lib/api/alianzas'
+import SeccionReviewsCultura from '@/components/cultura/SeccionReviewsCultura'
 
 function rangoFechas(inicio: string, fin?: string | null): string {
   const opt: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' }
@@ -22,6 +27,55 @@ function rangoFechas(inicio: string, fin?: string | null): string {
 
 function disponibles(e: EntradaCultural): number | null {
   return e.cupo == null ? null : Math.max(0, e.cupo - e.vendidas)
+}
+
+/** Sección "Aliados para tu visita": alianzas comerciales vigentes en la región del evento. */
+function AliadosVisita({ departamento, municipio, fecha }: { departamento: string; municipio: string; fecha: string }) {
+  const [alianzas, setAlianzas] = useState<AlianzaResumen[]>([])
+
+  useEffect(() => {
+    let activo = true
+    listarAlianzasPorRegion({ departamento, municipio, fecha })
+      .then((data) => { if (activo) setAlianzas(data) })
+      .catch(() => {})
+    return () => { activo = false }
+  }, [departamento, municipio, fecha])
+
+  if (alianzas.length === 0) return null
+
+  return (
+    <div className="mt-8">
+      <h2 className="font-serif text-lg text-[#1B4332]">Aliados para tu visita</h2>
+      <p className="mt-1 text-sm text-[#1A1A1A]/55">
+        Comercios de la región con descuentos especiales durante estas fechas.
+      </p>
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {alianzas.map((a) => (
+          <Link
+            key={a.id}
+            href={`/alianzas/${a.codigoCompartido}`}
+            className="flex items-center gap-3 rounded-2xl border border-[#1A1A1A]/8 bg-white p-4 transition hover:border-[#2D6A4F]/40 hover:shadow-sm"
+          >
+            <span className="text-2xl" aria-hidden="true">🤝</span>
+            <div className="flex-1 min-w-0">
+              <p className="font-serif text-base leading-tight text-[#1B4332]">{a.nombre}</p>
+              {a.descripcion && <p className="mt-0.5 truncate text-xs text-[#1A1A1A]/55">{a.descripcion}</p>}
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CulturaShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-screen flex-col bg-[#F8F5F0]">
+      <Header />
+      <main className="flex-1">{children}</main>
+      <Footer />
+    </div>
+  )
 }
 
 export default function EventoCulturalPage() {
@@ -40,6 +94,7 @@ export default function EventoCulturalPage() {
   const [enviando, setEnviando] = useState(false)
   const [errorReserva, setErrorReserva] = useState<string | null>(null)
   const [confirmacion, setConfirmacion] = useState<ReservaCultural | null>(null)
+  const [reservaElegibleId, setReservaElegibleId] = useState<number | undefined>()
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -63,6 +118,14 @@ export default function EventoCulturalPage() {
   useEffect(() => {
     if (usuario) setNombre((n) => n || usuario.nombre || '')
   }, [usuario])
+
+  useEffect(() => {
+    if (!usuario || !evento) return
+    misReservasCultura().then((rs) => {
+      const elegible = rs.find((r) => r.eventoCulturalId === evento.id && r.estado === 'USADA' && !r.review)
+      setReservaElegibleId(elegible?.id)
+    }).catch(() => {})
+  }, [usuario, evento])
 
   async function reservar(ev: React.FormEvent) {
     ev.preventDefault()
@@ -90,28 +153,34 @@ export default function EventoCulturalPage() {
 
   if (cargando) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-10">
-        <div className="h-56 animate-pulse rounded-2xl bg-[#1A1A1A]/5" />
-      </div>
+      <CulturaShell>
+        <div className="mx-auto w-full max-w-4xl px-4 py-10">
+          <div className="h-56 animate-pulse rounded-2xl bg-[#1A1A1A]/5" />
+        </div>
+      </CulturaShell>
     )
   }
 
   if (error || !evento) {
     return (
-      <div className="mx-auto w-full max-w-2xl px-4 py-16 text-center">
+      <CulturaShell>
+        <div className="mx-auto w-full max-w-2xl px-4 py-16 text-center">
         <p className="text-4xl" aria-hidden="true">🎭</p>
         <p className="mt-3 font-serif text-2xl text-[#1B4332]">{error || 'Evento no encontrado'}</p>
         <Link href="/cultura" className="mt-4 inline-block rounded-full bg-[#1B4332] px-5 py-2 text-sm text-white">
           Ver la agenda
         </Link>
-      </div>
+        </div>
+      </CulturaShell>
     )
   }
 
   const entradas = (evento.entradas ?? []).filter((e) => e.activa)
+  const fotosEvento = evento.fotos ?? []
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6">
+    <CulturaShell>
+      <div className="mx-auto w-full max-w-4xl px-4 py-6">
       <Link href="/cultura" className="text-sm text-[#2D6A4F] hover:underline">
         ← Agenda cultural
       </Link>
@@ -145,6 +214,32 @@ export default function EventoCulturalPage() {
           {evento.lugar && (
             <p className="mt-4 text-sm text-[#1A1A1A]/60">📍 {evento.lugar}</p>
           )}
+          {evento.videoUrl && (
+            <div className="mt-5 overflow-hidden rounded-2xl border border-[#1A1A1A]/8 bg-[#10251C]">
+              <video
+                src={evento.videoUrl}
+                poster={evento.portadaUrl ?? undefined}
+                controls
+                className="aspect-video w-full bg-[#10251C] object-cover"
+              />
+            </div>
+          )}
+          {fotosEvento.length > 0 && (
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {fotosEvento.slice(0, 6).map((foto, index) => (
+                <div key={`${foto}-${index}`} className="overflow-hidden rounded-2xl border border-[#1A1A1A]/8 bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={foto} alt={`${evento.titulo} ${index + 1}`} className="aspect-[4/3] w-full object-cover" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {evento.departamento && evento.municipio && (
+            <AliadosVisita departamento={evento.departamento} municipio={evento.municipio} fecha={evento.fechaInicio} />
+          )}
+
+          <SeccionReviewsCultura eventoCulturalId={evento.id} reservaElegibleId={reservaElegibleId} />
         </div>
 
         <aside className="lg:col-span-1">
@@ -273,6 +368,7 @@ export default function EventoCulturalPage() {
           </div>
         </aside>
       </div>
-    </div>
+      </div>
+    </CulturaShell>
   )
 }

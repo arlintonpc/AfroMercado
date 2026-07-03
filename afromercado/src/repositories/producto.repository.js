@@ -19,6 +19,7 @@ function includeProductoPublico(ahora = new Date()) {
         videoMimeType: true,
         calificacion: true,
         verificado: true,
+        verificadoEtnico: true,
         totalVentas: true,
         totalReviews: true,
       },
@@ -60,6 +61,7 @@ const ProductoRepository = {
     q,
     categoriaId,
     municipio,
+    departamento,
     comercioId,
     precioMin,
     precioMax,
@@ -109,6 +111,15 @@ const ProductoRepository = {
       };
     }
 
+    // Filtro por departamento del comercio (región activa del usuario)
+    if (departamento) {
+      where.comercio = {
+        ...where.comercio,
+        departamento: { contains: departamento, mode: "insensitive" },
+        activo: true,
+      };
+    }
+
     // Filtro por comercio específico (página pública del vendedor)
     if (comercioId) {
       where.comercioId = Number(comercioId);
@@ -150,6 +161,7 @@ const ProductoRepository = {
               municipio: true,
               calificacion: true,
               verificado: true,
+              verificadoEtnico: true,
               totalVentas: true,
               whatsappVisible: true,
               videoUrl: true,

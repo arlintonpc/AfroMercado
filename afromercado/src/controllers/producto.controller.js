@@ -73,12 +73,13 @@ const ProductoController = {
 
   async listar(req, res, next) {
     try {
-      const { q, categoriaId, municipio, comercioId, precioMin, precioMax, alcance, enOferta, pagina, porPagina } =
+      const { q, categoriaId, municipio, departamento, comercioId, precioMin, precioMax, alcance, enOferta, pagina, porPagina } =
         req.query;
       const resultado = await ProductoService.listar({
         q: q || undefined,
         categoriaId: categoriaId ? Number(categoriaId) : undefined,
         municipio: municipio || undefined,
+        departamento: departamento || undefined,
         comercioId: comercioId ? Number(comercioId) : undefined,
         precioMin: precioMin !== undefined ? Number(precioMin) : undefined,
         precioMax: precioMax !== undefined ? Number(precioMax) : undefined,

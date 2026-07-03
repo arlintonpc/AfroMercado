@@ -26,10 +26,25 @@ const VisibilidadRepository = {
     });
   },
 
-  async listarActivas(tipo) {
+  async listarActivas(tipo, departamento = null) {
     const ahora = new Date();
+    const filtroAlcance = departamento
+      ? {
+          OR: [
+            { alcance: "NACIONAL" },
+            { alcance: "DEPARTAMENTO", departamento },
+            { alcance: "MUNICIPIO", departamento },
+          ],
+        }
+      : {};
     return prisma.visibilidadPagada.findMany({
-      where: { activa: true, inicio: { lte: ahora }, fin: { gt: ahora }, ...(tipo ? { tipo } : {}) },
+      where: {
+        activa: true,
+        inicio: { lte: ahora },
+        fin: { gt: ahora },
+        ...(tipo ? { tipo } : {}),
+        ...filtroAlcance,
+      },
       include: {
         comercio: { select: { id: true, nombre: true } },
         producto: {

@@ -2,9 +2,9 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name:             'AfroMercado — Marketplace del Chocó',
+    name:             'AfroMercado — Marketplace de Colombia',
     short_name:       'AfroMercado',
-    description:      'Productos, tours, hoteles y transporte de las comunidades afrocolombianas del Chocó',
+    description:      'Productos, tours, hoteles, transporte y cultura de comunidades afro, indígenas y campesinas de todo el país',
     start_url:        '/',
     display:          'standalone',
     background_color: '#FAF8F5',

@@ -5,12 +5,18 @@ import Footer from '@/components/layout/Footer'
 import BadgeProductorCertificado from '@/components/ui/BadgeProductorCertificado'
 
 const CRITERIOS = [
-  { icono: '📍', titulo: 'Origen verificado', desc: 'El productor debe ser residente o nativo del departamento del Chocó, o pertenecer a una comunidad afrocolombiana reconocida.' },
+  { icono: '📍', titulo: 'Origen verificado', desc: 'El productor debe ser residente del municipio y departamento donde dice operar, en cualquier parte de Colombia.' },
   { icono: '🛍️', titulo: 'Productos auténticos', desc: 'Los productos deben ser elaborados, cultivados o comercializados directamente por el productor, sin intermediarios externos.' },
   { icono: '📞', titulo: 'Contacto validado', desc: 'Número de WhatsApp y datos de contacto verificados por el equipo AfroMercado mediante llamada directa.' },
   { icono: '⭐', titulo: 'Historial limpio', desc: 'Sin reportes de incumplimiento de pedidos, entregas falsas o comportamiento irregular en la plataforma.' },
   { icono: '📷', titulo: 'Fotos reales', desc: 'Las fotografías de productos y servicios deben ser originales y representar fielmente lo que se ofrece.' },
   { icono: '🔄', titulo: 'Renovación anual', desc: 'La certificación se revisa cada 12 meses para garantizar que los estándares se mantengan.' },
+]
+
+const CRITERIOS_ETNICO = [
+  { icono: '🌿', titulo: 'Comunidad reconocida', desc: 'El productor pertenece a una comunidad afrocolombiana, indígena, raizal o campesina reconocida en su territorio.' },
+  { icono: '🎥', titulo: 'Verificación reforzada', desc: 'Además de la validación estándar, el equipo AfroMercado confirma el vínculo comunitario por videollamada o llamada.' },
+  { icono: '🏺', titulo: 'Historia y origen', desc: 'El producto o servicio tiene una historia territorial y cultural que se muestra en el perfil del comercio.' },
 ]
 
 export default function CertificacionPage() {
@@ -29,7 +35,7 @@ export default function CertificacionPage() {
               Programa de Productores Certificados
             </h1>
             <p className="text-white/75 text-lg max-w-xl mx-auto leading-relaxed">
-              Garantizamos la autenticidad y origen de cada comerciante en AfroMercado.
+              Garantizamos la autenticidad y origen de cada comerciante en AfroMercado, en cualquier departamento de Colombia.
             </p>
           </div>
         </div>
@@ -50,6 +56,30 @@ export default function CertificacionPage() {
                 <p className="text-sm text-gray-500 leading-relaxed">{c.desc}</p>
               </div>
             ))}
+          </div>
+
+          {/* Sello adicional: comunidad étnica y territorial */}
+          <div className="mt-10 bg-white rounded-2xl border border-[#F4C842]/40 p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <BadgeProductorCertificado size="md" variante="etnico" mostrarTooltip={false} />
+            </div>
+            <h3 className="font-bold text-[#1A1A1A] mb-1 text-lg" style={{ fontFamily: 'var(--font-dm-serif)' }}>
+              Sello de Comunidad Étnica y Territorial
+            </h3>
+            <p className="text-sm text-gray-500 leading-relaxed mb-4">
+              Un reconocimiento adicional y opcional para productores que pertenecen a comunidades afrocolombianas, indígenas,
+              raizales o campesinas reconocidas. No reemplaza al &ldquo;Productor Certificado&rdquo; — se otorga sobre esa base, después
+              de una verificación reforzada del vínculo comunitario y territorial.
+            </p>
+            <div className="grid md:grid-cols-3 gap-4">
+              {CRITERIOS_ETNICO.map(c => (
+                <div key={c.titulo} className="rounded-xl bg-[#FDF6E3] p-4">
+                  <span className="text-xl">{c.icono}</span>
+                  <h4 className="font-bold text-[#1A1A1A] text-sm mt-1 mb-0.5">{c.titulo}</h4>
+                  <p className="text-xs text-gray-500 leading-relaxed">{c.desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Proceso */}
@@ -80,10 +110,10 @@ export default function CertificacionPage() {
           {/* CTA */}
           <div className="mt-8 bg-[#1B4332] rounded-2xl p-8 text-center text-white">
             <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'var(--font-dm-serif)' }}>
-              ¿Eres productor del Chocó?
+              ¿Eres productor en Colombia?
             </h3>
             <p className="text-white/70 mb-5 text-sm">
-              Solicita tu certificación y destaca tu comercio ante miles de compradores.
+              Solicita tu certificación y destaca tu comercio ante miles de compradores en todo el país.
             </p>
             <a
               href="https://wa.me/573000000000?text=Hola%2C%20quiero%20solicitar%20la%20certificaci%C3%B3n%20de%20Productor%20Certificado%20en%20AfroMercado"

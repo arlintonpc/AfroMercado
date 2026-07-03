@@ -293,10 +293,10 @@ export default function ToursPage() {
               </div>
               <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight">
                 Tours & Experiencias<br />
-                <span className="text-[#52B788]">en el Chocó</span>
+                <span className="text-[#52B788]">de Colombia</span>
               </h1>
               <p className="text-white/55 text-sm mt-2.5 max-w-sm">
-                Vive el Pacífico colombiano con guías locales que conocen cada rincón
+                Vive el territorio colombiano con guías locales que conocen cada rincón
               </p>
             </div>
 
@@ -304,7 +304,13 @@ export default function ToursPage() {
             <div className="flex gap-4 sm:gap-6">
               {[
                 { label: 'Experiencias', value: items.length > 0 ? `${items.length}` : '–' },
-                { label: 'Región', value: 'Chocó' },
+                {
+                  label: 'Regiones',
+                  value: (() => {
+                    const n = new Set(tours.map(t => t.comercio?.departamento).filter(Boolean)).size
+                    return n > 0 ? `${n}` : '–'
+                  })(),
+                },
               ].map(s => (
                 <div key={s.label} className="text-center">
                   <p className="text-2xl font-black text-white">{s.value}</p>

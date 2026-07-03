@@ -58,12 +58,12 @@ const ExpressController = {
   async crearPedido(req, res, next) {
     try {
       const clienteId = req.usuario.id;
-      const { comercioId, modalidad, metodoPago, items, notaCliente, direccionTexto, municipioEntrega, codigoCupon } = req.body;
+      const { comercioId, modalidad, metodoPago, items, notaCliente, direccionTexto, municipioEntrega, codigoCupon, fechaProgramada } = req.body;
       if (!comercioId || !modalidad || !metodoPago || !items?.length) {
         return res.status(400).json({ ok: false, error: "Faltan campos requeridos" });
       }
       const pedido = await ExpressService.crearPedido({
-        clienteId, comercioId: Number(comercioId), modalidad, metodoPago, items, notaCliente, direccionTexto, municipioEntrega, codigoCupon,
+        clienteId, comercioId: Number(comercioId), modalidad, metodoPago, items, notaCliente, direccionTexto, municipioEntrega, codigoCupon, fechaProgramada,
       });
       res.status(201).json({ ok: true, data: pedido });
     } catch (err) { next(err); }
@@ -265,7 +265,33 @@ const ExpressController = {
   async estadisticas(req, res, next) {
     try {
       const comercioId = await getComercioId(req.usuario.id);
-      const data = await ExpressService.estadisticasExpress(comercioId);
+      const data = await ExpressService.estadisticasExpress(comercioId, {
+        desde: req.query.desde,
+        hasta: req.query.hasta,
+      });
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  // ── FAVORITOS ─────────────────────────────────────────────────
+
+  async toggleFavorito(req, res, next) {
+    try {
+      const data = await ExpressService.toggleFavorito(req.usuario.id, Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async misFavoritos(req, res, next) {
+    try {
+      const data = await ExpressService.misFavoritosExpress(req.usuario.id);
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async esFavorito(req, res, next) {
+    try {
+      const data = await ExpressService.esFavoritoExpress(req.usuario.id, Number(req.params.id));
       res.json({ ok: true, data });
     } catch (err) { next(err); }
   },
@@ -480,6 +506,35 @@ async function subirImagenItemComplemento(req, res, next) {
   }
 }
 
+// ── IMAGEN ÍTEM BIBLIOTECA ────────────────────────────────────
+
+async function uploadItemBibliotecaImagen(req, res, next) {
+  _uploadItemImagen.single('imagen')(req, res, err => { if (err) return next(err); next(); });
+}
+
+async function subirImagenItemBiblioteca(req, res, next) {
+  const filePath = req.file?.path;
+  try {
+    const comercioId = await getComercioId(req.usuario.id);
+    if (!req.file) return res.status(400).json({ ok: false, error: 'No se recibió imagen' });
+    const itemId = Number(req.params.itemId);
+    // Verificar ownership
+    const item = await prisma.itemComplementoBiblioteca.findFirst({
+      where: { id: itemId },
+      include: { grupo: true },
+    });
+    if (!item || item.grupo.comercioId !== comercioId) {
+      return res.status(404).json({ ok: false, error: 'Ítem no encontrado' });
+    }
+    const cloudUrl = await subirACloudinary(filePath, 'afromercado/complementos');
+    const imagenUrl = cloudUrl ?? null;
+    const updated = await prisma.itemComplementoBiblioteca.update({ where: { id: itemId }, data: { imagenUrl } });
+    res.json({ ok: true, data: updated });
+  } catch (err) { next(err); } finally {
+    if (filePath) fs.unlink(filePath, () => {});
+  }
+}
+
 ExpressController.copiarGrupoATodos = async (req, res, next) => {
   try {
     const comercioId = await getComercioId(req.usuario.id);
@@ -491,6 +546,9 @@ ExpressController.copiarGrupoATodos = async (req, res, next) => {
 
 ExpressController.uploadItemComplementoImagen = uploadItemComplementoImagen;
 ExpressController.subirImagenItemComplemento  = subirImagenItemComplemento;
+
+ExpressController.uploadItemBibliotecaImagen = uploadItemBibliotecaImagen;
+ExpressController.subirImagenItemBiblioteca  = subirImagenItemBiblioteca;
 
 ExpressController.uploadVideoExpress      = uploadVideoExpress;
 ExpressController.subirVideoExpress       = subirVideoExpress;

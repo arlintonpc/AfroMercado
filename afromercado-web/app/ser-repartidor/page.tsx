@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { apiFetch } from '@/lib/api/client'
 import { subirDocumentoSolicitud } from '@/lib/api/repartidor'
 import { useAuth } from '@/context/AuthContext'
-import { MUNICIPIOS_CHOCO } from '@/components/comerciante/constantes'
+import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -168,6 +168,7 @@ export default function SerRepartidorPage() {
   const [placa, setPlaca]             = useState('')
   const [anio, setAnio]               = useState('')
   const [licencia, setLicencia]       = useState('')
+  const [departamentoBase, setDepartamentoBase] = useState('')
   const [municipioBase, setMunicipioBase] = useState('')
   const [docs, setDocs]               = useState<Record<string, string>>({})
   const [subiendoDoc, setSubiendoDoc] = useState<string | null>(null)
@@ -219,6 +220,7 @@ export default function SerRepartidorPage() {
     if (!anio.trim() || anioNum < 1990 || anioNum > new Date().getFullYear() + 1)
       e.anio = 'Año inválido.'
     if (!licencia.trim()) e.licencia = 'Escribe el número de licencia.'
+    if (!departamentoBase) e.departamentoBase = 'Elige tu departamento de operación.'
     if (!municipioBase) e.municipioBase = 'Indica tu municipio de operación principal.'
     // Documentos
     if (!docs.cedulaFrente)  e.cedulaFrente  = 'Sube la foto de tu cédula (frente).'
@@ -285,7 +287,7 @@ export default function SerRepartidorPage() {
             Sé repartidor
           </h1>
           <p className="mt-2 text-base text-[#1A1A1A]/60 max-w-sm mx-auto">
-            Lleva productos de los emprendedores del Chocó a sus compradores. Tú pones el vehículo, nosotros la plataforma.
+            Lleva productos de los emprendedores locales a sus compradores. Tú pones el vehículo, nosotros la plataforma.
           </p>
         </div>
 
@@ -405,19 +407,36 @@ export default function SerRepartidorPage() {
                 <p className="text-xs text-[#1A1A1A]/50 mb-4">
                   Indica dónde operas. El admin lo usa para asignarte entregas.
                 </p>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-[#1A1A1A]">Municipio principal</label>
-                  <select
-                    value={municipioBase}
-                    onChange={(e) => setMunicipioBase(e.target.value)}
-                    className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:border-[#2D6A4F] focus:outline-none bg-white ${errores.municipioBase ? 'border-red-400' : 'border-[#1A1A1A]/15'}`}
-                  >
-                    <option value="">Elige tu municipio…</option>
-                    {MUNICIPIOS_CHOCO.map((m) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                  {errores.municipioBase && <p className="mt-1 text-xs text-red-600">{errores.municipioBase}</p>}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-[#1A1A1A]">Departamento</label>
+                    <select
+                      value={departamentoBase}
+                      onChange={(e) => { setDepartamentoBase(e.target.value); setMunicipioBase('') }}
+                      className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:border-[#2D6A4F] focus:outline-none bg-white ${errores.departamentoBase ? 'border-red-400' : 'border-[#1A1A1A]/15'}`}
+                    >
+                      <option value="">Elige tu departamento…</option>
+                      {DEPARTAMENTOS.map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                    {errores.departamentoBase && <p className="mt-1 text-xs text-red-600">{errores.departamentoBase}</p>}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-[#1A1A1A]">Municipio principal</label>
+                    <select
+                      value={municipioBase}
+                      onChange={(e) => setMunicipioBase(e.target.value)}
+                      disabled={!departamentoBase}
+                      className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:border-[#2D6A4F] focus:outline-none bg-white disabled:opacity-50 ${errores.municipioBase ? 'border-red-400' : 'border-[#1A1A1A]/15'}`}
+                    >
+                      <option value="">{departamentoBase ? 'Elige tu municipio…' : 'Primero elige el departamento'}</option>
+                      {municipiosDe(departamentoBase).map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    {errores.municipioBase && <p className="mt-1 text-xs text-red-600">{errores.municipioBase}</p>}
+                  </div>
                 </div>
               </div>
 

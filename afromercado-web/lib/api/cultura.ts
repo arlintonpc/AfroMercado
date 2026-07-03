@@ -1,6 +1,6 @@
 import { apiFetch } from './client'
 
-export type EstadoEventoCultural = 'BORRADOR' | 'PUBLICADO' | 'FINALIZADO' | 'CANCELADO'
+export type EstadoEventoCultural = 'BORRADOR' | 'PUBLICADO' | 'FINALIZADO' | 'CANCELADO' | 'POSPUESTO'
 export type EstadoReservaCultural = 'PENDIENTE' | 'CONFIRMADA' | 'CANCELADA' | 'RECHAZADA' | 'USADA'
 
 export interface EntradaCultural {
@@ -60,6 +60,7 @@ export interface ReservaCultural {
   updatedAt: string
   evento?: EventoCultural
   entrada?: EntradaCultural
+  review?: { id: number } | null
 }
 
 export async function listarAgenda(params: { departamento?: string; municipio?: string; categoria?: string } = {}): Promise<EventoCultural[]> {

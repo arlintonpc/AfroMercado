@@ -84,7 +84,7 @@ export default function ExpressComerciante() {
   const [pedidosNuevos, setPedidosNuevos] = useState(0)
   const pedidosRef                    = useRef<PedidoExpress[]>([])
   const primerasCarga                 = useRef(true)
-  const [comercioDep, setComercioDep] = useState('Chocó')
+  const [comercioDep, setComercioDep] = useState('')
   const [comercioMun, setComercioMun] = useState('')
   const [busqMunicipio, setBusqMunicipio] = useState('')
   const [municipioCustom, setMunicipioCustom] = useState('')
@@ -106,6 +106,8 @@ export default function ExpressComerciante() {
   const [cupones, setCupones]           = useState<CuponExpress[]>([])
   const [estadisticas, setEstadisticas] = useState<EstadisticasExpress | null>(null)
   const [cargandoStats, setCargandoStats] = useState(false)
+  const [desdeFiltro, setDesdeFiltro] = useState('')
+  const [hastaFiltro, setHastaFiltro] = useState('')
   const [nuevoCupon, setNuevoCupon]     = useState({
     codigo: '', tipo: 'PORCENTAJE' as 'PORCENTAJE' | 'VALOR_FIJO',
     valor: '', minimoSubtotal: '', usosMaximos: '',
@@ -220,6 +222,15 @@ export default function ExpressComerciante() {
       if (menu) setProductosExpress(menu.productos)
     } catch {}
     finally { setCargandoMenu(false) }
+  }
+
+  async function cargarEstadisticasExpress(params?: { desde?: string; hasta?: string }) {
+    setCargandoStats(true)
+    try {
+      const data = await obtenerEstadisticasExpress(params)
+      setEstadisticas(data)
+    } catch {}
+    finally { setCargandoStats(false) }
   }
 
   async function toggleAbierto() {
@@ -364,10 +375,7 @@ export default function ExpressComerciante() {
                 cargarMenuExpressPropio()
               }
               if (id === 'cupones') listarCuponesExpress().then(setCupones).catch(() => {})
-              if (id === 'estadisticas') {
-                setCargandoStats(true)
-                obtenerEstadisticasExpress().then(setEstadisticas).catch(() => {}).finally(() => setCargandoStats(false))
-              }
+              if (id === 'estadisticas') cargarEstadisticasExpress()
             }}
             className={`relative px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               pestana === id ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -618,6 +626,100 @@ export default function ExpressComerciante() {
             </div>
           ) : (
             <>
+              {/* Filtro por rango de fechas (consultas contables) */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-wrap items-end gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Desde</label>
+                  <input
+                    type="date"
+                    value={desdeFiltro}
+                    onChange={e => setDesdeFiltro(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Hasta</label>
+                  <input
+                    type="date"
+                    value={hastaFiltro}
+                    onChange={e => setHastaFiltro(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <button
+                  onClick={() => desdeFiltro && hastaFiltro && cargarEstadisticasExpress({ desde: desdeFiltro, hasta: hastaFiltro })}
+                  disabled={!desdeFiltro || !hastaFiltro}
+                  className="px-4 py-1.5 rounded-lg bg-[#2D6A4F] text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Consultar
+                </button>
+                {estadisticas.rango && (
+                  <button
+                    onClick={() => { setDesdeFiltro(''); setHastaFiltro(''); cargarEstadisticasExpress() }}
+                    className="px-4 py-1.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+
+              {/* Resultado del rango consultado */}
+              {estadisticas.rango && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-4">
+                  <h3 className="font-semibold text-gray-800">
+                    Rango consultado: {estadisticas.rango.desde} a {estadisticas.rango.hasta}
+                  </h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-xl bg-white border border-amber-100 p-3">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Pedidos</p>
+                      <p className="text-lg font-bold text-gray-800">{estadisticas.rango.pedidos}</p>
+                    </div>
+                    <div className="rounded-xl bg-white border border-amber-100 p-3">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Ingresos</p>
+                      <p className="text-lg font-bold text-gray-800">${estadisticas.rango.ingresos.toLocaleString('es-CO')}</p>
+                    </div>
+                    <div className="rounded-xl bg-white border border-amber-100 p-3">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Comisión</p>
+                      <p className="text-lg font-bold text-gray-800">${estadisticas.rango.comision.toLocaleString('es-CO')}</p>
+                    </div>
+                  </div>
+
+                  {estadisticas.rango.topProductos.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Productos más pedidos</h4>
+                      <div className="space-y-2">
+                        {estadisticas.rango.topProductos.map((item, idx) => (
+                          <div key={item.producto.id} className="flex items-center gap-3">
+                            <span className="text-gray-400 text-sm font-bold w-5">{idx + 1}</span>
+                            <p className="flex-1 text-sm font-medium text-gray-800 truncate">{item.producto.nombre}</p>
+                            <p className="text-sm font-bold text-[#1B4332]">{item.cantidad} unid.</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {estadisticas.rango.topComplementos.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Complementos más pedidos</h4>
+                      <div className="space-y-2">
+                        {estadisticas.rango.topComplementos.map((item, idx) => (
+                          <div key={item.nombre} className="flex items-center gap-3">
+                            <span className="text-gray-400 text-sm font-bold w-5">{idx + 1}</span>
+                            <p className="flex-1 text-sm font-medium text-gray-800 truncate">{item.nombre}</p>
+                            <p className="text-sm font-bold text-[#1B4332]">{item.cantidad} unid.</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {estadisticas.rango.pedidos === 0 && (
+                    <p className="text-sm text-gray-500">No hay pedidos entregados en este rango.</p>
+                  )}
+                </div>
+              )}
+
               {/* KPIs */}
               <div className="grid grid-cols-3 gap-3">
                 {([
@@ -675,6 +777,25 @@ export default function ExpressComerciante() {
                           <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-base flex-shrink-0">🥘</div>
                         )}
                         <p className="flex-1 text-sm font-medium text-gray-800 truncate">{item.producto.nombre}</p>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-[#1B4332]">{item.cantidad}</p>
+                          <p className="text-xs text-gray-400">unid.</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Top complementos */}
+              {estadisticas.topComplementos.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                  <h3 className="font-semibold text-gray-800 mb-4">Complementos más pedidos</h3>
+                  <div className="space-y-3">
+                    {estadisticas.topComplementos.map((item, idx) => (
+                      <div key={item.nombre} className="flex items-center gap-3">
+                        <span className="text-gray-400 text-sm font-bold w-5">{idx + 1}</span>
+                        <p className="flex-1 text-sm font-medium text-gray-800 truncate">{item.nombre}</p>
                         <div className="text-right">
                           <p className="text-sm font-bold text-[#1B4332]">{item.cantidad}</p>
                           <p className="text-xs text-gray-400">unid.</p>

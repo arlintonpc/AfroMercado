@@ -236,6 +236,42 @@ export async function crearComercio(datos: DatosComercio): Promise<Comercio> {
   return resp.comercio
 }
 
+/**
+ * Resultado completo de crear el comercio, incluyendo el token fresco firmado
+ * con el rol nuevo ("COMERCIANTE"). Útil cuando un COMPRADOR ya autenticado
+ * se convierte en vendedor y necesita actualizar su sesión sin volver a
+ * iniciar sesión.
+ *
+ * Nota: esta respuesta NO incluye un objeto `usuario` completo (no expone
+ * email/teléfono) — el llamador debe fusionar `rolNuevo` con el usuario que
+ * ya tiene en su propio estado (useAuth()), nunca reemplazarlo.
+ */
+export interface ResultadoCrearComercio {
+  comercio: Comercio
+  token: string
+  rolNuevo: string
+}
+
+/**
+ * Crea el comercio del comerciante y devuelve también el token fresco y el
+ * rol nuevo que responde el backend.
+ * POST /comercios → { ok, comercio, token, rolNuevo }
+ */
+export async function crearComercioConSesion(
+  datos: DatosComercio,
+): Promise<ResultadoCrearComercio> {
+  const resp = await apiFetch<{
+    ok: boolean
+    comercio: Comercio
+    token: string
+    rolNuevo: string
+  }>('/comercios', {
+    method: 'POST',
+    body: datos,
+  })
+  return { comercio: resp.comercio, token: resp.token, rolNuevo: resp.rolNuevo }
+}
+
 export async function obtenerCuentaDispersion(): Promise<CuentaDispersion | null> {
   const resp = await apiFetch<{ ok: boolean; data: CuentaDispersion | null }>(
     '/comercios/cuenta-dispersion',
@@ -483,6 +519,14 @@ export async function quitarVideoComercio(): Promise<VideoEstado> {
   const resp = await apiFetch<{ ok: boolean; comercio: Comercio }>(
     '/comercios/video',
     { method: 'DELETE' },
+  )
+  return normalizarVideoEstado(resp.comercio)
+}
+
+export async function guardarVideoLinkComercio(videoUrl: string): Promise<VideoEstado> {
+  const resp = await apiFetch<{ ok: boolean; comercio: Comercio }>(
+    '/comercios/video-link',
+    { method: 'PATCH', body: { videoUrl } },
   )
   return normalizarVideoEstado(resp.comercio)
 }

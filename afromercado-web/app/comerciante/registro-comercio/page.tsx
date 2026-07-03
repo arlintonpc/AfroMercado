@@ -1,11 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { CampoTexto, CampoArea, CampoSelect } from '@/components/comerciante/Campos'
 import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
-import { crearComercio, obtenerMiComercio, type TipoDocumento } from '@/components/comerciante/api'
+import { crearComercioConSesion, obtenerMiComercio, type TipoDocumento } from '@/components/comerciante/api'
+import { useAuth } from '@/context/AuthContext'
+import { TOKEN_KEY } from '@/lib/api/client'
 
 const TIPOS_DOCUMENTO: { valor: TipoDocumento; etiqueta: string }[] = [
   { valor: 'CC', etiqueta: 'Cédula de Ciudadanía (CC)' },
@@ -18,8 +21,10 @@ const TIPOS_DOCUMENTO: { valor: TipoDocumento; etiqueta: string }[] = [
 
 export default function RegistroComercioPage() {
   const router = useRouter()
+  const { autenticado, cargando: cargandoAuth, usuario, actualizarUsuario } = useAuth()
 
   const [verificando, setVerificando] = useState(true)
+  const [listo, setListo] = useState(false)
 
   const [nombre, setNombre] = useState('')
   const [departamento, setDepartamento] = useState('')
@@ -35,6 +40,13 @@ export default function RegistroComercioPage() {
   const [enviando, setEnviando] = useState(false)
 
   useEffect(() => {
+    if (!cargandoAuth && !autenticado) {
+      router.replace('/ingresar?redirect=/comerciante/registro-comercio')
+    }
+  }, [cargandoAuth, autenticado, router])
+
+  useEffect(() => {
+    if (cargandoAuth || !autenticado) return
     let activo = true
     obtenerMiComercio()
       .then((c) => {
@@ -48,7 +60,7 @@ export default function RegistroComercioPage() {
     return () => {
       activo = false
     }
-  }, [router])
+  }, [cargandoAuth, autenticado, router])
 
   function validar(): boolean {
     const e: Record<string, string> = {}
@@ -75,7 +87,7 @@ export default function RegistroComercioPage() {
 
     setEnviando(true)
     try {
-      await crearComercio({
+      const { token } = await crearComercioConSesion({
         nombre: nombre.trim(),
         departamento,
         municipio,
@@ -85,7 +97,21 @@ export default function RegistroComercioPage() {
         historia: historia.trim() || undefined,
         whatsapp: whatsapp.replace(/\D/g, '') || undefined,
       })
-      router.replace('/comerciante/dashboard')
+
+      // Actualiza la sesión sin pedir volver a entrar: guarda el token nuevo
+      // (firmado ya con el rol COMERCIANTE) y fusiona el rol en el usuario
+      // que YA está cargado en el contexto, sin reconstruirlo desde la
+      // respuesta del backend (que no trae email/avatarUrl/etc).
+      try {
+        window.localStorage.setItem(TOKEN_KEY, token)
+      } catch {
+        // localStorage no disponible: la sesión seguirá viva en memoria.
+      }
+      if (usuario) {
+        actualizarUsuario({ ...usuario, rol: 'COMERCIANTE' })
+      }
+
+      setListo(true)
     } catch (err) {
       setErrorGeneral(
         err instanceof Error
@@ -96,10 +122,42 @@ export default function RegistroComercioPage() {
     }
   }
 
-  if (verificando) {
+  if (cargandoAuth || verificando) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <p className="text-base text-[#1A1A1A]/55">Un momento…</p>
+      </div>
+    )
+  }
+
+  if (listo) {
+    return (
+      <div className="mx-auto w-full max-w-xl">
+        <div className="rounded-2xl border border-[#52B788]/30 bg-[#52B788]/10 px-6 py-8 text-center">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#2D6A4F] text-white text-2xl">
+            ✓
+          </div>
+          <h2
+            className="text-2xl font-bold text-[#2D6A4F]"
+            style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
+          >
+            ¡Tu tienda ya está lista!
+          </h2>
+          <p className="mt-2 text-[#1A1A1A]/60 text-sm max-w-sm mx-auto">
+            Ya puedes publicar tu primer producto y empezar a vender en AfroMercado.
+          </p>
+          <Link href="/comerciante/publicar" className="mt-5 inline-block">
+            <Button size="lg">Publicar mi primer producto</Button>
+          </Link>
+          <div className="mt-4">
+            <Link
+              href="/comerciante/dashboard"
+              className="text-sm font-semibold text-[#2D6A4F] underline"
+            >
+              Ver mi panel más tarde
+            </Link>
+          </div>
+        </div>
       </div>
     )
   }

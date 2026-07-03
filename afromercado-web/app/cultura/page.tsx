@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import Header from '@/components/layout/Header'
+import Footer from '@/components/layout/Footer'
 import { listarAgenda, precioDesde, type EventoCultural } from '@/lib/api/cultura'
 import { DEPARTAMENTOS } from '@/lib/data/colombia'
 
@@ -77,7 +79,10 @@ export default function CulturaPage() {
   }, [cargar])
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6">
+    <div className="flex min-h-screen flex-col bg-[#F8F5F0]">
+      <Header />
+      <main className="flex-1">
+        <div className="mx-auto w-full max-w-6xl px-4 py-6">
       <header className="mb-6">
         <p className="text-xs font-medium tracking-wide text-[#2D6A4F]">🎭 CULTURA</p>
         <h1 className="font-serif text-3xl leading-tight text-[#1B4332]">La agenda viva del territorio</h1>
@@ -133,6 +138,9 @@ export default function CulturaPage() {
           ))}
         </div>
       )}
+        </div>
+      </main>
+      <Footer />
     </div>
   )
 }

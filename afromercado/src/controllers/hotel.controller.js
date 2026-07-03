@@ -54,6 +54,13 @@ const HotelController = {
     } catch (e) { next(e); }
   },
 
+  async reservarMultiple(req, res, next) {
+    try {
+      const data = await HotelService.crearReservaMultiple(req.usuario.id, req.body);
+      res.status(201).json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
   async misReservas(req, res, next) {
     try {
       const data = await HotelService.misReservas(req.usuario.id);

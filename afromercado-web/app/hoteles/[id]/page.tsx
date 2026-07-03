@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { obtenerHotel, verificarDisponibilidad, crearReserva, misReservasHotel, listarHoteles, iniciarPagoReserva, validarCuponHotel, esFavoritoHotel, toggleFavoritoHotel, type ConfigHotel, type HabitacionTipo, type ReservaHotel, type ValidacionCupon, type TemporadaHotel, type ModalidadReservaHotel } from '@/lib/api/hotel'
+import { obtenerHotel, verificarDisponibilidad, crearReserva, crearReservaMultiple, misReservasHotel, listarHoteles, iniciarPagoReserva, validarCuponHotel, esFavoritoHotel, toggleFavoritoHotel, type ConfigHotel, type HabitacionTipo, type ReservaHotel, type ReservaMultipleResultado, type ValidacionCupon, type TemporadaHotel, type ModalidadReservaHotel } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
@@ -208,8 +208,10 @@ function GaleriaHero({ fotos, nombre, onOpen }: { fotos: string[]; nombre: strin
 }
 
 /* ── Tarjeta habitación ─────────────────────────────────── */
-function TarjetaHabitacion({ hab, onReservar, onVerFotos }: {
+function TarjetaHabitacion({ hab, cantidad, onCantidad, onReservar, onVerFotos }: {
   hab: HabitacionTipo
+  cantidad: number
+  onCantidad: (n: number) => void
   onReservar: (h: HabitacionTipo) => void
   onVerFotos: (fotos: string[], idx: number) => void
 }) {
@@ -358,9 +360,28 @@ function TarjetaHabitacion({ hab, onReservar, onVerFotos }: {
             </div>
           )}
 
-          {/* Spacer + botón */}
-          <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between gap-4">
-            <p className="text-xs text-gray-400">Sin cobros ocultos · Cancelación flexible</p>
+          {/* Cantidad + botón */}
+          <div className="mt-auto pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-gray-400 hidden sm:block">Sin cobros ocultos · Cancelación flexible</p>
+              <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-1 py-1" title="Cantidad de habitaciones de este tipo">
+                <button
+                  type="button"
+                  onClick={() => onCantidad(Math.max(0, cantidad - 1))}
+                  disabled={cantidad <= 0}
+                  className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center font-bold text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                  −
+                </button>
+                <span className="w-6 text-center font-bold text-sm">{cantidad}</span>
+                <button
+                  type="button"
+                  onClick={() => onCantidad(Math.min(hab.cantidad, cantidad + 1))}
+                  disabled={cantidad >= hab.cantidad}
+                  className="w-8 h-8 rounded-lg bg-[#ECFDF5] flex items-center justify-center font-bold text-[#16A34A] hover:bg-[#D1FAE5] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                  +
+                </button>
+              </div>
+            </div>
             <button onClick={() => onReservar(hab)}
               className="flex-shrink-0 bg-[#1B4332] hover:bg-[#15362A] active:scale-[0.98] text-white font-bold px-7 py-3 rounded-xl text-sm transition-all shadow-sm whitespace-nowrap">
               Reservar ahora
@@ -801,6 +822,226 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
   )
 }
 
+/* ── Form reserva MÚLTIPLE (varios tipos/cantidades de habitación) ── */
+function FormReservaMultiple({ hotel, seleccion, onClose, onSuccess }: {
+  hotel: ConfigHotel
+  seleccion: { hab: HabitacionTipo; cantidad: number }[]
+  onClose: () => void
+  onSuccess: (r: ReservaMultipleResultado) => void
+}) {
+  const { usuario } = useAuth()
+  const hoy = new Date().toISOString().split('T')[0]
+  const [fechaEntrada, setFechaEntrada] = useState(hoy)
+  const [fechaSalida,  setFechaSalida]  = useState(new Date(new Date(hoy).getTime() + 86400000).toISOString().split('T')[0])
+  const [huespedesPorHab, setHuespedesPorHab] = useState<Record<number, number>>(() =>
+    Object.fromEntries(seleccion.map(s => [s.hab.id, 1]))
+  )
+  const [notas,        setNotas]        = useState('')
+  const [nombre,       setNombre]       = useState(usuario?.nombre ?? '')
+  const [telefono,     setTelefono]     = useState(usuario?.telefono?.replace(/\D/g, '').replace(/^57/, '') ?? '')
+  const [modoPago,     setModoPago]     = useState<ModoPago>(hotel.permitePagarAlLlegar !== false ? 'efectivo' : 'deposito')
+  const [cargando, setCargando] = useState(false)
+  const [error, setError] = useState('')
+  const [codigoCupon, setCodigoCupon] = useState('')
+  const [mostrarCupon, setMostrarCupon] = useState(false)
+
+  const noches = Math.max(1, Math.ceil((new Date(fechaSalida).getTime() - new Date(fechaEntrada).getTime()) / 86400000))
+  const totalHabitaciones = seleccion.reduce((a, s) => a + s.cantidad, 0)
+
+  const totalEstimado = seleccion.reduce((acc, s) => acc + Number(s.hab.precioPorNoche) * noches * s.cantidad, 0)
+
+  const opcionesPago: { id: ModoPago; icon: string; titulo: string; desc: string }[] = [
+    ...(hotel.permitePagarAlLlegar !== false ? [{ id: 'efectivo' as ModoPago, icon: '💵', titulo: 'Pagar al llegar', desc: 'Sin cargo ahora. Efectivo, Nequi o transferencia al check-in.' }] : []),
+    ...(hotel.permiteDeposito30    !== false ? [{ id: 'deposito' as ModoPago, icon: '💳', titulo: `Depósito 30% — ${formatearPrecio(Math.round(totalEstimado * 0.30))}`, desc: 'Confirma inmediatamente. El resto lo pagas al llegar.' }] : []),
+  ]
+
+  async function reservar() {
+    if (opcionesPago.length === 0) { setError('Este hotel aun no tiene metodos de pago activos'); return }
+    if (!nombre.trim() || !telefono.trim()) { setError('Completa nombre y teléfono'); return }
+    if (fechaSalida <= fechaEntrada) { setError('La fecha de salida debe ser posterior'); return }
+    setError(''); setCargando(true)
+    try {
+      const metodoPagoFinal = modoPago === 'efectivo' ? 'EFECTIVO' : 'WOMPI'
+      // Expandir: una entrada por cada unidad de cada tipo de habitación seleccionado
+      const habitaciones = seleccion.flatMap(s =>
+        Array.from({ length: s.cantidad }, () => ({
+          habitacionTipoId: s.hab.id,
+          huespedes: huespedesPorHab[s.hab.id] ?? 1,
+        }))
+      )
+      const resultado = await crearReservaMultiple({
+        habitaciones,
+        fechaEntrada,
+        fechaSalida,
+        modalidad: 'NOCHE',
+        metodoPago: metodoPagoFinal,
+        notasCliente: notas || undefined,
+        nombreHuesped: nombre.trim(),
+        telefonoHuesped: telefono.trim(),
+        codigoCupon: codigoCupon.trim() || undefined,
+      })
+      if (modoPago !== 'efectivo') {
+        const { checkoutUrl } = await iniciarPagoReserva(resultado.reservas[0].id)
+        window.location.href = checkoutUrl
+        return
+      }
+      onSuccess(resultado)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'No se pudo crear la reserva'
+      setError(msg)
+    } finally { setCargando(false) }
+  }
+
+  const textoBoton = cargando ? 'Procesando…'
+    : modoPago === 'deposito' ? `Pagar depósito ${formatearPrecio(Math.round(totalEstimado * 0.30))} →`
+    : hotel.confirmacionAuto  ? 'Confirmar reserva' : 'Solicitar reserva'
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-end lg:items-center justify-center p-0 lg:p-6" onClick={onClose}>
+      <div className="bg-white w-full lg:max-w-lg max-h-[93vh] overflow-y-auto rounded-t-3xl lg:rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-center py-3 lg:hidden"><div className="w-12 h-1.5 bg-gray-200 rounded-full" /></div>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="font-bold text-xl text-gray-900">Reserva grupal</h3>
+            <p className="text-sm text-[#1B4332] font-semibold mt-0.5">{totalHabitaciones} habitaciones</p>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors text-xl leading-none font-bold">×</button>
+        </div>
+        <div className="px-6 pt-5 pb-8 space-y-5">
+          {/* Resumen de habitaciones seleccionadas */}
+          <div className="space-y-2">
+            {seleccion.map(s => (
+              <div key={s.hab.id} className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{s.hab.nombre}</p>
+                  <p className="text-xs text-gray-400">{formatearPrecio(Number(s.hab.precioPorNoche))} / noche</p>
+                </div>
+                <span className="text-sm font-bold text-[#1B4332] bg-[#ECFDF5] px-3 py-1 rounded-full">× {s.cantidad}</span>
+              </div>
+            ))}
+          </div>
+
+          <CalendarioReserva fechaEntrada={fechaEntrada} fechaSalida={fechaSalida}
+            onChangeFechaEntrada={setFechaEntrada} onChangeFechaSalida={setFechaSalida}
+            checkInHora={hotel.checkInHora} checkOutHora={hotel.checkOutHora} />
+
+          <div className="rounded-xl p-4 flex items-center justify-between border bg-gray-50 border-gray-100">
+            <div>
+              <p className="font-semibold text-gray-900">{noches} noche{noches !== 1 ? 's' : ''} · {totalHabitaciones} habitaciones</p>
+              <p className="text-xs mt-0.5 text-gray-500">La disponibilidad final se verifica al confirmar</p>
+            </div>
+            <p className="font-black text-2xl text-gray-900">{formatearPrecio(totalEstimado)}</p>
+          </div>
+
+          {/* Huéspedes por tipo de habitación */}
+          <div className="space-y-3">
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest">Huéspedes por habitación</label>
+            {seleccion.map(s => (
+              <div key={s.hab.id} className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3">
+                <span className="text-sm font-medium text-gray-700">{s.hab.nombre} (máx. {s.hab.capacidad})</span>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setHuespedesPorHab(prev => ({ ...prev, [s.hab.id]: Math.max(1, (prev[s.hab.id] ?? 1) - 1) }))}
+                    className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-600 hover:bg-gray-200 transition-colors">−</button>
+                  <span className="w-6 text-center font-bold">{huespedesPorHab[s.hab.id] ?? 1}</span>
+                  <button onClick={() => setHuespedesPorHab(prev => ({ ...prev, [s.hab.id]: Math.min(s.hab.capacidad, (prev[s.hab.id] ?? 1) + 1) }))}
+                    className="w-8 h-8 rounded-full bg-[#ECFDF5] flex items-center justify-center font-bold text-[#16A34A] hover:bg-[#D1FAE5] transition-colors">+</button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Nombre del huésped</label>
+              <input type="text" autoComplete="name" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre completo"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#1B4332] focus:ring-2 focus:ring-[#1B4332]/10" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Teléfono</label>
+              <input type="tel" autoComplete="tel" value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="3001234567"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#1B4332] focus:ring-2 focus:ring-[#1B4332]/10" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿Cómo quieres pagar?</label>
+            {opcionesPago.map(op => (
+              <button key={op.id} type="button" onClick={() => setModoPago(op.id)}
+                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${modoPago === op.id ? 'border-[#1B4332] bg-[#F0FDF4]' : 'border-gray-200 hover:border-gray-300'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${modoPago === op.id ? 'border-[#1B4332]' : 'border-gray-300'}`}>
+                    {modoPago === op.id && <div className="w-2 h-2 rounded-full bg-[#1B4332]" />}
+                  </div>
+                  <span className="text-lg">{op.icon}</span>
+                  <div>
+                    <p className={`font-bold text-sm ${modoPago === op.id ? 'text-[#1B4332]' : 'text-gray-800'}`}>{op.titulo}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{op.desc}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+            {opcionesPago.length === 0 && (
+              <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
+                Este hotel aun debe activar un metodo de pago para recibir reservas.
+              </div>
+            )}
+          </div>
+
+          {hotel.politicaCancelacion && (
+            <div className="flex gap-3 bg-amber-50 border border-amber-100 rounded-xl p-4">
+              <span className="text-lg flex-shrink-0">⚠️</span>
+              <div>
+                <p className="text-xs font-bold text-amber-800 uppercase tracking-wide mb-1">Política de cancelación</p>
+                <p className="text-xs text-amber-700 leading-relaxed">{hotel.politicaCancelacion}</p>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Notas especiales (opcional)</label>
+            <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2}
+              placeholder="Llegada tarde, habitaciones contiguas, necesidades especiales…"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#1B4332] resize-none" />
+          </div>
+
+          <div className="mt-4">
+            {!mostrarCupon ? (
+              <button onClick={() => setMostrarCupon(true)}
+                className="text-xs text-[#2D6A4F] underline hover:text-[#1B4332] text-left">
+                ¿Tienes un código de descuento?
+              </button>
+            ) : (
+              <div className="flex gap-2 mt-1.5">
+                <input
+                  type="text"
+                  value={codigoCupon}
+                  onChange={e => setCodigoCupon(e.target.value.toUpperCase())}
+                  placeholder="Ej: AFRO20"
+                  autoFocus
+                  className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 uppercase"
+                />
+              </div>
+            )}
+            <p className="text-[11px] text-gray-400 mt-1">El cupón se valida y aplica al total combinado al confirmar.</p>
+          </div>
+
+          {error && <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>}
+
+          <button onClick={reservar}
+            disabled={cargando || totalEstimado <= 0}
+            className="w-full bg-[#1B4332] text-white font-bold py-4 rounded-xl text-base hover:bg-[#15362A] transition-colors disabled:opacity-50 active:scale-[0.98] shadow-md">
+            {textoBoton}
+          </button>
+
+          {!hotel.confirmacionAuto && modoPago === 'efectivo' && (
+            <p className="text-xs text-center text-gray-400">El hotel confirmará en máx. {hotel.horasLimiteConfirm} horas</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── PÁGINA PRINCIPAL ───────────────────────────────────── */
 export default function HotelDetallePage() {
   const { id } = useParams()
@@ -813,6 +1054,9 @@ export default function HotelDetallePage() {
   const [cargando, setCargando]   = useState(true)
   const [habSelec, setHabSelec]   = useState<HabitacionTipo | null>(null)
   const [reservaOk, setReservaOk] = useState<ReservaHotel | null>(null)
+  const [cantidades, setCantidades] = useState<Record<number, number>>({})
+  const [reservaMultipleAbierta, setReservaMultipleAbierta] = useState(false)
+  const [reservaMultipleOk, setReservaMultipleOk] = useState<ReservaMultipleResultado | null>(null)
   const [reservaElegibleId, setReservaElegibleId] = useState<number | undefined>()
   const [lightbox, setLightbox]   = useState<{ fotos: string[]; idx: number } | null>(null)
   const [similares, setSimilares] = useState<ConfigHotel[]>([])
@@ -827,6 +1071,12 @@ export default function HotelDetallePage() {
     if (idx >= 0) setWidgetHabIdx(idx)
     setHabSelec(h)
   }
+
+  function setCantidad(habitacionTipoId: number, n: number) {
+    setCantidades(prev => ({ ...prev, [habitacionTipoId]: n }))
+  }
+
+  const totalHabitacionesSeleccionadas = Object.values(cantidades).reduce((a, b) => a + b, 0)
 
   function seleccionarHabYScroll(h: HabitacionTipo) {
     if (!autenticado) { router.push('/ingresar'); return }
@@ -1062,10 +1312,34 @@ export default function HotelDetallePage() {
                 <div className="space-y-5">
                   {hotel.habitaciones.map(hab => (
                     <TarjetaHabitacion key={hab.id} hab={hab}
+                      cantidad={cantidades[hab.id] ?? 0}
+                      onCantidad={n => setCantidad(hab.id, n)}
                       onReservar={seleccionarHabYScroll}
                       onVerFotos={(f, i) => setLightbox({ fotos: f, idx: i })}
                     />
                   ))}
+                </div>
+              )}
+
+              {/* Resumen de selección múltiple — solo aparece con más de 1 habitación seleccionada */}
+              {totalHabitacionesSeleccionadas > 1 && (
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-[#1B4332] bg-[#F0FDF4] px-5 py-4">
+                  <div>
+                    <p className="font-bold text-gray-900 text-sm">
+                      {totalHabitacionesSeleccionadas} habitaciones seleccionadas
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {hotel.habitaciones
+                        .filter(h => (cantidades[h.id] ?? 0) > 0)
+                        .map(h => `${cantidades[h.id]} × ${h.nombre}`)
+                        .join(' · ')}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { if (!autenticado) { router.push('/ingresar'); return }; setReservaMultipleAbierta(true) }}
+                    className="flex-shrink-0 bg-[#1B4332] hover:bg-[#15362A] active:scale-[0.98] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-sm whitespace-nowrap">
+                    Reservar {totalHabitacionesSeleccionadas} habitaciones
+                  </button>
                 </div>
               )}
             </div>
@@ -1188,6 +1462,18 @@ export default function HotelDetallePage() {
         />
       )}
 
+      {/* MODAL RESERVA MÚLTIPLE */}
+      {reservaMultipleAbierta && !reservaMultipleOk && (
+        <FormReservaMultiple
+          hotel={hotel}
+          seleccion={hotel.habitaciones
+            .filter(h => (cantidades[h.id] ?? 0) > 0)
+            .map(h => ({ hab: h, cantidad: cantidades[h.id] }))}
+          onClose={() => setReservaMultipleAbierta(false)}
+          onSuccess={(r) => { setReservaMultipleAbierta(false); setReservaMultipleOk(r); setCantidades({}) }}
+        />
+      )}
+
       {/* CONFIRMACIÓN */}
       {reservaOk && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
@@ -1257,6 +1543,52 @@ export default function HotelDetallePage() {
                   Ver mis reservas
                 </Link>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMACIÓN RESERVA MÚLTIPLE */}
+      {reservaMultipleOk && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+            <div className="w-20 h-20 bg-[#ECFDF5] rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <h3 className="font-black text-2xl text-gray-900 mb-1">¡Reserva grupal enviada!</h3>
+            <p className="text-sm text-gray-500 mb-5">
+              {reservaMultipleOk.reservas.length} habitaciones ·{' '}
+              {hotel.confirmacionAuto
+                ? 'confirmadas exitosamente. ¡Te esperamos!'
+                : `el hotel revisará tu solicitud en máx. ${hotel.horasLimiteConfirm} horas.`}
+            </p>
+
+            <div className="mb-5 space-y-2">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Códigos de reserva</p>
+              {reservaMultipleOk.reservas.map(r => (
+                <div key={r.id} className="flex items-center justify-between gap-2 bg-gray-100 rounded-xl px-4 py-2.5">
+                  <span className="text-xs text-gray-500 truncate">{r.habitacionTipo?.nombre}</span>
+                  <span className="font-mono text-sm font-black tracking-widest text-gray-900">{r.codigo}</span>
+                </div>
+              ))}
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-2 font-medium">
+                Guarda estos códigos — los necesitarás al hacer check-in
+              </p>
+            </div>
+
+            <p className="text-sm text-gray-500 mb-5">
+              Total <span className="font-bold text-gray-900">{formatearPrecio(Number(reservaMultipleOk.total))}</span>
+            </p>
+
+            <div className="flex gap-3">
+              <button onClick={() => setReservaMultipleOk(null)}
+                className="flex-1 border border-gray-200 rounded-xl py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+                Seguir viendo
+              </button>
+              <Link href="/hoteles/mis-reservas"
+                className="flex-1 bg-[#1B4332] text-white rounded-xl py-3 text-sm font-bold text-center hover:bg-[#15362A] transition-colors">
+                Ver mis reservas
+              </Link>
             </div>
           </div>
         </div>

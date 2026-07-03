@@ -6,6 +6,7 @@ import {
   listarComerciosAdmin,
   verificarComercianteAdmin,
   toggleWhatsappAdmin,
+  toggleVerificadoEtnicoAdmin,
   setComisionComercioAdmin,
   type AdminComercio,
   type CambioCriticoComercio,
@@ -466,12 +467,14 @@ function CardComerciante({
   procesando,
   onAccion,
   onWhatsapp,
+  onVerificadoEtnico,
   onComision,
 }: {
   comercio: AdminComercio
   procesando: boolean
   onAccion: (c: AdminComercio, a: 'APROBAR' | 'RECHAZAR' | 'SUSPENDER' | 'REHABILITAR') => void
   onWhatsapp: (c: AdminComercio) => void
+  onVerificadoEtnico: (c: AdminComercio) => void
   onComision: (c: AdminComercio) => void
 }) {
   const señales = señalesFraude(comercio)
@@ -569,6 +572,20 @@ function CardComerciante({
             ) : (
               <span className="mt-1 block text-[#1A1A1A]/35">Sin número</span>
             )}
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[#1A1A1A]/40">Sello étnico/territorial</p>
+            <button
+              onClick={() => onVerificadoEtnico(comercio)}
+              disabled={procesando}
+              className={`mt-1 rounded-full px-3 py-1 text-xs font-bold transition-colors ${
+                comercio.verificadoEtnico
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              {comercio.verificadoEtnico ? 'Otorgado' : 'No otorgado'}
+            </button>
           </div>
         </div>
 
@@ -691,6 +708,19 @@ export default function ComerciantesAdminPage() {
       const actualizado = await toggleWhatsappAdmin(comercio.id)
       setComercios((prev) => prev.map((c) => c.id === comercio.id ? { ...c, whatsappVisible: actualizado.whatsappVisible } : c))
       setAviso({ tipo: 'exito', texto: `WhatsApp ${actualizado.whatsappVisible ? 'activado' : 'desactivado'} para "${comercio.nombre}".` })
+    } catch (e) {
+      setAviso({ tipo: 'error', texto: e instanceof Error ? e.message : 'Error' })
+    } finally {
+      setProcesandoId(null)
+    }
+  }
+
+  async function handleVerificadoEtnico(comercio: AdminComercio) {
+    setProcesandoId(comercio.id)
+    try {
+      const actualizado = await toggleVerificadoEtnicoAdmin(comercio.id)
+      setComercios((prev) => prev.map((c) => c.id === comercio.id ? { ...c, verificadoEtnico: actualizado.verificadoEtnico } : c))
+      setAviso({ tipo: 'exito', texto: `Sello étnico/territorial ${actualizado.verificadoEtnico ? 'otorgado a' : 'retirado de'} "${comercio.nombre}".` })
     } catch (e) {
       setAviso({ tipo: 'error', texto: e instanceof Error ? e.message : 'Error' })
     } finally {
@@ -859,6 +889,7 @@ export default function ComerciantesAdminPage() {
                     procesando={procesandoId === comercio.id}
                     onAccion={(c, a) => setModalAccion({ comercio: c, accion: a })}
                     onWhatsapp={handleWhatsapp}
+                    onVerificadoEtnico={handleVerificadoEtnico}
                     onComision={(c) => setModalComision(c)}
                   />
                 ))}

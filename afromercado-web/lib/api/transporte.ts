@@ -56,8 +56,63 @@ export interface ReservaTransporte {
   nombreContacto: string
   telefonoContacto: string
   creadoAt: string
+  montoDescuento?: number | null
+  codigoCupon?: string | null
   ruta?: RutaTransporte & { configTransporte?: ConfigTransporte }
   cliente?: { id: number; nombre: string; email: string }
+}
+
+// ── CUPONES ───────────────────────────────────────────────────
+export interface CuponTransporte {
+  id: number
+  codigo: string
+  tipo: 'PORCENTAJE' | 'VALOR_FIJO'
+  valor: number | string
+  minimoAsientos?: number | null
+  usosMaximos?: number | null
+  usosActuales: number
+  activo: boolean
+  inicio: string
+  fin: string
+  configTransporteId?: number | null
+  createdAt: string
+}
+
+export interface ValidacionCuponTransporte {
+  cupon: CuponTransporte
+  descuento: number
+  totalConDescuento: number
+}
+
+export async function validarCuponTransporte(datos: {
+  codigo: string
+  rutaTransporteId: number
+  asientos: number
+}): Promise<ValidacionCuponTransporte> {
+  const r = await apiFetch<{ ok: boolean; data: ValidacionCuponTransporte }>('/transportes/cupones/validar', { method: 'POST', body: datos, auth: false })
+  return r.data
+}
+
+export async function listarCuponesTransporte(): Promise<CuponTransporte[]> {
+  const r = await apiFetch<{ ok: boolean; data: CuponTransporte[] }>('/transportes/mi-transporte/cupones')
+  return r.data
+}
+
+export async function crearCuponTransporte(datos: {
+  codigo: string
+  tipo: 'PORCENTAJE' | 'VALOR_FIJO'
+  valor: number
+  minimoAsientos?: number
+  usosMaximos?: number
+  inicio: string
+  fin: string
+}): Promise<CuponTransporte> {
+  const r = await apiFetch<{ ok: boolean; data: CuponTransporte }>('/transportes/mi-transporte/cupones', { method: 'POST', body: datos })
+  return r.data
+}
+
+export async function eliminarCuponTransporte(id: number): Promise<void> {
+  await apiFetch(`/transportes/mi-transporte/cupones/${id}`, { method: 'DELETE' })
 }
 
 // ── PÚBLICO ──────────────────────────────────────────────────
@@ -88,6 +143,7 @@ export async function crearReservaTransporte(datos: {
   notasCliente?: string
   nombreContacto: string
   telefonoContacto: string
+  codigoCupon?: string
 }): Promise<ReservaTransporte> {
   const r = await apiFetch<{ ok: boolean; data: ReservaTransporte }>('/transportes/reservas', { method: 'POST', body: datos })
   return r.data

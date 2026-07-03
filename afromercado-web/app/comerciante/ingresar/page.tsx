@@ -27,17 +27,32 @@ export default function ComercianteIngresarPage() {
 
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
+  const [correoYaExiste, setCorreoYaExiste] = useState(false)
   const [enviando, setEnviando] = useState(false)
 
   function limpiar() {
     setErrores({})
     setErrorGeneral(null)
+    setCorreoYaExiste(false)
   }
 
   function cambiarModo(nuevo: Modo) {
     if (nuevo === modo) return
     setModo(nuevo)
     limpiar()
+  }
+
+  // El backend responde este mensaje exacto (auth.service.js) cuando el
+  // correo ya tiene una cuenta. En vez del error genérico, ofrecemos ir
+  // directo a iniciar sesión con el mismo correo ya escrito.
+  function irAIniciarSesionConCorreo() {
+    setModo('login')
+    setErrores({})
+    setErrorGeneral(null)
+    setCorreoYaExiste(false)
+    // El flujo normal de login (más abajo) ya redirige a
+    // /comerciante/registro-comercio cuando el usuario no tiene comercio,
+    // así que no hace falta guardar ningún estado extra de "post-login".
   }
 
   function validar(): boolean {
@@ -83,15 +98,17 @@ export default function ComercianteIngresarPage() {
         })
       }
 
-      if (usuario.rol !== 'COMERCIANTE') {
+      if (usuario.rol === 'ADMIN') {
         setErrorGeneral(
-          'Esta cuenta no es de vendedor. Crea una cuenta de vendedor para continuar.',
+          'Una cuenta de administrador no puede abrir una tienda. Ingresa con otra cuenta.',
         )
         setEnviando(false)
         return
       }
 
-      // Decidir a dónde ir: ¿ya tiene comercio?
+      // Comprador, comerciante o repartidor: todos pueden continuar. Si aún no
+      // tiene comercio, registro-comercio lo crea y lo asciende a COMERCIANTE
+      // con la misma cuenta — decidir a dónde ir: ¿ya tiene comercio?
       const comercio = await obtenerMiComercio()
       if (comercio) {
         router.replace('/comerciante/dashboard')
@@ -99,11 +116,13 @@ export default function ComercianteIngresarPage() {
         router.replace('/comerciante/registro-comercio')
       }
     } catch (err) {
-      setErrorGeneral(
-        err instanceof Error
-          ? err.message
-          : 'No pudimos continuar. Intenta de nuevo.',
-      )
+      const mensaje = err instanceof Error ? err.message : ''
+      if (modo === 'registro' && /ya existe una cuenta con ese correo/i.test(mensaje)) {
+        setCorreoYaExiste(true)
+        setErrorGeneral(null)
+      } else {
+        setErrorGeneral(mensaje || 'No pudimos continuar. Intenta de nuevo.')
+      }
       setEnviando(false)
     }
   }
@@ -272,6 +291,27 @@ export default function ComercianteIngresarPage() {
               onChange={setPassword}
               error={errores.password}
             />
+
+            {correoYaExiste && (
+              <div
+                role="alert"
+                className="rounded-xl bg-[#D4A017]/10 border border-[#D4A017]/25 px-4 py-3 text-sm text-[#1A1A1A]"
+              >
+                <p className="font-semibold text-[#9B7300]">
+                  Ya tienes una cuenta en AfroMercado con ese correo.
+                </p>
+                <p className="mt-1 text-[#1A1A1A]/70">
+                  Inicia sesión y en un paso abrimos tu tienda desde ahí — no necesitas crear una cuenta nueva.
+                </p>
+                <button
+                  type="button"
+                  onClick={irAIniciarSesionConCorreo}
+                  className="mt-3 inline-flex items-center justify-center min-h-[40px] px-4 rounded-lg text-sm font-semibold bg-[#2D6A4F] text-white hover:bg-[#245a42]"
+                >
+                  Iniciar sesión y continuar
+                </button>
+              </div>
+            )}
 
             {errorGeneral && (
               <div

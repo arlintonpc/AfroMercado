@@ -56,6 +56,7 @@ export interface PedidoExpress {
   municipioEntrega: string | null
   notaCliente: string | null
   motivoCancelacion: string | null
+  fechaProgramada: string | null
   tiempoEstimadoMin: number
   tiempoAjustadoMin: number | null
   creadoAt: string
@@ -154,6 +155,8 @@ export async function crearPedidoExpress(body: {
   direccionTexto?: string
   municipioEntrega?: string
   codigoCupon?: string
+  /** ISO datetime; si se omite el pedido es inmediato (comportamiento actual) */
+  fechaProgramada?: string
 }): Promise<PedidoExpress> {
   const r = await apiFetch<{ ok: boolean; data: PedidoExpress }>('/express/pedidos', { method: 'POST', body })
   return r.data
@@ -317,13 +320,43 @@ export interface EstadisticasExpress {
     cantidad: number
     pedidos: number
   }>
+  topComplementos: Array<{ nombre: string; cantidad: number }>
   ultimosPedidos: Array<{
     id: number; codigo: string; estado: string; total: number; creadoAt: string; modalidad: string
   }>
+  rango?: {
+    pedidos: number
+    ingresos: number
+    comision: number
+    topProductos: EstadisticasExpress['topProductos']
+    topComplementos: Array<{ nombre: string; cantidad: number }>
+    desde: string
+    hasta: string
+  }
 }
 
-export async function obtenerEstadisticasExpress(): Promise<EstadisticasExpress> {
-  const r = await apiFetch<{ ok: boolean; data: EstadisticasExpress }>('/express/mis-estadisticas')
+export async function obtenerEstadisticasExpress(params?: { desde?: string; hasta?: string }): Promise<EstadisticasExpress> {
+  const qs = params?.desde && params?.hasta
+    ? `?${new URLSearchParams({ desde: params.desde, hasta: params.hasta }).toString()}`
+    : ''
+  const r = await apiFetch<{ ok: boolean; data: EstadisticasExpress }>(`/express/mis-estadisticas${qs}`)
+  return r.data
+}
+
+// ── FAVORITOS EXPRESS ──────────────────────────────────────────
+
+export async function toggleFavoritoExpress(configExpressId: number): Promise<{ favorito: boolean }> {
+  const r = await apiFetch<{ ok: boolean; data: { favorito: boolean } }>(`/express/favoritos/${configExpressId}/toggle`, { method: 'POST' })
+  return r.data
+}
+
+export async function misFavoritosExpress(): Promise<ComercioExpress[]> {
+  const r = await apiFetch<{ ok: boolean; data: ComercioExpress[] }>('/express/favoritos/mis')
+  return r.data
+}
+
+export async function esFavoritoExpress(configExpressId: number): Promise<{ favorito: boolean }> {
+  const r = await apiFetch<{ ok: boolean; data: { favorito: boolean } }>(`/express/favoritos/${configExpressId}`)
   return r.data
 }
 
@@ -452,6 +485,16 @@ export async function crearItemBiblioteca(
   const r = await apiFetch<{ ok: boolean; data: ItemComplementoBiblioteca }>(`/express/complementos/biblioteca/grupos/${grupoId}/items`, {
     method: 'POST',
     body: datos,
+  })
+  return r.data
+}
+
+export async function subirImagenItemBiblioteca(itemId: number, file: File): Promise<ItemComplementoBiblioteca> {
+  const form = new FormData()
+  form.append('imagen', file)
+  const r = await apiFetch<{ ok: boolean; data: ItemComplementoBiblioteca }>(`/express/complementos/biblioteca/items/${itemId}/imagen`, {
+    method: 'POST',
+    body: form,
   })
   return r.data
 }

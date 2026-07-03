@@ -25,6 +25,7 @@ export interface Producto {
     nombre: string
     municipio: string
     verificado: boolean
+    verificadoEtnico?: boolean
     totalVentas: number
     calificacion: number
     totalReviews: number

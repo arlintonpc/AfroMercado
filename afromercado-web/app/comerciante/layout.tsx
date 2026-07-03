@@ -105,27 +105,33 @@ export default function ComercianteLayout({
   const { usuario, cargando, logout } = useAuth()
 
   const esRutaIngresar = pathname === '/comerciante/ingresar'
+  // Un comprador autenticado (sin comercio todavía) debe poder llegar aquí para
+  // abrir su tienda — esta página ya tiene su propia guardia de autenticación,
+  // no le corresponde al layout exigir que YA sea comerciante.
+  const esRutaRegistroComercio = pathname === '/comerciante/registro-comercio'
   // /comerciante/perfil sigue accesible aunque el comercio esté suspendido.
   const esRutaPerfil = pathname === '/comerciante/perfil' || pathname.startsWith('/comerciante/perfil/')
   const esComerciante = usuario?.rol === 'COMERCIANTE'
+  const rutaSinProteccionDeRol = esRutaIngresar || esRutaRegistroComercio
 
   const { noLeidas } = useNotificaciones()
   const [nombreComercio, setNombreComercio] = useState<string | null>(null)
   const [comercio, setComercio] = useState<Comercio | null | undefined>(undefined)
   const [menuAbierto, setMenuAbierto] = useState(false)
   const [masAbierto, setMasAbierto] = useState(false)
+  const [serviciosAbierto, setServiciosAbierto] = useState(false)
 
   // Protección de ruta: sin sesión de comerciante → a ingresar.
   useEffect(() => {
-    if (cargando || esRutaIngresar) return
+    if (cargando || rutaSinProteccionDeRol) return
     if (!esComerciante) {
       router.replace('/comerciante/ingresar')
     }
-  }, [cargando, esRutaIngresar, esComerciante, router])
+  }, [cargando, rutaSinProteccionDeRol, esComerciante, router])
 
   // Cargar el comercio para la barra superior y la protección por estado.
   useEffect(() => {
-    if (cargando || esRutaIngresar || !esComerciante) return
+    if (cargando || rutaSinProteccionDeRol || !esComerciante) return
     let activo = true
     obtenerMiComercio()
       .then((c) => {
@@ -140,15 +146,16 @@ export default function ComercianteLayout({
     return () => {
       activo = false
     }
-  }, [cargando, esRutaIngresar, esComerciante])
+  }, [cargando, rutaSinProteccionDeRol, esComerciante])
 
   // La pantalla de ingreso usa su propio diseño, sin protección ni chrome.
   useEffect(() => {
     setMenuAbierto(false)
     setMasAbierto(false)
+    setServiciosAbierto(false)
   }, [pathname])
 
-  if (esRutaIngresar) {
+  if (rutaSinProteccionDeRol) {
     return <>{children}</>
   }
 
@@ -188,29 +195,42 @@ export default function ComercianteLayout({
     { href: '/comerciante/publicar',       etiqueta: 'Publicar' },
     { href: '/comerciante/ofertas',        etiqueta: 'Ofertas' },
     { href: '/comerciante/cupones',        etiqueta: 'Cupones' },
+    { href: '/comerciante/alianzas',       etiqueta: 'Alianzas' },
     { href: '/comerciante/publicidad',     etiqueta: 'Publicidad' },
     { href: '/comerciante/analytics',      etiqueta: 'Analíticas' },
     { href: '/comerciante/liquidaciones',  etiqueta: 'Liquidaciones' },
     { href: '/comerciante/perfil',         etiqueta: 'Mi tienda' },
     { href: '/notificaciones',             etiqueta: 'Notificaciones' },
   ]
+  // Fila principal acotada a 5 para que quepa en una sola línea sin encimarse
+  // (con los 5 módulos de servicio + Más + Cerrar sesión ya eran 12 elementos).
   const enlacesPrincipales = enlaces.filter((e) =>
     [
       '/comerciante/dashboard',
       '/comerciante/pedidos',
-      '/comerciante/express',
-      '/comerciante/hoteles',
-      '/comerciante/tours',
-      '/comerciante/transportes',
-      '/comerciante/cultura',
       '/comerciante/mis-productos',
       '/comerciante/publicar',
       '/comerciante/perfil',
     ].includes(e.href)
   )
-  const enlacesSecundarios = enlaces.filter((e) => !enlacesPrincipales.some((p) => p.href === e.href))
+  // Los 5 módulos de servicio comparten un desplegable propio, mismo patrón que "Más".
+  const enlacesServicios = enlaces.filter((e) =>
+    [
+      '/comerciante/express',
+      '/comerciante/hoteles',
+      '/comerciante/tours',
+      '/comerciante/transportes',
+      '/comerciante/cultura',
+    ].includes(e.href)
+  )
+  const enlacesSecundarios = enlaces.filter(
+    (e) =>
+      !enlacesPrincipales.some((p) => p.href === e.href) &&
+      !enlacesServicios.some((s) => s.href === e.href)
+  )
   const enlaceActivo = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
   const secundarioActivo = enlacesSecundarios.some((e) => enlaceActivo(e.href))
+  const servicioActivo = enlacesServicios.some((e) => enlaceActivo(e.href))
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F8F5F0] text-[#1A1A1A]">
@@ -252,7 +272,38 @@ export default function ComercianteLayout({
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setMasAbierto((v) => !v)}
+                onClick={() => { setServiciosAbierto((v) => !v); setMasAbierto(false) }}
+                className={`whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold transition-colors ${
+                  servicioActivo || serviciosAbierto ? 'bg-white/15' : 'text-white/80 hover:bg-white/10'
+                }`}
+                aria-expanded={serviciosAbierto}
+              >
+                Servicios
+              </button>
+              {serviciosAbierto && (
+                <div className="absolute left-0 top-full mt-2 w-56 rounded-2xl border border-white/10 bg-[#1F5A42] p-2 shadow-xl">
+                  {enlacesServicios.map((e) => {
+                    const activo = enlaceActivo(e.href)
+                    return (
+                      <Link
+                        key={e.href}
+                        href={e.href}
+                        onClick={() => setServiciosAbierto(false)}
+                        className={`block rounded-xl px-3 py-2 text-sm font-bold transition-colors ${
+                          activo ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10'
+                        }`}
+                      >
+                        {e.etiqueta}
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => { setMasAbierto((v) => !v); setServiciosAbierto(false) }}
                 className={`relative whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold transition-colors ${
                   secundarioActivo || masAbierto ? 'bg-white/15' : 'text-white/80 hover:bg-white/10'
                 }`}

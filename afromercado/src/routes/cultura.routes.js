@@ -1,6 +1,7 @@
 const express = require("express");
 const { autenticar, autorizar } = require("../middlewares/auth");
 const CulturaController = require("../controllers/cultura.controller");
+const ReviewController = require("../controllers/review.controller");
 
 const router = express.Router();
 
@@ -24,11 +25,15 @@ router.delete("/entradas/:id",             ...soloComercio, CulturaController.el
 router.post( "/reservas",              ...soloAuth, CulturaController.reservar);
 router.get(  "/reservas/mis",          ...soloAuth, CulturaController.misReservas);
 router.patch("/reservas/:id/cancelar", ...soloAuth, CulturaController.cancelarReserva);
+router.post( "/reservas/:id/review",   ...soloAuth, ReviewController.crearReviewCultura);
 
 // ── ADMIN ─────────────────────────────────────────────────────
 router.get(  "/admin/todos",      ...soloAdmin, CulturaController.adminListar);
 router.post( "/admin/eventos",    ...soloAdmin, CulturaController.adminCrearEvento);
 router.patch("/admin/:id/estado", ...soloAdmin, CulturaController.adminCambiarEstado);
+
+// ── PÚBLICO (reviews) ─────────────────────────────────────────
+router.get("/:id/reviews", ReviewController.reviewsCultura);
 
 // Detalle público del evento — al final para no capturar rutas específicas
 router.get("/:id", CulturaController.obtener);

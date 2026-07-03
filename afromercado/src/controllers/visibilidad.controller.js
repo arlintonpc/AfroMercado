@@ -15,8 +15,8 @@ const VisibilidadController = {
 
   async listarActivas(req, res, next) {
     try {
-      const { tipo } = req.query;
-      const items = await VisibilidadService.listarActivas(tipo || null);
+      const { tipo, departamento } = req.query;
+      const items = await VisibilidadService.listarActivas(tipo || null, departamento || null);
       res.json({ ok: true, items });
     } catch (err) { next(err); }
   },

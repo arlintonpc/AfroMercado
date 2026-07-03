@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState, useCallback } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
@@ -10,11 +10,16 @@ import {
   crearPedidoExpress,
   validarCuponExpress,
   misPedidosExpress,
+  obtenerPedidoExpress,
+  esFavoritoExpress,
+  toggleFavoritoExpress,
   type MenuComercioExpress,
   type MenuSeccion,
   type ModalidadExpress,
   type MetodoPagoExpress,
   type ValidacionCuponExpress,
+  type DiaSemana,
+  type HorarioExpress,
 } from '@/lib/api/express'
 import { reviewsExpress, crearReviewExpress, type ReviewExpress } from '@/lib/api/review'
 import SeccionReviews, { type ReviewItem } from '@/components/ui/SeccionReviews'
@@ -30,6 +35,16 @@ interface ItemCarrito {
   nota: string
   fotoUrl: string | null
   complementos?: Array<{ nombre: string; precio: number }>
+}
+
+// getDay(): 0=domingo … 6=sábado
+const DIA_SEMANA_POR_INDICE: DiaSemana[] = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO']
+
+/** Horario de apertura del comercio para el día de hoy (hora local Colombia = hora del navegador del usuario). */
+function horarioDeHoy(horarios: HorarioExpress[] | undefined): HorarioExpress | null {
+  if (!horarios?.length) return null
+  const dia = DIA_SEMANA_POR_INDICE[new Date().getDay()]
+  return horarios.find(h => h.dia === dia) ?? null
 }
 
 type Paso = 'menu' | 'checkout' | 'confirmado'
@@ -93,11 +108,13 @@ function TarjetaProducto({
   )
 }
 
-export default function MenuExpressPage() {
+function MenuExpressContent() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { autenticado, usuario } = useAuth()
   const comercioId = Number(params.id)
+  const reorderId = searchParams.get('reorder')
 
   const [menu, setMenu] = useState<MenuComercioExpress | null>(null)
   const [cargando, setCargando] = useState(true)
@@ -111,6 +128,8 @@ export default function MenuExpressPage() {
   const [reviews, setReviews] = useState<ReviewExpress[]>([])
   const [cargandoReviews, setCargandoRev] = useState(true)
   const [pedidoElegibleId, setPedidoElegibleId] = useState<number | undefined>()
+  const [esFav, setEsFav] = useState(false)
+  const [toggling, setToggling] = useState(false)
 
   // Cupón
   const [codigoCupon, setCodigoCupon]         = useState('')
@@ -127,6 +146,10 @@ export default function MenuExpressPage() {
   const [notaCliente, setNotaCliente] = useState('')
   const [mesa, setMesa] = useState('')
 
+  // Cuándo: ahora vs. programado para más tarde
+  const [cuando, setCuando] = useState<'ahora' | 'programado'>('ahora')
+  const [horaProgramada, setHoraProgramada] = useState('')
+
   // Pre-llenar teléfono desde el perfil del usuario
   useEffect(() => {
     if (usuario?.telefono && !telefonoEntrega) {
@@ -139,9 +162,51 @@ export default function MenuExpressPage() {
     setMenu(data)
     setCargando(false)
     if (data?.modalidades?.length) setModalidad(data.modalidades[0])
-  }, [comercioId])
+    if (usuario && data) {
+      esFavoritoExpress(data.id).then(r => setEsFav(r.favorito)).catch(() => {})
+    }
+  }, [comercioId, usuario])
 
   useEffect(() => { cargar() }, [cargar])
+
+  // "Pedir de nuevo": prellenar el carrito con los productos de un pedido anterior.
+  // Los productos que ya no existen o están inactivos se omiten silenciosamente.
+  useEffect(() => {
+    if (!reorderId || !menu) return
+    obtenerPedidoExpress(Number(reorderId)).then(pedidoAnterior => {
+      const productosPorId = new Map(menu.productos.map(p => [p.id, p]))
+      const itemsPrellenado: ItemCarrito[] = []
+      for (const item of pedidoAnterior.items) {
+        const prod = productosPorId.get(item.productoId)
+        if (!prod) continue // producto eliminado o ya no disponible en este comercio
+        const complementos = Array.isArray(item.complementos)
+          ? (item.complementos as Array<{ nombre: string; precio: number }>)
+          : undefined
+        const precioExtras = complementos?.reduce((s, c) => s + Number(c.precio), 0) ?? 0
+        itemsPrellenado.push({
+          productoId: prod.id,
+          nombre: prod.nombre,
+          precio: Number(prod.precio) + precioExtras,
+          cantidad: item.cantidad,
+          nota: item.nota ?? '',
+          fotoUrl: prod.fotoUrl,
+          complementos,
+        })
+      }
+      if (itemsPrellenado.length > 0) setCarrito(itemsPrellenado)
+    }).catch(() => {})
+  }, [reorderId, menu])
+
+  async function toggleFav() {
+    if (!usuario) { router.push('/ingresar'); return }
+    if (!menu) return
+    setToggling(true)
+    try {
+      const r = await toggleFavoritoExpress(menu.id)
+      setEsFav(r.favorito)
+    } catch {}
+    setToggling(false)
+  }
 
   useEffect(() => {
     reviewsExpress(comercioId).then(r => { setReviews(r); setCargandoRev(false) }).catch(() => setCargandoRev(false))
@@ -228,6 +293,16 @@ export default function MenuExpressPage() {
       if (!telefonoEntrega.trim()) { setError('Ingresa un teléfono de contacto para el domicilio.'); return }
     }
     if (modalidad === 'MESA' && !mesa.trim()) { setError('Ingresa el número de mesa.'); return }
+    let fechaProgramada: string | undefined
+    if (cuando === 'programado') {
+      if (!horaProgramada) { setError('Elige una hora para programar el pedido.'); return }
+      const [hh, mm] = horaProgramada.split(':').map(Number)
+      const fecha = new Date()
+      fecha.setSeconds(0, 0)
+      fecha.setHours(hh, mm)
+      if (fecha.getTime() <= Date.now()) { setError('Elige una hora futura para el pedido programado.'); return }
+      fechaProgramada = fecha.toISOString()
+    }
     setEnviando(true)
     setError(null)
     try {
@@ -243,6 +318,7 @@ export default function MenuExpressPage() {
         direccionTexto: direccionFinal,
         municipioEntrega: menu?.comercio.municipio,
         codigoCupon: cuponAplicado ? codigoCupon.trim() : undefined,
+        fechaProgramada,
       })
       setPedidoId(pedido.id)
       setPaso('confirmado')
@@ -464,6 +540,58 @@ export default function MenuExpressPage() {
             </div>
           )}
 
+          {/* ¿Cuándo? — ahora o programado */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <p className="font-semibold text-[#1A1A1A] mb-3">¿Cuándo lo quieres?</p>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setCuando('ahora')}
+                className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                  cuando === 'ahora'
+                    ? 'bg-[#2D6A4F] text-white border-[#2D6A4F]'
+                    : 'bg-white text-[#1A1A1A] border-[#E8DCC8]'
+                }`}
+              >
+                🚀 Pedir ahora
+              </button>
+              <button
+                onClick={() => setCuando('programado')}
+                className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                  cuando === 'programado'
+                    ? 'bg-[#2D6A4F] text-white border-[#2D6A4F]'
+                    : 'bg-white text-[#1A1A1A] border-[#E8DCC8]'
+                }`}
+              >
+                🕐 Programar para más tarde
+              </button>
+            </div>
+            {cuando === 'programado' && (() => {
+              const horarioHoy = horarioDeHoy(menu?.horarios)
+              if (!horarioHoy || !horarioHoy.abierto) {
+                return (
+                  <p className="mt-3 text-xs text-[#721C24] bg-[#F8D7DA] rounded-xl px-3 py-2">
+                    El restaurante no tiene horario de apertura configurado para hoy. Intenta pedir ahora o elige otro momento.
+                  </p>
+                )
+              }
+              return (
+                <div className="mt-3 space-y-1.5">
+                  <input
+                    type="time"
+                    className="w-40 rounded-xl border border-[#E8DCC8] px-4 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F]"
+                    value={horaProgramada}
+                    min={horarioHoy.apertura}
+                    max={horarioHoy.cierre}
+                    onChange={e => setHoraProgramada(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-400">
+                    Horario de hoy: {horarioHoy.apertura} – {horarioHoy.cierre}
+                  </p>
+                </div>
+              )
+            })()}
+          </div>
+
           {/* Pago */}
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <p className="font-semibold text-[#1A1A1A] mb-3">Método de pago</p>
@@ -548,10 +676,14 @@ export default function MenuExpressPage() {
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E8DCC8] p-4">
           <button
             onClick={confirmarPedido}
-            disabled={enviando}
+            disabled={enviando || (cuando === 'programado' && !horaProgramada)}
             className="w-full max-w-lg mx-auto block rounded-2xl bg-[#2D6A4F] text-white py-4 font-bold text-lg disabled:opacity-60 transition-opacity"
           >
-            {enviando ? 'Enviando...' : `Pedir ahora · ${formatearPrecio(totalFinal)}`}
+            {enviando
+              ? 'Enviando...'
+              : cuando === 'programado'
+                ? `Programar pedido · ${formatearPrecio(totalFinal)}`
+                : `Pedir ahora · ${formatearPrecio(totalFinal)}`}
           </button>
         </div>
       </div>
@@ -576,7 +708,7 @@ export default function MenuExpressPage() {
             ) : (
               <div className="w-16 h-16 rounded-2xl bg-[#F0EBE3] flex items-center justify-center text-2xl flex-shrink-0">🍽️</div>
             )}
-            <div>
+            <div className="flex-1 min-w-0">
               <h1 className="text-xl font-bold text-[#1A1A1A]">{menu.comercio.nombre}</h1>
               <p className="text-sm text-[#666] flex items-center gap-1">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -591,6 +723,13 @@ export default function MenuExpressPage() {
                 {menu.abiertoAhora ? '● Abierto' : '● Cerrado'}
               </span>
             </div>
+            <button onClick={toggleFav} disabled={toggling}
+              className={`flex-shrink-0 p-2 rounded-full transition-colors ${esFav ? 'bg-red-50 text-red-500' : 'bg-white/80 text-gray-400 hover:text-red-400'}`}
+              title={esFav ? 'Quitar de favoritos' : 'Guardar en favoritos'}>
+              <svg className="w-5 h-5" fill={esFav ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            </button>
           </div>
 
           {!menu.abiertoAhora && (
@@ -807,5 +946,17 @@ export default function MenuExpressPage() {
         />
       )}
     </div>
+  )
+}
+
+export default function MenuExpressPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#FAF8F5] flex items-center justify-center">
+        <div className="animate-pulse text-[#2D6A4F] text-lg">Cargando menú...</div>
+      </div>
+    }>
+      <MenuExpressContent />
+    </Suspense>
   )
 }

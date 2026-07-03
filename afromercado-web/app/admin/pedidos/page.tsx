@@ -70,6 +70,48 @@ function FilaEsqueleto() {
   )
 }
 
+// ── Vista de tarjeta (móvil, < md) ─────────────────────────────
+
+function TarjetaPedidoMovil({ p }: { p: AdminPedidoResumen }) {
+  return (
+    <div className="border-b border-[#1A1A1A]/5 last:border-0 px-4 py-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <code className="text-xs font-bold bg-[#F8F5F0] border border-[#1A1A1A]/8 px-2 py-0.5 rounded-lg tracking-wide text-[#1A1A1A]">
+            {p.codigo ?? `#${p.id}`}
+          </code>
+          <p className="mt-1.5 font-semibold text-[#1A1A1A] leading-tight">{p.comprador.nombre}</p>
+          <p className="text-xs text-[#1A1A1A]/40 leading-tight">{p.comprador.email}</p>
+        </div>
+        <BadgeEstado estado={p.estado} />
+      </div>
+      <div className="mt-2 flex items-center justify-between text-xs text-[#1A1A1A]/60">
+        <span>{formatearFecha(p.createdAt)}</span>
+        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#2D6A4F]/10 text-[#2D6A4F] font-bold">
+          {p.subPedidos.length}
+        </span>
+        <span className="font-semibold text-[#2D6A4F]">{formatearPrecio(p.total)}</span>
+      </div>
+      <Link
+        href={`/admin/pedidos/${p.id}`}
+        className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[#2D6A4F] hover:text-[#245a42] transition-colors"
+      >
+        Ver detalle →
+      </Link>
+    </div>
+  )
+}
+
+function TarjetaEsqueleto() {
+  return (
+    <div className="border-b border-[#1A1A1A]/5 px-4 py-3">
+      <div className="h-4 w-24 bg-[#1A1A1A]/8 rounded animate-pulse" />
+      <div className="mt-2 h-4 w-40 bg-[#1A1A1A]/8 rounded animate-pulse" />
+      <div className="mt-2 h-4 w-full bg-[#1A1A1A]/8 rounded animate-pulse" />
+    </div>
+  )
+}
+
 // ── Página ────────────────────────────────────────────────────
 
 export default function AdminPedidosPage() {
@@ -158,8 +200,21 @@ export default function AdminPedidosPage() {
         </div>
       )}
 
-      {/* Tabla */}
-      <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 shadow-sm overflow-hidden">
+      {/* Tarjetas (móvil, < md) */}
+      <div className="md:hidden bg-white rounded-2xl border border-[#1A1A1A]/8 shadow-sm overflow-hidden">
+        {cargando ? (
+          <>{[1, 2, 3, 4, 5].map((i) => <TarjetaEsqueleto key={i} />)}</>
+        ) : items.length === 0 ? (
+          <p className="px-4 py-16 text-center text-base font-semibold text-[#1A1A1A]/40">
+            No hay pedidos{filtroEstado ? ` con estado "${LABEL_ESTADO[filtroEstado]}"` : ''}.
+          </p>
+        ) : (
+          items.map((p) => <TarjetaPedidoMovil key={p.id} p={p} />)
+        )}
+      </div>
+
+      {/* Tabla (desktop/tablet, md+) */}
+      <div className="hidden md:block bg-white rounded-2xl border border-[#1A1A1A]/8 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead>
@@ -240,53 +295,53 @@ export default function AdminPedidosPage() {
             </tbody>
           </table>
         </div>
-
-        {/* Paginación */}
-        {paginas > 1 && (
-          <div className="px-5 py-3 border-t border-[#1A1A1A]/5 flex items-center justify-between bg-[#F8F5F0]/40">
-            <p className="text-xs text-[#1A1A1A]/50">
-              Página {pagina} de {paginas}
-            </p>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => handlePagina(pagina - 1)}
-                disabled={pagina <= 1 || cargando}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#1A1A1A]/60 hover:text-[#1A1A1A] disabled:opacity-30 hover:bg-[#1A1A1A]/5 transition-colors"
-              >
-                ← Anterior
-              </button>
-              {Array.from({ length: Math.min(paginas, 7) }, (_, i) => {
-                const p = paginas <= 7 ? i + 1 : i + Math.max(1, pagina - 3)
-                if (p > paginas) return null
-                return (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => handlePagina(p)}
-                    disabled={cargando}
-                    className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${
-                      p === pagina
-                        ? 'bg-[#2D6A4F] text-white'
-                        : 'text-[#1A1A1A]/60 hover:text-[#1A1A1A] hover:bg-[#1A1A1A]/5'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                )
-              })}
-              <button
-                type="button"
-                onClick={() => handlePagina(pagina + 1)}
-                disabled={pagina >= paginas || cargando}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#1A1A1A]/60 hover:text-[#1A1A1A] disabled:opacity-30 hover:bg-[#1A1A1A]/5 transition-colors"
-              >
-                Siguiente →
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Paginación (compartida entre vista de tarjetas y de tabla) */}
+      {paginas > 1 && (
+        <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 shadow-sm px-5 py-3 flex items-center justify-between">
+          <p className="text-xs text-[#1A1A1A]/50">
+            Página {pagina} de {paginas}
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => handlePagina(pagina - 1)}
+              disabled={pagina <= 1 || cargando}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#1A1A1A]/60 hover:text-[#1A1A1A] disabled:opacity-30 hover:bg-[#1A1A1A]/5 transition-colors"
+            >
+              ← Anterior
+            </button>
+            {Array.from({ length: Math.min(paginas, 7) }, (_, i) => {
+              const p = paginas <= 7 ? i + 1 : i + Math.max(1, pagina - 3)
+              if (p > paginas) return null
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => handlePagina(p)}
+                  disabled={cargando}
+                  className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${
+                    p === pagina
+                      ? 'bg-[#2D6A4F] text-white'
+                      : 'text-[#1A1A1A]/60 hover:text-[#1A1A1A] hover:bg-[#1A1A1A]/5'
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => handlePagina(pagina + 1)}
+              disabled={pagina >= paginas || cargando}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#1A1A1A]/60 hover:text-[#1A1A1A] disabled:opacity-30 hover:bg-[#1A1A1A]/5 transition-colors"
+            >
+              Siguiente →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

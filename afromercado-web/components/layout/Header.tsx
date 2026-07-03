@@ -4,8 +4,10 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCarrito } from '@/context/CarritoContext'
 import { useAuth } from '@/context/AuthContext'
+import { useRegion } from '@/context/RegionContext'
 import { apiFetch } from '@/lib/api/client'
 import { obtenerReglasPublicas } from '@/lib/api/config'
+import { DEPARTAMENTOS } from '@/lib/data/colombia'
 import CampanaNotificaciones from './CampanaNotificaciones'
 import BuscadorGlobal from './BuscadorGlobal'
 
@@ -16,16 +18,19 @@ interface HeaderProps {
 export default function Header({ itemsCarrito }: HeaderProps) {
   const { cantidadTotal } = useCarrito()
   const { usuario, autenticado, logout } = useAuth()
+  const { regionActiva, elegirRegion } = useRegion()
   const router = useRouter()
 
   const badge = itemsCarrito ?? cantidadTotal
 
   const [menuAbierto, setMenuAbierto] = useState(false)
+  const [regionMenuAbierto, setRegionMenuAbierto] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [busquedasRecientes, setBusquedasRecientes] = useState<string[]>([])
   const [mostrarSugerencias, setMostrarSugerencias] = useState(false)
   const [logoUrl, setLogoUrl] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
+  const regionRef = useRef<HTMLDivElement>(null)
   const busquedaRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -67,6 +72,17 @@ export default function Header({ itemsCarrito }: HeaderProps) {
   }, [menuAbierto])
 
   useEffect(() => {
+    if (!regionMenuAbierto) return
+    function onClick(e: MouseEvent) {
+      if (regionRef.current && !regionRef.current.contains(e.target as Node)) {
+        setRegionMenuAbierto(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [regionMenuAbierto])
+
+  useEffect(() => {
     if (!mostrarSugerencias) return
     function onClick(e: MouseEvent) {
       if (busquedaRef.current && !busquedaRef.current.contains(e.target as Node)) {
@@ -94,6 +110,62 @@ export default function Header({ itemsCarrito }: HeaderProps) {
           )}
         </Link>
 
+        {/* Selector de región activa */}
+        <div className="relative ml-2 md:ml-3 flex-shrink-0" ref={regionRef}>
+          <button
+            type="button"
+            onClick={() => setRegionMenuAbierto((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={regionMenuAbierto}
+            className="flex items-center gap-1 min-h-[36px] px-2 md:px-2.5 rounded-lg text-xs md:text-sm font-semibold text-[#1B4332] hover:bg-[#2D6A4F]/10 border border-[#2D6A4F]/20"
+          >
+            <span aria-hidden="true">📍</span>
+            <span className="max-w-[90px] md:max-w-[140px] truncate">
+              {regionActiva ?? 'Todo el país'}
+            </span>
+            <svg className="w-3 h-3 text-[#1A1A1A]/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {regionMenuAbierto && (
+            <div
+              role="menu"
+              className="absolute left-0 mt-2 w-56 bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] py-1 z-50"
+            >
+              <p className="px-4 py-1.5 text-xs font-semibold text-[#1A1A1A]/40 uppercase tracking-wide">
+                Región activa
+              </p>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => { elegirRegion(null); setRegionMenuAbierto(false) }}
+                className={`block w-full text-left px-4 py-2 text-sm hover:bg-[#2D6A4F]/10 ${
+                  regionActiva === null ? 'font-semibold text-[#D4A017]' : 'text-[#1A1A1A]'
+                }`}
+              >
+                🌎 Todo el país
+              </button>
+              <div className="border-t border-[#1A1A1A]/10 my-1" />
+              <div className="max-h-64 overflow-y-auto">
+                {DEPARTAMENTOS.map((departamento) => (
+                  <button
+                    key={departamento}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { elegirRegion(departamento); setRegionMenuAbierto(false) }}
+                    className={`block w-full text-left px-4 py-2 text-sm hover:bg-[#2D6A4F]/10 ${
+                      regionActiva === departamento ? 'font-semibold text-[#D4A017]' : 'text-[#1A1A1A]'
+                    }`}
+                  >
+                    {departamento}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Barra de búsqueda — solo desktop */}
         <form onSubmit={buscar} className="hidden md:flex flex-1 max-w-md mx-8" role="search">
           <div className="relative w-full" ref={busquedaRef}>
@@ -105,7 +177,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                 cargarBusquedasRecientes()
                 setMostrarSugerencias(true)
               }}
-              placeholder="Buscar productos del Chocó..."
+              placeholder="Buscar productos..."
               aria-label="Buscar productos"
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-[#1A1A1A]/20 bg-white focus:outline-none focus:border-[#D4A017] text-sm"
             />
@@ -139,7 +211,52 @@ export default function Header({ itemsCarrito }: HeaderProps) {
           </div>
         </form>
 
-        <nav className="hidden lg:flex items-center gap-1 mr-3">
+        {/* Navegación tablet — versión comprimida (solo iconos) visible entre md: y lg: */}
+        <nav className="hidden md:flex lg:hidden items-center gap-0.5 mr-2" aria-label="Navegación principal">
+          <Link
+            href="/express"
+            title="Sabores"
+            aria-label="Sabores"
+            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-green-700 hover:bg-green-50 flex items-center justify-center"
+          >
+            🍽️
+          </Link>
+          <Link
+            href="/hoteles"
+            title="Hoteles"
+            aria-label="Hoteles"
+            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
+          >
+            🏨
+          </Link>
+          <Link
+            href="/tours"
+            title="Tours"
+            aria-label="Tours"
+            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
+          >
+            🗺️
+          </Link>
+          <Link
+            href="/transportes"
+            title="Transporte"
+            aria-label="Transporte"
+            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
+          >
+            🛥️
+          </Link>
+          <Link
+            href="/cultura"
+            title="Cultura"
+            aria-label="Cultura"
+            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
+          >
+            🎭
+          </Link>
+        </nav>
+
+        {/* Navegación desktop — versión completa (icono + texto) desde lg: */}
+        <nav className="hidden lg:flex items-center gap-1 mr-3" aria-label="Navegación principal">
           <Link
             href="/express"
             className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-green-700 hover:bg-green-50 flex items-center gap-1"
@@ -277,10 +394,16 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                     </>
                   )}
                   {usuario?.rol === 'COMPRADOR' && (
-                    <Link href="/ser-repartidor" role="menuitem" onClick={() => setMenuAbierto(false)}
-                      className="block px-4 py-2 text-sm font-semibold text-[#D4A017] hover:bg-[#D4A017]/10">
-                      🚴 Sé repartidor
-                    </Link>
+                    <>
+                      <Link href="/comerciante/registro-comercio" role="menuitem" onClick={() => setMenuAbierto(false)}
+                        className="block px-4 py-2 text-sm font-semibold text-[#D4A017] hover:bg-[#D4A017]/10">
+                        🏪 Abre tu tienda
+                      </Link>
+                      <Link href="/ser-repartidor" role="menuitem" onClick={() => setMenuAbierto(false)}
+                        className="block px-4 py-2 text-sm font-semibold text-[#D4A017] hover:bg-[#D4A017]/10">
+                        🚴 Sé repartidor
+                      </Link>
+                    </>
                   )}
                   <Link href="/perfil" role="menuitem" onClick={() => setMenuAbierto(false)}
                     className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
@@ -310,6 +433,10 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                   <Link href="/transportes/mis-reservas" role="menuitem" onClick={() => setMenuAbierto(false)}
                     className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
                     🛥️ Reservas transporte
+                  </Link>
+                  <Link href="/cultura/mis-reservas" role="menuitem" onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    🎭 Reservas cultura
                   </Link>
                   <div className="border-t border-[#1A1A1A]/10 my-1" />
                   <Link href="/chat" role="menuitem" onClick={() => setMenuAbierto(false)}

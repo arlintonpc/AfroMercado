@@ -45,6 +45,11 @@ router.delete( "/mis-cupones/:id",      ...soloComercio, ExpressController.elimi
 // Estadísticas del comerciante
 router.get(    "/mis-estadisticas",     ...soloComercio, ExpressController.estadisticas);
 
+// Favoritos — auth cliente (mis debe ir ANTES de :id para evitar ambigüedad)
+router.get ("/favoritos/mis",         ...soloAuth, ExpressController.misFavoritos);
+router.post("/favoritos/:id/toggle",  ...soloAuth, ExpressController.toggleFavorito);
+router.get ("/favoritos/:id",         ...soloAuth, ExpressController.esFavorito);
+
 // Video Express
 router.post(  "/config/video",      ...soloComercio, ExpressController.uploadVideoExpress, ExpressController.subirVideoExpress);
 router.delete("/config/video",      ...soloComercio, ExpressController.quitarVideoExpress);
@@ -58,6 +63,7 @@ router.delete("/complementos/biblioteca/grupos/:grupoId",       ...soloComercio,
 router.post(  "/complementos/biblioteca/grupos/:grupoId/items", ...soloComercio, ExpressController.crearItemBiblioteca);
 router.patch( "/complementos/biblioteca/items/:itemId",         ...soloComercio, ExpressController.actualizarItemBiblioteca);
 router.delete("/complementos/biblioteca/items/:itemId",         ...soloComercio, ExpressController.eliminarItemBiblioteca);
+router.post(  "/complementos/biblioteca/items/:itemId/imagen",  ...soloComercio, ExpressController.uploadItemBibliotecaImagen, ExpressController.subirImagenItemBiblioteca);
 router.post(  "/complementos/:productoId/biblioteca/:grupoId",  ...soloComercio, ExpressController.vincularGrupoBibliotecaProducto);
 router.delete("/complementos/:productoId/biblioteca/:grupoId",  ...soloComercio, ExpressController.desvincularGrupoBibliotecaProducto);
 router.get(   "/complementos/:productoId",              ...soloComercio, ExpressController.listarComplementos);

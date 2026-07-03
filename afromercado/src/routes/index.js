@@ -58,5 +58,6 @@ router.use("/tours",         require("./tour.routes"));
 router.use("/transportes",   require("./transporte.routes"));
 router.use("/cultura",       require("./cultura.routes"));
 router.use("/busqueda",      require("./busqueda.routes"));
+router.use("/alianzas",      require("./alianza.routes"));
 
 module.exports = router;

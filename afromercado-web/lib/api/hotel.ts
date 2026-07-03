@@ -142,6 +142,7 @@ export interface ReservaHotel {
   horaEstimadaLlegada?: string | null
   solicitudesEspeciales?: string | null
   tokenCheckin?: string | null
+  grupoReservaId?: string | null
   habitacionTipo?: { nombre: string; fotos: string[]; precioPorNoche: number | string; precioPorHora?: number | string | null }
   habitacionFisica?: { id: number; nombre: string; piso?: string | null; zona?: string | null; estado?: string | null } | null
   configHotel?: {
@@ -256,6 +257,29 @@ export async function crearReserva(datos: {
 
 export async function misReservasHotel(): Promise<ReservaHotel[]> {
   const r = await apiFetch<{ ok: boolean; data: ReservaHotel[] }>('/hoteles/reservas/mis')
+  return r.data
+}
+
+export interface ReservaMultipleResultado {
+  reservas: ReservaHotel[]
+  grupoReservaId: string
+  total: number
+}
+
+export async function crearReservaMultiple(datos: {
+  habitaciones: { habitacionTipoId: number; huespedes: number }[]
+  fechaEntrada: string
+  fechaSalida: string
+  modalidad?: ModalidadReservaHotel
+  horaEntrada?: string
+  horaSalida?: string
+  metodoPago: string
+  notasCliente?: string
+  nombreHuesped: string
+  telefonoHuesped: string
+  codigoCupon?: string
+}): Promise<ReservaMultipleResultado> {
+  const r = await apiFetch<{ ok: boolean; data: ReservaMultipleResultado }>('/hoteles/reservas/multiple', { method: 'POST', body: datos })
   return r.data
 }
 

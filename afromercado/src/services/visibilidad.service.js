@@ -86,8 +86,8 @@ const VisibilidadService = {
     return VisibilidadRepository.crear({ comercioId, productoId, tipo, inicio, fin, montoCOP, notas, etiqueta, adminId });
   },
 
-  async listarActivas(tipo) {
-    const items = await VisibilidadRepository.listarActivas(tipo);
+  async listarActivas(tipo, departamento = null) {
+    const items = await VisibilidadRepository.listarActivas(tipo, departamento);
     if (!tipo) {
       // Sin filtro: cortar cada tipo a su límite
       const limites = await Promise.all(

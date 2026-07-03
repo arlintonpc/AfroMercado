@@ -65,7 +65,7 @@ const MAPA: Record<string, InfoEstado> = {
     etiqueta: 'Entregado',
     variante: 'verde',
     titulo: '¡Pedido entregado!',
-    mensaje: 'Esperamos que disfrutes lo mejor del Chocó. Gracias por tu compra.',
+    mensaje: 'Esperamos que disfrutes tu compra. ¡Gracias por apoyar a los productores locales!',
   },
   CANCELADO: {
     etiqueta: 'Cancelado',

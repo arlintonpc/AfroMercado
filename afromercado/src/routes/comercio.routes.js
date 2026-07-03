@@ -8,19 +8,24 @@ const VisibilidadController = require("../controllers/visibilidad.controller");
 
 const router = express.Router();
 
-// POST /comercios - registrar comercio (COMERCIANTE o ADMIN)
+// POST /comercios - abrir tienda con la cuenta ya autenticada (COMPRADOR se
+// convierte en COMERCIANTE; ADMIN queda bloqueado dentro del service por
+// separación de privilegios). COMERCIANTE también puede pegarle (ej. reintento),
+// el service ya rechaza si ya tiene un comercio registrado.
 router.post(
   "/",
   autenticar,
-  autorizar("COMERCIANTE", "ADMIN"),
+  autorizar("COMPRADOR", "COMERCIANTE"),
   ComercioController.registrar,
 );
 
-// GET /comercios/mi-comercio - ver el propio comercio
+// GET /comercios/mi-comercio - ver el propio comercio (o null si aún no tiene).
+// Cualquier rol autenticado puede consultarlo (solo devuelve datos del propio
+// usuario, sin filtro de rol tiene sentido: así sabe si ya abrió tienda o si
+// registro-comercio debe mostrarle el formulario, sin importar su rol actual).
 router.get(
   "/mi-comercio",
   autenticar,
-  autorizar("COMERCIANTE", "ADMIN"),
   ComercioController.miComercio,
 );
 
@@ -70,6 +75,14 @@ router.delete(
   autenticar,
   autorizar("COMERCIANTE", "ADMIN"),
   ComercioController.quitarVideo,
+);
+
+// PATCH /comercios/video-link - usa un link externo (YouTube/Facebook/etc.) como video de la tienda
+router.patch(
+  "/video-link",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.guardarVideoLink,
 );
 
 // GET /comercios/visibilidad/metricas - metricas de slots activos del propio comercio
