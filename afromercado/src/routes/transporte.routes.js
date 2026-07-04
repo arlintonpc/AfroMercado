@@ -70,7 +70,7 @@ router.get(   "/mi-transporte/estadisticas",        ...soloComercio, async (req,
   try {
     const comercioId = req.usuario.comercio?.id;
     if (!comercioId) return res.status(400).json({ error: "No tienes un comercio asignado" });
-    res.json({ ok: true, data: await TransporteService.estadisticas(comercioId) });
+    res.json({ ok: true, data: await TransporteService.estadisticas(comercioId, { desde: req.query.desde, hasta: req.query.hasta }) });
   } catch(e) { next(e); }
 });
 

@@ -1746,7 +1746,7 @@ const HotelService = {
 
   // ── ESTADÍSTICAS DEL HOTELERO ─────────────────────────────────
 
-  async estadisticasHotelero(comercioId) {
+  async estadisticasHotelero(comercioId, { desde, hasta } = {}) {
     const hotel = await prisma.configHotel.findUnique({ where: { comercioId } });
     if (!hotel) throw new ErrorNoEncontrado("Hotel no encontrado");
 
@@ -1828,7 +1828,11 @@ const HotelService = {
       where: { configHotelId: hotel.id, estado: "CANCELADA", creadoAt: { gte: hace6m } },
     });
 
-    return {
+    // Ranking de habitaciones más reservadas por cantidad (últimos 30 días)
+    const hace30dias = new Date(Date.now() - 30 * 86400000);
+    const topHabitaciones = await this._topHabitacionesPorRango(hotel.id, { gte: hace30dias });
+
+    const resultado = {
       ingresosPorMes: Object.entries(ingresosPorMes).map(([mes, ingreso]) => ({ mes, ingreso })),
       ingresoTotal6m,
       reservasMesActual,
@@ -1838,7 +1842,70 @@ const HotelService = {
       tasaOcupacionPromedio: ocupacionPorHab.length
         ? Math.round(ocupacionPorHab.reduce((a, b) => a + b.tasaOcupacion, 0) / ocupacionPorHab.length)
         : 0,
+      topHabitaciones,
     };
+
+    // Rango de fechas puntual (opcional, para consultas contables)
+    if (desde && hasta) {
+      const inicioRango = new Date(`${desde}T00:00:00-05:00`);
+      const finRango = new Date(`${hasta}T23:59:59-05:00`);
+
+      const [rangoStats, rangoCancelaciones, rangoTopHabitaciones] = await Promise.all([
+        prisma.reservaHotel.aggregate({
+          where: {
+            configHotelId: hotel.id,
+            estado: { notIn: ["CANCELADA", "RECHAZADA"] },
+            creadoAt: { gte: inicioRango, lte: finRango },
+          },
+          _count: { id: true },
+          _sum: { total: true },
+        }),
+        prisma.reservaHotel.count({
+          where: { configHotelId: hotel.id, estado: "CANCELADA", creadoAt: { gte: inicioRango, lte: finRango } },
+        }),
+        this._topHabitacionesPorRango(hotel.id, { gte: inicioRango, lte: finRango }),
+      ]);
+
+      resultado.rango = {
+        reservas: rangoStats._count.id,
+        ingresos: Number(rangoStats._sum.total ?? 0),
+        cancelaciones: rangoCancelaciones,
+        topHabitaciones: rangoTopHabitaciones,
+        desde,
+        hasta,
+      };
+    }
+
+    return resultado;
+  },
+
+  // Ranking de tipos de habitación por cantidad de reservas en un rango de `creadoAt` dado
+  async _topHabitacionesPorRango(configHotelId, creadoAtFiltro) {
+    const grupos = await prisma.reservaHotel.groupBy({
+      by: ["habitacionTipoId"],
+      where: {
+        configHotelId,
+        estado: { notIn: ["CANCELADA", "RECHAZADA"] },
+        creadoAt: creadoAtFiltro,
+      },
+      _count: { id: true },
+      _sum: { total: true },
+      orderBy: { _count: { id: "desc" } },
+      take: 5,
+    });
+
+    const habIds = grupos.map(g => g.habitacionTipoId);
+    const habs = await prisma.habitacionTipo.findMany({
+      where: { id: { in: habIds } },
+      select: { id: true, nombre: true },
+    });
+    const habMap = Object.fromEntries(habs.map(h => [h.id, h]));
+
+    return grupos.map(g => ({
+      habitacion: habMap[g.habitacionTipoId] ?? { id: g.habitacionTipoId, nombre: "Desconocida" },
+      reservas: g._count.id,
+      ingresos: Number(g._sum.total ?? 0),
+    }));
   },
 
   // ── CHECK-IN ONLINE ───────────────────────────────────────────

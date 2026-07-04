@@ -55,6 +55,8 @@ export default function ComercianteTourPage() {
   const [cupones, setCupones]             = useState<CuponTour[]>([])
   const [estadisticas, setEstadisticas]   = useState<EstadisticasTour | null>(null)
   const [cargandoStats, setCargandoStats] = useState(false)
+  const [desdeFiltro, setDesdeFiltro] = useState('')
+  const [hastaFiltro, setHastaFiltro] = useState('')
   const [nuevoCupon, setNuevoCupon]       = useState({
     codigo: '', tipo: 'PORCENTAJE' as 'PORCENTAJE' | 'VALOR_FIJO',
     valor: '', minimoPersonas: '', usosMaximos: '',
@@ -114,6 +116,15 @@ export default function ComercianteTourPage() {
     }, 20000)
     return () => clearInterval(iv)
   }, [])
+
+  async function cargarEstadisticasTour(params?: { desde?: string; hasta?: string }) {
+    setCargandoStats(true)
+    try {
+      const data = await obtenerEstadisticasTour(params)
+      setEstadisticas(data)
+    } catch {}
+    finally { setCargandoStats(false) }
+  }
 
   async function cambiarEstado(id: number, estado: EstadoReservaTour) {
     try {
@@ -385,10 +396,7 @@ export default function ComercianteTourPage() {
             onClick={() => {
               setTab(id)
               if (id === 'cupones') listarCuponesTour().then(setCupones).catch(() => {})
-              if (id === 'estadisticas') {
-                setCargandoStats(true)
-                obtenerEstadisticasTour().then(setEstadisticas).catch(() => {}).finally(() => setCargandoStats(false))
-              }
+              if (id === 'estadisticas') cargarEstadisticasTour()
             }}
             className={`px-4 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
               tab === id ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -454,6 +462,74 @@ export default function ComercianteTourPage() {
             </div>
           ) : (
             <>
+              {/* Filtro por rango de fechas (consultas contables) */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-wrap items-end gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Desde</label>
+                  <input
+                    type="date"
+                    value={desdeFiltro}
+                    onChange={e => setDesdeFiltro(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Hasta</label>
+                  <input
+                    type="date"
+                    value={hastaFiltro}
+                    onChange={e => setHastaFiltro(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <button
+                  onClick={() => desdeFiltro && hastaFiltro && cargarEstadisticasTour({ desde: desdeFiltro, hasta: hastaFiltro })}
+                  disabled={!desdeFiltro || !hastaFiltro}
+                  className="px-4 py-1.5 rounded-lg bg-[#2D6A4F] text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Consultar
+                </button>
+                {estadisticas.rango && (
+                  <button
+                    onClick={() => { setDesdeFiltro(''); setHastaFiltro(''); cargarEstadisticasTour() }}
+                    className="px-4 py-1.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+
+              {/* Resultado del rango consultado */}
+              {estadisticas.rango && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-4">
+                  <h3 className="font-semibold text-gray-800">
+                    Rango consultado: {estadisticas.rango.desde} a {estadisticas.rango.hasta}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-white border border-amber-100 p-3">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Reservas</p>
+                      <p className="text-lg font-bold text-gray-800">{estadisticas.rango.reservas}</p>
+                    </div>
+                    <div className="rounded-xl bg-white border border-amber-100 p-3">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Participantes</p>
+                      <p className="text-lg font-bold text-gray-800">{estadisticas.rango.participantes}</p>
+                    </div>
+                    <div className="rounded-xl bg-white border border-amber-100 p-3">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Ingresos</p>
+                      <p className="text-lg font-bold text-gray-800">${estadisticas.rango.ingresos.toLocaleString('es-CO')}</p>
+                    </div>
+                    <div className="rounded-xl bg-white border border-amber-100 p-3">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Comisión</p>
+                      <p className="text-lg font-bold text-gray-800">${estadisticas.rango.comision.toLocaleString('es-CO')}</p>
+                    </div>
+                  </div>
+
+                  {estadisticas.rango.reservas === 0 && (
+                    <p className="text-sm text-gray-500">No hay reservas confirmadas en este rango.</p>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-green-50 border border-green-100 rounded-2xl p-4">
                   <p className="text-xs font-medium text-gray-500 mb-1">Este mes</p>

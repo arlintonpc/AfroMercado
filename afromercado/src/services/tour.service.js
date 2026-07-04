@@ -723,7 +723,7 @@ const TourService = {
 
   // ── ESTADÍSTICAS TOUR ─────────────────────────────────────────
 
-  async estadisticasTour(comercioId) {
+  async estadisticasTour(comercioId, { desde, hasta } = {}) {
     const tour = await prisma.configTour.findUnique({ where: { comercioId } });
     if (!tour) return null;
 
@@ -767,7 +767,7 @@ const TourService = {
       porMes[key].ingresos += Number(r.total);
     }
 
-    return {
+    const resultado = {
       mes: {
         reservas: mesCurrent._count.id,
         ingresos: Number(mesCurrent._sum.total ?? 0),
@@ -782,6 +782,29 @@ const TourService = {
       proximasReservas: proximas,
       porMes: Object.entries(porMes).sort(([a], [b]) => a.localeCompare(b)).map(([mes, data]) => ({ mes, ...data })),
     };
+
+    // Rango de fechas puntual (opcional, para consultas contables)
+    if (desde && hasta) {
+      const inicioRango = new Date(`${desde}T00:00:00-05:00`);
+      const finRango = new Date(`${hasta}T23:59:59-05:00`);
+
+      const rangoStats = await prisma.reservaTour.aggregate({
+        where: { configTourId: tour.id, estado: { in: ["CONFIRMADA", "COMPLETADA"] }, creadoAt: { gte: inicioRango, lte: finRango } },
+        _count: { id: true },
+        _sum: { total: true, comision: true, participantes: true },
+      });
+
+      resultado.rango = {
+        reservas: rangoStats._count.id,
+        ingresos: Number(rangoStats._sum.total ?? 0),
+        comision: Number(rangoStats._sum.comision ?? 0),
+        participantes: rangoStats._sum.participantes ?? 0,
+        desde,
+        hasta,
+      };
+    }
+
+    return resultado;
   },
 
   // ── VIDEO TOUR ────────────────────────────────────────────────

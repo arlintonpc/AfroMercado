@@ -624,13 +624,21 @@ function CalendarioOcupacion({
 function DashboardEstadisticas() {
   const [stats, setStats] = useState<EstadisticasHotel | null>(null)
   const [cargando, setCargando] = useState(true)
+  const [desdeFiltro, setDesdeFiltro] = useState('')
+  const [hastaFiltro, setHastaFiltro] = useState('')
+
+  const cargarStats = useCallback(async (params?: { desde?: string; hasta?: string }) => {
+    setCargando(true)
+    try {
+      const data = await obtenerEstadisticasHotel(params)
+      setStats(data)
+    } catch {}
+    finally { setCargando(false) }
+  }, [])
 
   useEffect(() => {
-    obtenerEstadisticasHotel()
-      .then(setStats)
-      .catch(() => {})
-      .finally(() => setCargando(false))
-  }, [])
+    cargarStats()
+  }, [cargarStats])
 
   if (cargando) return (
     <div className="flex items-center justify-center py-8">
@@ -644,6 +652,86 @@ function DashboardEstadisticas() {
 
   return (
     <div className="space-y-6">
+      {/* Filtro por rango de fechas (consultas contables) */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-500">Desde</label>
+          <input
+            type="date"
+            value={desdeFiltro}
+            onChange={e => setDesdeFiltro(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-500">Hasta</label>
+          <input
+            type="date"
+            value={hastaFiltro}
+            onChange={e => setHastaFiltro(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+          />
+        </div>
+        <button
+          onClick={() => desdeFiltro && hastaFiltro && cargarStats({ desde: desdeFiltro, hasta: hastaFiltro })}
+          disabled={!desdeFiltro || !hastaFiltro}
+          className="px-4 py-1.5 rounded-lg bg-[#2D6A4F] text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Consultar
+        </button>
+        {stats.rango && (
+          <button
+            onClick={() => { setDesdeFiltro(''); setHastaFiltro(''); cargarStats() }}
+            className="px-4 py-1.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium"
+          >
+            Limpiar
+          </button>
+        )}
+      </div>
+
+      {/* Resultado del rango consultado */}
+      {stats.rango && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-4">
+          <h3 className="font-semibold text-gray-800">
+            Rango consultado: {stats.rango.desde} a {stats.rango.hasta}
+          </h3>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-xl bg-white border border-amber-100 p-3">
+              <p className="text-xs font-medium text-gray-500 mb-1">Reservas</p>
+              <p className="text-lg font-bold text-gray-800">{stats.rango.reservas}</p>
+            </div>
+            <div className="rounded-xl bg-white border border-amber-100 p-3">
+              <p className="text-xs font-medium text-gray-500 mb-1">Ingresos</p>
+              <p className="text-lg font-bold text-gray-800">{formatearPrecio(stats.rango.ingresos)}</p>
+            </div>
+            <div className="rounded-xl bg-white border border-amber-100 p-3">
+              <p className="text-xs font-medium text-gray-500 mb-1">Cancelaciones</p>
+              <p className="text-lg font-bold text-gray-800">{stats.rango.cancelaciones}</p>
+            </div>
+          </div>
+
+          {stats.rango.topHabitaciones.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Habitaciones más reservadas</h4>
+              <div className="space-y-2">
+                {stats.rango.topHabitaciones.map((item, idx) => (
+                  <div key={item.habitacion.id} className="flex items-center gap-3">
+                    <span className="text-gray-400 text-sm font-bold w-5">{idx + 1}</span>
+                    <p className="flex-1 text-sm font-medium text-gray-800 truncate">{item.habitacion.nombre}</p>
+                    <p className="text-sm font-bold text-[#1B4332]">{item.reservas} res.</p>
+                    <p className="text-sm text-gray-500">{formatearPrecio(item.ingresos)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {stats.rango.reservas === 0 && (
+            <p className="text-sm text-gray-500">No hay reservas en este rango.</p>
+          )}
+        </div>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
@@ -706,6 +794,25 @@ function DashboardEstadisticas() {
           </div>
         </div>
       )}
+
+      {/* Habitaciones más reservadas (últimos 30 días) */}
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Habitaciones más reservadas (30 días)</p>
+        {stats.topHabitaciones.length > 0 ? (
+          <div className="space-y-2">
+            {stats.topHabitaciones.map((item, idx) => (
+              <div key={item.habitacion.id} className="flex items-center gap-3">
+                <span className="text-gray-400 text-sm font-bold w-5">{idx + 1}</span>
+                <p className="flex-1 text-sm font-medium text-gray-800 truncate">{item.habitacion.nombre}</p>
+                <p className="text-sm font-bold text-[#1B4332]">{item.reservas} res.</p>
+                <p className="text-sm text-gray-500">{formatearPrecio(item.ingresos)}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">No hay reservas en los últimos 30 días.</p>
+        )}
+      </div>
     </div>
   )
 }

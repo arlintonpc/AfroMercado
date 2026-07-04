@@ -63,6 +63,19 @@ export interface EstadisticasHotel {
   cancelaciones6m: number
   ocupacionPorHab: { id: number; nombre: string; tasaOcupacion: number; diasOcupados: number }[]
   tasaOcupacionPromedio: number
+  topHabitaciones: Array<{
+    habitacion: { id: number; nombre: string }
+    reservas: number
+    ingresos: number
+  }>
+  rango?: {
+    reservas: number
+    ingresos: number
+    cancelaciones: number
+    topHabitaciones: EstadisticasHotel['topHabitaciones']
+    desde: string
+    hasta: string
+  }
 }
 
 export interface ConfigHotel {
@@ -518,8 +531,11 @@ export async function eliminarTemporadaHotel(id: number): Promise<void> {
   await apiFetch(`/hoteles/mi-hotel/temporadas/${id}`, { method: 'DELETE' })
 }
 
-export async function obtenerEstadisticasHotel(): Promise<EstadisticasHotel> {
-  const r = await apiFetch<{ ok: boolean; data: EstadisticasHotel }>('/hoteles/mi-hotel/estadisticas')
+export async function obtenerEstadisticasHotel(params?: { desde?: string; hasta?: string }): Promise<EstadisticasHotel> {
+  const qs = params?.desde && params?.hasta
+    ? `?${new URLSearchParams({ desde: params.desde, hasta: params.hasta }).toString()}`
+    : ''
+  const r = await apiFetch<{ ok: boolean; data: EstadisticasHotel }>(`/hoteles/mi-hotel/estadisticas${qs}`)
   return r.data
 }
 

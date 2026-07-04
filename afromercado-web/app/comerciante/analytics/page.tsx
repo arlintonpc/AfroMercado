@@ -61,6 +61,14 @@ interface ProductoVistas {
   vistas: number
 }
 
+interface RangoConsultado {
+  ventas: number
+  ingresos: number
+  topVendidos: ProductoVenta[]
+  desde: string
+  hasta: string
+}
+
 interface AnaliticasData {
   resumen: ResumenMes
   tendenciaMensual: TendenciaMes[]
@@ -79,6 +87,7 @@ interface AnaliticasData {
     reviewsRecientes: ReviewReciente[]
   }
   insights: Insight[]
+  rango?: RangoConsultado
 }
 
 // ── helpers ───────────────────────────────────────────────────────────
@@ -215,13 +224,16 @@ export default function AnalíticasPage() {
   const [data, setData] = useState<AnaliticasData | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [desdeFiltro, setDesdeFiltro] = useState('')
+  const [hastaFiltro, setHastaFiltro] = useState('')
 
-  const cargar = useCallback(async () => {
+  const cargar = useCallback(async (desde?: string, hasta?: string) => {
     setCargando(true)
     setError(null)
     try {
       const token = localStorage.getItem('afromercado_token')
-      const res = await fetch(`${API_URL}/comercios/mis-analiticas`, {
+      const qs = desde && hasta ? `?${new URLSearchParams({ desde, hasta }).toString()}` : ''
+      const res = await fetch(`${API_URL}/comercios/mis-analiticas${qs}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('No pudimos cargar las analíticas.')
@@ -235,6 +247,17 @@ export default function AnalíticasPage() {
   }, [])
 
   useEffect(() => {
+    void cargar()
+  }, [cargar])
+
+  const consultarRango = useCallback(() => {
+    if (!desdeFiltro || !hastaFiltro) return
+    void cargar(desdeFiltro, hastaFiltro)
+  }, [cargar, desdeFiltro, hastaFiltro])
+
+  const limpiarRango = useCallback(() => {
+    setDesdeFiltro('')
+    setHastaFiltro('')
     void cargar()
   }, [cargar])
 
@@ -254,7 +277,7 @@ export default function AnalíticasPage() {
       <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
         <p className="font-semibold text-red-700">{error}</p>
         <button
-          onClick={cargar}
+          onClick={() => cargar()}
           className="mt-4 rounded-xl bg-[#2D6A4F] px-5 py-2 text-sm font-semibold text-white hover:bg-[#235a41]"
         >
           Reintentar
@@ -265,7 +288,7 @@ export default function AnalíticasPage() {
 
   if (!data) return null
 
-  const { resumen, tendenciaMensual, productos, vistas, reputacion, insights } = data
+  const { resumen, tendenciaMensual, productos, vistas, reputacion, insights, rango } = data
   const hayUrgente = resumen.pedidosUrgentes > 0 || productos.stockCritico.length > 0
 
   return (
@@ -284,7 +307,7 @@ export default function AnalíticasPage() {
           </p>
         </div>
         <button
-          onClick={cargar}
+          onClick={() => cargar(desdeFiltro && hastaFiltro ? desdeFiltro : undefined, desdeFiltro && hastaFiltro ? hastaFiltro : undefined)}
           className="inline-flex items-center gap-2 rounded-xl border border-[#1A1A1A]/10 bg-white px-4 py-2 text-sm font-medium text-[#1A1A1A]/60 shadow-sm hover:bg-[#F0EDE8]"
         >
           <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -294,6 +317,101 @@ export default function AnalíticasPage() {
           Actualizar
         </button>
       </div>
+
+      {/* ── Selector de rango de fechas ── */}
+      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#1A1A1A]/6 bg-white p-4 shadow-sm">
+        <div>
+          <label htmlFor="analytics-desde" className="mb-1 block text-xs font-bold uppercase tracking-wider text-[#1A1A1A]/40">
+            Desde
+          </label>
+          <input
+            id="analytics-desde"
+            type="date"
+            value={desdeFiltro}
+            onChange={(e) => setDesdeFiltro(e.target.value)}
+            className="rounded-xl border border-[#1A1A1A]/10 px-3 py-2 text-sm text-[#1A1A1A] focus:border-[#2D6A4F] focus:outline-none"
+          />
+        </div>
+        <div>
+          <label htmlFor="analytics-hasta" className="mb-1 block text-xs font-bold uppercase tracking-wider text-[#1A1A1A]/40">
+            Hasta
+          </label>
+          <input
+            id="analytics-hasta"
+            type="date"
+            value={hastaFiltro}
+            onChange={(e) => setHastaFiltro(e.target.value)}
+            className="rounded-xl border border-[#1A1A1A]/10 px-3 py-2 text-sm text-[#1A1A1A] focus:border-[#2D6A4F] focus:outline-none"
+          />
+        </div>
+        <button
+          onClick={consultarRango}
+          disabled={!desdeFiltro || !hastaFiltro}
+          className="rounded-xl bg-[#2D6A4F] px-4 py-2 text-sm font-semibold text-white hover:bg-[#235a41] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Consultar
+        </button>
+        {rango && (
+          <button
+            onClick={limpiarRango}
+            className="rounded-xl border border-[#1A1A1A]/10 px-4 py-2 text-sm font-medium text-[#1A1A1A]/60 hover:bg-[#F0EDE8]"
+          >
+            Limpiar
+          </button>
+        )}
+      </div>
+
+      {/* ── Rango consultado ── */}
+      {rango && (
+        <section className="rounded-2xl border border-[#D4A017]/30 bg-[#D4A017]/10 p-5 shadow-sm">
+          <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8a6a10]">
+            Rango consultado: {rango.desde} a {rango.hasta}
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="rounded-xl bg-white/70 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]/40">Ventas</p>
+              <p
+                className="mt-1 text-2xl font-bold leading-none text-[#1A1A1A]"
+                style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
+              >
+                {rango.ventas}
+              </p>
+            </div>
+            <div className="rounded-xl bg-white/70 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]/40">Ingresos netos</p>
+              <p
+                className="mt-1 text-2xl font-bold leading-none text-[#1A1A1A]"
+                style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
+              >
+                {cop(rango.ingresos)}
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 rounded-xl bg-white/70 p-4">
+            <h3 className="mb-3 text-sm font-bold text-[#1A1A1A]">Productos más vendidos en el rango</h3>
+            {rango.topVendidos.length === 0 ? (
+              <p className="text-sm text-[#1A1A1A]/40">Sin ventas registradas en este rango.</p>
+            ) : (
+              <ul className="space-y-3">
+                {rango.topVendidos.map((p, i) => (
+                  <li key={p.id} className="flex items-center gap-3">
+                    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#D4A017]/20 text-xs font-bold text-[#8a6a10]">
+                      {i + 1}
+                    </span>
+                    <FotoProducto url={p.fotoUrl} nombre={p.nombre} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-[#1A1A1A]">{p.nombre}</p>
+                      <p className="text-xs text-[#1A1A1A]/50">
+                        {p.cantidadVendida} unid. · {cop(p.ingresosGenerados)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ── Zona urgente ── */}
       {hayUrgente && (

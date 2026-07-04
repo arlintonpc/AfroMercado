@@ -264,7 +264,10 @@ const HotelController = {
   // ── ESTADÍSTICAS ──────────────────────────────────────────────
   async estadisticas(req, res, next) {
     try {
-      const data = await HotelService.estadisticasHotelero(req.usuario.comercio.id);
+      const data = await HotelService.estadisticasHotelero(req.usuario.comercio.id, {
+        desde: req.query.desde,
+        hasta: req.query.hasta,
+      });
       res.json({ ok: true, data });
     } catch (e) { next(e); }
   },

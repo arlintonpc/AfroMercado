@@ -248,6 +248,9 @@ const ComercioController = {
       const en48h = new Date(Date.now() + 48 * 3600_000);
       const CONFIRMADOS = ["CONFIRMADO", "ENTREGADO"];
 
+      // Rango de fechas puntual (opcional, para consultas contables)
+      const { desde, hasta } = req.query;
+
       const [
         sumaActual,
         sumaPasado,
@@ -413,18 +416,60 @@ const ComercioController = {
         pedidos: Number(r.pedidos),
       }));
 
-      res.json({
-        ok: true,
-        data: {
-          resumen: { ingresosNetos: ingresosActual, ingresosMesPasado: ingresosPasado, variacionPorcentaje, ventasMes, pedidosUrgentes },
-          tendenciaMensual,
-          productos: { topMasVendidos, sinVentas, stockCritico },
-          vistas: { topMasVistos, sinVistas },
-          reputacion: { calificacionPromedio: calProm, totalReviews, reviewsRecientes },
-          ofertasProximas,
-          insights,
-        },
-      });
+      const data = {
+        resumen: { ingresosNetos: ingresosActual, ingresosMesPasado: ingresosPasado, variacionPorcentaje, ventasMes, pedidosUrgentes },
+        tendenciaMensual,
+        productos: { topMasVendidos, sinVentas, stockCritico },
+        vistas: { topMasVistos, sinVistas },
+        reputacion: { calificacionPromedio: calProm, totalReviews, reviewsRecientes },
+        ofertasProximas,
+        insights,
+      };
+
+      // Rango de fechas puntual (opcional, para consultas contables)
+      if (desde && hasta) {
+        const inicioRango = new Date(`${desde}T00:00:00-05:00`);
+        const finRango = new Date(`${hasta}T23:59:59-05:00`);
+
+        const [rangoVentas, rangoIngresos, rangoTopVendidos] = await Promise.all([
+          prisma.subPedido.count({
+            where: { comercioId, createdAt: { gte: inicioRango, lte: finRango }, pedido: { estado: { in: CONFIRMADOS } } },
+          }),
+          prisma.subPedido.aggregate({
+            where: { comercioId, createdAt: { gte: inicioRango, lte: finRango }, pedido: { estado: { in: CONFIRMADOS } } },
+            _sum: { neto: true },
+          }),
+          prisma.pedidoItem.groupBy({
+            by: ["productoId"],
+            where: { subPedido: { comercioId, createdAt: { gte: inicioRango, lte: finRango }, pedido: { estado: { in: CONFIRMADOS } } } },
+            _sum: { cantidad: true, subtotal: true },
+            orderBy: { _sum: { subtotal: "desc" } },
+            take: 8,
+          }),
+        ]);
+
+        const rangoTopIds = rangoTopVendidos.map((t) => t.productoId);
+        const rangoTopInfo = rangoTopIds.length
+          ? await prisma.producto.findMany({
+              where: { id: { in: rangoTopIds } },
+              select: { id: true, nombre: true, fotoUrl: true, precio: true },
+            })
+          : [];
+
+        data.rango = {
+          ventas: rangoVentas,
+          ingresos: Number(rangoIngresos._sum.neto ?? 0),
+          topVendidos: rangoTopVendidos.map((t) => ({
+            ...rangoTopInfo.find((p) => p.id === t.productoId),
+            cantidadVendida: t._sum.cantidad ?? 0,
+            ingresosGenerados: Number(t._sum.subtotal ?? 0),
+          })),
+          desde,
+          hasta,
+        };
+      }
+
+      res.json({ ok: true, data });
     } catch (e) {
       next(e);
     }

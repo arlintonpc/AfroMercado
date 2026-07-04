@@ -178,6 +178,8 @@ export default function ComercianteTransportesPage() {
   const [mostrarFormRuta, setMostrarFormRuta] = useState(false)
   const [stats, setStats] = useState<EstadisticasTransporte | null>(null)
   const [cargandoStats, setCargandoStats] = useState(false)
+  const [desdeFiltro, setDesdeFiltro] = useState('')
+  const [hastaFiltro, setHastaFiltro] = useState('')
   const [cupones, setCupones] = useState<CuponTransporte[]>([])
   const [mostrarFormCupon, setMostrarFormCupon] = useState(false)
   const inputFotoRef = useRef<HTMLInputElement>(null)
@@ -204,9 +206,17 @@ export default function ComercianteTransportesPage() {
 
   useEffect(() => {
     if (tab !== 'estadisticas' || stats) return
-    setCargandoStats(true)
-    estadisticasTransporte().then(s => { setStats(s); setCargandoStats(false) }).catch(() => setCargandoStats(false))
+    cargarEstadisticas()
   }, [tab])
+
+  async function cargarEstadisticas(params?: { desde?: string; hasta?: string }) {
+    setCargandoStats(true)
+    try {
+      const s = await estadisticasTransporte(params)
+      setStats(s)
+    } catch {}
+    finally { setCargandoStats(false) }
+  }
 
   async function cargarCupones() {
     try {
@@ -500,6 +510,84 @@ export default function ComercianteTransportesPage() {
             <div className="flex justify-center py-8"><div className="w-8 h-8 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" /></div>
           ) : stats ? (
             <>
+              {/* Filtro por rango de fechas (consultas contables) */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-wrap items-end gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Desde</label>
+                  <input
+                    type="date"
+                    value={desdeFiltro}
+                    onChange={e => setDesdeFiltro(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Hasta</label>
+                  <input
+                    type="date"
+                    value={hastaFiltro}
+                    onChange={e => setHastaFiltro(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <button
+                  onClick={() => desdeFiltro && hastaFiltro && cargarEstadisticas({ desde: desdeFiltro, hasta: hastaFiltro })}
+                  disabled={!desdeFiltro || !hastaFiltro}
+                  className="px-4 py-1.5 rounded-lg bg-[#023E8A] text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Consultar
+                </button>
+                {stats.rango && (
+                  <button
+                    onClick={() => { setDesdeFiltro(''); setHastaFiltro(''); cargarEstadisticas() }}
+                    className="px-4 py-1.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+
+              {/* Resultado del rango consultado */}
+              {stats.rango && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-4">
+                  <h3 className="font-semibold text-gray-800">
+                    Rango consultado: {stats.rango.desde} a {stats.rango.hasta}
+                  </h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-xl bg-white border border-amber-100 p-3">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Reservas</p>
+                      <p className="text-lg font-bold text-gray-800">{stats.rango.reservas}</p>
+                    </div>
+                    <div className="rounded-xl bg-white border border-amber-100 p-3">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Ingresos</p>
+                      <p className="text-lg font-bold text-gray-800">{formatearPrecio(stats.rango.ingresos)}</p>
+                    </div>
+                    <div className="rounded-xl bg-white border border-amber-100 p-3">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Canceladas</p>
+                      <p className="text-lg font-bold text-gray-800">{stats.rango.canceladas}</p>
+                    </div>
+                  </div>
+
+                  {stats.rango.rutasPopulares.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Rutas más solicitadas</h4>
+                      <div className="space-y-2">
+                        {stats.rango.rutasPopulares.map((r, i) => (
+                          <div key={i} className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">{r.origen} → {r.destino}</span>
+                            <span className="font-semibold text-[#2D6A4F]">{r.total} reservas</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {stats.rango.reservas === 0 && (
+                    <p className="text-sm text-gray-500">No hay reservas en este rango.</p>
+                  )}
+                </div>
+              )}
+
               {/* KPIs principales */}
               <div className="grid grid-cols-2 gap-3">
                 {[

@@ -279,10 +279,21 @@ export interface EstadisticasTransporte {
   reservasPorMes: Array<{ mes: string; total: number; ingresos: number }>
   rutasPopulares: Array<{ origen: string; destino: string; total: number }>
   ocupacionPromedio: number
+  rango?: {
+    reservas: number
+    ingresos: number
+    canceladas: number
+    rutasPopulares: EstadisticasTransporte['rutasPopulares']
+    desde: string
+    hasta: string
+  }
 }
 
-export async function estadisticasTransporte(): Promise<EstadisticasTransporte> {
-  const r = await apiFetch<{ ok: boolean; data: EstadisticasTransporte }>('/transportes/mi-transporte/estadisticas')
+export async function estadisticasTransporte(params?: { desde?: string; hasta?: string }): Promise<EstadisticasTransporte> {
+  const qs = params?.desde && params?.hasta
+    ? `?${new URLSearchParams({ desde: params.desde, hasta: params.hasta }).toString()}`
+    : ''
+  const r = await apiFetch<{ ok: boolean; data: EstadisticasTransporte }>(`/transportes/mi-transporte/estadisticas${qs}`)
   return r.data
 }
 

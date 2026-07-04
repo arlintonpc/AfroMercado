@@ -362,7 +362,7 @@ const TransporteService = {
     return prisma.configTransporte.update({ where: { comercioId }, data: { videoUrl, videoPosterUrl: null } });
   },
 
-  async estadisticas(comercioId) {
+  async estadisticas(comercioId, { desde, hasta } = {}) {
     const cfg = await prisma.configTransporte.findUnique({ where: { comercioId } });
     if (!cfg) throw new Error('No tienes transporte configurado');
 
@@ -416,7 +416,7 @@ const TransporteService = {
       ? activas.reduce((s,r) => s + (r.asientos / r.ruta.capacidad), 0) / activas.length * 100
       : 0;
 
-    return {
+    const resultado = {
       totalReservas: reservas.length,
       reservasConfirmadas: confirmadas,
       reservasCompletadas: completadas,
@@ -427,6 +427,41 @@ const TransporteService = {
       rutasPopulares,
       ocupacionPromedio: Math.round(ocupacion),
     };
+
+    // Rango de fechas puntual (opcional, para consultas contables)
+    if (desde && hasta) {
+      const inicioRango = new Date(`${desde}T00:00:00-05:00`);
+      const finRango = new Date(`${hasta}T23:59:59-05:00`);
+
+      const reservasRango = reservas.filter(r => {
+        const f = new Date(r.creadoAt);
+        return f >= inicioRango && f <= finRango;
+      });
+
+      const canceladasRango = reservasRango.filter(r => ['CANCELADA','RECHAZADA'].includes(r.estado)).length;
+      const ingresosRango = reservasRango
+        .filter(r => ['CONFIRMADA','COMPLETADA'].includes(r.estado))
+        .reduce((s, r) => s + Number(r.total), 0);
+
+      const rutaCountRango = {};
+      for (const r of reservasRango) {
+        const key = `${r.ruta.origen}→${r.ruta.destino}`;
+        if (!rutaCountRango[key]) rutaCountRango[key] = { origen: r.ruta.origen, destino: r.ruta.destino, total: 0 };
+        rutaCountRango[key].total++;
+      }
+      const rutasPopularesRango = Object.values(rutaCountRango).sort((a,b) => b.total - a.total).slice(0,5);
+
+      resultado.rango = {
+        reservas: reservasRango.length,
+        ingresos: ingresosRango,
+        canceladas: canceladasRango,
+        rutasPopulares: rutasPopularesRango,
+        desde,
+        hasta,
+      };
+    }
+
+    return resultado;
   },
 
   // ── FAVORITOS ─────────────────────────────────────────────────

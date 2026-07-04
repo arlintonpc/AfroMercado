@@ -242,7 +242,10 @@ const TourController = {
   async estadisticas(req, res, next) {
     try {
       const comercioId = req.usuario.comercio.id;
-      const data = await TourService.estadisticasTour(comercioId);
+      const data = await TourService.estadisticasTour(comercioId, {
+        desde: req.query.desde,
+        hasta: req.query.hasta,
+      });
       res.json({ ok: true, data });
     } catch (err) { next(err); }
   },

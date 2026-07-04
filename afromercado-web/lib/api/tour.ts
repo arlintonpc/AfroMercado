@@ -342,10 +342,21 @@ export interface EstadisticasTour {
   totalHistorico: number
   proximasReservas: Array<{ id: number; codigo: string; fechaTour: string; participantes: number; total: number; nombreContacto: string }>
   porMes: Array<{ mes: string; reservas: number; ingresos: number }>
+  rango?: {
+    reservas: number
+    ingresos: number
+    comision: number
+    participantes: number
+    desde: string
+    hasta: string
+  }
 }
 
-export async function obtenerEstadisticasTour(): Promise<EstadisticasTour> {
-  const r = await apiFetch<{ ok: boolean; data: EstadisticasTour }>('/tours/mi-tour/estadisticas')
+export async function obtenerEstadisticasTour(params?: { desde?: string; hasta?: string }): Promise<EstadisticasTour> {
+  const qs = params?.desde && params?.hasta
+    ? `?${new URLSearchParams({ desde: params.desde, hasta: params.hasta }).toString()}`
+    : ''
+  const r = await apiFetch<{ ok: boolean; data: EstadisticasTour }>(`/tours/mi-tour/estadisticas${qs}`)
   return r.data
 }
 
