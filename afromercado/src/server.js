@@ -628,6 +628,19 @@ async function aplicarMigraciones() {
     // Certificación en dos niveles: base nacional + variante de comunidad étnica
     `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "verificadoEtnico" BOOLEAN NOT NULL DEFAULT false`,
 
+    // Declaración de organización territorial (Módulo D institucional, Ley 1581 - dato sensible)
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoOrganizacionTerritorial') THEN
+        CREATE TYPE "TipoOrganizacionTerritorial" AS ENUM ('CONSEJO_COMUNITARIO','RESGUARDO_INDIGENA','ZONA_RESERVA_CAMPESINA','OTRA');
+      END IF;
+    END $$`,
+    `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "organizacionTerritorialTipo" "TipoOrganizacionTerritorial"`,
+    `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "organizacionTerritorialNombre" TEXT`,
+    `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "organizacionTerritorialFecha" TIMESTAMP(3)`,
+
+    // Directorio de proveedores certificados para compra pública B2G (Módulo C institucional)
+    `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "disponibleComprasPublicas" BOOLEAN NOT NULL DEFAULT false`,
+
     // ── CuponTransporte / CuponTransporteUso ──────────────────────
     `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "montoDescuento" DECIMAL(10,2)`,
     `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "codigoCupon" TEXT`,

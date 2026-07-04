@@ -8,6 +8,7 @@ import {
   toggleWhatsappAdmin,
   toggleVerificadoEtnicoAdmin,
   setComisionComercioAdmin,
+  revisarDeclaracionTerritorial,
   type AdminComercio,
   type CambioCriticoComercio,
   type EstadoComerciante,
@@ -125,7 +126,15 @@ function urlSnapshot(snapshot: Record<string, unknown>, campo: string): string |
 function etiquetaTipoCambio(tipo: string): string {
   if (tipo === 'DOCUMENTO_IDENTIDAD') return 'Documento de identidad'
   if (tipo === 'CUENTA_DISPERSION') return 'Cuenta de pagos'
+  if (tipo === 'DECLARACION_TERRITORIAL') return 'Declaración de organización territorial'
   return tipo.replaceAll('_', ' ').toLowerCase()
+}
+
+const ETIQUETA_TIPO_ORGANIZACION: Record<string, string> = {
+  CONSEJO_COMUNITARIO: 'Consejo Comunitario',
+  RESGUARDO_INDIGENA: 'Resguardo Indígena',
+  ZONA_RESERVA_CAMPESINA: 'Zona de Reserva Campesina',
+  OTRA: 'Otra',
 }
 
 function colorEstadoCambio(estado: string): string {
@@ -192,19 +201,37 @@ function ResumenCuenta({ titulo, snapshot, compacta = false }: { titulo: string;
   )
 }
 
+function ResumenDeclaracionTerritorial({ snapshot }: { snapshot: Record<string, unknown> }) {
+  const tipo = valorSnapshot(snapshot, 'tipo')
+  return (
+    <div className="rounded-lg border border-[#1A1A1A]/8 bg-white px-2 py-1.5">
+      <div className="text-[10px] font-bold uppercase tracking-wide text-[#1A1A1A]/45">Declaración</div>
+      <div className="mt-1 text-xs leading-relaxed text-[#1A1A1A]/70">
+        <div>{ETIQUETA_TIPO_ORGANIZACION[tipo] ?? tipo}</div>
+        <div>Organización: {valorSnapshot(snapshot, 'nombreOrganizacion')}</div>
+      </div>
+    </div>
+  )
+}
+
 function CambioCriticoCard({
   cambio,
   comercio,
   compacta = false,
+  onRevisar,
+  procesando = false,
 }: {
   cambio: CambioCriticoComercio
   comercio: AdminComercio
   compacta?: boolean
+  onRevisar?: (cambio: CambioCriticoComercio, accion: 'APROBAR' | 'RECHAZAR') => void
+  procesando?: boolean
 }) {
   const anterior = snapshotSeguro(cambio.snapshotAnterior)
   const nuevoGuardado = snapshotSeguro(cambio.snapshotNuevo)
   const esDocumento = cambio.tipo === 'DOCUMENTO_IDENTIDAD'
   const esCuenta = cambio.tipo === 'CUENTA_DISPERSION'
+  const esDeclaracionTerritorial = cambio.tipo === 'DECLARACION_TERRITORIAL'
   const nuevo = esDocumento && cambio.estado === 'PENDIENTE'
     ? {
         ...nuevoGuardado,
@@ -242,10 +269,29 @@ function CambioCriticoCard({
             <ResumenCuenta titulo="Después" snapshot={nuevo} compacta={compacta} />
           </>
         )}
-        {!esDocumento && !esCuenta && (
+        {esDeclaracionTerritorial && <ResumenDeclaracionTerritorial snapshot={nuevoGuardado} />}
+        {!esDocumento && !esCuenta && !esDeclaracionTerritorial && (
           <div className="text-xs text-[#1A1A1A]/50">Cambio registrado para revisión administrativa.</div>
         )}
       </div>
+      {esDeclaracionTerritorial && cambio.estado === 'PENDIENTE' && onRevisar && (
+        <div className="mt-2 flex gap-2">
+          <button
+            onClick={() => onRevisar(cambio, 'APROBAR')}
+            disabled={procesando}
+            className="rounded-lg bg-[#2D6A4F] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#235540] disabled:opacity-50"
+          >
+            Aprobar
+          </button>
+          <button
+            onClick={() => onRevisar(cambio, 'RECHAZAR')}
+            disabled={procesando}
+            className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+          >
+            Rechazar
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -469,6 +515,7 @@ function CardComerciante({
   onWhatsapp,
   onVerificadoEtnico,
   onComision,
+  onRevisarDeclaracionTerritorial,
 }: {
   comercio: AdminComercio
   procesando: boolean
@@ -476,6 +523,7 @@ function CardComerciante({
   onWhatsapp: (c: AdminComercio) => void
   onVerificadoEtnico: (c: AdminComercio) => void
   onComision: (c: AdminComercio) => void
+  onRevisarDeclaracionTerritorial: (c: AdminComercio, cambio: CambioCriticoComercio, accion: 'APROBAR' | 'RECHAZAR') => void
 }) {
   const señales = señalesFraude(comercio)
   const tasaActual = comercio.comisiones[0] ? `${(Number(comercio.comisiones[0].tasa) * 100).toFixed(1)}%` : '10.0%'
@@ -635,7 +683,14 @@ function CardComerciante({
           {tieneCambios ? (
             <div className="grid gap-3 xl:grid-cols-2">
               {(comercio.cambiosCriticos ?? []).map((cambio) => (
-                <CambioCriticoCard key={cambio.id} cambio={cambio} comercio={comercio} compacta />
+                <CambioCriticoCard
+                  key={cambio.id}
+                  cambio={cambio}
+                  comercio={comercio}
+                  compacta
+                  procesando={procesando}
+                  onRevisar={(c, accion) => onRevisarDeclaracionTerritorial(comercio, c, accion)}
+                />
               ))}
             </div>
           ) : (
@@ -739,6 +794,28 @@ export default function ComerciantesAdminPage() {
           : c
       ))
       setAviso({ tipo: 'exito', texto: `Comisión de "${comercio.nombre}" actualizada a ${(tasa * 100).toFixed(1)}%.` })
+    } catch (e) {
+      setAviso({ tipo: 'error', texto: e instanceof Error ? e.message : 'Error' })
+    } finally {
+      setProcesandoId(null)
+    }
+  }
+
+  async function handleRevisarDeclaracionTerritorial(
+    comercio: AdminComercio,
+    cambio: CambioCriticoComercio,
+    accion: 'APROBAR' | 'RECHAZAR',
+  ) {
+    setProcesandoId(comercio.id)
+    try {
+      const actualizado = await revisarDeclaracionTerritorial(comercio.id, accion)
+      setComercios((prev) => prev.map((c) => c.id === comercio.id ? { ...c, ...actualizado } : c))
+      setAviso({
+        tipo: 'exito',
+        texto: accion === 'APROBAR'
+          ? `Declaración territorial de "${comercio.nombre}" aprobada.`
+          : `Declaración territorial de "${comercio.nombre}" rechazada.`,
+      })
     } catch (e) {
       setAviso({ tipo: 'error', texto: e instanceof Error ? e.message : 'Error' })
     } finally {
@@ -891,6 +968,7 @@ export default function ComerciantesAdminPage() {
                     onWhatsapp={handleWhatsapp}
                     onVerificadoEtnico={handleVerificadoEtnico}
                     onComision={(c) => setModalComision(c)}
+                    onRevisarDeclaracionTerritorial={handleRevisarDeclaracionTerritorial}
                   />
                 ))}
           </div>

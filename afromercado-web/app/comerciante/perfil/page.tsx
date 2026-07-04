@@ -15,6 +15,7 @@ import {
   subirVideoComercio,
   quitarVideoComercio,
   guardarVideoLinkComercio,
+  toggleComprasPublicas,
   type Comercio,
   type CuentaDispersion,
   type LadoDocumento,
@@ -23,6 +24,7 @@ import {
 } from '@/components/comerciante/api'
 import { obtenerReglasPublicas } from '@/lib/api/config'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
+import PanelDeclaracionTerritorial from '@/components/comerciante/PanelDeclaracionTerritorial'
 
 const BANCOS_DISPERSION = [
   { valor: 'BANCOLOMBIA', etiqueta: 'Bancolombia' },
@@ -248,6 +250,7 @@ export default function PerfilComerciantePage() {
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [guardando, setGuardando] = useState(false)
   const [aviso, setAviso] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null)
+  const [guardandoComprasPublicas, setGuardandoComprasPublicas] = useState(false)
 
   // Foto documento
   const [fotoDocumentoFrenteUrl, setFotoDocumentoFrenteUrl] = useState<string | null>(null)
@@ -464,6 +467,25 @@ export default function PerfilComerciantePage() {
       setErrorCuenta(err instanceof Error ? err.message : 'No pudimos guardar la cuenta.')
     } finally {
       setGuardandoCuenta(false)
+    }
+  }
+
+  async function handleToggleComprasPublicas() {
+    if (!comercio) return
+    setGuardandoComprasPublicas(true)
+    try {
+      const actualizado = await toggleComprasPublicas(!comercio.disponibleComprasPublicas)
+      setComercio(actualizado)
+      setAviso({
+        tipo: 'exito',
+        texto: actualizado.disponibleComprasPublicas
+          ? 'Tu tienda ya aparece en el directorio de compras públicas.'
+          : 'Tu tienda ya no aparece en el directorio de compras públicas.',
+      })
+    } catch (err) {
+      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No pudimos actualizar el directorio.' })
+    } finally {
+      setGuardandoComprasPublicas(false)
     }
   }
 
@@ -862,6 +884,36 @@ export default function PerfilComerciantePage() {
           onChange={(e) => subirDoc(e, 'REVERSO')}
         />
       </div>
+
+      {comercio && (
+        <PanelDeclaracionTerritorial comercio={comercio} onActualizado={setComercio} />
+      )}
+
+      {comercio && (
+        <div className="rounded-2xl border border-[#1A1A1A]/5 bg-white p-5 sm:p-6 shadow-sm flex flex-col gap-3">
+          <div>
+            <h2 className="text-base font-bold text-[#1A1A1A]">Directorio de compras públicas</h2>
+            <p className="mt-1 text-sm text-[#1A1A1A]/55">
+              Aparece en un directorio público para que entidades del Estado (alcaldías, gobernaciones) te
+              encuentren como proveedor certificado. La compra y facturación ocurren fuera de AfroMercado,
+              según las reglas de contratación pública vigentes (SECOP II).
+            </p>
+          </div>
+          {!comercio.verificado && (
+            <p className="text-sm text-[#C0392B]">Tu tienda debe estar verificada para activar esta opción.</p>
+          )}
+          <Button
+            type="button"
+            variant={comercio.disponibleComprasPublicas ? 'secondary' : 'primary'}
+            loading={guardandoComprasPublicas}
+            disabled={!comercio.verificado}
+            onClick={handleToggleComprasPublicas}
+            className="w-fit"
+          >
+            {comercio.disponibleComprasPublicas ? 'Salir del directorio' : 'Aparecer en el directorio'}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

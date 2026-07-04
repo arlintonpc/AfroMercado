@@ -279,6 +279,23 @@ const ComercioService = {
     return { ...actualizado, envioGratisDesde: await leerEnvioGratis(comercio.id) };
   },
 
+  // Opt-in de auto-servicio al directorio de proveedores certificados
+  // (Módulo C institucional, compra pública B2G). Solo comercios ya
+  // verificados por el equipo pueden activarlo — no requiere una segunda
+  // aprobación admin porque `verificado=true` ya implica revisión de
+  // identidad. Alcance deliberadamente reducido: el directorio es solo
+  // vitrina de descubrimiento, nunca dinero ni factura dentro de la plataforma.
+  async toggleComprasPublicas(usuarioId, activar) {
+    const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
+    if (!comercio) {
+      throw new ErrorNoEncontrado("No tienes un comercio registrado");
+    }
+    if (activar && !comercio.verificado) {
+      throw new ErrorValidacion("Tu tienda debe estar verificada para aparecer en el directorio de compras públicas.");
+    }
+    return ComercioRepository.actualizar(comercio.id, { disponibleComprasPublicas: Boolean(activar) });
+  },
+
   async guardarVideoLink(usuarioId, videoUrl) {
     const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
     if (!comercio) {

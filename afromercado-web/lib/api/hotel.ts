@@ -115,6 +115,7 @@ export interface ConfigHotel {
     totalReviews: number
     whatsapp?: string | null
     descripcion?: string | null
+    verificadoEtnico?: boolean
   }
 }
 
@@ -448,6 +449,11 @@ export async function adminListarHoteles(): Promise<HotelAdmin[]> {
 
 export async function adminCambiarEstadoHotel(id: number, activo: boolean): Promise<ConfigHotel> {
   const r = await apiFetch<{ ok: boolean; data: ConfigHotel }>(`/hoteles/admin/${id}/estado`, { method: 'PATCH', body: { activo } })
+  return r.data
+}
+
+export async function adminVerificarRntHotel(id: number, verificado: boolean): Promise<ConfigHotel> {
+  const r = await apiFetch<{ ok: boolean; data: ConfigHotel }>(`/hoteles/admin/${id}/rnt`, { method: 'PATCH', body: { verificado } })
   return r.data
 }
 

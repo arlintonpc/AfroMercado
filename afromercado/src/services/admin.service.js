@@ -361,6 +361,83 @@ const AdminService = {
     return actualizadoFinal || actualizado;
   },
 
+  // Aprobar/rechazar una declaración de organización territorial pendiente
+  // (Módulo D institucional). A diferencia de verificarComerciante, esto NO
+  // toca estadoRegistro/verificado/activo del comercio — declarar una
+  // organización territorial no es señal de riesgo de fraude de pagos, así
+  // que nunca pausa la tienda. Solo al APROBAR se copian los datos del
+  // snapshot a los campos reales de Comercio.
+  async revisarDeclaracionTerritorial(adminId, comercioId, { accion, motivo } = {}) {
+    if (!ACCIONES_VALIDAS.includes(accion)) {
+      throw new ErrorValidacion(`Acción inválida. Opciones: ${ACCIONES_VALIDAS.join(", ")}`);
+    }
+
+    const pendiente = await prisma.cambioCriticoComercio.findFirst({
+      where: { comercioId, tipo: "DECLARACION_TERRITORIAL", estado: "PENDIENTE" },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!pendiente) {
+      throw new ErrorNoEncontrado("No hay una declaración territorial pendiente de revisión para este comercio.");
+    }
+
+    const snapshot = pendiente.snapshotNuevo || {};
+    const datosComercio = accion === "APROBAR"
+      ? {
+          organizacionTerritorialTipo: snapshot.tipo,
+          organizacionTerritorialNombre: snapshot.nombreOrganizacion,
+          organizacionTerritorialFecha: new Date(),
+        }
+      : {};
+
+    const [comercio] = await prisma.$transaction([
+      prisma.comercio.update({
+        where: { id: comercioId },
+        data: datosComercio,
+        include: {
+          usuario: { select: { id: true, nombre: true, email: true, telefono: true } },
+          cambiosCriticos: { orderBy: { createdAt: "desc" }, take: 5 },
+        },
+      }),
+      prisma.cambioCriticoComercio.update({
+        where: { id: pendiente.id },
+        data: {
+          estado: accion === "APROBAR" ? "APROBADO" : "RECHAZADO",
+          revisadoPor: adminId,
+          revisadoAt: new Date(),
+          motivo: motivo?.trim() || null,
+        },
+      }),
+      prisma.accionModeracion.create({
+        data: {
+          adminId,
+          targetId: comercioId,
+          targetTipo: "COMERCIO",
+          accion: `${accion}_DECLARACION_TERRITORIAL`,
+          motivo: motivo?.trim() || null,
+        },
+      }),
+    ]);
+
+    setImmediate(async () => {
+      try {
+        if (comercio.usuario?.id) {
+          await NotificacionService.crearYEnviar({
+            usuarioId: comercio.usuario.id,
+            tipo: accion === "APROBAR" ? "DECLARACION_TERRITORIAL_APROBADA" : "DECLARACION_TERRITORIAL_RECHAZADA",
+            titulo: accion === "APROBAR" ? "Declaración territorial aprobada" : "Declaración territorial rechazada",
+            mensaje: accion === "APROBAR"
+              ? "Tu declaración de organización territorial fue aprobada."
+              : (motivo?.trim() || "El equipo revisó tu declaración territorial y no fue aprobada."),
+          });
+        }
+      } catch (e) {
+        console.error("[NOTIF] revisarDeclaracionTerritorial:", e.message);
+      }
+    });
+
+    return comercio;
+  },
+
   async listarComerciosAdmin({ soloSinVerificar = false, estado = null } = {}) {
     const where = {};
     if (estado) {

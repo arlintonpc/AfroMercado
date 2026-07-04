@@ -11,11 +11,14 @@ function debeVolverARevision(comercio) {
 
 function prepararRevisionPorCambioCritico(
   comercio,
-  { tipoCambio, accion, tipo, snapshotAnterior, snapshotNuevo, solicitadoPor },
+  { tipoCambio, accion, tipo, snapshotAnterior, snapshotNuevo, solicitadoPor, nuncaPausar = false, siempreRegistrar = false },
 ) {
   if (!comercio) return null;
 
-  const requiereCambioEstado = debeVolverARevision(comercio);
+  // nuncaPausar: para cambios que no son señal de riesgo de fraude de pagos
+  // (ej. declarar una organización territorial) y por lo tanto no deben
+  // desactivar el comercio ni forzarlo de vuelta a PENDIENTE_REVISION.
+  const requiereCambioEstado = nuncaPausar ? false : debeVolverARevision(comercio);
   const motivo = `Actualizacion de ${tipoCambio} por el comerciante; requiere nueva revision administrativa.`;
   return {
     accion,
@@ -23,6 +26,11 @@ function prepararRevisionPorCambioCritico(
     tipoCambio,
     motivo,
     requiereCambioEstado,
+    // siempreRegistrar: fuerza la creación del CambioCriticoComercio aunque
+    // requiereCambioEstado sea false (ver registrarRevisionCriticaTx) — hace
+    // falta para tipos que siempre deben aparecer en cola de revisión, sin
+    // depender de que el comercio ya esté verificado/aprobado.
+    siempreRegistrar,
     snapshotAnterior: snapshotAnterior || {},
     snapshotNuevo: snapshotNuevo || {},
     solicitadoPor: solicitadoPor || comercio.usuarioId || null,
@@ -67,7 +75,7 @@ async function registrarRevisionCriticaTx(tx, comercio, revision) {
     where: { comercioId: comercio.id, estado: "PENDIENTE" },
     select: { id: true },
   });
-  const debeCrearHistorial = revision.requiereCambioEstado || Boolean(pendienteComercio);
+  const debeCrearHistorial = revision.requiereCambioEstado || revision.siempreRegistrar || Boolean(pendienteComercio);
   if (!debeCrearHistorial) {
     return { cambioCriticoId: null, productosDesactivados: 0, actualizado: false };
   }

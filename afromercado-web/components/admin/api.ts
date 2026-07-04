@@ -256,6 +256,14 @@ export interface AdminComercio {
   totalVentas: number
   calificacion: number | string
   createdAt: string
+  organizacionTerritorialTipo?:
+    | 'CONSEJO_COMUNITARIO'
+    | 'RESGUARDO_INDIGENA'
+    | 'ZONA_RESERVA_CAMPESINA'
+    | 'OTRA'
+    | null
+  organizacionTerritorialNombre?: string | null
+  organizacionTerritorialFecha?: string | null
   usuario: {
     id: number
     nombre: string
@@ -290,6 +298,21 @@ export async function verificarComercianteAdmin(
   const res = await apiFetch<RespuestaOk<AdminComercio>>(`/admin/comercios/${id}/verificar`, {
     method: 'PATCH',
     body: { accion, motivo },
+  })
+  return res.data
+}
+
+/**
+ * PATCH /api/admin/comercios/:id/declaracion-territorial
+ */
+export async function revisarDeclaracionTerritorial(
+  id: number,
+  accion: 'APROBAR' | 'RECHAZAR',
+  motivo?: string,
+): Promise<AdminComercio> {
+  const res = await apiFetch<RespuestaOk<AdminComercio>>(`/admin/comercios/${id}/declaracion-territorial`, {
+    method: 'PATCH',
+    body: motivo !== undefined && motivo !== '' ? { accion, motivo } : { accion },
   })
   return res.data
 }

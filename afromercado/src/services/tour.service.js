@@ -2,7 +2,7 @@ const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const sseManager = require("../utils/sse-manager");
 const { enviarPushAUsuario } = require("../utils/push");
-const { notificarWhatsApp } = require("../utils/notificaciones");
+const { enviarMensajeWA } = require("../utils/whatsapp");
 const AlianzaService = require("./alianza.service");
 
 const TASA_COMISION_TOUR = 0.10;
@@ -31,7 +31,7 @@ const TOUR_INCLUDE = {
     select: {
       id: true, nombre: true, municipio: true, departamento: true,
       latitud: true, longitud: true, logoUrl: true, calificacion: true,
-      totalReviews: true, whatsapp: true, descripcion: true,
+      totalReviews: true, whatsapp: true, descripcion: true, verificadoEtnico: true,
     },
   },
 };
@@ -301,7 +301,7 @@ const TourService = {
       try {
         const operadorWA = tour.comercio?.whatsapp;
         if (operadorWA) {
-          await notificarWhatsApp(operadorWA,
+          await enviarMensajeWA(operadorWA,
             `🗺️ *Nueva reserva de tour*\n` +
             `Código: *${reserva.codigo}*\n` +
             `Tour: ${tour.nombre}\n` +
@@ -350,7 +350,12 @@ const TourService = {
 
   async actualizarTour(comercioId, datos) {
     const data = camposConfigTour(datos);
-    return prisma.configTour.update({ where: { comercioId }, data: { ...data, updatedAt: new Date() } });
+    // RNT (solo el operador puede actualizar su numero, no el estado de verificacion)
+    const { rnt } = datos;
+    return prisma.configTour.update({
+      where: { comercioId },
+      data: { ...data, ...(rnt !== undefined ? { rnt } : {}), updatedAt: new Date() },
+    });
   },
 
   async reservasOperador(comercioId, estado) {
@@ -592,6 +597,10 @@ const TourService = {
 
   async adminCambiarEstado(id, activo) {
     return prisma.configTour.update({ where: { id }, data: { activo } });
+  },
+
+  async adminVerificarRnt(id, verificado) {
+    return prisma.configTour.update({ where: { id }, data: { rntVerificado: !!verificado } });
   },
 
   // ── CUPONES TOUR ─────────────────────────────────────────────

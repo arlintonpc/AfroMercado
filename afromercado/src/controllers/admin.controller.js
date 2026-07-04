@@ -202,6 +202,27 @@ const AdminController = {
     } catch (e) { next(e); }
   },
 
+  // GET /admin/comercios/buscar-por-filtro?departamento=&municipio=&organizacionTerritorialTipo=
+  // Búsqueda estructurada de comercios activos y verificados, para asignación
+  // masiva de subsidios por región (Módulo E).
+  async buscarComerciosPorFiltro(req, res, next) {
+    try {
+      const { departamento, municipio, organizacionTerritorialTipo } = req.query;
+      const items = await prisma.comercio.findMany({
+        where: {
+          activo: true,
+          verificado: true,
+          ...(departamento && { departamento }),
+          ...(municipio && { municipio }),
+          ...(organizacionTerritorialTipo && { organizacionTerritorialTipo }),
+        },
+        select: { id: true, nombre: true, municipio: true, departamento: true, usuarioId: true },
+        take: 200,
+      });
+      res.json({ ok: true, data: items });
+    } catch (e) { next(e); }
+  },
+
   // GET /admin/productos?q=&activo=&page=
   async listarProductosAdmin(req, res, next) {
     try {
@@ -381,6 +402,15 @@ const AdminController = {
     try {
       const { accion, motivo } = req.body;
       const resultado = await AdminService.verificarComerciante(req.usuario.id, Number(req.params.id), { accion, motivo });
+      res.json({ ok: true, data: resultado });
+    } catch (e) { next(e); }
+  },
+
+  // PATCH /admin/comercios/:id/declaracion-territorial
+  async revisarDeclaracionTerritorial(req, res, next) {
+    try {
+      const { accion, motivo } = req.body;
+      const resultado = await AdminService.revisarDeclaracionTerritorial(req.usuario.id, Number(req.params.id), { accion, motivo });
       res.json({ ok: true, data: resultado });
     } catch (e) { next(e); }
   },

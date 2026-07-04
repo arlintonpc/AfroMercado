@@ -109,6 +109,13 @@ enum EstadoComerciante {
   SUSPENDIDO
 }
 
+enum TipoOrganizacionTerritorial {
+  CONSEJO_COMUNITARIO
+  RESGUARDO_INDIGENA
+  ZONA_RESERVA_CAMPESINA
+  OTRA
+}
+
 enum TipoLiquidacion {
   COMERCIANTE
   REPARTIDOR
@@ -252,6 +259,10 @@ model Comercio {
   totalVentas  Int       @default(0)
   verificado        Boolean           @default(false)
   verificadoEtnico  Boolean           @default(false)
+  organizacionTerritorialTipo   TipoOrganizacionTerritorial?
+  organizacionTerritorialNombre String?
+  organizacionTerritorialFecha  DateTime?
+  disponibleComprasPublicas Boolean       @default(false)
   estadoRegistro    EstadoComerciante @default(PENDIENTE_REVISION)
   motivoRechazo     String?
   revisadoPor       Int?
@@ -811,6 +822,7 @@ model Cupon {
   fin                   DateTime
   soloNuevos            Boolean                @default(false)
   distribucion          TipoDistribucionCupon  @default(PUBLICO)
+  programaNombre        String?                // agrupa cupones de un mismo programa de subsidio (ej. "Semillas 2026")
   createdAt             DateTime               @default(now())
 
   pedidos      Pedido[]
@@ -1585,6 +1597,8 @@ model ConfigTour {
   confirmacionAuto    Boolean  @default(false)
   horasLimiteConfirm  Int      @default(2)
   politicaCancelacion String?
+  rnt                 String?
+  rntVerificado       Boolean  @default(false)
   creadoAt            DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

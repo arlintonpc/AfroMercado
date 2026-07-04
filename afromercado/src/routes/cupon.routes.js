@@ -17,6 +17,9 @@ router.patch("/mis-cupones/:id/desactivar", ...soloComerciante, CuponController.
 // Selector de comercios para el formulario de creación
 router.get("/comercios", ...soloAdmin, CuponController.listarComerciosSelector);
 
+// Programas de subsidio (nombres distintos, para poblar filtros)
+router.get("/programas", ...soloAdmin, CuponController.programas);
+
 // Dashboard / reportes globales
 router.get("/reporte/resumen",     ...soloAdmin, CuponController.resumenGlobal);
 router.get("/reporte/lista",       ...soloAdmin, CuponController.listaComparativa);

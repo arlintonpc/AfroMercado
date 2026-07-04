@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { adminListarHoteles, adminCambiarEstadoHotel, adminReservasHotel, type HotelAdmin, type ReservaHotel } from '@/lib/api/hotel'
+import { adminListarHoteles, adminCambiarEstadoHotel, adminVerificarRntHotel, adminReservasHotel, type HotelAdmin, type ReservaHotel } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
 const ESTADO_COLOR: Record<string, string> = {
@@ -29,6 +29,11 @@ export default function AdminHotelesPage() {
   async function toggleEstado(hotel: HotelAdmin) {
     const actualizado = await adminCambiarEstadoHotel(hotel.id, !hotel.activo)
     setHoteles(prev => prev.map(h => h.id === hotel.id ? { ...h, activo: actualizado.activo } : h))
+  }
+
+  async function toggleRnt(hotel: HotelAdmin) {
+    const actualizado = await adminVerificarRntHotel(hotel.id, !hotel.rntVerificado)
+    setHoteles(prev => prev.map(h => h.id === hotel.id ? { ...h, rntVerificado: actualizado.rntVerificado } : h))
   }
 
   async function abrirReservas(hotel: HotelAdmin) {
@@ -116,6 +121,7 @@ export default function AdminHotelesPage() {
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">Habitaciones</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">Reservas</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500">Estado</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500">RNT</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
@@ -154,15 +160,33 @@ export default function AdminHotelesPage() {
                         {h.activo ? '✓ Activo' : '✗ Inactivo'}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        h.rntVerificado ? 'bg-blue-100 text-blue-700' : h.rnt ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {h.rntVerificado ? '✓ Verificado' : h.rnt ? 'Pendiente' : 'Sin RNT'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={() => toggleEstado(h)}
-                        className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
-                          h.activo
-                            ? 'border-red-200 text-red-600 hover:bg-red-50'
-                            : 'border-green-200 text-green-600 hover:bg-green-50'
-                        }`}>
-                        {h.activo ? 'Suspender' : 'Activar'}
-                      </button>
+                      <div className="flex flex-col gap-1.5 items-end">
+                        <button onClick={() => toggleEstado(h)}
+                          className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+                            h.activo
+                              ? 'border-red-200 text-red-600 hover:bg-red-50'
+                              : 'border-green-200 text-green-600 hover:bg-green-50'
+                          }`}>
+                          {h.activo ? 'Suspender' : 'Activar'}
+                        </button>
+                        <button onClick={() => toggleRnt(h)} disabled={!h.rnt}
+                          title={!h.rnt ? 'El hotel aún no registró su número de RNT' : undefined}
+                          className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                            h.rntVerificado
+                              ? 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                              : 'border-blue-200 text-blue-600 hover:bg-blue-50'
+                          }`}>
+                          {h.rntVerificado ? 'Quitar verificación' : 'Verificar RNT'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

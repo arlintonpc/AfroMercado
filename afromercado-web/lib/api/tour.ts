@@ -61,6 +61,8 @@ export interface ConfigTour {
   confirmacionAuto: boolean
   horasLimiteConfirm: number
   politicaCancelacion?: string | null
+  rnt?: string | null
+  rntVerificado?: boolean
   creadoAt: string
   updatedAt: string
   comercio: {
@@ -75,6 +77,7 @@ export interface ConfigTour {
     totalReviews: number
     whatsapp?: string | null
     descripcion?: string | null
+    verificadoEtnico?: boolean
   }
 }
 
@@ -246,6 +249,11 @@ export async function adminListarTours(): Promise<TourAdmin[]> {
 
 export async function adminCambiarEstadoTour(id: number, activo: boolean): Promise<ConfigTour> {
   const r = await apiFetch<{ ok: boolean; data: ConfigTour }>(`/tours/admin/${id}/estado`, { method: 'PATCH', body: { activo } })
+  return r.data
+}
+
+export async function adminVerificarRntTour(id: number, verificado: boolean): Promise<ConfigTour> {
+  const r = await apiFetch<{ ok: boolean; data: ConfigTour }>(`/tours/admin/${id}/rnt`, { method: 'PATCH', body: { verificado } })
   return r.data
 }
 

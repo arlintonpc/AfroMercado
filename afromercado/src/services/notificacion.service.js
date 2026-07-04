@@ -537,15 +537,15 @@ const NotificacionService = {
   // Método genérico: crea notificación en BD y la envía por SSE.
   // Acepta tanto un objeto { usuarioId, tipo, titulo, mensaje, pedidoId, comercioId }
   // como parámetros posicionales (usuarioId, tipo, titulo, mensaje, { pedidoId, comercioId }).
-  async crearYEnviar(usuarioIdOrObj, tipo, titulo, mensaje, { pedidoId, comercioId } = {}) {
+  async crearYEnviar(usuarioIdOrObj, tipo, titulo, mensaje, { pedidoId, comercioId, ...extra } = {}) {
     try {
-      let uid, t, tit, msg, pid, cid;
+      let uid, t, tit, msg, pid, cid, datosExtra;
       if (typeof usuarioIdOrObj === "object" && usuarioIdOrObj !== null) {
-        ({ usuarioId: uid, tipo: t, titulo: tit, mensaje: msg, pedidoId: pid, comercioId: cid } = usuarioIdOrObj);
+        ({ usuarioId: uid, tipo: t, titulo: tit, mensaje: msg, pedidoId: pid, comercioId: cid, ...datosExtra } = usuarioIdOrObj);
       } else {
-        uid = usuarioIdOrObj; t = tipo; tit = titulo; msg = mensaje; pid = pedidoId; cid = comercioId;
+        uid = usuarioIdOrObj; t = tipo; tit = titulo; msg = mensaje; pid = pedidoId; cid = comercioId; datosExtra = extra;
       }
-      const datos = {};
+      const datos = { ...datosExtra };
       if (pid !== undefined) datos.pedidoId = pid;
       if (cid !== undefined) datos.comercioId = cid;
       const notif = await prisma.notificacion.create({

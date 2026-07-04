@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiFetch } from '@/lib/api/client'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import { listarProgramasCupon } from '@/lib/api/cupones'
 
 interface UsoItem {
   id: number; createdAt: string; nUsoDelUsuario: number; pctEfectivo: number
-  cupon: { id: number; codigo: string; tipo: string; valor: number }
+  cupon: { id: number; codigo: string; tipo: string; valor: number; programaNombre?: string | null }
   usuario: { id: number; nombre: string; email: string; telefono?: string }
   pedido: { codigo: string; estado: string; subtotal: string; total: string; cuponDescuento: string | null; subPedidos: { comercio: { nombre: string } }[] }
 }
@@ -26,6 +27,8 @@ export default function LogUsos() {
   const [estado, setEstado]     = useState('')
   const [desde, setDesde]       = useState('')
   const [hasta, setHasta]       = useState('')
+  const [programaNombre, setProgramaNombre] = useState('')
+  const [programas, setProgramas] = useState<string[]>([])
 
   const cargar = useCallback(async (pag: number) => {
     setCargando(true)
@@ -35,13 +38,15 @@ export default function LogUsos() {
       if (estado)   p.set('estado', estado)
       if (desde)    p.set('desde', desde)
       if (hasta)    p.set('hasta', hasta)
+      if (programaNombre) p.set('programaNombre', programaNombre)
       const res = await apiFetch<{ ok:boolean; data:{ items:UsoItem[]; total:number } }>(`/cupones/usos?${p}`)
       setItems(res?.data?.items ?? [])
       setTotal(res?.data?.total ?? 0)
     } catch { /* */ } finally { setCargando(false) }
-  }, [q, estado, desde, hasta])
+  }, [q, estado, desde, hasta, programaNombre])
 
   useEffect(() => { void cargar(1) }, [cargar])
+  useEffect(() => { listarProgramasCupon().then(setProgramas).catch(() => {}) }, [])
 
   function buscar() { setPagina(1); cargar(1) }
 
@@ -79,8 +84,15 @@ export default function LogUsos() {
             <input type="date" value={hasta} onChange={e => { setHasta(e.target.value); setPagina(1) }}
               className="rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm" />
           </div>
-          {(q||estado||desde||hasta) && (
-            <button onClick={() => { setQ(''); setEstado(''); setDesde(''); setHasta(''); setPagina(1) }}
+          {programas.length > 0 && (
+            <select value={programaNombre} onChange={e => { setProgramaNombre(e.target.value); setPagina(1) }}
+              className="rounded-xl border border-[#1A1A1A]/10 bg-white px-3 py-2 text-sm">
+              <option value="">Todos los programas</option>
+              {programas.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          )}
+          {(q||estado||desde||hasta||programaNombre) && (
+            <button onClick={() => { setQ(''); setEstado(''); setDesde(''); setHasta(''); setProgramaNombre(''); setPagina(1) }}
               className="text-xs text-[#1A1A1A]/40 hover:text-[#1A1A1A] transition-colors">Limpiar filtros</button>
           )}
         </div>
@@ -94,13 +106,13 @@ export default function LogUsos() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[800px]">
             <thead className="bg-[#F8F5F0]/40 border-b border-[#1A1A1A]/5">
-              <tr>{['Fecha','Cupón','Comprador','Pedido','Estado','Subtotal','Descuento','% efectivo','N.º uso'].map(h=><th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-[#1A1A1A]/50 whitespace-nowrap">{h}</th>)}</tr>
+              <tr>{['Fecha','Cupón','Programa','Comprador','Pedido','Estado','Subtotal','Descuento','% efectivo','N.º uso'].map(h=><th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-[#1A1A1A]/50 whitespace-nowrap">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-[#1A1A1A]/5">
               {cargando ? [1,2,3,4,5].map(i=>(
-                <tr key={i}><td colSpan={9} className="px-4 py-3"><div className="h-4 bg-[#1A1A1A]/6 rounded animate-pulse"/></td></tr>
+                <tr key={i}><td colSpan={10} className="px-4 py-3"><div className="h-4 bg-[#1A1A1A]/6 rounded animate-pulse"/></td></tr>
               )) : items.length === 0 ? (
-                <tr><td colSpan={9} className="px-5 py-16 text-center"><p className="text-base font-semibold text-[#1A1A1A]/50">Sin resultados</p><p className="text-sm text-[#1A1A1A]/30 mt-1">Prueba ajustando los filtros.</p></td></tr>
+                <tr><td colSpan={10} className="px-5 py-16 text-center"><p className="text-base font-semibold text-[#1A1A1A]/50">Sin resultados</p><p className="text-sm text-[#1A1A1A]/30 mt-1">Prueba ajustando los filtros.</p></td></tr>
               ) : items.map(uso => {
                 const desc = Number(uso.pedido.cuponDescuento ?? 0)
                 const sub  = Number(uso.pedido.subtotal)
@@ -112,6 +124,7 @@ export default function LogUsos() {
                     <td className="px-4 py-2.5">
                       <Link href={`/admin/cupones/${uso.cupon.id}`} className="font-mono text-xs font-bold text-[#2D6A4F] hover:underline">{uso.cupon.codigo}</Link>
                     </td>
+                    <td className="px-4 py-2.5 text-xs text-[#1A1A1A]/60 truncate max-w-[120px]">{uso.cupon.programaNombre ?? '—'}</td>
                     <td className="px-4 py-2.5">
                       <p className="font-semibold text-[#1A1A1A] truncate max-w-[140px]">{uso.usuario.nombre}</p>
                       <p className="text-xs text-[#1A1A1A]/40 truncate max-w-[140px]">{uso.usuario.telefono ?? uso.usuario.email}</p>

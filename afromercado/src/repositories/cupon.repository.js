@@ -1,5 +1,6 @@
 const prisma = require("../config/prisma");
 const AlianzaService = require("../services/alianza.service");
+const NotificacionService = require("../services/notificacion.service");
 
 function normalizarSubtotalesPorComercio(subtotalesPorComercio) {
   if (subtotalesPorComercio instanceof Map) return subtotalesPorComercio;
@@ -268,7 +269,7 @@ const CuponRepository = {
 
   async crearAdmin(datos) {
     const { comercioIds = [], usuarioIds = [], ...campos } = datos;
-    return prisma.cupon.create({
+    const cupon = await prisma.cupon.create({
       data: {
         ...campos,
         ...(comercioIds.length > 0 && {
@@ -284,12 +285,32 @@ const CuponRepository = {
       },
       include: { comercios: true, asignaciones: { select: { usuarioId: true } } },
     });
+
+    // Aviso al comercio/usuario beneficiario de que ya puede redimir el subsidio.
+    if (campos.distribucion === "ASIGNADO" && usuarioIds.length > 0) {
+      setImmediate(() => {
+        for (const usuarioId of usuarioIds) {
+          NotificacionService.crearYEnviar({
+            usuarioId,
+            tipo: "SUBSIDIO_ASIGNADO",
+            titulo: "¡Nuevo cupón disponible!",
+            mensaje: `Se te asignó el cupón ${cupon.codigo}${campos.programaNombre ? ` del programa "${campos.programaNombre}"` : ""}. Puedes usarlo en tu próxima compra.`,
+            codigoCupon: cupon.codigo,
+            programaNombre: campos.programaNombre ?? null,
+          }).catch((err) => console.error("[CUPON] notificación SUBSIDIO_ASIGNADO:", err.message));
+        }
+      });
+    }
+
+    return cupon;
   },
 
-  async listarAdmin({ pagina = 1, porPagina = 20 } = {}) {
+  async listarAdmin({ pagina = 1, porPagina = 20, programaNombre } = {}) {
     const skip = (pagina - 1) * porPagina;
+    const where = programaNombre ? { programaNombre } : {};
     const [items, total] = await Promise.all([
       prisma.cupon.findMany({
+        where,
         orderBy: { createdAt: "desc" },
         skip,
         take: porPagina,
@@ -298,9 +319,22 @@ const CuponRepository = {
           _count: { select: { usos: true, asignaciones: true } },
         },
       }),
-      prisma.cupon.count(),
+      prisma.cupon.count({ where }),
     ]);
     return { items, total, pagina, porPagina };
+  },
+
+  /**
+   * Lista alfabética de los nombres de programa distintos (para poblar filtros).
+   */
+  async listarProgramas() {
+    const filas = await prisma.cupon.findMany({
+      where: { programaNombre: { not: null } },
+      select: { programaNombre: true },
+      distinct: ["programaNombre"],
+      orderBy: { programaNombre: "asc" },
+    });
+    return filas.map((f) => f.programaNombre).filter(Boolean);
   },
 
   async desactivar(id) {
@@ -441,12 +475,13 @@ const CuponRepository = {
    * Log paginado de usos, filtrable. Sirve tanto para el tab B del detalle
    * como para la vista global /admin/cupones/usos.
    */
-  async logUsos({ cuponId, estado, desde, hasta, q, pagina = 1, porPagina = 50 } = {}) {
+  async logUsos({ cuponId, estado, desde, hasta, q, programaNombre, pagina = 1, porPagina = 50 } = {}) {
     const skip = (pagina - 1) * porPagina;
     const where = {};
     if (cuponId) where.cuponId = cuponId;
     if (desde || hasta) where.createdAt = { ...(desde && { gte: new Date(desde) }), ...(hasta && { lte: new Date(hasta) }) };
     if (estado?.length) where.pedido = { estado: { in: estado } };
+    if (programaNombre) where.cupon = { programaNombre };
     if (q) {
       where.OR = [
         { usuario: { nombre:   { contains: q, mode: "insensitive" } } },
@@ -464,7 +499,7 @@ const CuponRepository = {
         skip,
         take: porPagina,
         include: {
-          cupon: { select: { id: true, codigo: true, tipo: true, valor: true } },
+          cupon: { select: { id: true, codigo: true, tipo: true, valor: true, programaNombre: true } },
           usuario: { select: { id: true, nombre: true, email: true, telefono: true } },
           pedido: {
             select: {

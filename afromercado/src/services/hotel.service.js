@@ -33,7 +33,7 @@ const HOTEL_INCLUDE = {
     select: {
       id: true, nombre: true, municipio: true, departamento: true,
       latitud: true, longitud: true, logoUrl: true, calificacion: true,
-      totalReviews: true, whatsapp: true, descripcion: true,
+      totalReviews: true, whatsapp: true, descripcion: true, verificadoEtnico: true,
     },
   },
   habitaciones: {

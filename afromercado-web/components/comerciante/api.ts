@@ -58,6 +58,23 @@ export interface Comercio {
   videoMimeType?: string | null
   /** Monto mínimo para envío gratis de esta tienda (null = desactivado). */
   envioGratisDesde?: string | number | null
+  organizacionTerritorialTipo?:
+    | 'CONSEJO_COMUNITARIO'
+    | 'RESGUARDO_INDIGENA'
+    | 'ZONA_RESERVA_CAMPESINA'
+    | 'OTRA'
+    | null
+  organizacionTerritorialNombre?: string | null
+  organizacionTerritorialFecha?: string | null
+  /** Opt-in al directorio público de proveedores certificados (compra pública B2G). */
+  disponibleComprasPublicas?: boolean
+  /**
+   * Cambios críticos del comercio (documento, cuenta de dispersión,
+   * declaración territorial…), si el backend los expone en esta respuesta.
+   * Forma mínima best-effort: solo se usa para detectar si hay una
+   * declaración territorial PENDIENTE de revisión.
+   */
+  cambiosCriticos?: Array<{ tipo: string; estado: string }>
 }
 
 /** Producto propio del comerciante (forma de /productos/mis/productos). */
@@ -786,4 +803,65 @@ export async function crearCuponVendedor(datos: DatosCuponVendedor): Promise<Cup
 
 export async function desactivarCuponVendedor(id: number): Promise<void> {
   await apiFetch(`/cupones/mis-cupones/${id}/desactivar`, { method: 'PATCH' })
+}
+
+// ── Declaración de organización territorial ───────────────────
+
+export type TipoOrganizacionTerritorial =
+  | 'CONSEJO_COMUNITARIO'
+  | 'RESGUARDO_INDIGENA'
+  | 'ZONA_RESERVA_CAMPESINA'
+  | 'OTRA'
+
+export interface ConsentimientosDeclaracionTerritorial {
+  aceptaAlmacenarDeclaracion: boolean
+  aceptaMostrarSelloPublico: boolean
+}
+
+export interface DatosDeclaracionTerritorial {
+  tipo: TipoOrganizacionTerritorial
+  nombreOrganizacion: string
+  consentimientos: ConsentimientosDeclaracionTerritorial
+}
+
+export interface ResultadoDeclaracionTerritorial {
+  cambioCriticoId: number
+  productosDesactivados: number
+  actualizado: unknown
+}
+
+/**
+ * Solicita (para revisión admin) una declaración de organización territorial.
+ * POST /comercios/declaracion-territorial → { ok, data }
+ */
+export async function solicitarDeclaracionTerritorial(
+  datos: DatosDeclaracionTerritorial,
+): Promise<ResultadoDeclaracionTerritorial> {
+  const resp = await apiFetch<{ ok: boolean; data: ResultadoDeclaracionTerritorial }>(
+    '/comercios/declaracion-territorial',
+    { method: 'POST', body: datos },
+  )
+  return resp.data
+}
+
+/**
+ * Revoca de inmediato la declaración de organización territorial aprobada.
+ * DELETE /comercios/declaracion-territorial → { ok, data }
+ */
+export async function revocarDeclaracionTerritorial(): Promise<void> {
+  await apiFetch('/comercios/declaracion-territorial', { method: 'DELETE' })
+}
+
+/**
+ * Activa/desactiva la aparición del comercio en el directorio público de
+ * proveedores certificados (Módulo C, compra pública B2G). Requiere que el
+ * comercio ya esté verificado.
+ * PATCH /comercios/compras-publicas → { ok, comercio }
+ */
+export async function toggleComprasPublicas(activar: boolean): Promise<Comercio> {
+  const resp = await apiFetch<{ ok: boolean; comercio: Comercio }>(
+    '/comercios/compras-publicas',
+    { method: 'PATCH', body: { activar } },
+  )
+  return resp.comercio
 }

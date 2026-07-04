@@ -1176,6 +1176,26 @@ export default function ComercianteTourPage() {
             />
           </div>
 
+          {/* RNT */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              RNT — Registro Nacional de Turismo
+            </label>
+            <input
+              value={(editConfig as any).rnt ?? ''}
+              onChange={e => setEditConfig(c => ({ ...c, rnt: e.target.value }))}
+              placeholder="Ej: 123456"
+              className="w-full mt-1.5 px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+            />
+            {tour?.rntVerificado ? (
+              <p className="text-xs text-blue-600 mt-1">✓ RNT verificado por AfroMercado</p>
+            ) : tour?.rnt ? (
+              <p className="text-xs text-amber-600 mt-1">Pendiente de verificación</p>
+            ) : (
+              <p className="text-xs text-gray-400 mt-1">Ingresar el número mejora la visibilidad de tu tour</p>
+            )}
+          </div>
+
           {/* Política cancelación */}
           <div className="bg-white rounded-2xl border border-gray-100 p-4">
             <h3 className="font-semibold text-[#1A1A1A] mb-2">Política de cancelación</h3>

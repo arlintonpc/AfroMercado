@@ -125,6 +125,30 @@ router.post(
   ComercioController.subirDocumento,
 );
 
+// POST /comercios/declaracion-territorial - solicitar declaracion de organizacion territorial (Ley 1581)
+router.post(
+  "/declaracion-territorial",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.solicitarDeclaracionTerritorial,
+);
+
+// DELETE /comercios/declaracion-territorial - revocar la declaracion propia, sin pasar por revision
+router.delete(
+  "/declaracion-territorial",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.revocarDeclaracionTerritorial,
+);
+
+// PATCH /comercios/compras-publicas - opt-in/opt-out al directorio de proveedores certificados
+router.patch(
+  "/compras-publicas",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.toggleComprasPublicas,
+);
+
 // GET /comercios/:id - ver cualquier comercio (publico)
 router.get("/:id", ComercioController.obtener);
 

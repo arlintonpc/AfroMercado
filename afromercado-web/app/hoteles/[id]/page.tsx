@@ -11,6 +11,7 @@ import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
 import SeccionReviewsHotel from '@/components/hoteles/SeccionReviewsHotel'
 import { Toast, useToast } from '@/components/ui/Toast'
 import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
+import BadgeTurismoComunitario from '@/components/ui/BadgeTurismoComunitario'
 
 const MapaHoteles = dynamic(() => import('@/components/hoteles/MapaHoteles'), { ssr: false })
 
@@ -1224,12 +1225,19 @@ export default function HotelDetallePage() {
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex-1 min-w-0">
                   <h1 className="text-3xl lg:text-4xl font-black text-gray-900">{hotel.comercio.nombre}</h1>
-                  {hotel.rntVerificado && (
-                    <span className="inline-flex items-center gap-1 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full mt-2">
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
-                      RNT verificado
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2 flex-wrap mt-2">
+                    {hotel.rntVerificado && (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
+                        RNT verificado
+                      </span>
+                    )}
+                    <BadgeTurismoComunitario
+                      verificadoEtnico={!!hotel.comercio.verificadoEtnico}
+                      rntVerificado={!!hotel.rntVerificado}
+                      size="sm"
+                    />
+                  </div>
                 </div>
                 <button onClick={toggleFav} disabled={toggling}
                   className={`flex-shrink-0 p-2 rounded-full transition-colors ${esFav ? 'bg-red-50 text-red-500' : 'bg-white/80 text-gray-400 hover:text-red-400'}`}

@@ -81,6 +81,7 @@ router.post("/reservas/:id/review",...soloAuth, ReviewController.crearReviewTour
 // ── ADMIN ─────────────────────────────────────────────────────
 router.get(  "/admin/todos",          ...soloAdmin, TourController.adminListar);
 router.patch("/admin/:id/estado",     ...soloAdmin, TourController.adminCambiarEstado);
+router.patch("/admin/:id/rnt",        ...soloAdmin, TourController.adminVerificarRnt);
 router.get(  "/admin/:id/reservas",   ...soloAdmin, async (req, res, next) => {
   try {
     const prisma = require("../config/prisma");

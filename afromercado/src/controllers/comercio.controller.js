@@ -7,6 +7,7 @@ const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
 const ComercioService = require("../services/comercio.service");
+const DeclaracionTerritorialService = require("../services/declaracion-territorial.service");
 const { generarToken } = require("../utils/auth");
 const CuentaDispersionService = require("../services/cuenta-dispersion.service");
 const NotificacionService = require("../services/notificacion.service");
@@ -230,6 +231,34 @@ const ComercioController = {
       }
       const comercio = await ComercioService.guardarVideoLink(req.usuario.id, videoUrl.trim());
       res.json({ ok: true, comercio });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async toggleComprasPublicas(req, res, next) {
+    try {
+      const { activar } = req.body;
+      const comercio = await ComercioService.toggleComprasPublicas(req.usuario.id, Boolean(activar));
+      res.json({ ok: true, comercio });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async solicitarDeclaracionTerritorial(req, res, next) {
+    try {
+      const data = await DeclaracionTerritorialService.solicitar(req.usuario.id, req.body);
+      res.status(201).json({ ok: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async revocarDeclaracionTerritorial(req, res, next) {
+    try {
+      const data = await DeclaracionTerritorialService.revocar(req.usuario.id);
+      res.json({ ok: true, data });
     } catch (e) {
       next(e);
     }

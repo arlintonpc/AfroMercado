@@ -39,6 +39,7 @@ const CuponController = {
         distribucion = "PUBLICO",
         comercioIds = [],
         usuarioIds = [],
+        programaNombre,
       } = req.body;
 
       if (!codigo || !tipo || valor === undefined || !inicio || !fin) {
@@ -67,6 +68,7 @@ const CuponController = {
         distribucion,
         comercioIds: comercioIds.map(Number),
         usuarioIds: usuarioIds.map(Number),
+        programaNombre: programaNombre?.trim() ? programaNombre.trim() : null,
       });
       res.status(201).json({ ok: true, data: cupon });
     } catch (err) {
@@ -74,13 +76,26 @@ const CuponController = {
     }
   },
 
-  // GET /cupones
+  // GET /cupones?pagina&porPagina&programaNombre
   async listar(req, res, next) {
     try {
       const pagina = req.query.pagina ? parseInt(req.query.pagina) : 1;
       const porPagina = req.query.porPagina ? parseInt(req.query.porPagina) : 20;
-      const resultado = await CuponRepository.listarAdmin({ pagina, porPagina });
+      const resultado = await CuponRepository.listarAdmin({
+        pagina, porPagina,
+        programaNombre: req.query.programaNombre || undefined,
+      });
       res.json({ ok: true, data: resultado });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // GET /cupones/programas → nombres de programa distintos, para poblar filtros
+  async programas(req, res, next) {
+    try {
+      const data = await CuponRepository.listarProgramas();
+      res.json({ ok: true, data });
     } catch (err) {
       next(err);
     }
@@ -116,14 +131,14 @@ const CuponController = {
     } catch (err) { next(err); }
   },
 
-  // GET /cupones/usos?cuponId&estado&desde&hasta&q&pagina&porPagina
+  // GET /cupones/usos?cuponId&estado&desde&hasta&q&programaNombre&pagina&porPagina
   async logUsos(req, res, next) {
     try {
-      const { cuponId, desde, hasta, q, pagina, porPagina } = req.query;
+      const { cuponId, desde, hasta, q, programaNombre, pagina, porPagina } = req.query;
       const estado = req.query.estado ? req.query.estado.split(",") : undefined;
       const data = await CuponRepository.logUsos({
         cuponId: cuponId ? parseInt(cuponId) : undefined,
-        estado, desde, hasta, q,
+        estado, desde, hasta, q, programaNombre,
         pagina: pagina ? parseInt(pagina) : 1,
         porPagina: porPagina ? Math.min(parseInt(porPagina), 100) : 50,
       });
@@ -159,15 +174,15 @@ const CuponController = {
     } catch (err) { next(err); }
   },
 
-  // GET /cupones/:id/usos?estado&desde&hasta&q&pagina&porPagina
+  // GET /cupones/:id/usos?estado&desde&hasta&q&programaNombre&pagina&porPagina
   async usosPorCupon(req, res, next) {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) throw new ErrorValidacion("ID inválido");
-      const { desde, hasta, q, pagina, porPagina } = req.query;
+      const { desde, hasta, q, programaNombre, pagina, porPagina } = req.query;
       const estado = req.query.estado ? req.query.estado.split(",") : undefined;
       const data = await CuponRepository.logUsos({
-        cuponId: id, estado, desde, hasta, q,
+        cuponId: id, estado, desde, hasta, q, programaNombre,
         pagina: pagina ? parseInt(pagina) : 1,
         porPagina: porPagina ? Math.min(parseInt(porPagina), 100) : 50,
       });

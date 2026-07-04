@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { apiFetch } from '@/lib/api/client'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import { buscarComerciosPorFiltro, type ComercioPorFiltro } from '@/lib/api/cupones'
+import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 
 // ── Tipos ─────────────────────────────────────────────────────
 
@@ -17,6 +19,7 @@ interface Cupon {
   usosActuales: number; activo: boolean; inicio: string; fin: string
   soloNuevos: boolean; distribucion: 'PUBLICO' | 'ASIGNADO'
   comercios: CuponComercio[]
+  programaNombre?: string | null
   _count?: { usos: number; asignaciones: number }
 }
 
@@ -32,6 +35,7 @@ interface FormCupon {
   soloNuevos: boolean; distribucion: 'PUBLICO' | 'ASIGNADO'
   comerciosSeleccionados: Comercio[]; usuariosSeleccionados: UsuarioItem[]
   inicio: string; fin: string
+  programaNombre: string
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -57,7 +61,7 @@ function valorDesc(c: Cupon) {
 function formDefault(): FormCupon {
   const ahora = new Date(); ahora.setMinutes(ahora.getMinutes() + 5)
   const fin   = new Date(); fin.setDate(fin.getDate() + 30)
-  return { codigo:'', tipo:'PORCENTAJE', valor:'', minimoCompra:'', usosMaximos:'', usosMaximosPorUsuario:'', soloNuevos:false, distribucion:'PUBLICO', comerciosSeleccionados:[], usuariosSeleccionados:[], inicio:fechaLocal(ahora), fin:fechaLocal(fin) }
+  return { codigo:'', tipo:'PORCENTAJE', valor:'', minimoCompra:'', usosMaximos:'', usosMaximosPorUsuario:'', soloNuevos:false, distribucion:'PUBLICO', comerciosSeleccionados:[], usuariosSeleccionados:[], inicio:fechaLocal(ahora), fin:fechaLocal(fin), programaNombre:'' }
 }
 
 // ── Componentes base ──────────────────────────────────────────
@@ -213,6 +217,98 @@ function BuscadorUsuario({ seleccionados, onAgregar, onQuitar }: { seleccionados
   )
 }
 
+// ── Buscador de comercios por filtro de región (asignación masiva de subsidios) ─
+
+function BuscadorComercioPorFiltro({ seleccionados, onAgregarVarios }: { seleccionados: UsuarioItem[]; onAgregarVarios: (items: UsuarioItem[]) => void }) {
+  const [departamento, setDepartamento] = useState('')
+  const [municipio, setMunicipio] = useState('')
+  const [buscando, setBuscando] = useState(false)
+  const [resultados, setResultados] = useState<ComercioPorFiltro[]>([])
+  const [marcados, setMarcados] = useState<Set<number>>(new Set())
+  const [buscado, setBuscado] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function buscar() {
+    setBuscando(true); setError(null); setBuscado(false)
+    try {
+      const items = await buscarComerciosPorFiltro({ departamento: departamento || undefined, municipio: municipio || undefined })
+      setResultados(items.filter(c => !seleccionados.some(s => s.id === c.usuarioId)))
+      setMarcados(new Set())
+      setBuscado(true)
+    } catch (e) { setError(e instanceof Error ? e.message : 'Error al buscar comercios.') }
+    finally { setBuscando(false) }
+  }
+
+  function alternar(usuarioId: number) {
+    setMarcados(prev => {
+      const nuevo = new Set(prev)
+      if (nuevo.has(usuarioId)) nuevo.delete(usuarioId); else nuevo.add(usuarioId)
+      return nuevo
+    })
+  }
+  function seleccionarTodos() {
+    setMarcados(marcados.size === resultados.length ? new Set() : new Set(resultados.map(c => c.usuarioId)))
+  }
+  function agregarMarcados() {
+    const items: UsuarioItem[] = resultados
+      .filter(c => marcados.has(c.usuarioId))
+      .map(c => ({ id: c.usuarioId, nombre: c.nombre }))
+    onAgregarVarios(items)
+    setResultados(resultados.filter(c => !marcados.has(c.usuarioId)))
+    setMarcados(new Set())
+  }
+
+  return (
+    <Campo label="Buscar comercios por región" sub="(asignación masiva por departamento/municipio)">
+      <div className="flex flex-wrap gap-2">
+        <select value={departamento} onChange={e => { setDepartamento(e.target.value); setMunicipio('') }} className={`${inputCls} flex-1 min-w-[160px]`}>
+          <option value="">Todos los departamentos</option>
+          {DEPARTAMENTOS.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <select value={municipio} onChange={e => setMunicipio(e.target.value)} disabled={!departamento} className={`${inputCls} flex-1 min-w-[160px] disabled:opacity-50`}>
+          <option value="">Todos los municipios</option>
+          {municipiosDe(departamento).map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <button type="button" onClick={buscar} disabled={buscando} className="bg-[#2D6A4F] hover:bg-[#245a42] text-white text-sm font-semibold px-4 py-2 rounded-xl disabled:opacity-50 transition-colors whitespace-nowrap">
+          {buscando ? 'Buscando…' : 'Buscar'}
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-600 mt-1.5">{error}</p>}
+
+      {buscado && resultados.length === 0 && (
+        <p className="text-xs text-[#1A1A1A]/40 mt-2">Sin comercios verificados que coincidan con el filtro.</p>
+      )}
+
+      {resultados.length > 0 && (
+        <div className="mt-2 border border-[#1A1A1A]/10 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 bg-[#F8F5F0]/80 border-b border-[#1A1A1A]/8">
+            <label className="flex items-center gap-2 text-xs font-semibold text-[#1A1A1A]/60 cursor-pointer">
+              <input type="checkbox" checked={marcados.size === resultados.length && resultados.length > 0} onChange={seleccionarTodos} className="w-3.5 h-3.5 accent-[#2D6A4F]" />
+              Seleccionar todos ({resultados.length})
+            </label>
+            {marcados.size > 0 && (
+              <button type="button" onClick={agregarMarcados} className="text-xs font-semibold text-[#2D6A4F] hover:underline">
+                Agregar {marcados.size} seleccionado{marcados.size > 1 ? 's' : ''}
+              </button>
+            )}
+          </div>
+          <ul className="max-h-52 overflow-y-auto divide-y divide-[#1A1A1A]/5">
+            {resultados.map(c => (
+              <li key={c.id}>
+                <label className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[#F8F5F0] cursor-pointer">
+                  <input type="checkbox" checked={marcados.has(c.usuarioId)} onChange={() => alternar(c.usuarioId)} className="w-3.5 h-3.5 accent-[#2D6A4F] flex-shrink-0" />
+                  <span className="text-sm text-[#1A1A1A] truncate">{c.nombre}</span>
+                  <span className="text-xs text-[#1A1A1A]/40 ml-auto flex-shrink-0">{c.municipio}{c.departamento ? `, ${c.departamento}` : ''}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Campo>
+  )
+}
+
 // ── Dashboard cards ───────────────────────────────────────────
 
 function TarjetaKPI({ titulo, valor, sub, color }: { titulo: string; valor: string; sub?: string; color?: string }) {
@@ -239,6 +335,7 @@ export default function PaginaCupones() {
   const [desactivando, setDesactivando] = useState<number | null>(null)
   const [secLimites, setSecLimites]     = useState(false)
   const [secAlcance, setSecAlcance]     = useState(false)
+  const [modoAsignacion, setModoAsignacion] = useState<'individual' | 'region'>('individual')
 
   async function cargar() {
     try {
@@ -292,9 +389,10 @@ export default function PaginaCupones() {
           soloNuevos: form.soloNuevos, distribucion: form.distribucion,
           comercioIds: form.comerciosSeleccionados.map(c => c.id),
           usuarioIds:  form.usuariosSeleccionados.map(u => u.id),
+          programaNombre: form.programaNombre.trim() || undefined,
         },
       })
-      setForm(formDefault()); setMostrarForm(false); setSecLimites(false); setSecAlcance(false)
+      setForm(formDefault()); setMostrarForm(false); setSecLimites(false); setSecAlcance(false); setModoAsignacion('individual')
       setAviso('Cupón creado correctamente.')
       setTimeout(() => setAviso(null), 4000)
       await cargar()
@@ -373,6 +471,10 @@ export default function PaginaCupones() {
             <Campo label="Compra mínima (COP)" sub="(opcional)">
               <input type="number" min="0" value={form.minimoCompra} onChange={e => set('minimoCompra',e.target.value)} placeholder="Sin mínimo si está vacío" className={inputCls} />
             </Campo>
+            <Campo label="Programa de subsidio" sub="(opcional)">
+              <input type="text" value={form.programaNombre} onChange={e => set('programaNombre',e.target.value)} placeholder='Ej: Semillas 2026' maxLength={100} className={inputCls} />
+              <p className="text-[10px] text-[#1A1A1A]/40 mt-0.5">Agrupa este cupón con otros del mismo programa para trazabilidad.</p>
+            </Campo>
             <Campo label="Válido desde"><input type="datetime-local" value={form.inicio} onChange={e => set('inicio',e.target.value)} className={inputCls} /></Campo>
             <Campo label="Válido hasta"><input type="datetime-local" value={form.fin} onChange={e => set('fin',e.target.value)} className={inputCls} /></Campo>
           </div>
@@ -406,7 +508,27 @@ export default function PaginaCupones() {
                 ))}
               </div>
               {form.distribucion === 'ASIGNADO' && (
-                <div className="mt-4"><BuscadorUsuario seleccionados={form.usuariosSeleccionados} onAgregar={u => set('usuariosSeleccionados',[...form.usuariosSeleccionados,u])} onQuitar={id => set('usuariosSeleccionados',form.usuariosSeleccionados.filter(u=>u.id!==id))} /></div>
+                <div className="mt-4 flex flex-col gap-3">
+                  <div className="flex gap-2">
+                    {(['individual','region'] as const).map(m => (
+                      <button key={m} type="button" onClick={() => setModoAsignacion(m)}
+                        className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${modoAsignacion===m ? 'bg-[#2D6A4F] text-white' : 'bg-[#1A1A1A]/5 text-[#1A1A1A]/50 hover:bg-[#1A1A1A]/10'}`}>
+                        {m==='individual' ? 'Buscar usuario' : 'Buscar por región'}
+                      </button>
+                    ))}
+                  </div>
+                  {modoAsignacion === 'individual' ? (
+                    <BuscadorUsuario seleccionados={form.usuariosSeleccionados} onAgregar={u => set('usuariosSeleccionados',[...form.usuariosSeleccionados,u])} onQuitar={id => set('usuariosSeleccionados',form.usuariosSeleccionados.filter(u=>u.id!==id))} />
+                  ) : (
+                    <BuscadorComercioPorFiltro seleccionados={form.usuariosSeleccionados} onAgregarVarios={items => set('usuariosSeleccionados',[...form.usuariosSeleccionados,...items])} />
+                  )}
+                  {modoAsignacion === 'region' && form.usuariosSeleccionados.length > 0 && (
+                    <div>
+                      <p className="text-xs text-[#1A1A1A]/40 mb-1.5">{form.usuariosSeleccionados.length} usuario{form.usuariosSeleccionados.length > 1 ? 's' : ''} asignado{form.usuariosSeleccionados.length > 1 ? 's' : ''}:</p>
+                      <div className="flex flex-wrap gap-2">{form.usuariosSeleccionados.map(u => <Chip key={u.id} label={u.nombre} onRemove={() => set('usuariosSeleccionados',form.usuariosSeleccionados.filter(x=>x.id!==u.id))} />)}</div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </Seccion>

@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext'
 import SeccionReviewsTour from '@/components/tours/SeccionReviewsTour'
 import { Toast, useToast } from '@/components/ui/Toast'
 import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
+import BadgeTurismoComunitario from '@/components/ui/BadgeTurismoComunitario'
 
 const SERVICIOS_LABELS: Record<string, { icon: string; label: string }> = {
   transporte:  { icon: '🚐', label: 'Transporte incluido' },
@@ -748,7 +749,14 @@ export default function TourDetallePage() {
             )}
             <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Operado por</p>
-              <p className="font-black text-gray-900 text-base">{tour.comercio.nombre}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-black text-gray-900 text-base">{tour.comercio.nombre}</p>
+                <BadgeTurismoComunitario
+                  verificadoEtnico={!!tour.comercio.verificadoEtnico}
+                  rntVerificado={!!tour.rntVerificado}
+                  size="sm"
+                />
+              </div>
               <p className="text-sm text-gray-500">{tour.comercio.municipio}{tour.comercio.departamento ? `, ${tour.comercio.departamento}` : ''}</p>
             </div>
             {tour.comercio.whatsapp && (

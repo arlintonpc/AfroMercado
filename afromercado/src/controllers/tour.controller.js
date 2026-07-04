@@ -99,6 +99,13 @@ const TourController = {
     } catch (e) { next(e); }
   },
 
+  async adminVerificarRnt(req, res, next) {
+    try {
+      const { verificado } = req.body;
+      res.json({ ok: true, data: await TourService.adminVerificarRnt(Number(req.params.id), verificado) });
+    } catch (e) { next(e); }
+  },
+
   async subirFotos(req, res, next) {
     try {
       const files = req.files ?? [];

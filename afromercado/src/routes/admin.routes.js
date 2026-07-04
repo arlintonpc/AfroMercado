@@ -35,6 +35,7 @@ router.post("/whatsapp/conectar", ...soloAdmin, AdminController.conectarWhatsApp
 
 // Búsqueda de comercios, productos y usuarios (para formularios admin)
 router.get("/comercios/buscar", ...soloAdmin, AdminController.buscarComercios);
+router.get("/comercios/buscar-por-filtro", ...soloAdmin, AdminController.buscarComerciosPorFiltro);
 router.get("/productos/buscar", ...soloAdmin, AdminController.buscarProductos);
 router.get("/usuarios/buscar",  ...soloAdmin, AdminController.buscarUsuarios);
 
@@ -78,6 +79,7 @@ router.get("/comercios",                        ...soloAdmin, AdminController.li
 router.patch("/comercios/:id/verificar",        ...soloAdmin, AdminController.verificarComerciante);
 router.patch("/comercios/:id/whatsapp-visible", ...soloAdmin, AdminController.toggleWhatsappVisible);
 router.patch("/comercios/:id/verificado-etnico", ...soloAdmin, AdminController.toggleVerificadoEtnico);
+router.patch("/comercios/:id/declaracion-territorial", ...soloAdmin, AdminController.revisarDeclaracionTerritorial);
 router.post("/comercios/:id/comision",          ...soloAdmin, AdminController.setComisionComercio);
 
 // Panel de administración — dashboard y gestión avanzada
