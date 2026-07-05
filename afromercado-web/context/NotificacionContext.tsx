@@ -20,11 +20,19 @@ export interface EventoMensajeChat {
   mensaje: { id: number }
 }
 
+export interface EventoUbicacionRepartidor {
+  entregaId: number
+  lat: number
+  lng: number
+  actualizadoAt: string
+}
+
 interface NotificacionCtx {
   notificaciones: Notificacion[]
   noLeidas: number
   cargando: boolean
   ultimoMensajeChat: EventoMensajeChat | null
+  ultimaUbicacionRepartidor: EventoUbicacionRepartidor | null
   marcarLeida: (id: number) => Promise<void>
   marcarTodasLeidas: () => Promise<void>
 }
@@ -34,6 +42,7 @@ const Ctx = createContext<NotificacionCtx>({
   noLeidas: 0,
   cargando: false,
   ultimoMensajeChat: null,
+  ultimaUbicacionRepartidor: null,
   marcarLeida: async () => {},
   marcarTodasLeidas: async () => {},
 })
@@ -46,6 +55,7 @@ export function NotificacionProvider({ children }: { children: React.ReactNode }
   const [noLeidas, setNoLeidas] = useState(0)
   const [cargando, setCargando] = useState(false)
   const [ultimoMensajeChat, setUltimoMensajeChat] = useState<EventoMensajeChat | null>(null)
+  const [ultimaUbicacionRepartidor, setUltimaUbicacionRepartidor] = useState<EventoUbicacionRepartidor | null>(null)
   const esRef = useRef<EventSource | null>(null)
   const idsRef = useRef<Set<number>>(new Set())
   const idsNoLeidasRef = useRef<Set<number>>(new Set())
@@ -141,6 +151,15 @@ export function NotificacionProvider({ children }: { children: React.ReactNode }
       }
     })
 
+    esActual.addEventListener('ubicacion-repartidor', (e) => {
+      try {
+        if (tokenActivoRef.current !== token) return
+        setUltimaUbicacionRepartidor(JSON.parse(e.data) as EventoUbicacionRepartidor)
+      } catch {
+        // evento malformado
+      }
+    })
+
     esActual.onerror = () => {
       // El navegador reintenta automaticamente.
     }
@@ -184,6 +203,7 @@ export function NotificacionProvider({ children }: { children: React.ReactNode }
       noLeidas,
       cargando,
       ultimoMensajeChat,
+      ultimaUbicacionRepartidor,
       marcarLeida,
       marcarTodasLeidas,
     }}>

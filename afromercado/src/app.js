@@ -104,6 +104,14 @@ app.use(
   "/uploads/marca",
   express.static(path.join(__dirname, "..", "uploads", "marca"))
 );
+app.use("/uploads/hojas-de-vida", (req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
+app.use(
+  "/uploads/hojas-de-vida",
+  express.static(path.join(__dirname, "..", "uploads", "hojas-de-vida"))
+);
 
 // Rate limiting — se omite completamente en desarrollo para no interferir con hot-reload
 const esProd = process.env.NODE_ENV === "production";

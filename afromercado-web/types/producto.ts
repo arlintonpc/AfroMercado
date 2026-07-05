@@ -38,6 +38,8 @@ export interface Producto {
     videoRecorteInicioSegundos?: number | null
     videoRecorteFinSegundos?: number | null
     videoMimeType?: string | null
+    ivaActivo?: boolean
+    ivaPorcentaje?: number
   }
   categoriaId?: string
   comercioId?: string

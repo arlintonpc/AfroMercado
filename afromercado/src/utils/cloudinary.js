@@ -121,6 +121,16 @@ async function subirACloudinary(rutaArchivo, carpeta = "afromercado/productos") 
 }
 
 /**
+ * Sube un documento (PDF, etc.) a Cloudinary como resource_type "raw" y
+ * devuelve la secure_url. Devuelve null si no esta configurado o si falla
+ * (para usar el disco local como respaldo).
+ */
+async function subirDocumentoACloudinary(rutaArchivo, carpeta = "afromercado/documentos") {
+  const subida = await subirArchivoACloudinary(rutaArchivo, { carpeta, resourceType: "raw" });
+  return subida?.secure_url ?? null;
+}
+
+/**
  * Sube un video a Cloudinary y devuelve URLs derivadas y metadatos.
  * Devuelve null si no esta configurado o si falla.
  */
@@ -171,6 +181,7 @@ async function eliminarDeCloudinary(publicId, resourceType = "video") {
 
 module.exports = {
   subirACloudinary,
+  subirDocumentoACloudinary,
   subirVideoACloudinary,
   eliminarDeCloudinary,
   cloudinaryActivo,

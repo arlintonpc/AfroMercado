@@ -8,6 +8,7 @@ const { enviarEmail } = require("../utils/email");
 const emailHotel = require("../utils/templates/email-hotel");
 const { notificarReservaHotel, notificarClienteReserva } = require("../utils/notificaciones");
 const AlianzaService = require("./alianza.service");
+const FacturacionService = require("./facturacion.service");
 
 function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -574,6 +575,10 @@ const HotelService = {
         comercioNombre: reserva.configHotel.comercio.nombre,
       }).catch(e => console.error('[WhatsApp]', e?.message ?? e));
     });
+
+    FacturacionService.emitirParaReferencia("HOTEL", reserva.id).catch((e) =>
+      console.error(`[FACTURACION] emisión fallida para ReservaHotel #${reserva.id}, quedará en reintento:`, e.message)
+    );
 
     return reserva;
   },

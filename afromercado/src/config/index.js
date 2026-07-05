@@ -9,6 +9,14 @@ function requerido(nombre, valorPorDefecto = undefined) {
   return valor;
 }
 
+// Variables degradables: si faltan, la función asociada queda deshabilitada
+// pero el servidor sigue arrancando (a diferencia de requerido(), que sí detiene el arranque).
+function advertirSiFalta(nombre, contexto) {
+  if (!process.env[nombre]) {
+    console.warn(`[CONFIG] Advertencia: falta ${nombre} — ${contexto} estará deshabilitado.`);
+  }
+}
+
 const config = {
   entorno: process.env.NODE_ENV || "development",
   puerto: parseInt(process.env.PORT || "3000", 10),
@@ -23,5 +31,10 @@ const config = {
 
   bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || "10", 10),
 };
+
+advertirSiFalta("SENTRY_DSN", "el reporte de errores a Sentry");
+advertirSiFalta("CLOUDINARY_URL", "la subida de imágenes/videos a Cloudinary");
+advertirSiFalta("VAPID_PUBLIC_KEY", "las notificaciones push");
+advertirSiFalta("VAPID_PRIVATE_KEY", "las notificaciones push");
 
 module.exports = config;

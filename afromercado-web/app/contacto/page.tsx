@@ -1,6 +1,11 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import { useAuth } from '@/context/AuthContext'
+import { crearPqrsd, type TipoPqrsd } from '@/lib/api/pqrsd'
 
 const CANALES = [
   {
@@ -22,6 +27,136 @@ const CANALES = [
     accion: 'Ir al catálogo',
   },
 ]
+
+const TIPOS: { valor: TipoPqrsd; etiqueta: string }[] = [
+  { valor: 'PETICION', etiqueta: 'Petición' },
+  { valor: 'QUEJA', etiqueta: 'Queja' },
+  { valor: 'RECLAMO', etiqueta: 'Reclamo' },
+  { valor: 'SUGERENCIA', etiqueta: 'Sugerencia' },
+  { valor: 'DENUNCIA', etiqueta: 'Denuncia' },
+]
+
+function FormularioPqrsd() {
+  const { usuario } = useAuth()
+  const [nombre, setNombre] = useState(usuario?.nombre ?? '')
+  const [email, setEmail] = useState(usuario?.email ?? '')
+  const [telefono, setTelefono] = useState('')
+  const [tipo, setTipo] = useState<TipoPqrsd>('PETICION')
+  const [asunto, setAsunto] = useState('')
+  const [mensaje, setMensaje] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [exito, setExito] = useState(false)
+
+  async function enviar(e: React.FormEvent) {
+    e.preventDefault()
+    if (!usuario && (!nombre.trim() || !email.trim())) {
+      setError('Tu nombre y correo son obligatorios.')
+      return
+    }
+    if (!asunto.trim() || !mensaje.trim()) {
+      setError('Completa el asunto y el mensaje.')
+      return
+    }
+    setEnviando(true)
+    setError(null)
+    try {
+      await crearPqrsd({
+        nombreContacto: usuario ? undefined : nombre.trim(),
+        emailContacto: usuario ? undefined : email.trim(),
+        telefonoContacto: telefono.trim() || undefined,
+        tipo,
+        asunto: asunto.trim(),
+        mensaje: mensaje.trim(),
+      })
+      setExito(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo enviar tu mensaje.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  if (exito) {
+    return (
+      <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 text-center">
+        <p className="text-2xl mb-2">✅</p>
+        <h2 className="text-lg font-semibold text-[#1A1A1A]">Mensaje enviado</h2>
+        <p className="mt-2 text-sm text-[#1A1A1A]/60">
+          Recibimos tu mensaje. Te responderemos por correo{usuario ? ' y aquí en tu cuenta' : ''}.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={enviar} className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-5 md:p-6 shadow-sm">
+      <h2 className="text-lg md:text-xl font-semibold text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
+        ¿Nada de esto encajó? Escríbenos directamente
+      </h2>
+      <p className="mt-1 text-sm text-[#1A1A1A]/55">
+        Para peticiones, quejas, reclamos, sugerencias o denuncias dirigidas a AfroMercado (no a un comercio en particular).
+      </p>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {!usuario && (
+          <>
+            <input
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Tu nombre"
+              className="rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+            />
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              placeholder="Tu correo"
+              className="rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+            />
+          </>
+        )}
+        <input
+          value={telefono}
+          onChange={(e) => setTelefono(e.target.value)}
+          placeholder="Teléfono (opcional)"
+          className="rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+        />
+        <select
+          value={tipo}
+          onChange={(e) => setTipo(e.target.value as TipoPqrsd)}
+          className="rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+        >
+          {TIPOS.map((t) => <option key={t.valor} value={t.valor}>{t.etiqueta}</option>)}
+        </select>
+      </div>
+
+      <input
+        value={asunto}
+        onChange={(e) => setAsunto(e.target.value)}
+        placeholder="Asunto"
+        className="mt-3 w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+      />
+      <textarea
+        value={mensaje}
+        onChange={(e) => setMensaje(e.target.value)}
+        rows={4}
+        placeholder="Cuéntanos con detalle"
+        className="mt-3 w-full resize-none rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+      />
+
+      {error && <p className="mt-2 text-xs text-[#C0392B]">{error}</p>}
+
+      <button
+        type="submit"
+        disabled={enviando}
+        className="mt-4 rounded-xl bg-[#2D6A4F] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#245a42] transition-colors disabled:opacity-50"
+      >
+        {enviando ? 'Enviando…' : 'Enviar mensaje'}
+      </button>
+    </form>
+  )
+}
 
 export default function PaginaContacto() {
   return (
@@ -59,6 +194,10 @@ export default function PaginaContacto() {
               </Link>
             </div>
           ))}
+        </div>
+
+        <div className="mt-6">
+          <FormularioPqrsd />
         </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">

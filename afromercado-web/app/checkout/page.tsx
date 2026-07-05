@@ -63,6 +63,7 @@ export default function PaginaCheckout() {
   const [cuponCombinable, setCuponCombinable] = useState(true)
 
   const grupos = useMemo(() => agruparPorComercio(items), [items])
+  const ivaEstimado = useMemo(() => grupos.reduce((acc, g) => acc + g.iva, 0), [grupos])
 
   // Subtotal por comercio (id → $). Permite que los cupones restringidos a una
   // tienda se validen y estimen igual que en el checkout real.
@@ -682,6 +683,13 @@ export default function PaginaCheckout() {
                 </div>
               )}
 
+              {ivaEstimado > 0 && (
+                <div className="flex justify-between text-sm text-[#1A1A1A]/70 mb-1">
+                  <span>IVA</span>
+                  <span>{formatearPrecio(ivaEstimado)}</span>
+                </div>
+              )}
+
               <div className="flex justify-between text-sm text-[#1A1A1A]/70 mb-1">
                 <span>Envío estimado</span>
                 <span>
@@ -714,6 +722,7 @@ export default function PaginaCheckout() {
                 <span className="text-xl font-bold text-[#2D6A4F]">
                   {formatearPrecio(
                     (cuponAplicado ? cuponAplicado.totalConDescuento : subtotal) +
+                    ivaEstimado +
                     (costoEnvio ?? 0)
                   )}
                 </span>

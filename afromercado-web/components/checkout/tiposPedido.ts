@@ -44,12 +44,22 @@ export interface ComercioSubPedido {
   municipio?: string
 }
 
+export interface EntregaSubPedido {
+  id: number
+  estado: string
+  ultimaLatitud?: number | null
+  ultimaLongitud?: number | null
+  ultimaUbicacionAt?: string | null
+  calificacion?: { calificacion: number } | null
+}
+
 export interface SubPedido {
   id?: string | number
   comercio?: ComercioSubPedido | string | null
   items?: ItemSubPedido[]
   subtotal?: number
   estado?: string
+  entrega?: EntregaSubPedido | null
 }
 
 export interface PedidoDetalle {

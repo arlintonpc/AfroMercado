@@ -19,6 +19,7 @@ function mapearPedido(p) {
     ...p,
     subtotal:      Number(p.subtotal),
     comisionTotal: Number(p.comisionTotal),
+    ivaTotal:      Number(p.ivaTotal ?? 0),
     total:         Number(p.total),
     costoEnvio:    Number(p.costoEnvio ?? 0),
     cuponDescuento: p.cuponDescuento != null ? Number(p.cuponDescuento) : null,
@@ -26,6 +27,7 @@ function mapearPedido(p) {
       ...sp,
       subtotal:             Number(sp.subtotal),
       comision:             Number(sp.comision),
+      iva:                  Number(sp.iva ?? 0),
       neto:                 Number(sp.neto),
       tasaComisionAplicada: sp.tasaComisionAplicada != null ? Number(sp.tasaComisionAplicada) : null,
       items: (sp.items || []).map(item => ({
@@ -50,6 +52,7 @@ const PedidoRepository = {
       compradorId,
       subtotal,
       comisionTotal,
+      ivaTotal,
       total,
       costoEnvio,
       direccionTexto,
@@ -66,6 +69,7 @@ const PedidoRepository = {
         compradorId,
         subtotal,
         comisionTotal,
+        ivaTotal: ivaTotal ?? 0,
         total,
         costoEnvio: costoEnvio ?? 0,
         direccionTexto,
@@ -85,6 +89,7 @@ const PedidoRepository = {
             subtotal: sp.subtotal,
             comision: sp.comision,
             tasaComisionAplicada: sp.tasaComisionAplicada ?? null,
+            iva: sp.iva ?? 0,
             neto: sp.neto,
             estado: "CONFIRMADO",
             items: {
@@ -120,6 +125,7 @@ const PedidoRepository = {
           include: {
             items: { include: { producto: true } },
             comercio: true,
+            entrega: { include: { calificacion: true } },
           },
         },
       },

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { misReservasTour, cancelarReservaTour, type ReservaTour } from '@/lib/api/tour'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
+import ModalReportarProblema from '@/components/disputas/ModalReportarProblema'
 
 const ESTADO_INFO: Record<string, { label: string; color: string; paso: number }> = {
   PENDIENTE:  { label: '⏳ Pendiente',   color: 'bg-amber-100 text-amber-700', paso: 1 },
@@ -65,6 +66,7 @@ export default function MisReservasTourPage() {
   function TarjetaReserva({ r }: { r: ReservaTour }) {
     const ei = ESTADO_INFO[r.estado]
     const fecha = new Date(r.fechaTour).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })
+    const [modalReportar, setModalReportar] = useState(false)
     return (
       <div className="bg-white rounded-2xl border border-gray-100 p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
@@ -100,7 +102,22 @@ export default function MisReservasTourPage() {
               {cancelando === r.id ? 'Cancelando…' : 'Cancelar'}
             </button>
           )}
+          {r.estado === 'COMPLETADA' && (
+            <button onClick={() => setModalReportar(true)}
+              className="text-xs text-[#C0392B] hover:underline">
+              Reportar un problema
+            </button>
+          )}
         </div>
+
+        {modalReportar && (
+          <ModalReportarProblema
+            moduloOrigen="TOUR"
+            referenciaId={r.id}
+            onCerrar={() => setModalReportar(false)}
+            onExito={() => setModalReportar(false)}
+          />
+        )}
       </div>
     )
   }

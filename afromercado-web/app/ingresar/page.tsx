@@ -24,9 +24,10 @@ function FormularioIngresar() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/'
+  const codigoReferido = searchParams.get('ref') || undefined
   const { login, registro } = useAuth()
 
-  const [modo, setModo] = useState<Modo>('login')
+  const [modo, setModo] = useState<Modo>(codigoReferido ? 'registro' : 'login')
 
   // Campos
   const [nombre, setNombre] = useState('')
@@ -90,6 +91,7 @@ function FormularioIngresar() {
           telefono: telefono.replace(/\D/g, ''),
           rol: 'COMPRADOR',
           autorizacionDatos: true,
+          ...(codigoReferido ? { codigoReferido } : {}),
         })
       }
       router.replace(redirect)

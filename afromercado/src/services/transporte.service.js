@@ -3,6 +3,7 @@ const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const sseManager = require("../utils/sse-manager");
 const { enviarPushAUsuario } = require("../utils/push");
 const AlianzaService = require("./alianza.service");
+const FacturacionService = require("./facturacion.service");
 
 function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -214,6 +215,11 @@ const TransporteService = {
     if (operadorId) {
       await notif(operadorId, "🛥️ Nueva reserva de transporte", `${nombreContacto} reservó ${asientos} asiento(s) en ${ruta.origen} → ${ruta.destino}`, "/comerciante/transportes");
     }
+
+    FacturacionService.emitirParaReferencia("TRANSPORTE", reserva.id).catch((e) =>
+      console.error(`[FACTURACION] emisión fallida para ReservaTransporte #${reserva.id}, quedará en reintento:`, e.message)
+    );
+
     return reserva;
   },
 

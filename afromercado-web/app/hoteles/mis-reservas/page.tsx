@@ -7,6 +7,7 @@ import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Toast, useToast } from '@/components/ui/Toast'
+import ModalReportarProblema from '@/components/disputas/ModalReportarProblema'
 
 const ESTADO_INFO: Record<string, { label: string; color: string; paso: number }> = {
   PENDIENTE:  { label: 'â³ Esperando confirmaciÃ³n', color: 'bg-amber-100 text-amber-700',  paso: 0 },
@@ -48,6 +49,7 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
   const [cargandoPolitica, setCargandoPolitica] = useState(false)
   const [copiado, setCopiado] = useState(false)
   const [generandoToken, setGenerandoToken] = useState(false)
+  const [modalReportar, setModalReportar] = useState(false)
 
   const puedeCheckin = reserva.estado === 'CONFIRMADA' && !reserva.checkinOnlineAt
   const diasParaEntrada = Math.ceil((new Date(reserva.fechaEntrada).getTime() - Date.now()) / 86400000)
@@ -174,6 +176,22 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
           <span>âœ“</span>
           <span>Check-in realizado Â· {new Date(reserva.checkinOnlineAt).toLocaleDateString('es-CO')}</span>
         </div>
+      )}
+
+      {reserva.estado === 'CHECKOUT' && (
+        <button onClick={() => setModalReportar(true)}
+          className="mt-3 w-full text-center text-xs font-medium text-[#C0392B] border border-[#C0392B]/30 rounded-xl py-2 hover:bg-[#C0392B]/5 transition-colors">
+          Reportar un problema
+        </button>
+      )}
+
+      {modalReportar && (
+        <ModalReportarProblema
+          moduloOrigen="HOTEL"
+          referenciaId={reserva.id}
+          onCerrar={() => setModalReportar(false)}
+          onExito={() => setModalReportar(false)}
+        />
       )}
 
       {/* Modal confirmaciÃ³n cancelaciÃ³n */}

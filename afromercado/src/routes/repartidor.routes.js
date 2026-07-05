@@ -11,6 +11,8 @@ router.get("/entregas",              ...soloRepartidor, RepartidorController.mis
 router.get("/entregas/disponibles",  ...soloRepartidor, RepartidorController.disponibles);
 router.patch("/entregas/:id/tomar",  ...soloRepartidor, RepartidorController.tomar);
 router.patch("/entregas/:id/estado", ...soloRepartidor, RepartidorController.actualizarEstado);
+router.patch("/entregas/:id/ubicacion", ...soloRepartidor, RepartidorController.actualizarUbicacion);
+router.post("/entregas/:id/calificar", autenticar, RepartidorController.calificar);
 router.post("/entregas/:id/foto",    ...soloRepartidor, RepartidorController.uploadFotoEntrega, RepartidorController.subirFotoEntrega);
 
 // ── Estadísticas del repartidor ────────────────────────────────

@@ -12,6 +12,7 @@ const soloCompradores = [autenticar, autorizar("COMPRADOR", "COMERCIANTE", "REPA
 router.post("/checkout", ...soloCompradores, PedidoController.checkout);
 router.get("/", ...soloCompradores, PedidoController.listar);
 router.get("/:id", ...soloCompradores, PedidoController.detalle);
+router.get("/:id/recibo.pdf", ...soloCompradores, PedidoController.reciboPdf);
 router.post("/:id/cancelar", ...soloCompradores, PedidoController.cancelar);
 
 module.exports = router;

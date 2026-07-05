@@ -1,7 +1,9 @@
-const CACHE_VERSION = 'afromercado-pwa-v1';
+const CACHE_VERSION = 'afromercado-pwa-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
+const PAGES_CACHE = `${CACHE_VERSION}-pages`;
 const CORE_ASSETS = [
   '/',
+  '/offline',
   '/manifest.webmanifest',
   '/icon-192.svg',
   '/icon-512.svg',
@@ -50,8 +52,16 @@ self.addEventListener('fetch', event => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .then(response => response)
-        .catch(() => caches.match('/'))
+        .then(response => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(PAGES_CACHE).then(cache => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match(request, { cacheName: PAGES_CACHE }).then(cached => cached || caches.match('/offline'))
+        )
     );
     return;
   }

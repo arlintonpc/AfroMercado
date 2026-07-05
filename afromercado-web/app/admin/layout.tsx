@@ -14,6 +14,10 @@ const NAV_LINKS = [
   { href: '/admin/comerciantes',         label: 'Comerciantes'   },
   { href: '/admin/solicitudes-repartidor', label: 'Repartidores' },
   { href: '/admin/liquidaciones',        label: 'Liquidaciones'  },
+  { href: '/admin/disputas',             label: 'Reclamos'       },
+  { href: '/admin/facturas',             label: 'Facturas'       },
+  { href: '/admin/pqrsd',                label: 'PQRSD'          },
+  { href: '/admin/empleo',               label: 'Empleo'         },
   { href: '/admin/entregas',             label: 'Entregas'       },
   { href: '/admin/envios',              label: 'Envíos'         },
   { href: '/admin/pedidos',              label: 'Pedidos'        },
@@ -142,13 +146,13 @@ export default function AdminLayout({
       {/* Nav secundaria */}
       <nav className="border-b border-[#1A1A1A]/10 bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <ul className="flex overflow-x-auto gap-1 py-1 scrollbar-none">
+          <ul className="flex flex-wrap gap-1 py-2">
             {NAV_LINKS.map(({ href, label }) => {
               const activo = href === '/admin'
                 ? pathname === '/admin'
                 : pathname === href || pathname.startsWith(href + '/')
               return (
-                <li key={href} className="shrink-0">
+                <li key={href}>
                   <Link
                     href={href}
                     className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${

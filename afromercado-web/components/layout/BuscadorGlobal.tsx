@@ -9,6 +9,7 @@ const ICONOS  = { productos: '🛍️', hoteles: '🏨', tours: '🗺️', trans
 const RUTAS   = { productos: '/producto', hoteles: '/hoteles', tours: '/tours', transportes: '/transportes' } as const
 const LABELS  = { productos: 'Productos', hoteles: 'Hoteles', tours: 'Tours', transportes: 'Transportes' } as const
 const SUGERENCIAS = ['Hoteles en Quibdó', 'Tours río Atrato', 'Artesanías', 'Transporte', 'Gastronomía']
+const RADIO_CERCA_KM = 30
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value)
@@ -24,14 +25,32 @@ export default function BuscadorGlobal() {
   const [q, setQ] = useState('')
   const [resultados, setResultados] = useState<ResultadoBusqueda | null>(null)
   const [cargando, setCargando] = useState(false)
+  const [cercaDeMi, setCercaDeMi] = useState(false)
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [buscandoGps, setBuscandoGps] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const qDebounced = useDebounce(q, 300)
+
+  function activarCercaDeMi() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return
+    setBuscandoGps(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setCercaDeMi(true)
+        setBuscandoGps(false)
+      },
+      () => setBuscandoGps(false),
+      { enableHighAccuracy: true, timeout: 8000 }
+    )
+  }
 
   useEffect(() => {
     if (qDebounced.trim().length < 2) { setResultados(null); return }
     setCargando(true)
-    busquedaGlobal(qDebounced).then(setResultados).finally(() => setCargando(false))
-  }, [qDebounced])
+    const filtros = cercaDeMi && coords ? { lat: coords.lat, lng: coords.lng, radioKm: RADIO_CERCA_KM } : {}
+    busquedaGlobal(qDebounced, filtros).then(setResultados).finally(() => setCargando(false))
+  }, [qDebounced, cercaDeMi, coords])
 
   useEffect(() => {
     if (abierto) setTimeout(() => inputRef.current?.focus(), 50)
@@ -90,6 +109,19 @@ export default function BuscadorGlobal() {
                 <button onClick={() => setAbierto(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none flex-shrink-0">×</button>
               </div>
 
+              {/* Cerca de mí */}
+              <div className="px-4 py-2 border-b border-gray-100">
+                <button
+                  onClick={() => (cercaDeMi ? setCercaDeMi(false) : activarCercaDeMi())}
+                  disabled={buscandoGps}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                    cercaDeMi ? 'bg-[#2D6A4F] text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                >
+                  📍 {buscandoGps ? 'Ubicándote…' : cercaDeMi ? `Cerca de mí (${RADIO_CERCA_KM}km)` : 'Cerca de mí'}
+                </button>
+              </div>
+
               {/* Resultados */}
               {resultados && total > 0 && (
                 <div className="max-h-[60vh] overflow-y-auto py-2">
@@ -102,7 +134,7 @@ export default function BuscadorGlobal() {
                           {ICONOS[modulo]} {LABELS[modulo]}
                         </p>
                         {items.map((item: any) => {
-                          const foto = item.fotos?.[0] ?? item.habitaciones?.[0]?.fotos?.[0] ?? null
+                          const foto = item.fotoUrl ?? item.fotos?.[0] ?? item.habitaciones?.[0]?.fotos?.[0] ?? null
                           const nombre = item.nombre ?? item.comercio?.nombre
                           const municipio = item.comercio?.municipio
                           const precio = item.precio ?? item.precioPersona ?? item.habitaciones?.[0]?.precioPorNoche

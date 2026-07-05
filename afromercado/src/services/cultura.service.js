@@ -1,6 +1,7 @@
 const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
+const FacturacionService = require("./facturacion.service");
 
 const TASA_COMISION_CULTURA = 0.10;
 const ESTADOS_EVENTO = ["BORRADOR", "PUBLICADO", "FINALIZADO", "CANCELADO", "POSPUESTO"];
@@ -155,7 +156,7 @@ const CulturaService = {
     const total = Number(entrada.precio) * cant;
     const comision = Math.round(total * TASA_COMISION_CULTURA);
 
-    return prisma.$transaction(async (tx) => {
+    const reserva = await prisma.$transaction(async (tx) => {
       // Reserva de cupo con UPDATE atómico (a prueba de sobreventa)
       const actualizadas = await tx.$executeRaw`
         UPDATE "EntradaCultural"
@@ -186,6 +187,12 @@ const CulturaService = {
         include: { evento: { include: EVENTO_INCLUDE }, entrada: true },
       });
     });
+
+    FacturacionService.emitirParaReferencia("CULTURA", reserva.id).catch((e) =>
+      console.error(`[FACTURACION] emisión fallida para ReservaCultural #${reserva.id}, quedará en reintento:`, e.message)
+    );
+
+    return reserva;
   },
 
   async misReservas(clienteId) {

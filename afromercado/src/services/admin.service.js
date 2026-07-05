@@ -453,6 +453,14 @@ const AdminService = {
         _count: { select: { productos: true } },
         comisiones: { where: { OR: [{ hasta: null }, { hasta: { gt: new Date() } }] }, orderBy: { desde: "desc" }, take: 1 },
         cambiosCriticos: { orderBy: { createdAt: "desc" }, take: 5 },
+        // El filtro "modulo" del panel admin dependía de estos campos y nunca
+        // los tuvo — quedaba silenciosamente roto (siempre vacío). Se agregan
+        // aquí de paso, junto con configFiscal para la activación de IVA.
+        configHotel: { select: { id: true } },
+        configTour: { select: { id: true } },
+        configExpress: { select: { id: true } },
+        configTransporte: { select: { id: true } },
+        configFiscal: { select: { ivaActivo: true, ivaPorcentaje: true, regimenTributario: true } },
       },
     });
   },

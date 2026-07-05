@@ -628,6 +628,199 @@ const NotificacionService = {
       }
     }
   },
+
+  // Disputas — reclamo nuevo: avisa al comercio y a los admins
+  async disputaCreada({ disputa }) {
+    const comercio = await prisma.comercio.findUnique({
+      where: { id: disputa.comercioId },
+      select: { usuarioId: true, nombre: true },
+    });
+    if (!comercio) return;
+
+    await this.crearYEnviar({
+      usuarioId: comercio.usuarioId,
+      tipo: "DISPUTA_CREADA",
+      titulo: "Tienes un reclamo nuevo",
+      mensaje: "Un comprador reportó un problema con una compra. Tienes 48 horas para responder antes de que un administrador decida.",
+      url: "/comerciante/disputas",
+    });
+
+    await notificarAdmins({
+      tipo: "DISPUTA_CREADA_ADMIN",
+      titulo: "Nuevo reclamo",
+      mensaje: `Nuevo reclamo #${disputa.id} contra ${comercio.nombre}.`,
+      url: "/admin/disputas",
+    });
+  },
+
+  // Disputas — el comercio ya respondió: avisa al comprador
+  async disputaRespondidaComercio({ disputa }) {
+    await this.crearYEnviar({
+      usuarioId: disputa.compradorId,
+      tipo: "DISPUTA_RESPONDIDA",
+      titulo: "El comercio respondió tu reclamo",
+      mensaje: "El comercio ya dio su versión. Un administrador revisará tu caso.",
+      url: "/mis-disputas",
+    });
+  },
+
+  // Disputas — el admin ya resolvió: avisa a comprador y comercio
+  async disputaResuelta({ disputa }) {
+    const comercio = await prisma.comercio.findUnique({
+      where: { id: disputa.comercioId },
+      select: { usuarioId: true, nombre: true },
+    });
+
+    let mensajeComprador;
+    if (disputa.estado === "RESUELTA_RECHAZADA") {
+      mensajeComprador = "Tu reclamo fue revisado y no fue aprobado.";
+      if (disputa.resolucion) mensajeComprador += ` ${disputa.resolucion}`;
+    } else if (["RESUELTA_REEMBOLSO_TOTAL", "RESUELTA_REEMBOLSO_PARCIAL"].includes(disputa.estado)) {
+      mensajeComprador = `Se aprobó tu reembolso por $${disputa.montoReembolsoAprobado}. Un administrador te transferirá el dinero manualmente en los próximos días — recibirás otra notificación cuando se confirme.`;
+    }
+    if (mensajeComprador) {
+      await this.crearYEnviar({
+        usuarioId: disputa.compradorId,
+        tipo: "DISPUTA_RESUELTA",
+        titulo: "Tu reclamo fue resuelto",
+        mensaje: mensajeComprador,
+        url: "/mis-disputas",
+      });
+    }
+
+    if (comercio) {
+      let mensajeComercio = `Tu reclamo #${disputa.id} fue resuelto.`;
+      if (["RESUELTA_REEMBOLSO_TOTAL", "RESUELTA_REEMBOLSO_PARCIAL"].includes(disputa.estado)) {
+        mensajeComercio += ` Se descontará $${disputa.montoDescuentoComercio} de tu próxima liquidación.`;
+      }
+      await this.crearYEnviar({
+        usuarioId: comercio.usuarioId,
+        tipo: "DISPUTA_RESUELTA",
+        titulo: "Reclamo resuelto",
+        mensaje: mensajeComercio,
+        url: "/comerciante/disputas",
+      });
+    }
+  },
+
+  // Job de reintento de dispersiones — alerta al admin tras agotar los reintentos automáticos
+  async dispersionFallidaAdmin({ pagoId, comercioNombre, intentos }) {
+    await notificarAdmins({
+      tipo: "DISPERSION_FALLIDA_ADMIN",
+      titulo: "Dispersión de pago sin resolver",
+      mensaje: `El pago #${pagoId} (comercio: ${comercioNombre || "desconocido"}) lleva ${intentos} intentos fallidos de dispersión. El comprador ya pagó — requiere intervención manual.`,
+      url: "/admin/pagos",
+      datos: { pagoId },
+    });
+  },
+
+  // PQRSD — nuevo ticket dirigido a la plataforma (no a un comercio)
+  async pqrsdCreado({ pqrsd }) {
+    await notificarAdmins({
+      tipo: "PQRSD_CREADO_ADMIN",
+      titulo: `Nuevo ${pqrsd.tipo.toLowerCase()}`,
+      mensaje: `${pqrsd.nombreContacto}: ${pqrsd.asunto}`,
+      url: "/admin/pqrsd",
+      datos: { pqrsdId: pqrsd.id },
+    });
+  },
+
+  // Stock bajo (Fase 5.3) — avisa al comerciante cuando un producto cruza su stockMinimo
+  async stockBajo({ comercioId, producto }) {
+    const comercio = await prisma.comercio.findUnique({ where: { id: comercioId }, select: { usuarioId: true } });
+    if (!comercio) return;
+    await this.crearYEnviar({
+      usuarioId: comercio.usuarioId,
+      tipo: "STOCK_BAJO",
+      titulo: "Stock bajo",
+      mensaje: `"${producto.nombre}" quedó con ${producto.stock} unidad(es) — por debajo de tu mínimo configurado.`,
+      url: "/comerciante/mis-productos",
+    });
+  },
+
+  // PQRSD — el admin respondió: avisa al usuario (in-app si tiene cuenta, siempre por email)
+  async pqrsdRespondido({ pqrsd }) {
+    if (pqrsd.usuarioId) {
+      await this.crearYEnviar({
+        usuarioId: pqrsd.usuarioId,
+        tipo: "PQRSD_RESPONDIDO",
+        titulo: "Respondimos tu mensaje",
+        mensaje: `Sobre "${pqrsd.asunto}": ${pqrsd.respuesta}`,
+        url: "/mis-pqrsd",
+      });
+    }
+    await dispararNotificacion(() =>
+      enviarEmail({
+        to: pqrsd.emailContacto,
+        subject: `Respuesta a tu mensaje — ${pqrsd.asunto}`,
+        html: `<p>Hola ${pqrsd.nombreContacto},</p><p>Sobre tu mensaje "<strong>${pqrsd.asunto}</strong>":</p><p>${pqrsd.respuesta}</p><p>— Equipo AfroMercado</p>`,
+      }), "email PQRSD respondido");
+  },
+
+  // Empleo (Fase 6) — nueva oferta creada, requiere moderación admin
+  async ofertaEmpleoCreada({ oferta }) {
+    await notificarAdmins({
+      tipo: "OFERTA_EMPLEO_CREADA_ADMIN",
+      titulo: "Nueva oferta de empleo por moderar",
+      mensaje: `"${oferta.titulo}" en ${oferta.municipio} espera revisión.`,
+      url: "/admin/empleo",
+      datos: { ofertaId: oferta.id },
+    });
+  },
+
+  // Empleo — el admin aprobó/rechazó: avisa a quien publicó
+  async ofertaEmpleoModerada({ oferta }) {
+    const aprobada = oferta.estadoModeracion === "APROBADA";
+    await this.crearYEnviar({
+      usuarioId: oferta.publicadoPorId,
+      tipo: "OFERTA_EMPLEO_MODERADA",
+      titulo: aprobada ? "Tu oferta de empleo fue aprobada" : "Tu oferta de empleo no fue aprobada",
+      mensaje: aprobada
+        ? `"${oferta.titulo}" ya está visible para postulantes.`
+        : `"${oferta.titulo}" no fue aprobada.${oferta.motivoRechazoModeracion ? ` Motivo: ${oferta.motivoRechazoModeracion}` : ""}`,
+      url: "/empleo/mis-ofertas",
+    });
+  },
+
+  // Empleo — nueva postulación recibida: avisa a quien publicó
+  async nuevaPostulacionEmpleo({ oferta }) {
+    await this.crearYEnviar({
+      usuarioId: oferta.publicadoPorId,
+      tipo: "NUEVA_POSTULACION_EMPLEO",
+      titulo: "Nueva postulación",
+      mensaje: `Alguien se postuló a "${oferta.titulo}".`,
+      url: "/empleo/mis-ofertas",
+    });
+  },
+
+  // Empleo — se llenaron las vacantes y la oferta se cerró sola: avisa a quien publicó
+  async ofertaEmpleoVacantesLlenas({ oferta }) {
+    await this.crearYEnviar({
+      usuarioId: oferta.publicadoPorId,
+      tipo: "OFERTA_EMPLEO_VACANTES_LLENAS",
+      titulo: "Tu oferta se cerró automáticamente",
+      mensaje: `"${oferta.titulo}" ya cubrió sus vacantes, así que se cerró para nuevas postulaciones.`,
+      url: "/empleo/mis-ofertas",
+    });
+  },
+
+  // Empleo — cambio de estado de postulación: avisa al postulante
+  async postulacionEmpleoActualizada({ postulacion, postulanteId }) {
+    const ESTADO_MSG = {
+      PRESELECCIONADO: "Fuiste preseleccionado",
+      RECHAZADA: "Tu postulación no fue seleccionada",
+      CONTRATADO: "¡Fuiste contratado!",
+    };
+    const mensaje = ESTADO_MSG[postulacion.estado];
+    if (!mensaje) return;
+    await this.crearYEnviar({
+      usuarioId: postulanteId,
+      tipo: "POSTULACION_EMPLEO_ACTUALIZADA",
+      titulo: mensaje,
+      mensaje: "Revisa el detalle en tus postulaciones.",
+      url: "/empleo/mis-postulaciones",
+    });
+  },
 };
 
 module.exports = NotificacionService;

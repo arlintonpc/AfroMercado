@@ -13,6 +13,9 @@ export interface EntregaDetalle {
   pagoRepartidor?: number
   /** URL de la foto de prueba de entrega (si se subió). */
   fotoEntrega?: string | null
+  ultimaLatitud?: number | null
+  ultimaLongitud?: number | null
+  ultimaUbicacionAt?: string | null
   subPedido: {
     id: number
     comercio: { nombre: string }
@@ -66,6 +69,14 @@ export async function actualizarEstadoEntrega(
     body: { estado, notas },
   })
   return res.data
+}
+
+export async function actualizarUbicacionEntrega(id: number, lat: number, lng: number): Promise<void> {
+  await apiFetch(`/repartidor/entregas/${id}/ubicacion`, { method: 'PATCH', body: { lat, lng } })
+}
+
+export async function calificarEntrega(id: number, calificacion: number, comentario?: string): Promise<void> {
+  await apiFetch(`/repartidor/entregas/${id}/calificar`, { method: 'POST', body: { calificacion, comentario } })
 }
 
 /** Sube una imagen al backend (multipart, campo "foto") y devuelve su URL. */

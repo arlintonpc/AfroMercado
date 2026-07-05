@@ -6,7 +6,8 @@ const CarritoRepository = require("../repositories/carrito.repository");
 const DireccionRepository = require("../repositories/direccion.repository");
 const PedidoRepository = require("../repositories/pedido.repository");
 const CuponRepository = require("../repositories/cupon.repository");
-const { calcularDesglose, redondear } = require("../utils/comision");
+const { calcularDesglose, calcularDesgloseConIva, redondear } = require("../utils/comision");
+const ConfigFiscalRepository = require("../repositories/config-fiscal.repository");
 const config = require("../config");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
 const { ofertaTieneCupo, ofertaVigente, precioVigente } = require("../utils/ofertas");
@@ -169,7 +170,7 @@ const PedidoService = {
       throw new ErrorValidacion("No puedes comprar productos de tu propia tienda.");
     }
     const ahora2 = new Date();
-    const [overridesComision, configGlobal] = await Promise.all([
+    const [overridesComision, configGlobal, configFiscalPorComercio] = await Promise.all([
       prisma.comisionComercio.findMany({
         where: {
           comercioId: { in: comercioIds },
@@ -179,6 +180,7 @@ const PedidoService = {
         orderBy: { desde: "desc" },
       }),
       prisma.config.findUnique({ where: { clave: "comision_global" } }),
+      ConfigFiscalRepository.buscarPorComercioIds(comercioIds),
     ]);
     const tasaGlobal = configGlobal
       ? parseFloat(configGlobal.valor)
@@ -189,6 +191,7 @@ const PedidoService = {
 
     let subtotalGeneral = 0;
     let comisionGeneral = 0;
+    let ivaGeneral = 0;
     const subtotalesPorComercio = new Map();
     const subtotalesElegibles = new Map(); // subtotal de items SIN oferta, por comercio (para cupón no combinable)
     const subPedidosData = Object.values(porComercio).map(({ comercio, items: itms }) => {
@@ -201,9 +204,15 @@ const PedidoService = {
         0
       );
       const tasa = tasaPorComercio.get(comercio.id) ?? tasaGlobal;
-      const desglose = calcularDesglose(subtotalComercio, tasa);
+      // El IVA se calcula sobre el subtotal antes del cupón (mismo tratamiento
+      // que la comisión cuando comision_base no es "post_descuento" — ver más
+      // abajo). No se recalcula proporcionalmente si se aplica un cupón porque
+      // hoy IVA está apagado por defecto y es un caso borde tributario que
+      // amerita confirmarse con un contador antes de ajustarlo.
+      const desglose = calcularDesgloseConIva(subtotalComercio, configFiscalPorComercio.get(comercio.id), tasa);
       subtotalGeneral += desglose.subtotal;
       comisionGeneral += desglose.comision;
+      ivaGeneral += desglose.iva;
       subtotalesPorComercio.set(comercio.id, desglose.subtotal);
       subtotalesElegibles.set(comercio.id, redondear(subtotalSinOferta));
 
@@ -212,6 +221,7 @@ const PedidoService = {
         subtotal: desglose.subtotal,
         comision: desglose.comision,
         tasaComisionAplicada: tasa,
+        iva: desglose.iva,
         neto: desglose.montoComerciante,
         items: itms.map((i) => ({
           productoId: i.productoId,
@@ -318,6 +328,11 @@ const PedidoService = {
         }
       }
 
+      // El IVA se suma al total una sola vez aquí, después de cualquier ajuste
+      // por cupón hecho arriba (con o sin cupón, totalGeneral ya tiene su valor
+      // final salvo el envío + IVA en este punto).
+      totalGeneral = redondear(totalGeneral + ivaGeneral);
+
       // 5b. Crear pedido con expiresAt = now + 30 min
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
       const nuevoPedido = await PedidoRepository.crear(
@@ -325,6 +340,7 @@ const PedidoService = {
           compradorId: usuarioId,
           subtotal: subtotalGeneral,
           comisionTotal: comisionTotalFinal,
+          ivaTotal: ivaGeneral,
           total: totalGeneral,
           costoEnvio: costoEnvioNum,
           direccionTexto: direccionTexto.trim(),

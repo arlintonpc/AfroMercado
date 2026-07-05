@@ -199,6 +199,7 @@ export default function ComercianteLayout({
     { href: '/comerciante/publicidad',     etiqueta: 'Publicidad' },
     { href: '/comerciante/analytics',      etiqueta: 'Analíticas' },
     { href: '/comerciante/liquidaciones',  etiqueta: 'Liquidaciones' },
+    { href: '/comerciante/disputas',       etiqueta: 'Reclamos' },
     { href: '/comerciante/perfil',         etiqueta: 'Mi tienda' },
     { href: '/notificaciones',             etiqueta: 'Notificaciones' },
   ]

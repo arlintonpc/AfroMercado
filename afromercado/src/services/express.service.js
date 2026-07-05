@@ -4,6 +4,7 @@ const { diaSemanaEnum, festivosAnio } = require("../utils/festivos-colombia");
 const { enviarPushAUsuario } = require("../utils/push");
 const sseManager = require("../utils/sse-manager");
 const AlianzaService = require("./alianza.service");
+const FacturacionService = require("./facturacion.service");
 
 const DIAS_ORDEN = ['LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO','DOMINGO','FESTIVO'];
 
@@ -296,6 +297,10 @@ const ExpressService = {
       "⚡ Pedido recibido",
       `Tu pedido ${pedido.codigo} está siendo revisado por el restaurante`,
       "/express/mis-pedidos"
+    );
+
+    FacturacionService.emitirParaReferencia("EXPRESS", pedido.id).catch((e) =>
+      console.error(`[FACTURACION] emisión fallida para PedidoExpress #${pedido.id}, quedará en reintento:`, e.message)
     );
 
     return pedido;

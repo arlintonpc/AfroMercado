@@ -33,6 +33,7 @@ export default function EditarProductoPage() {
   const [descripcion, setDescripcion] = useState('')
   const [precio, setPrecio] = useState('')
   const [stock, setStock] = useState('')
+  const [stockMinimo, setStockMinimo] = useState('')
   const [alcance, setAlcance] = useState<Alcance>('LOCAL')
   const [pesoKg, setPesoKg] = useState('')
   const [categoriaId, setCategoriaId] = useState('')
@@ -69,6 +70,7 @@ export default function EditarProductoPage() {
         setDescripcion(p.descripcion ?? '')
         setPrecio(String(Number(p.precio)))
         setStock(String(p.stock))
+        setStockMinimo(p.stockMinimo ? String(p.stockMinimo) : '')
         setAlcance(p.alcance)
         setPesoKg(p.pesoKg !== undefined && p.pesoKg !== null ? String(Number(p.pesoKg)) : '')
         setCategoriaId(p.categoria?.id ? String(p.categoria.id) : '')
@@ -112,6 +114,7 @@ export default function EditarProductoPage() {
         descripcion: descripcion.trim(),
         precio: Number(precio.replace(/\D/g, '')),
         stock: Number(stock.replace(/\D/g, '')),
+        stockMinimo: stockMinimo.trim() ? Number(stockMinimo.replace(/\D/g, '')) : 0,
         alcance,
         pesoKg: pesoKgNum !== null && pesoKgNum > 0 ? pesoKgNum : null,
         categoriaId: categoriaId ? Number(categoriaId) : undefined,
@@ -254,6 +257,16 @@ export default function EditarProductoPage() {
           value={stock}
           onChange={(v) => setStock(v.replace(/\D/g, ''))}
           error={errores.stock}
+        />
+
+        <CampoTexto
+          label="Avisarme cuando queden pocas unidades (opcional)"
+          name="stockMinimo"
+          inputMode="numeric"
+          placeholder="Ej: 5"
+          value={stockMinimo}
+          onChange={(v) => setStockMinimo(v.replace(/\D/g, ''))}
+          hint="Te notificamos cuando el stock baje a este número o menos. Déjalo vacío para no recibir avisos."
         />
 
         <CampoTexto

@@ -15,6 +15,9 @@ import { BadgeEstado } from '@/components/checkout/estadoPedido'
 import { desenvolver, nombreComercio, type PedidoDetalle } from '@/components/checkout/tiposPedido'
 import { puedeCalificarTienda, crearReviewTienda } from '@/lib/api/reviewsTienda'
 import { puedeCalificarProducto, crearReviewProducto } from '@/lib/api/reviewsProducto'
+import ModalReportarProblema from '@/components/disputas/ModalReportarProblema'
+import { obtenerFactura } from '@/lib/api/facturacion'
+import { descargarReciboPedido } from '@/lib/api/recibo'
 
 // ── Utilidades ────────────────────────────────────────────────
 
@@ -382,6 +385,58 @@ function ModalCalificarProducto({
   )
 }
 
+// ── Enlace a factura (silencioso si no hay proveedor DIAN activo) ──
+
+function EnlaceFactura({ subPedidoId }: { subPedidoId: number }) {
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelado = false
+    obtenerFactura('PEDIDO', subPedidoId).then(f => {
+      if (!cancelado && f?.estado === 'ACEPTADA' && f.pdfUrl) setPdfUrl(f.pdfUrl)
+    })
+    return () => { cancelado = true }
+  }, [subPedidoId])
+
+  if (!pdfUrl) return null
+  return (
+    <a
+      href={pdfUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-xs font-semibold text-[#2D6A4F] underline"
+    >
+      Ver factura
+    </a>
+  )
+}
+
+function BotonRecibo({ pedidoId }: { pedidoId: number }) {
+  const [cargando, setCargando] = useState(false)
+
+  async function handleClick() {
+    setCargando(true)
+    try {
+      await descargarReciboPedido(pedidoId)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'No se pudo descargar el recibo.')
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={cargando}
+      className="rounded-xl border border-[#1A1A1A]/15 hover:border-[#1A1A1A]/30 text-[#1A1A1A]/60 hover:text-[#1A1A1A] text-xs font-semibold px-3 py-1.5 transition-colors disabled:opacity-50"
+    >
+      {cargando ? 'Generando…' : 'Recibo'}
+    </button>
+  )
+}
+
 // ── Tarjeta de pedido ─────────────────────────────────────────
 
 const ESTADOS_ACTIVOS = new Set(['PENDIENTE_PAGO', 'VERIFICANDO_PAGO', 'CONFIRMADO'])
@@ -393,9 +448,10 @@ interface TarjetaPedidoProps {
   yaCalifico?: boolean
   onCalificar?: (pedidoId: number) => void
   onCalificarProductos?: (pedidoId: number | string) => void
+  onReportarProblema?: (subPedidoId: number) => void
 }
 
-function TarjetaPedido({ pedido, puedeCalificar, yaCalifico, onCalificar, onCalificarProductos }: TarjetaPedidoProps) {
+function TarjetaPedido({ pedido, puedeCalificar, yaCalifico, onCalificar, onCalificarProductos, onReportarProblema }: TarjetaPedidoProps) {
   const total = pedido.total ?? pedido.subtotal ?? 0
   const n = contarItems(pedido)
   const fecha = fechaLegible(pedido.creadoEn)
@@ -452,10 +508,36 @@ function TarjetaPedido({ pedido, puedeCalificar, yaCalifico, onCalificar, onCali
         <p className="text-xs text-[#1A1A1A]/35 mt-1 truncate">📍 {pedido.direccionTexto}</p>
       )}
 
+      {/* Reportar un problema por comercio (a nivel de subpedido entregado) */}
+      {onReportarProblema && (pedido.subPedidos ?? []).some(sp => sp.estado === 'ENTREGADO') && (
+        <div className="mt-3 pt-3 border-t border-[#1A1A1A]/5 flex flex-col gap-2">
+          {(pedido.subPedidos ?? [])
+            .filter(sp => sp.estado === 'ENTREGADO' && sp.id != null)
+            .map(sp => (
+              <div key={String(sp.id)} className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-xs text-[#1A1A1A]/50 truncate">{nombreComercio(sp)}</span>
+                <div className="flex items-center gap-3">
+                  <EnlaceFactura subPedidoId={Number(sp.id)} />
+                  <button
+                    type="button"
+                    onClick={() => onReportarProblema(Number(sp.id))}
+                    className="rounded-xl border border-[#C0392B]/25 text-[#C0392B] hover:bg-[#C0392B]/5 text-xs font-semibold px-3 py-1.5 transition-colors"
+                  >
+                    Reportar un problema
+                  </button>
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
+
       {/* Pie */}
       <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#1A1A1A]/5 gap-2 flex-wrap">
         <span className="text-lg font-bold text-[#2D6A4F]">{formatearPrecio(total)}</span>
         <div className="flex items-center gap-2">
+          {!esPendiente && !esExpiradoOFallido && (
+            <BotonRecibo pedidoId={Number(pedido.id)} />
+          )}
           {esExpiradoOFallido && (
             <Link
               href={primerProductoId ? `/producto/${primerProductoId}` : '/buscar'}
@@ -523,6 +605,7 @@ export default function PaginaMisPedidos() {
   const [yaCalifico, setYaCalifico] = useState<Record<number, boolean>>({})
   const [pedidoACalificar, setPedidoACalificar] = useState<number | null>(null)
   const [pedidoACalificarProductos, setPedidoACalificarProductos] = useState<number | null>(null)
+  const [subPedidoAReportar, setSubPedidoAReportar] = useState<number | null>(null)
 
   useEffect(() => {
     if (!cargandoAuth && !autenticado) {
@@ -644,6 +727,7 @@ export default function PaginaMisPedidos() {
                       yaCalifico={yaCalifico[Number(p.id)]}
                       onCalificar={setPedidoACalificar}
                       onCalificarProductos={(id) => setPedidoACalificarProductos(Number(id))}
+                      onReportarProblema={setSubPedidoAReportar}
                     />
                   ))}
                 </div>
@@ -673,6 +757,15 @@ export default function PaginaMisPedidos() {
           />
         ) : null
       })()}
+
+      {subPedidoAReportar !== null && (
+        <ModalReportarProblema
+          moduloOrigen="PEDIDO"
+          referenciaId={subPedidoAReportar}
+          onCerrar={() => setSubPedidoAReportar(null)}
+          onExito={() => setSubPedidoAReportar(null)}
+        />
+      )}
     </div>
   )
 }

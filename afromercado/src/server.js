@@ -20,7 +20,18 @@ const { cerrarConexion } = require("./utils/whatsapp");
 const { iniciarCron } = require("./utils/cron");
 const { iniciarJob: iniciarJobHotel } = require("./jobs/expirarReservasHotel");
 const { iniciarJob: iniciarJobRecordatorioTour } = require("./jobs/recordatorioTour");
+const { iniciarJob: iniciarJobReintentarDispersiones } = require("./jobs/reintentar-dispersiones.job");
+const { iniciarJob: iniciarJobReintentarFacturacion } = require("./jobs/reintentar-facturacion.job");
 const prisma = require("./config/prisma");
+const { estaConfigurado: smtpConfigurado } = require("./utils/email");
+
+// Advertencias de arranque que dependen de la BD (tabla Config), por eso van
+// aparte de config/index.js (síncrono) y corren después de aplicarMigraciones().
+async function verificarAdvertenciasArranque() {
+  if (!(await smtpConfigurado())) {
+    console.warn("[CONFIG] Advertencia: SMTP no configurado (ni en Config ni en variables de entorno) — los correos transaccionales estarán deshabilitados.");
+  }
+}
 
 // Aplica migraciones DDL pendientes sin usar prisma migrate (Neon pooler)
 async function aplicarMigraciones() {
@@ -641,6 +652,395 @@ async function aplicarMigraciones() {
     // Directorio de proveedores certificados para compra pública B2G (Módulo C institucional)
     `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "disponibleComprasPublicas" BOOLEAN NOT NULL DEFAULT false`,
 
+    // Sistema de reclamos/disputas post-compra (reporte + mediación; el reembolso
+    // aprobado se descuenta de la siguiente Liquidacion, nunca revierte el pago en Wompi)
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoDisputa') THEN
+        CREATE TYPE "EstadoDisputa" AS ENUM ('ABIERTA','RESPONDIDA_COMERCIO','RESUELTA_RECHAZADA','RESUELTA_REEMBOLSO_TOTAL','RESUELTA_REEMBOLSO_PARCIAL','CERRADA_SIN_RESPUESTA');
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'MotivoDisputa') THEN
+        CREATE TYPE "MotivoDisputa" AS ENUM ('PRODUCTO_NO_LLEGO','PRODUCTO_DEFECTUOSO_O_DANADO','PRODUCTO_INCOMPLETO','PRODUCTO_DIFERENTE_AL_PEDIDO','CALIDAD_NO_CONFORME','SERVICIO_NO_PRESTADO','COBRO_INCORRECTO','OTRO');
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "Disputa" (
+      "id" SERIAL NOT NULL,
+      "moduloOrigen" TEXT NOT NULL,
+      "referenciaId" INTEGER NOT NULL,
+      "compradorId" INTEGER NOT NULL,
+      "comercioId" INTEGER NOT NULL,
+      "motivo" "MotivoDisputa" NOT NULL,
+      "descripcion" TEXT NOT NULL,
+      "evidenciaUrls" TEXT[] NOT NULL DEFAULT '{}',
+      "montoOriginal" DECIMAL(12,2) NOT NULL,
+      "montoNetoOriginal" DECIMAL(12,2) NOT NULL,
+      "montoReembolsoSolicitado" DECIMAL(12,2),
+      "estado" "EstadoDisputa" NOT NULL DEFAULT 'ABIERTA',
+      "respuestaComercio" TEXT,
+      "respuestaComercioUrls" TEXT[] NOT NULL DEFAULT '{}',
+      "respondidoPor" INTEGER,
+      "respondidoAt" TIMESTAMP(3),
+      "resolucion" TEXT,
+      "montoReembolsoAprobado" DECIMAL(12,2),
+      "montoDescuentoComercio" DECIMAL(12,2),
+      "resueltoPor" INTEGER,
+      "resueltoAt" TIMESTAMP(3),
+      "notaCreditoAplicada" BOOLEAN NOT NULL DEFAULT false,
+      "notaCreditoLiquidacionId" INTEGER,
+      "reembolsoTransferidoAt" TIMESTAMP(3),
+      "reembolsoTransferidoPor" INTEGER,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "Disputa_pkey" PRIMARY KEY ("id")
+    )`,
+    `CREATE INDEX IF NOT EXISTS "Disputa_moduloOrigen_referenciaId_idx" ON "Disputa"("moduloOrigen", "referenciaId")`,
+    `CREATE INDEX IF NOT EXISTS "Disputa_comercioId_estado_idx" ON "Disputa"("comercioId", "estado")`,
+    `CREATE INDEX IF NOT EXISTS "Disputa_compradorId_createdAt_idx" ON "Disputa"("compradorId", "createdAt")`,
+    `CREATE INDEX IF NOT EXISTS "Disputa_estado_createdAt_idx" ON "Disputa"("estado", "createdAt")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'Disputa_compradorId_fkey') THEN
+        ALTER TABLE "Disputa" ADD CONSTRAINT "Disputa_compradorId_fkey" FOREIGN KEY ("compradorId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'Disputa_comercioId_fkey') THEN
+        ALTER TABLE "Disputa" ADD CONSTRAINT "Disputa_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+
+    // ── IVA configurable por comercio (Fase 1.1) ──────────────────
+    `CREATE TABLE IF NOT EXISTS "ConfigFiscalComercio" (
+      "id"                SERIAL PRIMARY KEY,
+      "comercioId"        INTEGER NOT NULL,
+      "ivaActivo"         BOOLEAN NOT NULL DEFAULT false,
+      "ivaPorcentaje"     DECIMAL(5,2) NOT NULL DEFAULT 19.00,
+      "regimenTributario" TEXT,
+      "activadoPor"       INTEGER,
+      "activadoAt"        TIMESTAMP(3),
+      "createdAt"         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"         TIMESTAMP(3) NOT NULL
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "ConfigFiscalComercio_comercioId_key" ON "ConfigFiscalComercio"("comercioId")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'ConfigFiscalComercio_comercioId_fkey') THEN
+        ALTER TABLE "ConfigFiscalComercio" ADD CONSTRAINT "ConfigFiscalComercio_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `ALTER TABLE "Pedido" ADD COLUMN IF NOT EXISTS "ivaTotal" DECIMAL(12,2) NOT NULL DEFAULT 0`,
+    `ALTER TABLE "SubPedido" ADD COLUMN IF NOT EXISTS "iva" DECIMAL(12,2) NOT NULL DEFAULT 0`,
+
+    // ── Módulo Empleo / Bolsa de Trabajo (Fase 6) ──────────────────
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoOfertaEmpleo') THEN
+        CREATE TYPE "EstadoOfertaEmpleo" AS ENUM ('BORRADOR','PUBLICADA','PAUSADA','CERRADA');
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoContratoEmpleo') THEN
+        CREATE TYPE "TipoContratoEmpleo" AS ENUM ('TIEMPO_COMPLETO','MEDIO_TIEMPO','POR_DIAS','TEMPORAL','OTRO');
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoPostulacionEmpleo') THEN
+        CREATE TYPE "EstadoPostulacionEmpleo" AS ENUM ('ENVIADA','VISTA','PRESELECCIONADO','RECHAZADA','CONTRATADO');
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "OfertaEmpleo" (
+      "id"                      SERIAL PRIMARY KEY,
+      "publicadoPorId"          INTEGER NOT NULL,
+      "comercioId"              INTEGER,
+      "titulo"                  TEXT NOT NULL,
+      "descripcion"             TEXT NOT NULL,
+      "categoria"               TEXT,
+      "tipoContrato"            "TipoContratoEmpleo" NOT NULL,
+      "municipio"               TEXT NOT NULL,
+      "departamento"            TEXT,
+      "salarioMin"              DECIMAL(12,2),
+      "salarioMax"              DECIMAL(12,2),
+      "salarioNegociable"       BOOLEAN NOT NULL DEFAULT false,
+      "requisitos"              TEXT,
+      "vacantes"                INTEGER NOT NULL DEFAULT 1,
+      "estado"                  "EstadoOfertaEmpleo" NOT NULL DEFAULT 'BORRADOR',
+      "estadoModeracion"        TEXT NOT NULL DEFAULT 'PENDIENTE',
+      "revisadoPor"             INTEGER,
+      "revisadoAt"              TIMESTAMP(3),
+      "motivoRechazoModeracion" TEXT,
+      "fechaCierre"             TIMESTAMP(3),
+      "contactoWhatsapp"        TEXT,
+      "createdAt"               TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"               TIMESTAMP(3) NOT NULL,
+      "deletedAt"               TIMESTAMP(3)
+    )`,
+    `CREATE INDEX IF NOT EXISTS "OfertaEmpleo_estado_estadoModeracion_municipio_createdAt_idx" ON "OfertaEmpleo"("estado", "estadoModeracion", "municipio", "createdAt")`,
+    `CREATE INDEX IF NOT EXISTS "OfertaEmpleo_publicadoPorId_idx" ON "OfertaEmpleo"("publicadoPorId")`,
+    `CREATE INDEX IF NOT EXISTS "OfertaEmpleo_comercioId_idx" ON "OfertaEmpleo"("comercioId")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'OfertaEmpleo_publicadoPorId_fkey') THEN
+        ALTER TABLE "OfertaEmpleo" ADD CONSTRAINT "OfertaEmpleo_publicadoPorId_fkey" FOREIGN KEY ("publicadoPorId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'OfertaEmpleo_comercioId_fkey') THEN
+        ALTER TABLE "OfertaEmpleo" ADD CONSTRAINT "OfertaEmpleo_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "HojaDeVida" (
+      "id"               SERIAL PRIMARY KEY,
+      "usuarioId"        INTEGER NOT NULL,
+      "resumenPerfil"    TEXT,
+      "telefonoContacto" TEXT NOT NULL,
+      "experiencia"      JSONB NOT NULL,
+      "educacion"        JSONB NOT NULL,
+      "habilidades"      TEXT[] NOT NULL DEFAULT '{}',
+      "disponibilidad"   TEXT,
+      "createdAt"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"        TIMESTAMP(3) NOT NULL
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "HojaDeVida_usuarioId_key" ON "HojaDeVida"("usuarioId")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'HojaDeVida_usuarioId_fkey') THEN
+        ALTER TABLE "HojaDeVida" ADD CONSTRAINT "HojaDeVida_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "PostulacionEmpleo" (
+      "id"              SERIAL PRIMARY KEY,
+      "ofertaEmpleoId"  INTEGER NOT NULL,
+      "postulanteId"    INTEGER NOT NULL,
+      "hojaDeVidaId"    INTEGER NOT NULL,
+      "experienciaSnap" JSONB NOT NULL,
+      "educacionSnap"   JSONB NOT NULL,
+      "habilidadesSnap" TEXT[] NOT NULL DEFAULT '{}',
+      "mensaje"         TEXT,
+      "estado"          "EstadoPostulacionEmpleo" NOT NULL DEFAULT 'ENVIADA',
+      "vistaAt"         TIMESTAMP(3),
+      "notasPublicador" TEXT,
+      "createdAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"       TIMESTAMP(3) NOT NULL
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "PostulacionEmpleo_ofertaEmpleoId_postulanteId_key" ON "PostulacionEmpleo"("ofertaEmpleoId", "postulanteId")`,
+    `CREATE INDEX IF NOT EXISTS "PostulacionEmpleo_ofertaEmpleoId_estado_idx" ON "PostulacionEmpleo"("ofertaEmpleoId", "estado")`,
+    `CREATE INDEX IF NOT EXISTS "PostulacionEmpleo_postulanteId_idx" ON "PostulacionEmpleo"("postulanteId")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'PostulacionEmpleo_ofertaEmpleoId_fkey') THEN
+        ALTER TABLE "PostulacionEmpleo" ADD CONSTRAINT "PostulacionEmpleo_ofertaEmpleoId_fkey" FOREIGN KEY ("ofertaEmpleoId") REFERENCES "OfertaEmpleo"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'PostulacionEmpleo_postulanteId_fkey') THEN
+        ALTER TABLE "PostulacionEmpleo" ADD CONSTRAINT "PostulacionEmpleo_postulanteId_fkey" FOREIGN KEY ("postulanteId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    // ALTER TYPE ... ADD VALUE no puede ir dentro de un bloque DO/transacción;
+    // se usa IF NOT EXISTS como sentencia suelta para que sea idempotente.
+    `ALTER TYPE "EstadoPostulacionEmpleo" ADD VALUE IF NOT EXISTS 'RETIRADA'`,
+    // CV adjunto (PDF) en la hoja de vida, y snapshot de foto+CV en la postulación.
+    `ALTER TABLE "HojaDeVida" ADD COLUMN IF NOT EXISTS "cvUrl" TEXT`,
+    `ALTER TABLE "PostulacionEmpleo" ADD COLUMN IF NOT EXISTS "fotoSnapUrl" TEXT`,
+    `ALTER TABLE "PostulacionEmpleo" ADD COLUMN IF NOT EXISTS "cvSnapUrl" TEXT`,
+    // Preguntas de selección por oferta + snapshot de respuestas.
+    `ALTER TABLE "OfertaEmpleo" ADD COLUMN IF NOT EXISTS "preguntas" JSONB NOT NULL DEFAULT '[]'`,
+    `ALTER TABLE "PostulacionEmpleo" ADD COLUMN IF NOT EXISTS "respuestas" JSONB NOT NULL DEFAULT '[]'`,
+    // El panel del empleador necesita resumen y disponibilidad también snapshoteados.
+    `ALTER TABLE "PostulacionEmpleo" ADD COLUMN IF NOT EXISTS "resumenPerfilSnap" TEXT`,
+    `ALTER TABLE "PostulacionEmpleo" ADD COLUMN IF NOT EXISTS "disponibilidadSnap" TEXT`,
+    // Favoritos de ofertas de empleo (mismo patrón que FavoritoHotel/FavoritoTour).
+    `CREATE TABLE IF NOT EXISTS "FavoritoOfertaEmpleo" (
+      "id"             SERIAL PRIMARY KEY,
+      "usuarioId"      INTEGER NOT NULL,
+      "ofertaEmpleoId" INTEGER NOT NULL,
+      "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "FavoritoOfertaEmpleo_usuarioId_ofertaEmpleoId_key" ON "FavoritoOfertaEmpleo"("usuarioId", "ofertaEmpleoId")`,
+    `CREATE INDEX IF NOT EXISTS "FavoritoOfertaEmpleo_usuarioId_idx" ON "FavoritoOfertaEmpleo"("usuarioId")`,
+    `CREATE INDEX IF NOT EXISTS "FavoritoOfertaEmpleo_ofertaEmpleoId_idx" ON "FavoritoOfertaEmpleo"("ofertaEmpleoId")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'FavoritoOfertaEmpleo_usuarioId_fkey') THEN
+        ALTER TABLE "FavoritoOfertaEmpleo" ADD CONSTRAINT "FavoritoOfertaEmpleo_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'FavoritoOfertaEmpleo_ofertaEmpleoId_fkey') THEN
+        ALTER TABLE "FavoritoOfertaEmpleo" ADD CONSTRAINT "FavoritoOfertaEmpleo_ofertaEmpleoId_fkey" FOREIGN KEY ("ofertaEmpleoId") REFERENCES "OfertaEmpleo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+
+    // ── Fidelización / referidos (Fase 5.2) ────────────────────────
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoMovimientoPuntos') THEN
+        CREATE TYPE "TipoMovimientoPuntos" AS ENUM ('GANADO_COMPRA','GANADO_REFERIDO','CANJEADO','AJUSTE_ADMIN');
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "PerfilFidelizacion" (
+      "id"                    SERIAL PRIMARY KEY,
+      "usuarioId"             INTEGER NOT NULL,
+      "puntos"                INTEGER NOT NULL DEFAULT 0,
+      "puntosAcumuladosTotal" INTEGER NOT NULL DEFAULT 0,
+      "codigoReferido"        TEXT NOT NULL,
+      "referidoPorId"         INTEGER,
+      "createdAt"             TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"             TIMESTAMP(3) NOT NULL
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "PerfilFidelizacion_usuarioId_key" ON "PerfilFidelizacion"("usuarioId")`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "PerfilFidelizacion_codigoReferido_key" ON "PerfilFidelizacion"("codigoReferido")`,
+    `CREATE INDEX IF NOT EXISTS "PerfilFidelizacion_codigoReferido_idx" ON "PerfilFidelizacion"("codigoReferido")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'PerfilFidelizacion_usuarioId_fkey') THEN
+        ALTER TABLE "PerfilFidelizacion" ADD CONSTRAINT "PerfilFidelizacion_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'PerfilFidelizacion_referidoPorId_fkey') THEN
+        ALTER TABLE "PerfilFidelizacion" ADD CONSTRAINT "PerfilFidelizacion_referidoPorId_fkey" FOREIGN KEY ("referidoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "MovimientoPuntos" (
+      "id"           SERIAL PRIMARY KEY,
+      "perfilId"     INTEGER NOT NULL,
+      "tipo"         "TipoMovimientoPuntos" NOT NULL,
+      "puntos"       INTEGER NOT NULL,
+      "moduloOrigen" TEXT,
+      "referenciaId" INTEGER,
+      "descripcion"  TEXT,
+      "creadoPor"    INTEGER,
+      "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE INDEX IF NOT EXISTS "MovimientoPuntos_perfilId_createdAt_idx" ON "MovimientoPuntos"("perfilId", "createdAt")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'MovimientoPuntos_perfilId_fkey') THEN
+        ALTER TABLE "MovimientoPuntos" ADD CONSTRAINT "MovimientoPuntos_perfilId_fkey" FOREIGN KEY ("perfilId") REFERENCES "PerfilFidelizacion"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+
+    // ── Alertas de stock bajo (Fase 5.3) ───────────────────────────
+    `ALTER TABLE "Producto" ADD COLUMN IF NOT EXISTS "stockMinimo" INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE "Producto" ADD COLUMN IF NOT EXISTS "stockBajoNotificadoAt" TIMESTAMP(3)`,
+
+    // ── Tracking de repartidor + calificación (Fase 4) ────────────
+    `ALTER TABLE "Entrega" ADD COLUMN IF NOT EXISTS "ultimaLatitud" DOUBLE PRECISION`,
+    `ALTER TABLE "Entrega" ADD COLUMN IF NOT EXISTS "ultimaLongitud" DOUBLE PRECISION`,
+    `ALTER TABLE "Entrega" ADD COLUMN IF NOT EXISTS "ultimaUbicacionAt" TIMESTAMP(3)`,
+    `CREATE TABLE IF NOT EXISTS "CalificacionRepartidor" (
+      "id"           SERIAL PRIMARY KEY,
+      "entregaId"    INTEGER NOT NULL,
+      "repartidorId" INTEGER NOT NULL,
+      "compradorId"  INTEGER NOT NULL,
+      "calificacion" INTEGER NOT NULL,
+      "comentario"   TEXT,
+      "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "CalificacionRepartidor_entregaId_key" ON "CalificacionRepartidor"("entregaId")`,
+    `CREATE INDEX IF NOT EXISTS "CalificacionRepartidor_repartidorId_idx" ON "CalificacionRepartidor"("repartidorId")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'CalificacionRepartidor_entregaId_fkey') THEN
+        ALTER TABLE "CalificacionRepartidor" ADD CONSTRAINT "CalificacionRepartidor_entregaId_fkey" FOREIGN KEY ("entregaId") REFERENCES "Entrega"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'CalificacionRepartidor_repartidorId_fkey') THEN
+        ALTER TABLE "CalificacionRepartidor" ADD CONSTRAINT "CalificacionRepartidor_repartidorId_fkey" FOREIGN KEY ("repartidorId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'CalificacionRepartidor_compradorId_fkey') THEN
+        ALTER TABLE "CalificacionRepartidor" ADD CONSTRAINT "CalificacionRepartidor_compradorId_fkey" FOREIGN KEY ("compradorId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+
+    // ── PQRSD genérico (Fase 3.1) ──────────────────────────────────
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoPqrsd') THEN
+        CREATE TYPE "TipoPqrsd" AS ENUM ('PETICION','QUEJA','RECLAMO','SUGERENCIA','DENUNCIA');
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoPqrsd') THEN
+        CREATE TYPE "EstadoPqrsd" AS ENUM ('ABIERTO','EN_PROCESO','RESPONDIDO','CERRADO');
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "Pqrsd" (
+      "id"                SERIAL PRIMARY KEY,
+      "usuarioId"         INTEGER,
+      "nombreContacto"    TEXT NOT NULL,
+      "emailContacto"     TEXT NOT NULL,
+      "telefonoContacto"  TEXT,
+      "tipo"              "TipoPqrsd" NOT NULL,
+      "asunto"            TEXT NOT NULL,
+      "mensaje"           TEXT NOT NULL,
+      "moduloRelacionado" TEXT,
+      "referenciaId"      INTEGER,
+      "adjuntoUrls"       TEXT[] NOT NULL DEFAULT '{}',
+      "estado"            "EstadoPqrsd" NOT NULL DEFAULT 'ABIERTO',
+      "prioridad"         TEXT NOT NULL DEFAULT 'NORMAL',
+      "respuesta"         TEXT,
+      "respondidoPor"     INTEGER,
+      "respondidoAt"      TIMESTAMP(3),
+      "cerradoPor"        INTEGER,
+      "cerradoAt"         TIMESTAMP(3),
+      "createdAt"         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"         TIMESTAMP(3) NOT NULL
+    )`,
+    `CREATE INDEX IF NOT EXISTS "Pqrsd_estado_createdAt_idx" ON "Pqrsd"("estado", "createdAt")`,
+    `CREATE INDEX IF NOT EXISTS "Pqrsd_usuarioId_createdAt_idx" ON "Pqrsd"("usuarioId", "createdAt")`,
+    `CREATE INDEX IF NOT EXISTS "Pqrsd_tipo_estado_idx" ON "Pqrsd"("tipo", "estado")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'Pqrsd_usuarioId_fkey') THEN
+        ALTER TABLE "Pqrsd" ADD CONSTRAINT "Pqrsd_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+
+    // ── Facturación electrónica DIAN (Fase 1.2) ───────────────────
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoFactura') THEN
+        CREATE TYPE "EstadoFactura" AS ENUM ('PENDIENTE','ENVIADA','ACEPTADA','RECHAZADA','ERROR','ANULADA','OMITIDA');
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "FacturaElectronica" (
+      "id"                 SERIAL PRIMARY KEY,
+      "moduloOrigen"       TEXT NOT NULL,
+      "referenciaId"       INTEGER NOT NULL,
+      "comercioId"         INTEGER NOT NULL,
+      "compradorId"        INTEGER NOT NULL,
+      "proveedor"          TEXT NOT NULL DEFAULT 'NINGUNO',
+      "estado"             "EstadoFactura" NOT NULL DEFAULT 'PENDIENTE',
+      "subtotal"           DECIMAL(12,2) NOT NULL,
+      "ivaTotal"           DECIMAL(12,2) NOT NULL DEFAULT 0,
+      "total"              DECIMAL(12,2) NOT NULL,
+      "cufe"               TEXT,
+      "numeroFactura"      TEXT,
+      "pdfUrl"             TEXT,
+      "xmlUrl"             TEXT,
+      "providerFacturaId"  TEXT,
+      "providerPayload"    JSONB,
+      "errorMensaje"       TEXT,
+      "intentosFallidos"   INTEGER NOT NULL DEFAULT 0,
+      "proximoReintentoAt" TIMESTAMP(3),
+      "anuladaPor"         INTEGER,
+      "anuladaAt"          TIMESTAMP(3),
+      "motivoAnulacion"    TEXT,
+      "createdAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"          TIMESTAMP(3) NOT NULL
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "FacturaElectronica_cufe_key" ON "FacturaElectronica"("cufe")`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "FacturaElectronica_moduloOrigen_referenciaId_key" ON "FacturaElectronica"("moduloOrigen", "referenciaId")`,
+    `CREATE INDEX IF NOT EXISTS "FacturaElectronica_comercioId_estado_idx" ON "FacturaElectronica"("comercioId", "estado")`,
+    `CREATE INDEX IF NOT EXISTS "FacturaElectronica_estado_proximoReintentoAt_idx" ON "FacturaElectronica"("estado", "proximoReintentoAt")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'FacturaElectronica_comercioId_fkey') THEN
+        ALTER TABLE "FacturaElectronica" ADD CONSTRAINT "FacturaElectronica_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'FacturaElectronica_compradorId_fkey') THEN
+        ALTER TABLE "FacturaElectronica" ADD CONSTRAINT "FacturaElectronica_compradorId_fkey" FOREIGN KEY ("compradorId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+
+    // ── Reintento de dispersiones fallidas ────────────────────────
+    `ALTER TABLE "PagoDispersion" ADD COLUMN IF NOT EXISTS "intentosFallidos" INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE "PagoDispersion" ADD COLUMN IF NOT EXISTS "proximoReintentoAt" TIMESTAMP(3)`,
+    `CREATE INDEX IF NOT EXISTS "PagoDispersion_estado_proximoReintentoAt_idx" ON "PagoDispersion"("estado", "proximoReintentoAt")`,
+
     // ── CuponTransporte / CuponTransporteUso ──────────────────────
     `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "montoDescuento" DECIMAL(10,2)`,
     `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "codigoCupon" TEXT`,
@@ -797,12 +1197,15 @@ async function shutdown(signal) {
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT",  () => shutdown("SIGINT"));
 
-aplicarMigraciones().then(() => {
+aplicarMigraciones().then(async () => {
+  await verificarAdvertenciasArranque();
   app.listen(config.puerto, () => {
     console.log(`🌿 AfroMercado API corriendo en http://localhost:${config.puerto}`);
     console.log(`   Entorno: ${config.entorno}`);
     iniciarCron();
     iniciarJobHotel();
     iniciarJobRecordatorioTour();
+    iniciarJobReintentarDispersiones();
+    iniciarJobReintentarFacturacion();
   });
 });

@@ -65,6 +65,8 @@ function mapearItem(item) {
             verificado: c.verificado,
             totalVentas: c.totalVentas,
             calificacion: Number(c.calificacion),
+            ivaActivo: c.configFiscal?.ivaActivo ?? false,
+            ivaPorcentaje: c.configFiscal ? Number(c.configFiscal.ivaPorcentaje) : 0,
           }
         : undefined,
     },

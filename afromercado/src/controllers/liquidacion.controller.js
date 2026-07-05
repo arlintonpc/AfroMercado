@@ -266,6 +266,7 @@ const LiquidacionController = {
         }
 
         let monto = 0;
+        let disputasAplicadas = [];
         if (tipo === "COMERCIANTE") {
           const comercio = await tx.comercio.findUnique({
             where: { usuarioId: beneficiarioNumero },
@@ -281,7 +282,31 @@ const LiquidacionController = {
               updatedAt: { gte: desde, lte: hasta },
             },
           });
-          monto = Number(ganado._sum.neto || 0);
+          const bruto = Number(ganado._sum.neto || 0);
+
+          // Reembolsos de disputas ya aprobados y aún no descontados de ninguna
+          // liquidación: se consumen en orden FIFO (más antiguo primero) hasta
+          // agotar lo ganado en el período. Nunca se crea una liquidación con
+          // monto negativo — lo que no alcance a cubrirse queda pendiente
+          // (notaCreditoAplicada sigue en false) para la siguiente ronda.
+          const reembolsosPendientes = await tx.disputa.findMany({
+            where: {
+              comercioId: comercio.id,
+              estado: { in: ["RESUELTA_REEMBOLSO_TOTAL", "RESUELTA_REEMBOLSO_PARCIAL"] },
+              notaCreditoAplicada: false,
+            },
+            orderBy: { resueltoAt: "asc" },
+            select: { id: true, montoDescuentoComercio: true },
+          });
+
+          let disponible = bruto;
+          for (const d of reembolsosPendientes) {
+            const descuento = Number(d.montoDescuentoComercio || 0);
+            if (descuento > disponible) break; // FIFO estricto: no saltar al siguiente si el actual no alcanza
+            disponible -= descuento;
+            disputasAplicadas.push(d.id);
+          }
+          monto = disponible;
         } else {
           const entregas = await tx.entrega.findMany({
             where: {
@@ -317,7 +342,7 @@ const LiquidacionController = {
           throw new ErrorValidacion("No hay saldo pendiente a liquidar en ese período");
         }
 
-        return tx.liquidacion.create({
+        const nuevaLiquidacion = await tx.liquidacion.create({
           data: {
             tipo,
             beneficiarioId: beneficiarioNumero,
@@ -334,6 +359,15 @@ const LiquidacionController = {
             },
           },
         });
+
+        if (disputasAplicadas.length > 0) {
+          await tx.disputa.updateMany({
+            where: { id: { in: disputasAplicadas } },
+            data: { notaCreditoAplicada: true, notaCreditoLiquidacionId: nuevaLiquidacion.id },
+          });
+        }
+
+        return nuevaLiquidacion;
       }, { isolationLevel: "Serializable" });
 
       res.status(201).json({ ok: true, data: liq });
@@ -422,6 +456,29 @@ const LiquidacionController = {
         take: 50,
       });
       res.json({ ok: true, data: items });
+    } catch (e) { next(e); }
+  },
+
+  // GET /admin/liquidaciones/comercio/:comercioId/reembolsos-pendientes — para
+  // que el admin vea, antes de crear la liquidación, cuánto se le va a
+  // descontar a ese comercio por disputas ya resueltas con reembolso.
+  async reembolsosPendientes(req, res, next) {
+    try {
+      const comercioId = Number(req.params.comercioId);
+      if (!Number.isInteger(comercioId) || comercioId < 1) {
+        throw new ErrorValidacion("comercioId inválido");
+      }
+      const items = await prisma.disputa.findMany({
+        where: {
+          comercioId,
+          estado: { in: ["RESUELTA_REEMBOLSO_TOTAL", "RESUELTA_REEMBOLSO_PARCIAL"] },
+          notaCreditoAplicada: false,
+        },
+        orderBy: { resueltoAt: "asc" },
+        select: { id: true, moduloOrigen: true, referenciaId: true, montoReembolsoAprobado: true, montoDescuentoComercio: true, resueltoAt: true },
+      });
+      const totalDescuento = items.reduce((s, d) => s + Number(d.montoDescuentoComercio || 0), 0);
+      res.json({ ok: true, data: { items, totalDescuento } });
     } catch (e) { next(e); }
   },
 };

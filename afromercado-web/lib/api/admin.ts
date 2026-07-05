@@ -14,6 +14,7 @@ export interface ComercioAdmin {
   configTour: { id: number } | null
   configExpress: { id: number } | null
   configTransporte: { id: number } | null
+  configFiscal: { ivaActivo: boolean; ivaPorcentaje: number | string; regimenTributario: string | null } | null
 }
 
 export interface UsuarioAdmin {

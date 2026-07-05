@@ -2,9 +2,119 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { listarComerciosAdmin, cambiarEstadoComercio, type ComercioAdmin } from '@/lib/api/admin'
+import { activarIva, desactivarIva } from '@/lib/api/config-fiscal'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
+
+// ─── Modal de IVA ─────────────────────────────────────────────────────────────
+
+function ModalIva({
+  comercio,
+  onCerrar,
+  onGuardado,
+}: {
+  comercio: ComercioAdmin
+  onCerrar: () => void
+  onGuardado: () => void
+}) {
+  const activo = comercio.configFiscal?.ivaActivo ?? false
+  const [porcentaje, setPorcentaje] = useState(String(comercio.configFiscal?.ivaPorcentaje ?? 19))
+  const [regimen, setRegimen] = useState(comercio.configFiscal?.regimenTributario ?? '')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function guardar() {
+    const valor = parseFloat(porcentaje)
+    if (!Number.isFinite(valor) || valor < 0 || valor > 100) {
+      setError('El porcentaje debe ser un número entre 0 y 100.')
+      return
+    }
+    setGuardando(true)
+    setError(null)
+    try {
+      await activarIva(comercio.id, { ivaPorcentaje: valor, regimenTributario: regimen.trim() || undefined })
+      onGuardado()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo activar el IVA.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function desactivar() {
+    setGuardando(true)
+    setError(null)
+    try {
+      await desactivarIva(comercio.id)
+      onGuardado()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo desactivar el IVA.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+        <h2 className="text-lg font-bold text-[#1A1A1A]">IVA — {comercio.nombre}</h2>
+        <p className="mt-1 text-sm text-[#1A1A1A]/55">
+          {activo ? 'Este comercio tiene IVA activo.' : 'Este comercio no cobra IVA actualmente.'}
+        </p>
+
+        <div className="mt-4">
+          <label className="mb-1 block text-sm font-medium text-[#1A1A1A]/70">Porcentaje de IVA</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={0.5}
+            value={porcentaje}
+            onChange={(e) => setPorcentaje(e.target.value)}
+            className="w-full rounded-lg border border-[#1A1A1A]/20 px-3 py-2 text-sm focus:border-[#2D6A4F] focus:outline-none"
+          />
+        </div>
+        <div className="mt-3">
+          <label className="mb-1 block text-sm font-medium text-[#1A1A1A]/70">
+            Régimen tributario <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span>
+          </label>
+          <input
+            type="text"
+            value={regimen}
+            onChange={(e) => setRegimen(e.target.value)}
+            placeholder="Ej: Régimen común"
+            className="w-full rounded-lg border border-[#1A1A1A]/20 px-3 py-2 text-sm focus:border-[#2D6A4F] focus:outline-none"
+          />
+        </div>
+
+        {error && <p className="mt-3 text-xs text-[#C0392B]">{error}</p>}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onCerrar} className="rounded-lg border border-[#1A1A1A]/15 px-4 py-2 text-sm font-medium text-[#1A1A1A]/70 hover:bg-[#F8F5F0]">
+            Cancelar
+          </button>
+          {activo && (
+            <button
+              onClick={desactivar}
+              disabled={guardando}
+              className="rounded-lg border border-[#C0392B]/30 px-4 py-2 text-sm font-semibold text-[#C0392B] hover:bg-[#C0392B]/5 disabled:opacity-50"
+            >
+              Desactivar
+            </button>
+          )}
+          <button
+            onClick={guardar}
+            disabled={guardando}
+            className="rounded-lg bg-[#2D6A4F] px-4 py-2 text-sm font-semibold text-white hover:bg-[#235540] disabled:opacity-50"
+          >
+            {activo ? 'Guardar' : 'Activar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +157,7 @@ export default function AdminComerciosPage() {
   const [modulo, setModulo] = useState('')
   const [procesandoId, setProcesandoId] = useState<number | null>(null)
   const [aviso, setAviso] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null)
+  const [comercioIva, setComercioIva] = useState<ComercioAdmin | null>(null)
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -195,6 +306,7 @@ export default function AdminComerciosPage() {
                   <th className="px-4 py-3 font-semibold">Productos</th>
                   <th className="px-4 py-3 font-semibold">Registro</th>
                   <th className="px-4 py-3 font-semibold">Estado</th>
+                  <th className="px-4 py-3 font-semibold">IVA</th>
                   <th className="px-4 py-3 text-right font-semibold">Acción</th>
                 </tr>
               </thead>
@@ -253,6 +365,21 @@ export default function AdminComerciosPage() {
                       </span>
                     </td>
 
+                    {/* IVA */}
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => setComercioIva(c)}
+                        className={[
+                          'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors',
+                          c.configFiscal?.ivaActivo
+                            ? 'border-[#D4A017]/40 bg-[#D4A017]/10 text-[#9B7300] hover:bg-[#D4A017]/20'
+                            : 'border-[#1A1A1A]/12 bg-[#F8F5F0] text-[#1A1A1A]/45 hover:bg-[#1A1A1A]/5',
+                        ].join(' ')}
+                      >
+                        {c.configFiscal?.ivaActivo ? `${Number(c.configFiscal.ivaPorcentaje)}%` : 'Inactivo'}
+                      </button>
+                    </td>
+
                     {/* Acción */}
                     <td className="px-4 py-3 text-right">
                       <Button
@@ -297,6 +424,18 @@ export default function AdminComerciosPage() {
           </div>
         )}
       </div>
+
+      {comercioIva && (
+        <ModalIva
+          comercio={comercioIva}
+          onCerrar={() => setComercioIva(null)}
+          onGuardado={() => {
+            setComercioIva(null)
+            setAviso({ tipo: 'exito', texto: `IVA de "${comercioIva.nombre}" actualizado.` })
+            void cargar()
+          }}
+        />
+      )}
     </div>
   )
 }

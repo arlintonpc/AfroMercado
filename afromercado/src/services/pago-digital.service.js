@@ -5,6 +5,8 @@ const {
   ErrorValidacion,
 } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
+const FacturacionService = require("./facturacion.service");
+const FidelizacionService = require("./fidelizacion.service");
 const VisibilidadRepository = require("../repositories/visibilidad.repository");
 const PagoPublicidadService = require("./pago-publicidad.service");
 const {
@@ -191,19 +193,26 @@ async function liberarStockPedido(tx, pedido) {
 
 async function confirmarPedidoPorPago(tx, pago) {
   const pedido = pago.pedido;
+  const productosStockBajo = [];
   for (const sub of pedido.subPedidos) {
     for (const item of sub.items) {
-      const result = await tx.$executeRaw`
+      const filas = await tx.$queryRaw`
         UPDATE "Producto"
         SET "stock" = "stock" - ${item.cantidad},
             "stockReservado" = GREATEST("stockReservado" - ${item.cantidad}, 0)
         WHERE id = ${item.productoId}
           AND "stock" >= ${item.cantidad}
+        RETURNING id, nombre, "comercioId", stock, "stockMinimo", "stockBajoNotificadoAt"
       `;
-      if (result === 0) {
+      if (filas.length === 0) {
         throw new ErrorValidacion(
           `Stock insuficiente para confirmar el producto #${item.productoId}`
         );
+      }
+      const p = filas[0];
+      if (p.stockMinimo > 0 && p.stock <= p.stockMinimo && p.stockBajoNotificadoAt === null) {
+        await tx.producto.update({ where: { id: p.id }, data: { stockBajoNotificadoAt: new Date() } });
+        productosStockBajo.push({ id: p.id, nombre: p.nombre, comercioId: p.comercioId, stock: p.stock });
       }
     }
   }
@@ -225,6 +234,8 @@ async function confirmarPedidoPorPago(tx, pago) {
   }
 
   await VisibilidadRepository.atribuirPedidoConfirmado(tx, pedido);
+
+  return productosStockBajo;
 }
 
 const PagoDigitalService = {
@@ -391,7 +402,7 @@ const PagoDigitalService = {
         throw new ErrorValidacion(`Este pago no se puede confirmar desde estado ${pago.estado}`);
       }
 
-      await confirmarPedidoPorPago(tx, pago);
+      const productosStockBajo = await confirmarPedidoPorPago(tx, pago);
 
       const actualizado = await tx.pago.update({
         where: { id: pago.id },
@@ -411,7 +422,13 @@ const PagoDigitalService = {
         data: { estado: "CONFIRMADO" },
       });
 
-      return { pago: actualizado, yaConfirmado: false };
+      return {
+        pago: actualizado,
+        yaConfirmado: false,
+        subPedidoIds: pago.pedido.subPedidos.map((sp) => sp.id),
+        productosStockBajo,
+        compradorId: pago.pedido.compradorId,
+      };
     });
 
     if (!resultado.yaConfirmado) {
@@ -427,6 +444,24 @@ const PagoDigitalService = {
         });
       }
       await notificarPagoAprobado(resultado.pago.pedidoId);
+
+      for (const subPedidoId of resultado.subPedidoIds || []) {
+        FacturacionService.emitirParaReferencia("PEDIDO", subPedidoId).catch((e) =>
+          console.error(`[FACTURACION] emisión fallida para SubPedido #${subPedidoId}, quedará en reintento:`, e.message)
+        );
+      }
+
+      for (const p of resultado.productosStockBajo || []) {
+        NotificacionService.stockBajo({ comercioId: p.comercioId, producto: p }).catch((e) =>
+          console.error("[STOCK-BAJO] notificar:", e.message)
+        );
+      }
+
+      FidelizacionService.otorgarPuntosPorCompra(resultado.compradorId, {
+        moduloOrigen: "PEDIDO",
+        referenciaId: resultado.pago.pedidoId,
+        subtotal: Number(resultado.pago.monto),
+      }).catch((e) => console.error("[FIDELIZACION] otorgar puntos fallido:", e.message));
     }
 
     return mapearPagoDigital(

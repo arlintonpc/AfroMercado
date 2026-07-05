@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { misReservasTransporte, cancelarReservaTransporte, type ReservaTransporte } from '@/lib/api/transporte'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
+import ModalReportarProblema from '@/components/disputas/ModalReportarProblema'
 
 const ESTADO_INFO: Record<string, { label: string; color: string }> = {
   PENDIENTE:  { label: '⏳ Pendiente',   color: 'bg-amber-100 text-amber-700' },
@@ -42,6 +43,7 @@ export default function MisReservasTransportePage() {
     const ei = ESTADO_INFO[r.estado]
     const ruta = r.ruta
     const cfg = ruta?.configTransporte
+    const [modalReportar, setModalReportar] = useState(false)
     return (
       <div className="bg-white rounded-2xl border border-gray-100 p-4">
         <div className="flex items-start justify-between gap-2 mb-3">
@@ -75,7 +77,22 @@ export default function MisReservasTransportePage() {
               {cancelando === r.id ? 'Cancelando…' : 'Cancelar'}
             </button>
           )}
+          {r.estado === 'COMPLETADA' && (
+            <button onClick={() => setModalReportar(true)}
+              className="text-xs text-[#C0392B] hover:underline">
+              Reportar un problema
+            </button>
+          )}
         </div>
+
+        {modalReportar && (
+          <ModalReportarProblema
+            moduloOrigen="TRANSPORTE"
+            referenciaId={r.id}
+            onCerrar={() => setModalReportar(false)}
+            onExito={() => setModalReportar(false)}
+          />
+        )}
       </div>
     )
   }

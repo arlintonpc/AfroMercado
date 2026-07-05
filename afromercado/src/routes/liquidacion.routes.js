@@ -10,6 +10,7 @@ router.get("/admin/liquidaciones/resumen",      ...soloAdmin, LiquidacionControl
 router.post("/admin/liquidaciones",             ...soloAdmin, LiquidacionController.crear);
 router.patch("/admin/liquidaciones/:id/pagar",  ...soloAdmin, LiquidacionController.marcarPagada);
 router.patch("/admin/liquidaciones/:id/cancelar", ...soloAdmin, LiquidacionController.cancelar);
+router.get("/admin/liquidaciones/comercio/:comercioId/reembolsos-pendientes", ...soloAdmin, LiquidacionController.reembolsosPendientes);
 
 router.get("/mis-liquidaciones", autenticar, autorizar("COMERCIANTE", "REPARTIDOR"), LiquidacionController.misLiquidaciones);
 

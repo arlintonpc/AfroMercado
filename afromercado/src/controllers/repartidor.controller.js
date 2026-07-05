@@ -5,6 +5,7 @@ const prisma = require("../config/prisma");
 const { subirACloudinary } = require("../utils/cloudinary");
 const { ErrorNoEncontrado, ErrorProhibido, ErrorValidacion } = require("../utils/errores");
 const NotificacionService = require("../services/notificacion.service");
+const sseManager = require("../utils/sse-manager");
 const {
   obtenerConfiguracionPago,
   calcularPagoEntrega,
@@ -345,6 +346,95 @@ const RepartidorController = {
       });
 
       res.json({ ok: true, data: actualizada });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // PATCH /repartidor/entregas/:id/ubicacion (Fase 4.1) — el repartidor emite su
+  // posición cada 10-15s mientras la entrega está EN_CAMINO; se reenvía por el
+  // mismo stream SSE de notificaciones que el comprador ya tiene abierto.
+  async actualizarUbicacion(req, res, next) {
+    try {
+      const id = Number(req.params.id);
+      const { lat, lng } = req.body || {};
+      const latitud = Number(lat);
+      const longitud = Number(lng);
+      if (!Number.isFinite(latitud) || !Number.isFinite(longitud)) {
+        throw new ErrorValidacion("lat/lng inválidos");
+      }
+
+      const entrega = await prisma.entrega.findUnique({
+        where: { id },
+        include: { subPedido: { include: { pedido: { select: { compradorId: true } } } } },
+      });
+      if (!entrega) throw new ErrorNoEncontrado("Entrega no encontrada");
+      if (entrega.repartidorId !== req.usuario.id) {
+        throw new ErrorProhibido("No eres el repartidor asignado a esta entrega");
+      }
+      if (entrega.estado !== "EN_CAMINO") {
+        throw new ErrorValidacion("Solo se puede reportar ubicación mientras la entrega está EN_CAMINO");
+      }
+
+      const ahora = new Date();
+      await prisma.entrega.update({
+        where: { id },
+        data: { ultimaLatitud: latitud, ultimaLongitud: longitud, ultimaUbicacionAt: ahora },
+      });
+
+      const compradorId = entrega.subPedido?.pedido?.compradorId;
+      if (compradorId) {
+        sseManager.enviar(compradorId, "ubicacion-repartidor", {
+          entregaId: id,
+          lat: latitud,
+          lng: longitud,
+          actualizadoAt: ahora,
+        });
+      }
+
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // POST /repartidor/entregas/:id/calificar (Fase 4.2) — solo el comprador
+  // dueño del pedido, solo tras ENTREGADA, unique constraint evita doble calificación.
+  async calificar(req, res, next) {
+    try {
+      const id = Number(req.params.id);
+      const { calificacion, comentario } = req.body || {};
+      const nota = Number(calificacion);
+      if (!Number.isInteger(nota) || nota < 1 || nota > 5) {
+        throw new ErrorValidacion("La calificación debe ser un entero entre 1 y 5");
+      }
+
+      const entrega = await prisma.entrega.findUnique({
+        where: { id },
+        include: { subPedido: { include: { pedido: { select: { compradorId: true } } } } },
+      });
+      if (!entrega) throw new ErrorNoEncontrado("Entrega no encontrada");
+      if (!entrega.repartidorId) throw new ErrorValidacion("Esta entrega no tiene repartidor asignado");
+      if (entrega.subPedido?.pedido?.compradorId !== req.usuario.id) {
+        throw new ErrorProhibido("No puedes calificar esta entrega");
+      }
+      if (entrega.estado !== "ENTREGADA") {
+        throw new ErrorValidacion("Solo puedes calificar una entrega ya finalizada");
+      }
+
+      const existente = await prisma.calificacionRepartidor.findUnique({ where: { entregaId: id } });
+      if (existente) throw new ErrorValidacion("Ya calificaste esta entrega");
+
+      const nueva = await prisma.calificacionRepartidor.create({
+        data: {
+          entregaId: id,
+          repartidorId: entrega.repartidorId,
+          compradorId: req.usuario.id,
+          calificacion: nota,
+          comentario: comentario?.trim() || null,
+        },
+      });
+      res.status(201).json({ ok: true, data: nueva });
     } catch (err) {
       next(err);
     }

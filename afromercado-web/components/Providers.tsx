@@ -9,6 +9,7 @@ import { FavoritoProvider } from '@/context/FavoritoContext'
 import { PushProvider } from '@/context/PushContext'
 import BannerRegionDetectada from '@/components/region/BannerRegionDetectada'
 import IrruptorBienvenida from '@/components/publicidad/IrruptorBienvenida'
+import IndicadorSinConexion from '@/components/IndicadorSinConexion'
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -21,6 +22,7 @@ export default function Providers({ children }: { children: ReactNode }) {
                 {children}
                 <BannerRegionDetectada />
                 <IrruptorBienvenida />
+                <IndicadorSinConexion />
               </CarritoProvider>
             </FavoritoProvider>
           </NotificacionProvider>

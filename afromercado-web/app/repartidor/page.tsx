@@ -9,6 +9,7 @@ import {
   historialEntregas,
   tomarEntrega,
   actualizarEstadoEntrega,
+  actualizarUbicacionEntrega,
   subirFotoEntrega,
   estadisticasRepartidor,
   type EntregaDetalle,
@@ -100,6 +101,25 @@ function TarjetaEntrega({
   const activa = estaActiva(entrega.estado)
   const siguiente = SIGUIENTE_ESTADO[entrega.estado]
   const ocupado = cargandoAccion === entrega.id
+
+  // Tracking en vivo: mientras la entrega está EN_CAMINO, reporta la ubicación
+  // del navegador cada ~12s. Si el repartidor niega el permiso, la entrega
+  // sigue funcionando igual — no es bloqueante.
+  useEffect(() => {
+    if (entrega.estado !== 'EN_CAMINO' || typeof navigator === 'undefined' || !navigator.geolocation) return
+    let ultimoEnvio = 0
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const ahora = Date.now()
+        if (ahora - ultimoEnvio < 12_000) return
+        ultimoEnvio = ahora
+        actualizarUbicacionEntrega(entrega.id, pos.coords.latitude, pos.coords.longitude).catch(() => {})
+      },
+      () => { /* permiso denegado o error — la entrega sigue funcionando sin tracking */ },
+      { enableHighAccuracy: true, maximumAge: 10_000 }
+    )
+    return () => navigator.geolocation.clearWatch(watchId)
+  }, [entrega.estado, entrega.id])
 
   return (
     <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-5 flex flex-col gap-4">

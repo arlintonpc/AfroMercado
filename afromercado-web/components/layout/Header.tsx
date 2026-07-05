@@ -253,6 +253,14 @@ export default function Header({ itemsCarrito }: HeaderProps) {
           >
             🎭
           </Link>
+          <Link
+            href="/empleo"
+            title="Empleo"
+            aria-label="Empleo"
+            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
+          >
+            💼
+          </Link>
         </nav>
 
         {/* Navegación desktop — versión completa (icono + texto) desde lg: */}
@@ -286,6 +294,12 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1"
           >
             🎭 Cultura
+          </Link>
+          <Link
+            href="/empleo"
+            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1"
+          >
+            💼 Empleo
           </Link>
           <Link
             href="/temporada"
@@ -437,6 +451,18 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                   <Link href="/cultura/mis-reservas" role="menuitem" onClick={() => setMenuAbierto(false)}
                     className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
                     🎭 Reservas cultura
+                  </Link>
+                  <Link href="/empleo/mis-postulaciones" role="menuitem" onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    💼 Mis postulaciones
+                  </Link>
+                  <Link href="/empleo/mis-ofertas" role="menuitem" onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    💼 Ofertas que publiqué
+                  </Link>
+                  <Link href="/empleo/favoritos" role="menuitem" onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    💼 Empleos favoritos
                   </Link>
                   <div className="border-t border-[#1A1A1A]/10 my-1" />
                   <Link href="/chat" role="menuitem" onClick={() => setMenuAbierto(false)}

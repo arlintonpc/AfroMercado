@@ -4,6 +4,7 @@ const sseManager = require("../utils/sse-manager");
 const { enviarPushAUsuario } = require("../utils/push");
 const { enviarMensajeWA } = require("../utils/whatsapp");
 const AlianzaService = require("./alianza.service");
+const FacturacionService = require("./facturacion.service");
 
 const TASA_COMISION_TOUR = 0.10;
 
@@ -313,6 +314,10 @@ const TourService = {
         }
       } catch (e) { console.error('[WHATSAPP-TOUR]', e.message); }
     });
+
+    FacturacionService.emitirParaReferencia("TOUR", reserva.id).catch((e) =>
+      console.error(`[FACTURACION] emisión fallida para ReservaTour #${reserva.id}, quedará en reintento:`, e.message)
+    );
 
     return reserva;
   },

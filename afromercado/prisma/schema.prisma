@@ -228,6 +228,17 @@ model Usuario {
   favoritosTransporte       FavoritoTransporte[]
   cuponesTourUsos           CuponTourUso[]
   cuponesTransporteUsos     CuponTransporteUso[]
+  disputasComoComprador     Disputa[]           @relation("DisputasComprador")
+  facturas                  FacturaElectronica[]
+  pqrsd                     Pqrsd[]
+  calificacionesRecibidas   CalificacionRepartidor[] @relation("CalificacionesRecibidas")
+  calificacionesEmitidas    CalificacionRepartidor[] @relation("CalificacionesEmitidas")
+  perfilFidelizacion        PerfilFidelizacion?      @relation("PerfilFidelizacion")
+  referidosHechos           PerfilFidelizacion[]     @relation("ReferidosHechos")
+  ofertasEmpleoPublicadas   OfertaEmpleo[]           @relation("OfertasEmpleoPublicadas")
+  hojaDeVida                HojaDeVida?
+  postulacionesEmpleoEnviadas PostulacionEmpleo[]    @relation("PostulacionesEmpleoEnviadas")
+  favoritosOfertaEmpleo     FavoritoOfertaEmpleo[]
 }
 
 model Comercio {
@@ -301,6 +312,27 @@ model Comercio {
   gruposComplementoBiblioteca GrupoComplementoBiblioteca[]
   eventosCulturales     EventoCultural[]  @relation("EventosCulturalesComercio")
   alianzasSocio         AlianzaSocio[]
+  disputas              Disputa[]         @relation("DisputasComercio")
+  configFiscal          ConfigFiscalComercio?
+  facturas              FacturaElectronica[]
+  ofertasEmpleo         OfertaEmpleo[]
+}
+
+// IVA configurable por comercio (Fase 1.1) — apagado por defecto, solo el ADMIN
+// lo activa. La tasa es por comercio porque cada uno puede tener un régimen
+// tributario distinto; no hay override global como el de comisión.
+model ConfigFiscalComercio {
+  id                 Int       @id @default(autoincrement())
+  comercioId         Int       @unique
+  ivaActivo          Boolean   @default(false)
+  ivaPorcentaje      Decimal   @default(19.00) @db.Decimal(5, 2)
+  regimenTributario  String?
+  activadoPor        Int?
+  activadoAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  comercio Comercio @relation(fields: [comercioId], references: [id])
 }
 
 model Categoria {
@@ -323,6 +355,8 @@ model Producto {
   unidad              UnidadVenta
   stock               Int          @default(0)
   stockReservado      Int          @default(0)
+  stockMinimo         Int          @default(0)
+  stockBajoNotificadoAt DateTime?
   fotoUrl             String?
   imagenes            String[]     @default([])
   videoUrl            String?
@@ -421,6 +455,7 @@ model Pedido {
   estado         EstadoPedido @default(PENDIENTE_PAGO)
   subtotal       Decimal      @db.Decimal(12, 2)
   comisionTotal  Decimal      @db.Decimal(12, 2)
+  ivaTotal       Decimal      @default(0) @db.Decimal(12, 2)
   total          Decimal      @db.Decimal(12, 2)
   costoEnvio     Decimal      @default(0) @db.Decimal(10, 2)
   notas          String?
@@ -451,6 +486,7 @@ model SubPedido {
   subtotal             Decimal         @db.Decimal(12, 2)
   comision             Decimal         @db.Decimal(12, 2)
   tasaComisionAplicada Decimal?        @db.Decimal(5, 4)
+  iva                  Decimal         @default(0) @db.Decimal(12, 2)
   neto                 Decimal         @db.Decimal(12, 2)
   notas                String?
   createdAt            DateTime        @default(now())
@@ -565,6 +601,181 @@ model CambioCriticoComercio {
   @@index([estado, createdAt])
 }
 
+enum EstadoDisputa {
+  ABIERTA
+  RESPONDIDA_COMERCIO
+  RESUELTA_RECHAZADA
+  RESUELTA_REEMBOLSO_TOTAL
+  RESUELTA_REEMBOLSO_PARCIAL
+  CERRADA_SIN_RESPUESTA
+}
+
+enum MotivoDisputa {
+  PRODUCTO_NO_LLEGO
+  PRODUCTO_DEFECTUOSO_O_DANADO
+  PRODUCTO_INCOMPLETO
+  PRODUCTO_DIFERENTE_AL_PEDIDO
+  CALIDAD_NO_CONFORME
+  SERVICIO_NO_PRESTADO
+  COBRO_INCORRECTO
+  OTRO
+}
+
+// Reclamo/disputa post-compra (Pedido vía SubPedido, Express, Hotel, Tour,
+// Transporte — un solo modelo, polimórfico vía moduloOrigen/referenciaId,
+// mismo patrón que AccionModeracion.targetTipo/targetId). El dinero de un
+// reembolso aprobado NUNCA se revierte automáticamente en Wompi (no existe
+// esa capacidad hoy) — se descuenta de la siguiente Liquidacion del comercio,
+// y la devolución real al comprador es un paso manual que el admin marca.
+model Disputa {
+  id           Int    @id @default(autoincrement())
+  moduloOrigen String // "PEDIDO" | "EXPRESS" | "HOTEL" | "TOUR" | "TRANSPORTE"
+  referenciaId Int    // para "PEDIDO" es SubPedido.id, NO Pedido.id
+
+  compradorId Int
+  comercioId  Int
+
+  motivo      MotivoDisputa
+  descripcion String
+  evidenciaUrls String[] @default([])
+
+  montoOriginal            Decimal  @db.Decimal(12, 2)
+  montoNetoOriginal        Decimal  @db.Decimal(12, 2)
+  montoReembolsoSolicitado Decimal? @db.Decimal(12, 2)
+
+  estado EstadoDisputa @default(ABIERTA)
+
+  respuestaComercio     String?
+  respuestaComercioUrls String[]  @default([])
+  respondidoPor         Int?
+  respondidoAt          DateTime?
+
+  resolucion             String?
+  montoReembolsoAprobado Decimal?  @db.Decimal(12, 2)
+  montoDescuentoComercio Decimal?  @db.Decimal(12, 2)
+  resueltoPor            Int?
+  resueltoAt             DateTime?
+
+  notaCreditoAplicada      Boolean   @default(false)
+  notaCreditoLiquidacionId Int?
+  reembolsoTransferidoAt   DateTime?
+  reembolsoTransferidoPor  Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comprador Usuario  @relation("DisputasComprador", fields: [compradorId], references: [id])
+  comercio  Comercio @relation("DisputasComercio", fields: [comercioId], references: [id])
+
+  @@index([moduloOrigen, referenciaId])
+  @@index([comercioId, estado])
+  @@index([compradorId, createdAt])
+  @@index([estado, createdAt])
+}
+
+// Facturación electrónica DIAN (Fase 1.2) — abstracción de proveedor externo
+// (ver services/facturacion/*), hoy solo con el proveedor no-op "NINGUNO".
+// Mismo patrón polimórfico que Disputa: referenciaId es SubPedido.id para
+// "PEDIDO", y el id de la reserva/pedido propio para los demás módulos.
+enum EstadoFactura {
+  PENDIENTE
+  ENVIADA
+  ACEPTADA
+  RECHAZADA
+  ERROR
+  ANULADA
+  OMITIDA
+}
+
+model FacturaElectronica {
+  id           Int    @id @default(autoincrement())
+  moduloOrigen String // "PEDIDO" | "EXPRESS" | "HOTEL" | "TOUR" | "TRANSPORTE" | "CULTURA"
+  referenciaId Int
+
+  comercioId  Int
+  compradorId Int
+
+  proveedor String        @default("NINGUNO")
+  estado    EstadoFactura @default(PENDIENTE)
+
+  subtotal Decimal @db.Decimal(12, 2)
+  ivaTotal Decimal @default(0) @db.Decimal(12, 2)
+  total    Decimal @db.Decimal(12, 2)
+
+  cufe              String? @unique
+  numeroFactura     String?
+  pdfUrl            String?
+  xmlUrl            String?
+  providerFacturaId String?
+  providerPayload   Json?
+
+  errorMensaje       String?
+  intentosFallidos   Int       @default(0)
+  proximoReintentoAt DateTime?
+
+  anuladaPor      Int?
+  anuladaAt       DateTime?
+  motivoAnulacion String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comercio  Comercio @relation(fields: [comercioId], references: [id])
+  comprador Usuario  @relation(fields: [compradorId], references: [id])
+
+  @@unique([moduloOrigen, referenciaId])
+  @@index([comercioId, estado])
+  @@index([estado, proximoReintentoAt])
+}
+
+// PQRSD genérico (Fase 3.1) — canal de contacto con la PLATAFORMA misma, no con
+// un comercio específico (eso ya lo cubre Disputa). Acepta visitantes sin
+// cuenta (usuarioId nullable), por eso nombreContacto/emailContacto son
+// obligatorios para poder cerrar el ciclo de atención sin depender de una cuenta.
+enum TipoPqrsd {
+  PETICION
+  QUEJA
+  RECLAMO
+  SUGERENCIA
+  DENUNCIA
+}
+
+enum EstadoPqrsd {
+  ABIERTO
+  EN_PROCESO
+  RESPONDIDO
+  CERRADO
+}
+
+model Pqrsd {
+  id               Int         @id @default(autoincrement())
+  usuarioId        Int?
+  nombreContacto   String
+  emailContacto    String
+  telefonoContacto String?
+  tipo             TipoPqrsd
+  asunto           String
+  mensaje          String
+  moduloRelacionado String?
+  referenciaId     Int?
+  adjuntoUrls      String[]    @default([])
+  estado           EstadoPqrsd @default(ABIERTO)
+  prioridad        String      @default("NORMAL")
+  respuesta        String?
+  respondidoPor    Int?
+  respondidoAt     DateTime?
+  cerradoPor       Int?
+  cerradoAt        DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([estado, createdAt])
+  @@index([usuarioId, createdAt])
+  @@index([tipo, estado])
+}
+
 model PagoEvento {
   id           Int           @id @default(autoincrement())
   pagoId       Int?
@@ -602,6 +813,8 @@ model PagoDispersion {
   programadaAt       DateTime?
   enviadaAt          DateTime?
   confirmadaAt       DateTime?
+  intentosFallidos   Int                 @default(0)
+  proximoReintentoAt DateTime?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -612,6 +825,7 @@ model PagoDispersion {
 
   @@index([comercioId, estado])
   @@index([pagoId, estado])
+  @@index([estado, proximoReintentoAt])
 }
 
 model Entrega {
@@ -622,11 +836,34 @@ model Entrega {
   direccion    String
   notas        String?
   pagoRepartidor Decimal?     @db.Decimal(10, 2)
+  // Tracking en vivo (Fase 4.1) — última posición conocida del repartidor,
+  // persistida (no solo en memoria) para sobrevivir a un restart del backend.
+  ultimaLatitud    Float?
+  ultimaLongitud   Float?
+  ultimaUbicacionAt DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
   subPedido  SubPedido @relation(fields: [subPedidoId], references: [id])
   repartidor Usuario?  @relation("EntregaRepartidor", fields: [repartidorId], references: [id])
+  calificacion CalificacionRepartidor?
+
+  @@index([repartidorId])
+}
+
+// Calificación del repartidor por el comprador (Fase 4.2) — solo tras ENTREGADA.
+model CalificacionRepartidor {
+  id           Int      @id @default(autoincrement())
+  entregaId    Int      @unique
+  repartidorId Int
+  compradorId  Int
+  calificacion Int
+  comentario   String?
+  createdAt    DateTime @default(now())
+
+  entrega    Entrega @relation(fields: [entregaId], references: [id])
+  repartidor Usuario @relation("CalificacionesRecibidas", fields: [repartidorId], references: [id])
+  comprador  Usuario @relation("CalificacionesEmitidas", fields: [compradorId], references: [id])
 
   @@index([repartidorId])
 }
@@ -770,6 +1007,180 @@ model BusquedaHistorial {
 
   @@index([usuarioId, createdAt])
   @@index([sesionId, createdAt])
+}
+
+// Fidelización/referidos (Fase 5.2). Economía configurable vía Config (clave
+// "fidelizacion.puntosPorCOP"), no hardcodeada — arranca en 1 punto por $1.000.
+enum TipoMovimientoPuntos {
+  GANADO_COMPRA
+  GANADO_REFERIDO
+  CANJEADO
+  AJUSTE_ADMIN
+}
+
+model PerfilFidelizacion {
+  id                    Int      @id @default(autoincrement())
+  usuarioId             Int      @unique
+  puntos                Int      @default(0)
+  puntosAcumuladosTotal Int      @default(0)
+  codigoReferido        String   @unique
+  referidoPorId         Int?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  usuario     Usuario            @relation("PerfilFidelizacion", fields: [usuarioId], references: [id])
+  referidoPor Usuario?           @relation("ReferidosHechos", fields: [referidoPorId], references: [id])
+  movimientos MovimientoPuntos[]
+
+  @@index([codigoReferido])
+}
+
+model MovimientoPuntos {
+  id           Int                  @id @default(autoincrement())
+  perfilId     Int
+  tipo         TipoMovimientoPuntos
+  puntos       Int
+  moduloOrigen String?
+  referenciaId Int?
+  descripcion  String?
+  creadoPor    Int?
+  createdAt    DateTime             @default(now())
+
+  perfil PerfilFidelizacion @relation(fields: [perfilId], references: [id])
+
+  @@index([perfilId, createdAt])
+}
+
+// ============================================================
+//  Módulo Empleo / Bolsa de Trabajo comunitario (Fase 6)
+//  Cualquier Usuario puede publicar una oferta (no solo Comercio — el
+//  espíritu "comunitario" incluye a quien no tiene un negocio formal) y
+//  cualquier Usuario puede postularse (el rol regula permisos de otros
+//  módulos, no es una identidad excluyente de "quien busca trabajo").
+//  Moderación ligera antes de publicar, dado el contexto de comunidades
+//  vulnerables. La hoja de vida se snapshotea en cada postulación (mismo
+//  espíritu que Disputa.montoOriginal) para que el postulante no pueda
+//  "editar retroactivamente" lo que un empleador ya vio.
+// ============================================================
+enum EstadoOfertaEmpleo {
+  BORRADOR
+  PUBLICADA
+  PAUSADA
+  CERRADA
+}
+
+enum TipoContratoEmpleo {
+  TIEMPO_COMPLETO
+  MEDIO_TIEMPO
+  POR_DIAS
+  TEMPORAL
+  OTRO
+}
+
+enum EstadoPostulacionEmpleo {
+  ENVIADA
+  VISTA
+  PRESELECCIONADO
+  RECHAZADA
+  CONTRATADO
+  RETIRADA
+}
+
+model OfertaEmpleo {
+  id                Int                @id @default(autoincrement())
+  publicadoPorId    Int
+  comercioId        Int?
+  titulo            String
+  descripcion       String
+  categoria         String?
+  tipoContrato      TipoContratoEmpleo
+  municipio         String
+  departamento      String?
+  salarioMin        Decimal?           @db.Decimal(12, 2)
+  salarioMax        Decimal?           @db.Decimal(12, 2)
+  salarioNegociable Boolean            @default(false)
+  requisitos        String?
+  vacantes          Int                @default(1)
+  estado            EstadoOfertaEmpleo @default(BORRADOR)
+  estadoModeracion  String             @default("PENDIENTE") // PENDIENTE | APROBADA | RECHAZADA
+  revisadoPor       Int?
+  revisadoAt        DateTime?
+  motivoRechazoModeracion String?
+  fechaCierre       DateTime?
+  contactoWhatsapp  String?
+  preguntas         Json               @default("[]") // [{id, texto, tipo: TEXTO|SI_NO|OPCION_MULTIPLE, opciones?}]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+
+  publicadoPor  Usuario             @relation("OfertasEmpleoPublicadas", fields: [publicadoPorId], references: [id])
+  comercio      Comercio?           @relation(fields: [comercioId], references: [id])
+  postulaciones PostulacionEmpleo[]
+  favoritos     FavoritoOfertaEmpleo[]
+
+  @@index([estado, estadoModeracion, municipio, createdAt])
+  @@index([publicadoPorId])
+  @@index([comercioId])
+}
+
+model FavoritoOfertaEmpleo {
+  id             Int      @id @default(autoincrement())
+  usuarioId      Int
+  ofertaEmpleoId Int
+  createdAt      DateTime @default(now())
+
+  usuario Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  oferta  OfertaEmpleo @relation(fields: [ofertaEmpleoId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, ofertaEmpleoId])
+  @@index([usuarioId])
+  @@index([ofertaEmpleoId])
+}
+
+model HojaDeVida {
+  id               Int      @id @default(autoincrement())
+  usuarioId        Int      @unique
+  resumenPerfil    String?
+  telefonoContacto String
+  experiencia      Json     // [{empresa, cargo, desde, hasta, descripcion}]
+  educacion        Json     // [{institucion, titulo, nivel, anio}]
+  habilidades      String[] @default([])
+  disponibilidad   String?
+  cvUrl            String?  // PDF adjunto por el usuario (opcional, complementa el formulario)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+}
+
+model PostulacionEmpleo {
+  id              Int                     @id @default(autoincrement())
+  ofertaEmpleoId  Int
+  postulanteId    Int
+  hojaDeVidaId    Int
+  // Snapshot de la hoja de vida al momento de postular (no solo la FK) —
+  // evita que el candidato la edite después de que el empleador ya la vio.
+  experienciaSnap Json
+  educacionSnap   Json
+  habilidadesSnap String[]                @default([])
+  resumenPerfilSnap String?               // HojaDeVida.resumenPerfil al momento de postular
+  disponibilidadSnap String?              // HojaDeVida.disponibilidad al momento de postular
+  fotoSnapUrl     String?                 // Usuario.avatarUrl al momento de postular
+  cvSnapUrl       String?                 // HojaDeVida.cvUrl al momento de postular
+  respuestas      Json                    @default("[]") // [{preguntaId, texto, respuesta}]
+  mensaje         String?
+  estado          EstadoPostulacionEmpleo @default(ENVIADA)
+  vistaAt         DateTime?
+  notasPublicador String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  oferta     OfertaEmpleo @relation(fields: [ofertaEmpleoId], references: [id])
+  postulante Usuario      @relation("PostulacionesEmpleoEnviadas", fields: [postulanteId], references: [id])
+
+  @@unique([ofertaEmpleoId, postulanteId])
+  @@index([ofertaEmpleoId, estado])
+  @@index([postulanteId])
 }
 
 model CampanaHero {

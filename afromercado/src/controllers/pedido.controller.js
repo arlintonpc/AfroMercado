@@ -2,6 +2,7 @@
 //  Controlador de Pedidos
 // ============================================================
 const PedidoService = require("../services/pedido.service");
+const { generarReciboPedido } = require("../utils/pdf/recibo-simple");
 
 const PedidoController = {
   // POST /pedidos/checkout
@@ -54,6 +55,19 @@ const PedidoController = {
     try {
       const resultado = await PedidoService.cancelar(req.usuario.id, Number(req.params.id));
       res.json({ ok: true, ...resultado });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  // GET /pedidos/:id/recibo.pdf — recibo interno, sin valor fiscal (Fase 1.3)
+  async reciboPdf(req, res, next) {
+    try {
+      const pedido = await PedidoService.detalle(req.usuario.id, Number(req.params.id));
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="recibo-${pedido.codigo ?? pedido.id}.pdf"`);
+      const doc = generarReciboPedido(pedido);
+      doc.pipe(res);
     } catch (e) {
       next(e);
     }

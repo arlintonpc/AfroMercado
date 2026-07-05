@@ -244,7 +244,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
 
         {/* Precio + botones */}
         <div className="flex items-center justify-between gap-2">
-          <div style={{ lineHeight: 1 }}>
+          <div className="min-w-0 flex-1" style={{ lineHeight: 1 }}>
             {producto.oferta ? (
               <>
                 <span className="text-xs text-[#1A1A1A]/40 line-through block" style={{ lineHeight: '14px' }}>

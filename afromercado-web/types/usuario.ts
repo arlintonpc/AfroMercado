@@ -28,6 +28,7 @@ export interface DatosRegistro {
   autorizacionDatos: boolean
   tipoDocumento?: TipoDocumento
   numeroDocumento?: string
+  codigoReferido?: string
 }
 
 export interface RespuestaAuth {

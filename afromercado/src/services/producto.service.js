@@ -26,7 +26,7 @@ const ProductoService = {
     if (!comercio) throw new ErrorValidacion("Debes tener un comercio registrado para publicar productos");
     assertPuedePublicar(comercio);
 
-    const { nombre, descripcion, precio, unidad, stock, diasAlistamientoMin, diasAlistamientoMax, alcance, fotoUrl, categoriaId, pesoKg, esExpress, tiempoEntregaMin } = datos;
+    const { nombre, descripcion, precio, unidad, stock, stockMinimo, diasAlistamientoMin, diasAlistamientoMax, alcance, fotoUrl, categoriaId, pesoKg, esExpress, tiempoEntregaMin } = datos;
 
     if (!nombre || !precio || !unidad) {
       throw new ErrorValidacion("Nombre, precio y unidad son obligatorios");
@@ -56,6 +56,7 @@ const ProductoService = {
       precio: parseFloat(precio),
       unidad,
       stock: parseInt(stock ?? 0),
+      stockMinimo: parseInt(stockMinimo ?? 0),
       diasAlistamientoMin: min,
       diasAlistamientoMax: max,
       alcance: alcance ?? "LOCAL",
@@ -100,7 +101,16 @@ const ProductoService = {
       if (parseFloat(datos.precio) <= 0) throw new ErrorValidacion("El precio debe ser mayor a cero");
       campos.precio = parseFloat(datos.precio);
     }
-    if (datos.stock !== undefined) campos.stock = parseInt(datos.stock);
+    if (datos.stockMinimo !== undefined) campos.stockMinimo = parseInt(datos.stockMinimo) || 0;
+    if (datos.stock !== undefined) {
+      campos.stock = parseInt(datos.stock);
+      // Si se repone stock por encima del mínimo, se resetea el aviso para
+      // que una futura venta que vuelva a cruzar el umbral notifique de nuevo.
+      const stockMinimoEfectivo = campos.stockMinimo ?? producto.stockMinimo;
+      if (stockMinimoEfectivo > 0 && campos.stock > stockMinimoEfectivo) {
+        campos.stockBajoNotificadoAt = null;
+      }
+    }
     if (datos.fotoUrl !== undefined) campos.fotoUrl = datos.fotoUrl;
     if (datos.alcance) {
       if (!ALCANCES_VALIDOS.includes(datos.alcance)) throw new ErrorValidacion("Alcance inválido");

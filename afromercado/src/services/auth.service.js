@@ -6,6 +6,7 @@
 const UsuarioRepository = require("../repositories/usuario.repository");
 const { hashearPassword, compararPassword, generarToken } = require("../utils/auth");
 const { ErrorValidacion, ErrorNoAutorizado } = require("../utils/errores");
+const FidelizacionService = require("./fidelizacion.service");
 
 const ROLES_VALIDOS = ["COMPRADOR", "COMERCIANTE", "REPARTIDOR"];
 
@@ -46,6 +47,12 @@ const AuthService = {
       tipoDocumento: datos.tipoDocumento || null,
       numeroDocumento: datos.numeroDocumento ? datos.numeroDocumento.trim() : null,
     });
+
+    // Crea el perfil de fidelización desde ya (código propio + referido, si vino uno)
+    // — el bono al referidor se otorga después, en la primera compra confirmada.
+    FidelizacionService.obtenerOCrearPerfil(usuario.id, datos.codigoReferido).catch((e) =>
+      console.error("[FIDELIZACION] no se pudo crear el perfil al registrar:", e.message)
+    );
 
     return this._respuestaConToken(usuario);
   },

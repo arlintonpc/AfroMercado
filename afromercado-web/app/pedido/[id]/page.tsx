@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
@@ -10,7 +11,14 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { apiFetch } from '@/lib/api/client'
 import { useAuth } from '@/context/AuthContext'
+import { useNotificaciones } from '@/context/NotificacionContext'
 import { BadgeEstado, infoEstado } from '@/components/checkout/estadoPedido'
+import ModalCalificarRepartidor from '@/components/pedido/ModalCalificarRepartidor'
+
+const MapaSeguimientoRepartidor = dynamic(() => import('@/components/pedido/MapaSeguimientoRepartidor'), {
+  ssr: false,
+  loading: () => <div className="h-64 rounded-2xl border border-[#1A1A1A]/8 bg-[#F8F5F0] animate-pulse" />,
+})
 import {
   desenvolver,
   nombreComercio,
@@ -54,6 +62,9 @@ export default function PaginaPedido({
   const [enviandoReview, setEnviandoReview] = useState(false)
   const [errorReview, setErrorReview] = useState<string | null>(null)
   const [graciasCalificacion, setGraciasCalificacion] = useState(false)
+  const [entregaACalificar, setEntregaACalificar] = useState<number | null>(null)
+  const [entregasCalificadas, setEntregasCalificadas] = useState<number[]>([])
+  const { ultimaUbicacionRepartidor } = useNotificaciones()
   const estadoPedido = pedido?.estado
 
   useEffect(() => {
@@ -344,6 +355,34 @@ export default function PaginaPedido({
                       )
                     })}
                   </ul>
+
+                  {grupo.entrega?.estado === 'EN_CAMINO' && (() => {
+                    const enVivo = ultimaUbicacionRepartidor?.entregaId === grupo.entrega?.id
+                      ? ultimaUbicacionRepartidor
+                      : null
+                    const lat = enVivo?.lat ?? grupo.entrega?.ultimaLatitud
+                    const lng = enVivo?.lng ?? grupo.entrega?.ultimaLongitud
+                    if (lat == null || lng == null) return null
+                    return (
+                      <div className="mt-3">
+                        <p className="text-xs font-semibold text-[#D4A017] mb-1.5">🛵 Tu repartidor va en camino</p>
+                        <MapaSeguimientoRepartidor lat={lat} lng={lng} />
+                      </div>
+                    )
+                  })()}
+
+                  {grupo.entrega?.estado === 'ENTREGADA' &&
+                    !grupo.entrega?.calificacion &&
+                    grupo.entrega?.id != null &&
+                    !entregasCalificadas.includes(grupo.entrega.id) && (
+                      <button
+                        type="button"
+                        onClick={() => setEntregaACalificar(grupo.entrega!.id)}
+                        className="mt-3 rounded-xl border border-[#D4A017]/30 bg-[#D4A017]/8 text-[#9B7300] hover:bg-[#D4A017]/15 text-xs font-semibold px-3 py-1.5 transition-colors"
+                      >
+                        Calificar a tu repartidor
+                      </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -510,6 +549,17 @@ export default function PaginaPedido({
             </div>
           </div>
         </div>
+      )}
+
+      {entregaACalificar != null && (
+        <ModalCalificarRepartidor
+          entregaId={entregaACalificar}
+          onCerrar={() => setEntregaACalificar(null)}
+          onCalificado={() => {
+            setEntregasCalificadas((prev) => [...prev, entregaACalificar])
+            setEntregaACalificar(null)
+          }}
+        />
       )}
     </div>
   )

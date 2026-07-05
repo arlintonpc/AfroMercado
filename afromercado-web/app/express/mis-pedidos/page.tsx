@@ -8,6 +8,7 @@ import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { obtenerToken } from '@/lib/api/client'
+import ModalReportarProblema from '@/components/disputas/ModalReportarProblema'
 
 const ESTADO_INFO: Record<string, { label: string; color: string; paso: number }> = {
   PENDIENTE:      { label: 'Pendiente de confirmacion', color: 'bg-amber-100 text-amber-700',   paso: 0 },
@@ -140,6 +141,7 @@ function TarjetaPedido({
   const activo = !['ENTREGADO', 'CANCELADO', 'RECHAZADO'].includes(pedido.estado)
   const [expandido, setExpandido] = useState(activo)
   const [mostrarReview, setMostrarReview] = useState(false)
+  const [mostrarReporte, setMostrarReporte] = useState(false)
   const yaResenado = !!(pedido as any).review
 
   const modalidadLabel =
@@ -290,6 +292,12 @@ function TarjetaPedido({
                     Pedir de nuevo
                   </Link>
                 )}
+                <button
+                  onClick={() => setMostrarReporte(true)}
+                  className="flex-1 text-center text-xs font-semibold text-[#C0392B] border border-[#C0392B]/30 rounded-xl py-2 hover:bg-[#C0392B]/5 transition-colors"
+                >
+                  Reportar un problema
+                </button>
               </div>
             )}
           </div>
@@ -302,6 +310,15 @@ function TarjetaPedido({
           restaurante={pedido.configExpress?.comercio.nombre ?? 'Restaurante'}
           onGuardado={() => { setMostrarReview(false); onActualizar() }}
           onCerrar={() => setMostrarReview(false)}
+        />
+      )}
+
+      {mostrarReporte && (
+        <ModalReportarProblema
+          moduloOrigen="EXPRESS"
+          referenciaId={pedido.id}
+          onCerrar={() => setMostrarReporte(false)}
+          onExito={() => setMostrarReporte(false)}
         />
       )}
     </>

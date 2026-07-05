@@ -88,6 +88,7 @@ export interface ProductoComerciante {
   precio: string | number
   unidad: string
   stock: number
+  stockMinimo: number
   stockReservado: number
   fotoUrl: string | null
   imagenes: string[]
@@ -195,6 +196,7 @@ export interface DatosProducto {
   precio: number
   unidad: string
   stock: number
+  stockMinimo?: number
   diasAlistamientoMin: number
   diasAlistamientoMax: number
   alcance: 'LOCAL' | 'NACIONAL' | 'AMBOS'
@@ -350,6 +352,7 @@ export interface DatosActualizarProducto {
   descripcion?: string
   precio?: number
   stock?: number
+  stockMinimo?: number
   alcance?: 'LOCAL' | 'NACIONAL' | 'AMBOS'
   fotoUrl?: string
   pesoKg?: number | null

@@ -54,6 +54,7 @@ export default function PublicarProductoPage() {
   const [precio, setPrecio] = useState('')
   const [unidad, setUnidad] = useState('')
   const [stock, setStock] = useState('')
+  const [stockMinimo, setStockMinimo] = useState('')
   const [diasMin, setDiasMin] = useState('')
   const [diasMax, setDiasMax] = useState('')
   const [alcance, setAlcance] = useState<Alcance | ''>('')
@@ -133,6 +134,7 @@ export default function PublicarProductoPage() {
         precio: Number(precio.replace(/\D/g, '')),
         unidad,
         stock: Number(stock.replace(/\D/g, '')),
+        ...(stockMinimo.trim() ? { stockMinimo: Number(stockMinimo) } : {}),
         diasAlistamientoMin: Number(diasMin.replace(/\D/g, '')),
         diasAlistamientoMax: Number(diasMax.replace(/\D/g, '')),
         alcance: alcance as Alcance,
@@ -371,6 +373,16 @@ export default function PublicarProductoPage() {
           value={stock}
           onChange={(v) => setStock(v.replace(/\D/g, ''))}
           error={errores.stock}
+        />
+
+        <CampoTexto
+          label="Avisarme cuando queden pocas unidades (opcional)"
+          name="stockMinimo"
+          inputMode="numeric"
+          placeholder="Ej: 5"
+          value={stockMinimo}
+          onChange={(v) => setStockMinimo(v.replace(/\D/g, ''))}
+          hint="Te notificamos cuando el stock baje a este número o menos. Déjalo vacío para no recibir avisos."
         />
 
         <CampoTexto
