@@ -6,6 +6,7 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { useAuth } from '@/context/AuthContext'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import ModalDenunciarOferta from '@/components/empleo/ModalDenunciarOferta'
 import {
   obtenerOfertaEmpleo,
   postularseOferta,
@@ -14,6 +15,7 @@ import {
   otrasOfertasDelPublicador,
   toggleFavoritoEmpleo,
   esFavoritoEmpleo,
+  yaDenuncieOferta,
   type OfertaEmpleo,
   type TipoContratoEmpleo,
   type EstadoPostulacionEmpleo,
@@ -51,6 +53,8 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
   const [favorito, setFavorito] = useState(false)
   const [otrasOfertas, setOtrasOfertas] = useState<OfertaEmpleo[]>([])
   const [copiado, setCopiado] = useState(false)
+  const [yaDenuncio, setYaDenuncio] = useState(false)
+  const [mostrarModalDenuncia, setMostrarModalDenuncia] = useState(false)
 
   useEffect(() => {
     obtenerOfertaEmpleo(Number(id))
@@ -64,6 +68,7 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
     if (!autenticado) return
     obtenerMiHojaDeVida().then((h) => setTieneHojaDeVida(!!h)).catch(() => setTieneHojaDeVida(false))
     esFavoritoEmpleo(Number(id)).then((r) => setFavorito(r.favorito)).catch(() => {})
+    yaDenuncieOferta(Number(id)).then((r) => setYaDenuncio(r.denunciado)).catch(() => {})
     misPostulacionesEmpleo()
       .then((lista) => {
         const existente = lista.find((p) => p.ofertaEmpleoId === Number(id))
@@ -200,6 +205,22 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
                 {oferta.fechaCierre && ` · Postulaciones hasta el ${fmtFecha(oferta.fechaCierre)}`}
               </p>
 
+              {autenticado && !esPropia && (
+                <p className="mt-3 text-xs">
+                  {yaDenuncio ? (
+                    <span className="text-[#1A1A1A]/35">Ya denunciaste esta oferta</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setMostrarModalDenuncia(true)}
+                      className="text-[#1A1A1A]/35 hover:text-[#C0392B] transition-colors underline-offset-2 hover:underline"
+                    >
+                      🚩 Denunciar esta oferta
+                    </button>
+                  )}
+                </p>
+              )}
+
               {oferta.contactoWhatsapp && (
                 <a
                   href={`https://wa.me/57${oferta.contactoWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, vi tu oferta "${oferta.titulo}" en AfroMercado y quiero más información.`)}`}
@@ -311,6 +332,14 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
                   ))}
                 </div>
               </div>
+            )}
+
+            {mostrarModalDenuncia && (
+              <ModalDenunciarOferta
+                ofertaId={Number(id)}
+                onCerrar={() => setMostrarModalDenuncia(false)}
+                onExito={() => setYaDenuncio(true)}
+              />
             )}
           </>
         )}

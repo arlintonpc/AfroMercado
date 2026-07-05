@@ -973,12 +973,25 @@ const PublicidadController = {
         destino = { tipo: "VISIBILIDAD", id: visibilidad.id, subtipo: visibilidad.tipo };
       } else {
         const esImagenPersonalizada = PAQUETES_IMAGEN_PERSONALIZADA.has(solicitud.paquete);
+        if (solicitud.paquete === "VIDEO_HISTORIA") {
+          if (!solicitud.videoUrl) {
+            throw new ErrorValidacion("Esta solicitud de Video Historia todavia no tiene un video adjunto.");
+          }
+          if (solicitud.videoAprobado !== true) {
+            throw new ErrorValidacion("El video de esta solicitud todavia no paso la revision editorial (revisarVideoAdmin).");
+          }
+        }
         let imagenUrl;
         if (esImagenPersonalizada) {
           if (!solicitud.imagenPersonalizadaUrl) {
             throw new ErrorValidacion(`El paquete ${solicitud.paquete} requiere que el comercio adjunte primero su imagen diseñada (imagenPersonalizadaUrl).`);
           }
           imagenUrl = solicitud.imagenPersonalizadaUrl;
+        } else if (solicitud.paquete === "VIDEO_HISTORIA") {
+          imagenUrl = solicitud.videoPortadaUrl || imagenParaCampana(solicitud);
+          if (!imagenUrl) {
+            throw new ErrorValidacion("Video Historia necesita una portada (videoPortadaUrl) o, en su defecto, foto de producto o logo de comercio.");
+          }
         } else {
           imagenUrl = imagenParaCampana(solicitud);
           if (!imagenUrl) {
@@ -991,6 +1004,7 @@ const PublicidadController = {
             titulo: tituloCampana(solicitud),
             subtitulo: solicitud.objetivo,
             imagenUrl,
+            videoUrl: solicitud.paquete === "VIDEO_HISTORIA" ? solicitud.videoUrl : null,
             ctaTexto: ctaPorPaquete(solicitud.paquete),
             urlDestino: destinoSolicitud(solicitud),
             alcance: solicitud.alcance || "NACIONAL",

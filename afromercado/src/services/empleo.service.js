@@ -7,11 +7,13 @@
 const crypto = require("crypto");
 const EmpleoRepository = require("../repositories/empleo.repository");
 const UsuarioRepository = require("../repositories/usuario.repository");
+const UsuarioService = require("./usuario.service");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
 
 const TIPOS_CONTRATO = ["TIEMPO_COMPLETO", "MEDIO_TIEMPO", "POR_DIAS", "TEMPORAL", "OTRO"];
 const TIPOS_PREGUNTA = ["TEXTO", "SI_NO", "OPCION_MULTIPLE"];
+const MOTIVOS_DENUNCIA = ["OFERTA_FALSA", "EXPLOTACION_LABORAL", "DISCRIMINATORIA", "ESTAFA_DINERO", "CONTENIDO_INAPROPIADO", "OTRO"];
 const TRANSICIONES_OFERTA = {
   BORRADOR: ["PUBLICADA"],
   PUBLICADA: ["PAUSADA", "CERRADA"],
@@ -204,6 +206,95 @@ const EmpleoService = {
       console.error("[EMPLEO] notificar moderación:", e.message)
     );
     return actualizada;
+  },
+
+  // ── Denuncias ─────────────────────────────────────────────────
+  async denunciarOferta(usuarioId, ofertaId, { motivo, descripcion }) {
+    if (!MOTIVOS_DENUNCIA.includes(motivo)) throw new ErrorValidacion(`Motivo inválido. Opciones: ${MOTIVOS_DENUNCIA.join(", ")}`);
+    const oferta = await EmpleoRepository.buscarOfertaPorId(ofertaId);
+    if (!oferta || oferta.deletedAt) throw new ErrorNoEncontrado("Oferta no encontrada");
+    if (oferta.publicadoPorId === usuarioId) throw new ErrorValidacion("No puedes denunciar tu propia oferta");
+    const existente = await EmpleoRepository.buscarDenuncia(ofertaId, usuarioId);
+    if (existente) throw new ErrorValidacion("Ya denunciaste esta oferta");
+    const denuncia = await EmpleoRepository.crearDenuncia({
+      ofertaEmpleoId: ofertaId,
+      denuncianteId: usuarioId,
+      motivo,
+      descripcion: descripcion?.trim() || null,
+    });
+    NotificacionService.denunciaOfertaEmpleoCreada({ denuncia, oferta }).catch((e) =>
+      console.error("[EMPLEO] notificar denuncia:", e.message)
+    );
+    return denuncia;
+  },
+
+  async yaDenuncie(usuarioId, ofertaId) {
+    const existente = await EmpleoRepository.buscarDenuncia(ofertaId, usuarioId);
+    return { denunciado: !!existente };
+  },
+
+  async listarDenunciasPendientes() {
+    return EmpleoRepository.listarDenunciasPendientes();
+  },
+
+  // Resuelve una denuncia: DESESTIMAR (queda constancia, no pasa nada más),
+  // BLOQUEAR_OFERTA (cierra solo la oferta denunciada), o BLOQUEAR_CUENTA
+  // (cierra TODAS las ofertas activas del publicador y bloquea su cuenta).
+  //
+  // Decisión de diseño aceptada: este flujo NO usa una única transacción
+  // Prisma gigante cruzando servicios (evita over-engineering). Es secuencial;
+  // si UsuarioService.bloquearCuenta falla después de cerrar las ofertas, el
+  // estado resultante es seguro (ofertas cerradas, cuenta aún activa) y el
+  // admin puede simplemente reintentar la acción.
+  async resolverDenuncia(adminId, denunciaId, { accion, motivo }) {
+    if (!["DESESTIMAR", "BLOQUEAR_OFERTA", "BLOQUEAR_CUENTA"].includes(accion)) {
+      throw new ErrorValidacion("Acción inválida");
+    }
+    const denuncia = await EmpleoRepository.buscarDenunciaPorId(denunciaId);
+    if (!denuncia) throw new ErrorNoEncontrado("Denuncia no encontrada");
+    if (denuncia.estado !== "PENDIENTE") throw new ErrorValidacion("Esta denuncia ya fue resuelta");
+
+    if (accion === "DESESTIMAR") {
+      return EmpleoRepository.actualizarDenuncia(denunciaId, {
+        estado: "DESESTIMADA",
+        revisadoPor: adminId,
+        revisadoAt: new Date(),
+        notaRevision: motivo?.trim() || null,
+      });
+    }
+
+    if (accion === "BLOQUEAR_OFERTA") {
+      await EmpleoRepository.actualizarOferta(denuncia.ofertaEmpleoId, {
+        estado: "CERRADA",
+        estadoModeracion: "RECHAZADA",
+        revisadoPor: adminId,
+        revisadoAt: new Date(),
+        motivoRechazoModeracion: motivo?.trim() || `Denuncia: ${denuncia.motivo}`,
+      });
+      const actualizada = await EmpleoRepository.actualizarDenuncia(denunciaId, {
+        estado: "OFERTA_BLOQUEADA",
+        revisadoPor: adminId,
+        revisadoAt: new Date(),
+        notaRevision: motivo?.trim() || null,
+      });
+      NotificacionService.ofertaEmpleoBloqueadaPorDenuncia({ oferta: denuncia.oferta, motivo }).catch((e) =>
+        console.error("[EMPLEO] notificar bloqueo oferta:", e.message)
+      );
+      return actualizada;
+    }
+
+    // BLOQUEAR_CUENTA — cierra todas las ofertas del publicador y resuelve de
+    // una vez TODAS sus denuncias pendientes (incluida esta misma, que sigue
+    // en PENDIENTE en este punto) con el estado CUENTA_BLOQUEADA.
+    const publicadoPorId = denuncia.oferta.publicadoPorId;
+    const motivoFinal = motivo?.trim() || `Cuenta bloqueada tras denuncia de oferta de empleo #${denuncia.ofertaEmpleoId}`;
+    await EmpleoRepository.cerrarTodasLasOfertasDelUsuario(publicadoPorId, adminId, motivoFinal);
+    await EmpleoRepository.resolverDenunciasPendientesDelUsuario(publicadoPorId, "CUENTA_BLOQUEADA", adminId, motivoFinal);
+    await UsuarioService.bloquearCuenta(adminId, publicadoPorId, motivoFinal);
+    NotificacionService.cuentaBloqueadaPorDenuncia({ usuarioId: publicadoPorId, motivo: motivoFinal }).catch((e) =>
+      console.error("[EMPLEO] notificar bloqueo cuenta:", e.message)
+    );
+    return EmpleoRepository.buscarDenunciaPorId(denunciaId);
   },
 
   // ── Hoja de vida ─────────────────────────────────────────────

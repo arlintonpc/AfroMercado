@@ -162,6 +162,36 @@ const EmpleoController = {
       res.json({ ok: true, data });
     } catch (e) { next(e); }
   },
+
+  // ── Denuncias ────────────────────────────────────────────────
+  async denunciarOferta(req, res, next) {
+    try {
+      const data = await EmpleoService.denunciarOferta(req.usuario.id, Number(req.params.id), req.body);
+      res.status(201).json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async yaDenuncie(req, res, next) {
+    try {
+      const data = await EmpleoService.yaDenuncie(req.usuario.id, Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // ── Admin: denuncias ─────────────────────────────────────────
+  async listarDenunciasPendientes(req, res, next) {
+    try {
+      const data = await EmpleoService.listarDenunciasPendientes();
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async resolverDenuncia(req, res, next) {
+    try {
+      const data = await EmpleoService.resolverDenuncia(req.usuario.id, Number(req.params.id), req.body);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
 };
 
 module.exports = EmpleoController;

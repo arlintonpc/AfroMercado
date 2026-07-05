@@ -14,6 +14,7 @@ const ConfigRepository = require("../repositories/config.repository");
 const Reglas = require("../config/reglas");
 const PaymentConfigService = require("../services/payment-config.service");
 const NotificacionService = require("../services/notificacion.service");
+const UsuarioService = require("../services/usuario.service");
 
 const RAIZ_PROYECTO = path.join(__dirname, "..", "..");
 
@@ -846,37 +847,14 @@ const AdminController = {
   },
 
   // PATCH /admin/usuarios/:id/activo — activa o desactiva un usuario
+  // Delega en UsuarioService (bloquearCuenta/activarCuenta) para que la lógica
+  // sensible de bloqueo de cuentas viva en un solo lugar — el flujo de
+  // denuncias del módulo Empleo reutiliza exactamente el mismo servicio.
   async toggleActivoUsuario(req, res, next) {
     try {
       const id = parseInt(req.params.id, 10);
       const { motivo } = req.body;
-      const usuario = await prisma.usuario.findUnique({ where: { id }, select: { id: true, activo: true, rol: true } });
-      if (!usuario) throw new ErrorNoEncontrado("Usuario no encontrado");
-      if (usuario.rol === "ADMIN") throw new ErrorValidacion("No se puede desactivar a un administrador.");
-
-      const bloqueando = usuario.activo;
-      const dataUsuario = bloqueando
-        ? { activo: false, motivoBloqueo: motivo?.trim() || null, bloqueadoPor: req.usuario.id, bloqueadoAt: new Date() }
-        : { activo: true, motivoBloqueo: null, bloqueadoPor: null, bloqueadoAt: null };
-
-      const [actualizado] = await prisma.$transaction([
-        prisma.usuario.update({ where: { id }, data: dataUsuario, select: { id: true, nombre: true, activo: true, motivoBloqueo: true } }),
-        // Si es comerciante, ocultar también su comercio del catálogo
-        ...(usuario.rol === "COMERCIANTE"
-          ? [prisma.comercio.updateMany({ where: { usuarioId: id }, data: { activo: !bloqueando } })]
-          : []),
-        // Log de moderación
-        prisma.accionModeracion.create({
-          data: {
-            adminId: req.usuario.id,
-            targetId: id,
-            targetTipo: "USUARIO",
-            accion: bloqueando ? "BLOQUEAR" : "ACTIVAR",
-            motivo: motivo?.trim() || null,
-          },
-        }),
-      ]);
-
+      const actualizado = await UsuarioService.toggleActivo(req.usuario.id, id, motivo);
       res.json({ ok: true, data: actualizado });
     } catch (e) { next(e); }
   },

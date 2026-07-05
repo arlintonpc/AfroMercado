@@ -821,6 +821,44 @@ const NotificacionService = {
       url: "/empleo/mis-postulaciones",
     });
   },
+
+  // Empleo — nueva denuncia de una oferta: avisa a los admins
+  async denunciaOfertaEmpleoCreada({ denuncia, oferta }) {
+    await notificarAdmins({
+      tipo: "DENUNCIA_OFERTA_EMPLEO_CREADA_ADMIN",
+      titulo: "Nueva denuncia de oferta de empleo",
+      mensaje: `"${oferta.titulo}" fue denunciada. Motivo: ${denuncia.motivo}.`,
+      url: "/admin/empleo",
+      datos: { ofertaId: oferta.id, denunciaId: denuncia.id },
+    });
+  },
+
+  // Empleo — el admin bloqueó la oferta tras validar una denuncia: avisa a quien publicó.
+  // Distinto del mensaje de "no aprobada" de moderación inicial (ofertaEmpleoModerada) —
+  // aquí la oferta ya estaba publicada y se retira por una denuncia validada.
+  async ofertaEmpleoBloqueadaPorDenuncia({ oferta, motivo }) {
+    await this.crearYEnviar({
+      usuarioId: oferta.publicadoPorId,
+      tipo: "OFERTA_EMPLEO_BLOQUEADA_DENUNCIA",
+      titulo: "Tu oferta de empleo fue retirada",
+      mensaje: `"${oferta.titulo}" fue retirada tras revisar una denuncia recibida.${motivo ? ` Motivo: ${motivo}` : ""}`,
+      url: "/empleo/mis-ofertas",
+    });
+  },
+
+  // Empleo — el admin bloqueó la cuenta completa tras validar una denuncia.
+  // Nota: si la cuenta ya quedó activo=false, el usuario no podrá ver esta
+  // notificación in-app (el middleware `autenticar` lo bloquea) — se crea
+  // igual en la BD por completitud/auditoría, pero no es el canal efectivo.
+  async cuentaBloqueadaPorDenuncia({ usuarioId, motivo }) {
+    await this.crearYEnviar({
+      usuarioId,
+      tipo: "CUENTA_BLOQUEADA_DENUNCIA",
+      titulo: "Tu cuenta fue bloqueada",
+      mensaje: `Tu cuenta fue bloqueada tras revisar una denuncia sobre una de tus ofertas de empleo.${motivo ? ` Motivo: ${motivo}` : ""}`,
+      url: "/",
+    });
+  },
 };
 
 module.exports = NotificacionService;

@@ -167,6 +167,64 @@ const EmpleoRepository = {
   async contarPostulacionesPorEstado(ofertaEmpleoId, estado) {
     return prisma.postulacionEmpleo.count({ where: { ofertaEmpleoId, estado } });
   },
+
+  // ── Denuncias ────────────────────────────────────────────────
+  async crearDenuncia(data) {
+    return prisma.denunciaOfertaEmpleo.create({ data });
+  },
+
+  async buscarDenuncia(ofertaEmpleoId, denuncianteId) {
+    return prisma.denunciaOfertaEmpleo.findUnique({
+      where: { ofertaEmpleoId_denuncianteId: { ofertaEmpleoId, denuncianteId } },
+    });
+  },
+
+  async buscarDenunciaPorId(id) {
+    return prisma.denunciaOfertaEmpleo.findUnique({
+      where: { id },
+      include: { oferta: true },
+    });
+  },
+
+  async listarDenunciasPendientes() {
+    return prisma.denunciaOfertaEmpleo.findMany({
+      where: { estado: "PENDIENTE" },
+      orderBy: { createdAt: "asc" },
+      include: {
+        oferta: { include: { publicadoPor: { select: { id: true, nombre: true, email: true } } } },
+        denunciante: { select: { id: true, nombre: true, email: true } },
+      },
+    });
+  },
+
+  async actualizarDenuncia(id, data) {
+    return prisma.denunciaOfertaEmpleo.update({ where: { id }, data });
+  },
+
+  async cerrarTodasLasOfertasDelUsuario(publicadoPorId, adminId, motivo) {
+    return prisma.ofertaEmpleo.updateMany({
+      where: { publicadoPorId, estado: { not: "CERRADA" }, deletedAt: null },
+      data: {
+        estado: "CERRADA",
+        estadoModeracion: "RECHAZADA",
+        revisadoPor: adminId,
+        revisadoAt: new Date(),
+        motivoRechazoModeracion: motivo,
+      },
+    });
+  },
+
+  async resolverDenunciasPendientesDelUsuario(publicadoPorId, nuevoEstado, adminId, motivo) {
+    return prisma.denunciaOfertaEmpleo.updateMany({
+      where: { estado: "PENDIENTE", oferta: { publicadoPorId } },
+      data: {
+        estado: nuevoEstado,
+        revisadoPor: adminId,
+        revisadoAt: new Date(),
+        notaRevision: motivo,
+      },
+    });
+  },
 };
 
 module.exports = EmpleoRepository;

@@ -1,6 +1,7 @@
 // ============================================================
 //  Servicio de Usuario — lógica de negocio del perfil
 // ============================================================
+const prisma = require("../config/prisma");
 const UsuarioRepository = require("../repositories/usuario.repository");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorNoAutorizado } = require("../utils/errores");
 const bcrypt = require("bcryptjs");
@@ -62,6 +63,76 @@ const UsuarioService = {
 
     const nuevoHash = await bcrypt.hash(passwordNueva, BCRYPT_ROUNDS);
     await UsuarioRepository.actualizar(id, { passwordHash: nuevoHash });
+  },
+
+  // ── Bloqueo / activación de cuenta (lógica sensible, un solo lugar) ──────
+  // Extraído literal de AdminController.toggleActivoUsuario para que otros
+  // flujos (p. ej. resolución de denuncias del módulo Empleo) reutilicen
+  // EXACTAMENTE el mismo comportamiento sin duplicar código de moderación.
+  // El middleware `autenticar` ya rechaza a cualquier usuario con activo=false,
+  // así que bloquear la cuenta basta para cortar todo el acceso.
+  async bloquearCuenta(adminId, usuarioId, motivo) {
+    const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { id: true, activo: true, rol: true } });
+    if (!usuario) throw new ErrorNoEncontrado("Usuario no encontrado");
+    if (usuario.rol === "ADMIN") throw new ErrorValidacion("No se puede desactivar a un administrador.");
+
+    const dataUsuario = { activo: false, motivoBloqueo: motivo?.trim() || null, bloqueadoPor: adminId, bloqueadoAt: new Date() };
+
+    const [actualizado] = await prisma.$transaction([
+      prisma.usuario.update({ where: { id: usuarioId }, data: dataUsuario, select: { id: true, nombre: true, activo: true, motivoBloqueo: true } }),
+      ...(usuario.rol === "COMERCIANTE"
+        ? [prisma.comercio.updateMany({ where: { usuarioId }, data: { activo: false } })]
+        : []),
+      prisma.accionModeracion.create({
+        data: {
+          adminId,
+          targetId: usuarioId,
+          targetTipo: "USUARIO",
+          accion: "BLOQUEAR",
+          motivo: motivo?.trim() || null,
+        },
+      }),
+    ]);
+
+    return actualizado;
+  },
+
+  // Reactiva la cuenta de un usuario previamente bloqueado (inverso exacto de bloquearCuenta).
+  async activarCuenta(adminId, usuarioId) {
+    const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { id: true, activo: true, rol: true } });
+    if (!usuario) throw new ErrorNoEncontrado("Usuario no encontrado");
+    if (usuario.rol === "ADMIN") throw new ErrorValidacion("No se puede desactivar a un administrador.");
+
+    const dataUsuario = { activo: true, motivoBloqueo: null, bloqueadoPor: null, bloqueadoAt: null };
+
+    const [actualizado] = await prisma.$transaction([
+      prisma.usuario.update({ where: { id: usuarioId }, data: dataUsuario, select: { id: true, nombre: true, activo: true, motivoBloqueo: true } }),
+      ...(usuario.rol === "COMERCIANTE"
+        ? [prisma.comercio.updateMany({ where: { usuarioId }, data: { activo: true } })]
+        : []),
+      prisma.accionModeracion.create({
+        data: {
+          adminId,
+          targetId: usuarioId,
+          targetTipo: "USUARIO",
+          accion: "ACTIVAR",
+          motivo: null,
+        },
+      }),
+    ]);
+
+    return actualizado;
+  },
+
+  // Usado por AdminController.toggleActivoUsuario — decide cuál de las dos
+  // operaciones de arriba aplicar según el estado actual del usuario.
+  async toggleActivo(adminId, usuarioId, motivo) {
+    const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { id: true, activo: true, rol: true } });
+    if (!usuario) throw new ErrorNoEncontrado("Usuario no encontrado");
+    if (usuario.rol === "ADMIN") throw new ErrorValidacion("No se puede desactivar a un administrador.");
+
+    if (usuario.activo) return this.bloquearCuenta(adminId, usuarioId, motivo);
+    return this.activarCuenta(adminId, usuarioId);
   },
 };
 

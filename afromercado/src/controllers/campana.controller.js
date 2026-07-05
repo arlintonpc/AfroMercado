@@ -46,8 +46,8 @@ const CampanaController = {
         orderBy: [{ prioridad: "desc" }, { createdAt: "asc" }],
         ...(take ? { take } : {}),
         select: {
-          id: true, tipo: true, titulo: true, subtitulo: true, imagenUrl: true,
-          ctaTexto: true, urlDestino: true, prioridad: true,
+          id: true, tipo: true, titulo: true, subtitulo: true, imagenUrl: true, videoUrl: true,
+          ctaTexto: true, urlDestino: true, prioridad: true, etiqueta: true,
         },
       });
       res.json({ ok: true, items: campanas });
@@ -69,12 +69,21 @@ const CampanaController = {
   async crear(req, res, next) {
     try {
       const { tipo = "PUBLICIDAD", titulo, subtitulo, imagenUrl, ctaTexto,
-              urlDestino, inicio, fin, montoCOP, notas, prioridad } = req.body;
+              urlDestino, inicio, fin, montoCOP, notas, prioridad, etiqueta,
+              alcance, departamento } = req.body;
       if (!titulo || !imagenUrl || !urlDestino || !inicio || !fin) {
         return res.status(400).json({ error: "titulo, imagenUrl, urlDestino, inicio y fin son requeridos." });
       }
-      const tipoFinal = tipo === "SOCIAL" ? "SOCIAL" : "PUBLICIDAD";
+      const TIPOS_PERMITIDOS = ["PUBLICIDAD", "SOCIAL", "IRRUPTOR_BIENVENIDA"];
+      const tipoFinal = TIPOS_PERMITIDOS.includes(tipo) ? tipo : "PUBLICIDAD";
       const ctaDefault = tipoFinal === "SOCIAL" ? "Conoce más" : "Ver más";
+      const etiquetaDefault = tipoFinal === "SOCIAL" ? "Comunidad" : "Patrocinado";
+
+      const alcanceFinal = alcance === "DEPARTAMENTO" ? "DEPARTAMENTO" : "NACIONAL";
+      if (alcanceFinal === "DEPARTAMENTO" && !departamento) {
+        return res.status(400).json({ error: "departamento es requerido cuando alcance es DEPARTAMENTO." });
+      }
+
       const campana = await prisma.campanaHero.create({
         data: {
           tipo: tipoFinal,
@@ -83,6 +92,9 @@ const CampanaController = {
           urlDestino, inicio: new Date(inicio), fin: new Date(fin),
           montoCOP: tipoFinal === "SOCIAL" ? null : (montoCOP ? Number(montoCOP) : null),
           notas: notas || null, prioridad: Number(prioridad ?? (tipoFinal === "SOCIAL" ? 8 : 0)),
+          etiqueta: etiqueta || etiquetaDefault,
+          alcance: alcanceFinal,
+          departamento: alcanceFinal === "DEPARTAMENTO" ? departamento : null,
           creadoPor: req.usuario.id,
         },
       });

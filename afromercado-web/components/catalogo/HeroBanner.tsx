@@ -21,6 +21,8 @@ interface FotoHero {
   esCampaña?: boolean
   tipoCampana?: TipoCampana
   subtitulo?: string
+  videoUrl?: string
+  etiquetaCampana?: string  // texto del badge (ej. "Patrocinado", "Comunidad", "Aliado")
 }
 
 interface HeroConfig {
@@ -35,8 +37,10 @@ interface CampanaAPI {
   titulo:     string
   subtitulo?: string
   imagenUrl:  string
+  videoUrl?:  string
   ctaTexto:   string
   urlDestino: string
+  etiqueta:   string
 }
 
 /* ─── Fallback visual cuando no hay productos ni campañas ───── */
@@ -60,7 +64,7 @@ function mezclar<T>(arr: T[]): T[] {
 function badgeCampana(foto: FotoHero) {
   const esSocial = foto.tipoCampana === 'SOCIAL'
   return {
-    label: esSocial ? 'Comunidad' : 'Publicidad',
+    label: foto.etiquetaCampana || (esSocial ? 'Comunidad' : 'Publicidad'),
     cls: esSocial
       ? 'bg-[#52B788] text-white'
       : 'bg-[#D4A017] text-[#1A1A1A]',
@@ -87,14 +91,26 @@ function Collage({ fotos, priority = false, onClic }: {
           style={{ aspectRatio: '3 / 4' }}
           tabIndex={0}
         >
-          <Image
-            src={foto.url}
-            alt={foto.alt}
-            fill
-            sizes="(max-width: 1024px) 0px, 25vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-            priority={priority && idx < 2}
-          />
+          {foto.videoUrl ? (
+            <video
+              src={foto.videoUrl}
+              poster={foto.url}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            />
+          ) : (
+            <Image
+              src={foto.url}
+              alt={foto.alt}
+              fill
+              sizes="(max-width: 1024px) 0px, 25vw"
+              className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+              priority={priority && idx < 2}
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
 
           {/* Badge campaña */}
@@ -140,7 +156,19 @@ function CollageMobile({ fotos, onClic }: {
           className="group relative flex-shrink-0 w-40 block rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A017]"
           style={{ aspectRatio: '3 / 4' }}
         >
-          <Image src={foto.url} alt={foto.alt} fill sizes="160px" className="object-cover transition-transform duration-500 group-hover:scale-[1.04]" priority={idx === 0} />
+          {foto.videoUrl ? (
+            <video
+              src={foto.videoUrl}
+              poster={foto.url}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            />
+          ) : (
+            <Image src={foto.url} alt={foto.alt} fill sizes="160px" className="object-cover transition-transform duration-500 group-hover:scale-[1.04]" priority={idx === 0} />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
           {foto.esCampaña && (
             <span className={`absolute top-2 right-2 text-[8px] font-bold px-1.5 py-0.5 rounded-full leading-none tracking-wide uppercase ${badgeCampana(foto).cls}`}>
@@ -221,6 +249,8 @@ export default function HeroBanner({ productos = [] }: { productos?: Producto[] 
       esCampaña: true,
       tipoCampana: c.tipo,
       subtitulo: c.subtitulo,
+      videoUrl:  c.videoUrl,
+      etiquetaCampana: c.etiqueta,
     }))
     const sociales = campanasHero.filter(c => c.tipoCampana === 'SOCIAL')
     const pagadas = campanasHero.filter(c => c.tipoCampana !== 'SOCIAL')

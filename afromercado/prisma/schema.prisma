@@ -239,6 +239,7 @@ model Usuario {
   hojaDeVida                HojaDeVida?
   postulacionesEmpleoEnviadas PostulacionEmpleo[]    @relation("PostulacionesEmpleoEnviadas")
   favoritosOfertaEmpleo     FavoritoOfertaEmpleo[]
+  denunciasEmpleoHechas     DenunciaOfertaEmpleo[]
 }
 
 model Comercio {
@@ -1117,6 +1118,7 @@ model OfertaEmpleo {
   comercio      Comercio?           @relation(fields: [comercioId], references: [id])
   postulaciones PostulacionEmpleo[]
   favoritos     FavoritoOfertaEmpleo[]
+  denuncias     DenunciaOfertaEmpleo[]
 
   @@index([estado, estadoModeracion, municipio, createdAt])
   @@index([publicadoPorId])
@@ -1135,6 +1137,45 @@ model FavoritoOfertaEmpleo {
   @@unique([usuarioId, ofertaEmpleoId])
   @@index([usuarioId])
   @@index([ofertaEmpleoId])
+}
+
+// Denuncias de ofertas de empleo (falsas, explotación laboral, discriminatorias,
+// estafa, etc.). El admin puede desestimar, bloquear solo la oferta denunciada,
+// o bloquear la cuenta completa del publicador — en ese último caso TODAS sus
+// demás ofertas activas se cierran también (ver EmpleoService.resolverDenuncia).
+enum MotivoDenunciaEmpleo {
+  OFERTA_FALSA
+  EXPLOTACION_LABORAL
+  DISCRIMINATORIA
+  ESTAFA_DINERO
+  CONTENIDO_INAPROPIADO
+  OTRO
+}
+
+enum EstadoDenunciaEmpleo {
+  PENDIENTE
+  DESESTIMADA
+  OFERTA_BLOQUEADA
+  CUENTA_BLOQUEADA
+}
+
+model DenunciaOfertaEmpleo {
+  id             Int                  @id @default(autoincrement())
+  ofertaEmpleoId Int
+  denuncianteId  Int
+  motivo         MotivoDenunciaEmpleo
+  descripcion    String?
+  estado         EstadoDenunciaEmpleo @default(PENDIENTE)
+  revisadoPor    Int?
+  revisadoAt     DateTime?
+  notaRevision   String?
+  createdAt      DateTime             @default(now())
+
+  oferta      OfertaEmpleo @relation(fields: [ofertaEmpleoId], references: [id], onDelete: Cascade)
+  denunciante Usuario      @relation(fields: [denuncianteId], references: [id])
+
+  @@unique([ofertaEmpleoId, denuncianteId])
+  @@index([estado, createdAt])
 }
 
 model HojaDeVida {
@@ -1189,6 +1230,7 @@ model CampanaHero {
   titulo      String
   subtitulo   String?
   imagenUrl   String
+  videoUrl    String?
   ctaTexto    String   @default("Ver más")
   urlDestino  String
   activa      Boolean  @default(true)
@@ -1206,6 +1248,10 @@ model CampanaHero {
   alcance      String  @default("NACIONAL")
   departamento String?
   municipio    String?
+
+  // Texto del badge visible sobre el anuncio (ej. "Patrocinado", "Comunidad",
+  // "Aliado") — personalizable por campaña en vez de fijo en el componente.
+  etiqueta String @default("Patrocinado")
 
   admin Usuario @relation("CampanaAdmin", fields: [creadoPor], references: [id])
 

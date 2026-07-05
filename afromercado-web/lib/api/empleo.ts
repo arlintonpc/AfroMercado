@@ -4,6 +4,9 @@ export type TipoContratoEmpleo = 'TIEMPO_COMPLETO' | 'MEDIO_TIEMPO' | 'POR_DIAS'
 export type EstadoOfertaEmpleo = 'BORRADOR' | 'PUBLICADA' | 'PAUSADA' | 'CERRADA'
 export type EstadoPostulacionEmpleo = 'ENVIADA' | 'VISTA' | 'PRESELECCIONADO' | 'RECHAZADA' | 'CONTRATADO' | 'RETIRADA'
 export type TipoPreguntaEmpleo = 'TEXTO' | 'SI_NO' | 'OPCION_MULTIPLE'
+export type MotivoDenunciaEmpleo = 'OFERTA_FALSA' | 'EXPLOTACION_LABORAL' | 'DISCRIMINATORIA' | 'ESTAFA_DINERO' | 'CONTENIDO_INAPROPIADO' | 'OTRO'
+export type EstadoDenunciaEmpleo = 'PENDIENTE' | 'DESESTIMADA' | 'OFERTA_BLOQUEADA' | 'CUENTA_BLOQUEADA'
+export type AccionResolverDenunciaEmpleo = 'DESESTIMAR' | 'BLOQUEAR_OFERTA' | 'BLOQUEAR_CUENTA'
 
 export const CATEGORIAS_EMPLEO: string[] = [
   'Pesca y acuicultura',
@@ -105,6 +108,21 @@ export interface PostulacionEmpleo {
   createdAt: string
   postulante?: { id: number; nombre: string; email: string; telefono: string | null }
   oferta?: { id: number; titulo: string; municipio: string; estado: EstadoOfertaEmpleo }
+}
+
+export interface DenunciaOfertaEmpleo {
+  id: number
+  ofertaEmpleoId: number
+  denuncianteId: number
+  motivo: MotivoDenunciaEmpleo
+  descripcion: string | null
+  estado: EstadoDenunciaEmpleo
+  revisadoPor: number | null
+  revisadoAt: string | null
+  notaRevision: string | null
+  createdAt: string
+  oferta?: OfertaEmpleo
+  denunciante?: { id: number; nombre: string; email: string }
 }
 
 interface RespuestaApi<T> {
@@ -223,5 +241,25 @@ export async function misFavoritosEmpleo(): Promise<OfertaEmpleo[]> {
 
 export async function esFavoritoEmpleo(ofertaId: number): Promise<{ favorito: boolean }> {
   const r = await apiFetch<RespuestaApi<{ favorito: boolean }>>(`/empleo/favoritos/${ofertaId}`)
+  return r.data
+}
+
+export async function denunciarOferta(ofertaId: number, datos: { motivo: MotivoDenunciaEmpleo; descripcion?: string }): Promise<DenunciaOfertaEmpleo> {
+  const r = await apiFetch<RespuestaApi<DenunciaOfertaEmpleo>>(`/empleo/ofertas/${ofertaId}/denunciar`, { method: 'POST', body: datos })
+  return r.data
+}
+
+export async function yaDenuncieOferta(ofertaId: number): Promise<{ denunciado: boolean }> {
+  const r = await apiFetch<RespuestaApi<{ denunciado: boolean }>>(`/empleo/ofertas/${ofertaId}/mi-denuncia`)
+  return r.data
+}
+
+export async function listarDenunciasEmpleoPendientes(): Promise<DenunciaOfertaEmpleo[]> {
+  const r = await apiFetch<RespuestaApi<DenunciaOfertaEmpleo[]>>('/admin/empleo/denuncias')
+  return r.data
+}
+
+export async function resolverDenunciaEmpleo(id: number, datos: { accion: AccionResolverDenunciaEmpleo; motivo?: string }): Promise<DenunciaOfertaEmpleo> {
+  const r = await apiFetch<RespuestaApi<DenunciaOfertaEmpleo>>(`/admin/empleo/denuncias/${id}/resolver`, { method: 'PATCH', body: datos })
   return r.data
 }

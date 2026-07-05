@@ -12,9 +12,11 @@ interface CampanaIrruptor {
   titulo:     string
   subtitulo?: string | null
   imagenUrl:  string
+  videoUrl?:  string | null
   ctaTexto:   string
   urlDestino: string
   prioridad:  number
+  etiqueta:   string
 }
 
 const VISITAS_KEY = 'afm_irruptor_visitas'
@@ -137,20 +139,32 @@ export default function IrruptorBienvenida() {
           </svg>
         </button>
 
-        {/* Badge Patrocinado */}
+        {/* Badge (etiqueta personalizable por campaña) */}
         <span className="absolute top-3 left-3 z-10 bg-[#2D6A4F] text-white text-[10px] font-bold px-2 py-0.5 rounded-full leading-none tracking-wide uppercase">
-          Patrocinado
+          {campana.etiqueta}
         </span>
 
         <div className="relative w-full" style={{ aspectRatio: '4 / 3' }}>
-          <Image
-            src={campana.imagenUrl}
-            alt={campana.titulo}
-            fill
-            sizes="(max-width: 640px) 100vw, 448px"
-            className="object-cover"
-            priority
-          />
+          {campana.videoUrl ? (
+            <video
+              src={campana.videoUrl}
+              poster={campana.imagenUrl}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <Image
+              src={campana.imagenUrl}
+              alt={campana.titulo}
+              fill
+              sizes="(max-width: 640px) 100vw, 448px"
+              className="object-cover"
+              priority
+            />
+          )}
         </div>
 
         <div className="p-5 text-center">

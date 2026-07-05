@@ -1,7 +1,8 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { DEPARTAMENTOS } from '@/lib/data/colombia'
 
 interface Campana {
   id:         number
@@ -20,10 +21,14 @@ interface Campana {
   vistas:     number
   clics:      number
   admin:      { nombre: string }
+  etiqueta:   string
+  alcance:    'NACIONAL' | 'DEPARTAMENTO'
+  departamento?: string | null
 }
 
-type TipoCampana = 'PUBLICIDAD' | 'SOCIAL'
+type TipoCampana = 'PUBLICIDAD' | 'SOCIAL' | 'IRRUPTOR_BIENVENIDA'
 type Aviso = { tipo: 'ok' | 'error'; texto: string }
+type OrdenCampana = 'RECIENTES' | 'VISTAS' | 'CLICS' | 'CTR'
 
 function localISO(d: Date) {
   const p = (n: number) => String(n).padStart(2, '0')
@@ -37,9 +42,12 @@ const FORM_INIT = {
   titulo: '', subtitulo: '', imagenUrl: '', ctaTexto: 'Ver más',
   urlDestino: '', inicio: HOY, fin: SEMANA,
   montoCOP: '', notas: '', prioridad: '0',
+  etiqueta: 'Patrocinado',
+  alcance: 'NACIONAL' as 'NACIONAL' | 'DEPARTAMENTO',
+  departamento: '',
 }
 
-type CampoTexto = Exclude<keyof typeof FORM_INIT, 'tipo'>
+type CampoTexto = Exclude<keyof typeof FORM_INIT, 'tipo' | 'alcance' | 'departamento'>
 
 function badge(c: Campana) {
   const ahora = Date.now()
@@ -56,6 +64,12 @@ function tipoBadge(tipo: TipoCampana) {
     return {
       label: 'Comunidad',
       cls: 'bg-[#52B788]/15 text-[#2D6A4F] border-[#52B788]/30',
+    }
+  }
+  if (tipo === 'IRRUPTOR_BIENVENIDA') {
+    return {
+      label: 'Flotante',
+      cls: 'bg-[#2A4AB8]/15 text-[#2A4AB8] border-[#2A4AB8]/30',
     }
   }
   return {
@@ -78,6 +92,7 @@ export default function AdminCampanasPage() {
   const [subiendoImg, setSubiendoImg] = useState(false)
   const [aviso, setAviso] = useState<Aviso | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
+  const [orden, setOrden] = useState<OrdenCampana>('RECIENTES')
   const imgInputRef = useRef<HTMLInputElement>(null)
 
   function getToken() { return localStorage.getItem('afromercado_token') ?? '' }
@@ -143,6 +158,8 @@ export default function AdminCampanasPage() {
           ...form,
           montoCOP:  esSocial ? null : (form.montoCOP ? Number(form.montoCOP) : null),
           prioridad: Number(form.prioridad),
+          etiqueta: form.etiqueta.trim() || undefined,
+          departamento: form.alcance === 'DEPARTAMENTO' ? form.departamento : undefined,
         }),
       })
       const j = await r.json()
@@ -175,6 +192,7 @@ export default function AdminCampanasPage() {
   function cambiarTipo(tipo: TipoCampana) {
     setForm(f => {
       const ctaActual = f.ctaTexto.trim()
+      const etiquetaActual = f.etiqueta.trim()
       return {
         ...f,
         tipo,
@@ -184,11 +202,26 @@ export default function AdminCampanasPage() {
             : tipo === 'PUBLICIDAD' && (ctaActual === 'Conoce más' || ctaActual === 'Apoya')
               ? 'Ver más'
               : f.ctaTexto,
+        etiqueta:
+          tipo === 'SOCIAL' && (!etiquetaActual || etiquetaActual === 'Patrocinado')
+            ? 'Comunidad'
+            : (tipo === 'PUBLICIDAD' || tipo === 'IRRUPTOR_BIENVENIDA') && etiquetaActual === 'Comunidad'
+              ? 'Patrocinado'
+              : f.etiqueta,
         montoCOP: tipo === 'SOCIAL' ? '' : f.montoCOP,
         prioridad: tipo === 'SOCIAL' && Number(f.prioridad) < 8 ? '8' : f.prioridad,
       }
     })
   }
+
+  const campanasOrdenadas = useMemo(() => {
+    if (orden === 'RECIENTES') return campanas
+    const arr = [...campanas]
+    if (orden === 'VISTAS') arr.sort((a, b) => b.vistas - a.vistas)
+    else if (orden === 'CLICS') arr.sort((a, b) => b.clics - a.clics)
+    else if (orden === 'CTR') arr.sort((a, b) => (b.clics / Math.max(b.vistas, 1)) - (a.clics / Math.max(a.vistas, 1)))
+    return arr
+  }, [campanas, orden])
 
   const ctr = 'w-full rounded-xl border border-[#1A1A1A]/15 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30'
 
@@ -230,7 +263,7 @@ export default function AdminCampanasPage() {
             {/* Tipo */}
             <div className="md:col-span-2">
               <label className="block text-xs font-semibold text-[#1A1A1A]/60 mb-2">Tipo de campaña</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {([
                   {
                     valor: 'PUBLICIDAD' as TipoCampana,
@@ -241,6 +274,11 @@ export default function AdminCampanasPage() {
                     valor: 'SOCIAL' as TipoCampana,
                     titulo: 'Campaña social',
                     desc: 'Eventos, emergencias, convocatorias o historias de comunidad sin cobro.',
+                  },
+                  {
+                    valor: 'IRRUPTOR_BIENVENIDA' as TipoCampana,
+                    titulo: 'Overlay flotante',
+                    desc: 'Ventana emergente al entrar al sitio, no en el listado del hero. Puede ser gratis o con cobro.',
                   },
                 ]).map(op => {
                   const activo = form.tipo === op.valor
@@ -261,6 +299,54 @@ export default function AdminCampanasPage() {
                   )
                 })}
               </div>
+              {form.tipo === 'IRRUPTOR_BIENVENIDA' && (
+                <p className="mt-2 text-xs text-[#2A4AB8]/80 leading-snug">
+                  Aparece como ventana emergente al entrar al sitio (no en el collage del home). Solo se muestra
+                  una a la vez (la de mayor prioridad activa), y cada visitante la ve como máximo una vez cada 48
+                  horas — nunca en su primera visita. Usa una imagen en proporción 4:3 para que se vea bien recortada.
+                </p>
+              )}
+            </div>
+
+            {/* Alcance geográfico */}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-[#1A1A1A]/60 mb-2">Alcance</label>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  { valor: 'NACIONAL' as const, titulo: 'Nacional', desc: 'Visible en todo el país.' },
+                  { valor: 'DEPARTAMENTO' as const, titulo: 'Departamento', desc: 'Visible solo para visitantes de un departamento.' },
+                ]).map(op => {
+                  const activo = form.alcance === op.valor
+                  return (
+                    <button
+                      key={op.valor}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, alcance: op.valor, departamento: op.valor === 'NACIONAL' ? '' : f.departamento }))}
+                      className={`text-left rounded-xl border px-4 py-3 transition-all ${
+                        activo
+                          ? 'border-[#2D6A4F] bg-[#2D6A4F]/5 shadow-sm'
+                          : 'border-[#1A1A1A]/10 hover:border-[#2D6A4F]/35'
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold text-[#1A1A1A]">{op.titulo}</span>
+                      <span className="mt-1 block text-xs leading-snug text-[#1A1A1A]/55">{op.desc}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              {form.alcance === 'DEPARTAMENTO' && (
+                <div className="mt-3">
+                  <label className="block text-xs font-semibold text-[#1A1A1A]/60 mb-1">Departamento *</label>
+                  <select
+                    value={form.departamento}
+                    onChange={e => setForm(f => ({ ...f, departamento: e.target.value }))}
+                    className={ctr}
+                  >
+                    <option value="">Selecciona un departamento…</option>
+                    {DEPARTAMENTOS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Título */}
@@ -332,6 +418,15 @@ export default function AdminCampanasPage() {
               <p className="text-xs text-[#1A1A1A]/40 mt-1">Texto que aparece en el botón de la campaña.</p>
             </div>
 
+            {/* Etiqueta del badge */}
+            <div>
+              <label className="block text-xs font-semibold text-[#1A1A1A]/60 mb-1">Etiqueta del badge</label>
+              <input {...campo('etiqueta')} placeholder="Patrocinado" className={ctr} />
+              <p className="text-xs text-[#1A1A1A]/40 mt-1">
+                El texto que aparece en la esquina del anuncio (ej. Patrocinado, Comunidad, Aliado).
+              </p>
+            </div>
+
             {/* URL destino */}
             <div>
               <label className="block text-xs font-semibold text-[#1A1A1A]/60 mb-1">¿A dónde lleva el clic? *</label>
@@ -353,11 +448,15 @@ export default function AdminCampanasPage() {
             </div>
 
             {/* Monto y prioridad */}
-            {form.tipo === 'PUBLICIDAD' ? (
+            {form.tipo !== 'SOCIAL' ? (
               <div>
                 <label className="block text-xs font-semibold text-[#1A1A1A]/60 mb-1">Monto cobrado (COP)</label>
                 <input type="number" {...campo('montoCOP')} placeholder="150000" className={ctr} />
-                <p className="text-xs text-[#1A1A1A]/40 mt-1">Cuánto pagó el comerciante por este slot.</p>
+                <p className="text-xs text-[#1A1A1A]/40 mt-1">
+                  {form.tipo === 'IRRUPTOR_BIENVENIDA'
+                    ? 'Déjalo vacío si es gratis para la comunidad, o registra cuánto pagó el comerciante.'
+                    : 'Cuánto pagó el comerciante por este slot.'}
+                </p>
               </div>
             ) : (
               <div className="rounded-xl border border-[#52B788]/25 bg-[#52B788]/10 px-3 py-2.5">
@@ -387,7 +486,7 @@ export default function AdminCampanasPage() {
           <div className="flex items-center gap-3 mt-5">
             <button
               onClick={crear}
-              disabled={guardando || subiendoImg || !form.titulo || !form.imagenUrl || !form.urlDestino}
+              disabled={guardando || subiendoImg || !form.titulo || !form.imagenUrl || !form.urlDestino || (form.alcance === 'DEPARTAMENTO' && !form.departamento)}
               className="bg-[#2D6A4F] text-white font-semibold px-6 py-2.5 rounded-full hover:bg-[#245a42] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               {guardando ? 'Creando…' : 'Crear campaña'}
@@ -399,8 +498,22 @@ export default function AdminCampanasPage() {
 
       {/* Lista de campañas */}
       <section className="rounded-2xl border border-[#1A1A1A]/5 bg-white shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#1A1A1A]/8">
+        <div className="px-5 py-4 border-b border-[#1A1A1A]/8 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-[#1A1A1A]">Todas las campañas</h2>
+          <div className="flex items-center gap-2">
+            <label htmlFor="orden-campanas" className="text-xs font-semibold text-[#1A1A1A]/50">Ordenar por</label>
+            <select
+              id="orden-campanas"
+              value={orden}
+              onChange={e => setOrden(e.target.value as OrdenCampana)}
+              className="rounded-lg border border-[#1A1A1A]/15 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
+            >
+              <option value="RECIENTES">Más recientes</option>
+              <option value="VISTAS">Más vistas</option>
+              <option value="CLICS">Más clics</option>
+              <option value="CTR">Mejor CTR</option>
+            </select>
+          </div>
         </div>
 
         {cargando ? (
@@ -413,7 +526,7 @@ export default function AdminCampanasPage() {
           </div>
         ) : (
           <div className="divide-y divide-[#1A1A1A]/5">
-            {campanas.map(c => {
+            {campanasOrdenadas.map(c => {
               const b = badge(c)
               const tb = tipoBadge(c.tipo ?? 'PUBLICIDAD')
               const ctrPct = c.clics > 0 ? ((c.clics / Math.max(c.vistas, 1)) * 100).toFixed(1) : '0'
@@ -438,6 +551,8 @@ export default function AdminCampanasPage() {
                         c.montoCOP && <span className="text-[#2D6A4F] font-semibold">${Number(c.montoCOP).toLocaleString('es-CO')}</span>
                       )}
                       <span>Admin: {c.admin.nombre}</span>
+                      <span>Badge: &quot;{c.etiqueta}&quot;</span>
+                      <span>{c.alcance === 'DEPARTAMENTO' ? `Depto: ${c.departamento}` : 'Nacional'}</span>
                     </div>
 
                     <div className="flex gap-4 mt-2">

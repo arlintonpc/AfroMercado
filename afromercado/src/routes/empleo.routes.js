@@ -51,8 +51,16 @@ router.get("/empleo/mis-postulaciones", autenticar, EmpleoController.misPostulac
 router.patch("/empleo/postulaciones/:id/estado", autenticar, EmpleoController.cambiarEstadoPostulacion);
 router.patch("/empleo/postulaciones/:id/retirar", autenticar, EmpleoController.retirarPostulacion);
 
+// Denuncias — "mi-denuncia" antes de ":id" para evitar ambigüedad de rutas
+router.post("/empleo/ofertas/:id/denunciar", autenticar, EmpleoController.denunciarOferta);
+router.get("/empleo/ofertas/:id/mi-denuncia", autenticar, EmpleoController.yaDenuncie);
+
 // Admin: moderación
 router.get("/admin/empleo/pendientes", ...soloAdmin, EmpleoController.listarPendientesModeracion);
 router.patch("/admin/empleo/:id/moderar", ...soloAdmin, EmpleoController.moderar);
+
+// Admin: denuncias
+router.get("/admin/empleo/denuncias", ...soloAdmin, EmpleoController.listarDenunciasPendientes);
+router.patch("/admin/empleo/denuncias/:id/resolver", ...soloAdmin, EmpleoController.resolverDenuncia);
 
 module.exports = router;
