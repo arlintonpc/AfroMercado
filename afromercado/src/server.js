@@ -5,7 +5,11 @@ if (process.env.SENTRY_DSN) {
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
     environment: process.env.NODE_ENV || "development",
-    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+    // En 0 se desactiva el rastreo de rendimiento por petición (transactions/spans);
+    // captureException para errores 500 sigue activo sin depender de esto.
+    // Bajado temporalmente tras un OOM en Render (Starter, 512MB) que coincidió
+    // con una ráfaga de peticiones — mitigación mientras se confirma la causa real.
+    tracesSampleRate: process.env.NODE_ENV === "production" ? 0 : 1.0,
     // Filtra eventos de test/desarrollo si es necesario
     beforeSend(event) {
       if (process.env.NODE_ENV === "test") return null;
