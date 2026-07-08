@@ -20,7 +20,18 @@ const EmpleoRepository = {
     return prisma.ofertaEmpleo.update({ where: { id }, data });
   },
 
-  async listarPublicas({ municipio, departamento, categoria, tipoContrato, page = 1, take = 20 }) {
+  async listarPublicas({ municipio, departamento, categoria, tipoContrato, search, salarioMin, salarioMax, page = 1, take = 20 }) {
+    const min = salarioMin != null && salarioMin !== "" ? Number(salarioMin) : null;
+    const max = salarioMax != null && salarioMax !== "" ? Number(salarioMax) : null;
+    // Rango solapado: la oferta califica si [oferta.salarioMin, oferta.salarioMax]
+    // se cruza con [min, max] pedido. Si el usuario pidió un rango de salario y la
+    // oferta no tiene salario definido, se excluye (no hay forma de comparar).
+    const filtroSalario = [];
+    if (min != null || max != null) {
+      filtroSalario.push({ salarioMin: { not: null } }, { salarioMax: { not: null } });
+      if (min != null) filtroSalario.push({ salarioMax: { gte: min } });
+      if (max != null) filtroSalario.push({ salarioMin: { lte: max } });
+    }
     const where = {
       estado: "PUBLICADA",
       estadoModeracion: "APROBADA",
@@ -28,8 +39,10 @@ const EmpleoRepository = {
       OR: [{ fechaCierre: null }, { fechaCierre: { gte: new Date() } }],
       ...(municipio ? { municipio: { contains: municipio, mode: "insensitive" } } : {}),
       ...(departamento ? { departamento: { equals: departamento, mode: "insensitive" } } : {}),
-      ...(categoria ? { categoria } : {}),
+      ...(categoria ? { categoria: { contains: categoria, mode: "insensitive" } } : {}),
       ...(tipoContrato ? { tipoContrato } : {}),
+      ...(search ? { titulo: { contains: search, mode: "insensitive" } } : {}),
+      ...(filtroSalario.length ? { AND: filtroSalario } : {}),
     };
     const skip = (Math.max(1, Number(page)) - 1) * take;
     const [items, total] = await Promise.all([

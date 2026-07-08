@@ -1302,6 +1302,9 @@ async function aplicarMigraciones() {
         ALTER TABLE "LikePublicacionCultural" ADD CONSTRAINT "LikePublicacionCultural_publicacionCulturalId_fkey" FOREIGN KEY ("publicacionCulturalId") REFERENCES "PublicacionCultural"("id") ON DELETE CASCADE ON UPDATE CASCADE;
       END IF;
     END $$`,
+
+    // ── Rediseño de Empleo: imagen tipo banner por vacante ──
+    `ALTER TABLE "OfertaEmpleo" ADD COLUMN IF NOT EXISTS "imagenUrl" TEXT`,
   ];
   for (const sql of migraciones) {
     try {

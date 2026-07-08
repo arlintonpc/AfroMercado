@@ -56,6 +56,7 @@ export interface OfertaEmpleo {
   motivoRechazoModeracion: string | null
   contactoWhatsapp: string | null
   fechaCierre: string | null
+  imagenUrl: string | null
   preguntas: PreguntaOferta[]
   createdAt: string
   publicadoPor?: { id: number; nombre: string }
@@ -130,12 +131,15 @@ interface RespuestaApi<T> {
   data: T
 }
 
-export async function listarOfertasEmpleo(filtros: { municipio?: string; departamento?: string; categoria?: string; tipoContrato?: TipoContratoEmpleo; page?: number } = {}): Promise<{ items: OfertaEmpleo[]; total: number; pagina: number }> {
+export async function listarOfertasEmpleo(filtros: { municipio?: string; departamento?: string; categoria?: string; tipoContrato?: TipoContratoEmpleo; search?: string; salarioMin?: number; salarioMax?: number; page?: number } = {}): Promise<{ items: OfertaEmpleo[]; total: number; pagina: number }> {
   const params = new URLSearchParams()
   if (filtros.municipio) params.set('municipio', filtros.municipio)
   if (filtros.departamento) params.set('departamento', filtros.departamento)
   if (filtros.categoria) params.set('categoria', filtros.categoria)
   if (filtros.tipoContrato) params.set('tipoContrato', filtros.tipoContrato)
+  if (filtros.search) params.set('search', filtros.search)
+  if (filtros.salarioMin != null) params.set('salarioMin', String(filtros.salarioMin))
+  if (filtros.salarioMax != null) params.set('salarioMax', String(filtros.salarioMax))
   if (filtros.page) params.set('page', String(filtros.page))
   const r = await apiFetch<RespuestaApi<{ items: OfertaEmpleo[]; total: number; pagina: number }>>(`/empleo/ofertas?${params.toString()}`)
   return r.data
@@ -148,6 +152,12 @@ export async function obtenerOfertaEmpleo(id: number): Promise<OfertaEmpleo> {
 
 export async function crearOfertaEmpleo(datos: Partial<OfertaEmpleo>): Promise<OfertaEmpleo> {
   const r = await apiFetch<RespuestaApi<OfertaEmpleo>>('/empleo/ofertas', { method: 'POST', body: datos })
+  return r.data
+}
+
+/** Solo funciona mientras la oferta está en estado BORRADOR (lo valida el backend). */
+export async function actualizarOferta(id: number, datos: Partial<OfertaEmpleo>): Promise<OfertaEmpleo> {
+  const r = await apiFetch<RespuestaApi<OfertaEmpleo>>(`/empleo/ofertas/${id}`, { method: 'PATCH', body: datos })
   return r.data
 }
 
@@ -187,6 +197,14 @@ export async function subirCvHojaDeVida(archivo: File): Promise<HojaDeVida> {
     throw new Error(json.mensaje ?? json.error ?? 'No se pudo subir el CV.')
   }
   return json.data as HojaDeVida
+}
+
+/** Sube la imagen/banner de una oferta (campo "imagen") y devuelve su URL. */
+export async function subirImagenOferta(archivo: File): Promise<string> {
+  const fd = new FormData()
+  fd.append('imagen', archivo)
+  const r = await apiFetch<{ ok: boolean; url: string }>('/empleo/ofertas/imagen', { method: 'POST', body: fd })
+  return r.url
 }
 
 export async function postularseOferta(ofertaId: number, mensaje?: string, respuestas?: { preguntaId: string; respuesta: string }[]): Promise<PostulacionEmpleo> {

@@ -7,8 +7,8 @@ const EmpleoController = {
   // ── Públicas ─────────────────────────────────────────────────
   async listarPublicas(req, res, next) {
     try {
-      const { municipio, departamento, categoria, tipoContrato, page } = req.query;
-      const data = await EmpleoService.listarPublicas({ municipio, departamento, categoria, tipoContrato, page });
+      const { municipio, departamento, categoria, tipoContrato, search, salarioMin, salarioMax, page } = req.query;
+      const data = await EmpleoService.listarPublicas({ municipio, departamento, categoria, tipoContrato, search, salarioMin, salarioMax, page });
       res.json({ ok: true, data });
     } catch (e) { next(e); }
   },

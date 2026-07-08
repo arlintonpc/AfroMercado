@@ -104,6 +104,7 @@ const EmpleoService = {
       vacantes: datos.vacantes ? Number(datos.vacantes) : 1,
       contactoWhatsapp: datos.contactoWhatsapp?.trim() || null,
       fechaCierre: datos.fechaCierre ? new Date(datos.fechaCierre) : null,
+      imagenUrl: datos.imagenUrl?.trim() || null,
       preguntas: normalizarPreguntas(datos.preguntas),
     });
   },
@@ -122,7 +123,7 @@ const EmpleoService = {
     }
     validarDatosOferta({ ...oferta, ...datos });
     const campos = {};
-    for (const campo of ["titulo", "descripcion", "categoria", "tipoContrato", "municipio", "departamento", "requisitos", "contactoWhatsapp"]) {
+    for (const campo of ["titulo", "descripcion", "categoria", "tipoContrato", "municipio", "departamento", "requisitos", "contactoWhatsapp", "imagenUrl"]) {
       if (datos[campo] !== undefined) campos[campo] = typeof datos[campo] === "string" ? datos[campo].trim() : datos[campo];
     }
     if (datos.salarioMin !== undefined) campos.salarioMin = datos.salarioMin != null ? Number(datos.salarioMin) : null;

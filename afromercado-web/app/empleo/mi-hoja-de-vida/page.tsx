@@ -26,7 +26,8 @@ export default function PaginaMiHojaDeVida() {
   const [resumenPerfil, setResumenPerfil] = useState('')
   const [telefonoContacto, setTelefonoContacto] = useState('')
   const [disponibilidad, setDisponibilidad] = useState('')
-  const [habilidadesTexto, setHabilidadesTexto] = useState('')
+  const [habilidades, setHabilidades] = useState<string[]>([])
+  const [nuevaHabilidad, setNuevaHabilidad] = useState('')
   const [experiencia, setExperiencia] = useState<ExperienciaItem[]>([{ ...EXPERIENCIA_VACIA }])
   const [educacion, setEducacion] = useState<EducacionItem[]>([{ ...EDUCACION_VACIA }])
   const [cvUrl, setCvUrl] = useState<string | null>(null)
@@ -50,7 +51,7 @@ export default function PaginaMiHojaDeVida() {
           setResumenPerfil(h.resumenPerfil ?? '')
           setTelefonoContacto(h.telefonoContacto)
           setDisponibilidad(h.disponibilidad ?? '')
-          setHabilidadesTexto(h.habilidades.join(', '))
+          setHabilidades(h.habilidades)
           if (h.experiencia.length) setExperiencia(h.experiencia)
           if (h.educacion.length) setEducacion(h.educacion)
           setCvUrl(h.cvUrl)
@@ -91,6 +92,26 @@ export default function PaginaMiHojaDeVida() {
     }
   }
 
+  function agregarHabilidad() {
+    const valor = nuevaHabilidad.trim()
+    if (!valor) return
+    setHabilidades((prev) => (prev.some((h) => h.toLowerCase() === valor.toLowerCase()) ? prev : [...prev, valor]))
+    setNuevaHabilidad('')
+  }
+
+  function quitarHabilidad(valor: string) {
+    setHabilidades((prev) => prev.filter((h) => h !== valor))
+  }
+
+  function handleKeyDownHabilidad(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      agregarHabilidad()
+    } else if (e.key === 'Backspace' && !nuevaHabilidad && habilidades.length > 0) {
+      quitarHabilidad(habilidades[habilidades.length - 1])
+    }
+  }
+
   async function handleGuardar() {
     if (!telefonoContacto.trim()) { setError('El teléfono de contacto es obligatorio.'); return }
     setGuardando(true)
@@ -100,7 +121,7 @@ export default function PaginaMiHojaDeVida() {
         resumenPerfil: resumenPerfil.trim() || undefined,
         telefonoContacto: telefonoContacto.trim(),
         disponibilidad: disponibilidad.trim() || undefined,
-        habilidades: habilidadesTexto.split(',').map((h) => h.trim()).filter(Boolean),
+        habilidades,
         experiencia: experiencia.filter((e) => e.empresa.trim() || e.cargo.trim()),
         educacion: educacion.filter((e) => e.institucion.trim() || e.titulo.trim()),
       })
@@ -185,9 +206,41 @@ export default function PaginaMiHojaDeVida() {
               className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Habilidades (separadas por coma)</label>
-            <input value={habilidadesTexto} onChange={(e) => setHabilidadesTexto(e.target.value)} placeholder="Ej: pesca, navegación, cocina"
-              className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none" />
+            <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Habilidades</label>
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 focus-within:ring-2 focus-within:ring-[#2D6A4F]/30">
+              {habilidades.map((h) => (
+                <span key={h} className="inline-flex items-center gap-1.5 rounded-full bg-[#2D6A4F]/10 text-[#2D6A4F] text-xs font-semibold pl-2.5 pr-1.5 py-1">
+                  {h}
+                  <button
+                    type="button"
+                    onClick={() => quitarHabilidad(h)}
+                    aria-label={`Quitar ${h}`}
+                    className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-[#2D6A4F]/20 leading-none"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              <input
+                value={nuevaHabilidad}
+                onChange={(e) => setNuevaHabilidad(e.target.value)}
+                onKeyDown={handleKeyDownHabilidad}
+                onBlur={agregarHabilidad}
+                placeholder={habilidades.length ? 'Agregar otra…' : 'Ej: pesca, navegación, cocina'}
+                className="flex-1 min-w-[8rem] bg-transparent text-sm focus:outline-none py-0.5"
+              />
+              {nuevaHabilidad.trim() && (
+                <button
+                  type="button"
+                  onClick={agregarHabilidad}
+                  className="shrink-0 rounded-full bg-[#2D6A4F] text-white w-6 h-6 flex items-center justify-center text-sm font-semibold hover:bg-[#245a42]"
+                  aria-label="Agregar habilidad"
+                >
+                  +
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-[#1A1A1A]/40 mt-1">Presiona Enter o coma para agregar cada habilidad.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Disponibilidad</label>

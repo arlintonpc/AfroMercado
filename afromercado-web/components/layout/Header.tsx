@@ -452,6 +452,10 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                     className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
                     🎭 Reservas cultura
                   </Link>
+                  <Link href="/empleo/mi-hoja-de-vida" role="menuitem" onClick={() => setMenuAbierto(false)}
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    💼 Mi hoja de vida
+                  </Link>
                   <Link href="/empleo/mis-postulaciones" role="menuitem" onClick={() => setMenuAbierto(false)}
                     className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
                     💼 Mis postulaciones

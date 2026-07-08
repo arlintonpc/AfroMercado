@@ -9,12 +9,14 @@ import { useAuth } from '@/context/AuthContext'
 import {
   misOfertasEmpleo,
   cambiarEstadoOfertaEmpleo,
+  actualizarOferta,
   postulacionesDeOferta,
   cambiarEstadoPostulacion,
   type OfertaEmpleo,
   type PostulacionEmpleo,
   type EstadoPostulacionEmpleo,
 } from '@/lib/api/empleo'
+import FormularioOferta, { type DatosFormularioOferta, type ValoresInicialesFormularioOferta } from '@/components/empleo/FormularioOferta'
 
 const ESTADO_OFERTA_LABEL: Record<string, string> = {
   BORRADOR: 'Borrador', PUBLICADA: 'Publicada', PAUSADA: 'Pausada', CERRADA: 'Cerrada',
@@ -157,8 +159,29 @@ function PanelPostulaciones({ ofertaId, vacantes }: { ofertaId: number; vacantes
   )
 }
 
+function ofertaAValoresIniciales(oferta: OfertaEmpleo): ValoresInicialesFormularioOferta {
+  return {
+    titulo: oferta.titulo,
+    descripcion: oferta.descripcion,
+    categoria: oferta.categoria ?? undefined,
+    departamento: oferta.departamento ?? undefined,
+    municipio: oferta.municipio,
+    tipoContrato: oferta.tipoContrato,
+    salarioMin: oferta.salarioMin != null ? Number(oferta.salarioMin) : undefined,
+    salarioMax: oferta.salarioMax != null ? Number(oferta.salarioMax) : undefined,
+    salarioNegociable: oferta.salarioNegociable,
+    requisitos: oferta.requisitos ?? undefined,
+    vacantes: oferta.vacantes,
+    contactoWhatsapp: oferta.contactoWhatsapp ?? undefined,
+    fechaCierre: oferta.fechaCierre ? oferta.fechaCierre.slice(0, 10) : undefined,
+    imagenUrl: oferta.imagenUrl,
+    preguntas: oferta.preguntas,
+  }
+}
+
 function TarjetaOferta({ oferta, onCambiado }: { oferta: OfertaEmpleo; onCambiado: () => void }) {
   const [expandido, setExpandido] = useState(false)
+  const [editando, setEditando] = useState(false)
   const [procesando, setProcesando] = useState(false)
 
   async function cambiar(estado: 'PUBLICADA' | 'PAUSADA' | 'CERRADA') {
@@ -171,8 +194,29 @@ function TarjetaOferta({ oferta, onCambiado }: { oferta: OfertaEmpleo; onCambiad
     }
   }
 
+  async function guardarEdicion(datos: DatosFormularioOferta) {
+    await actualizarOferta(oferta.id, datos)
+    setEditando(false)
+    onCambiado()
+  }
+
   const moderacion = MODERACION_LABEL[oferta.estadoModeracion]
   const vencida = oferta.estado === 'PUBLICADA' && !!oferta.fechaCierre && new Date(oferta.fechaCierre) < new Date()
+
+  if (editando) {
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="text-sm font-semibold text-[#1A1A1A]">Editando: {oferta.titulo}</p>
+        <FormularioOferta
+          valoresIniciales={ofertaAValoresIniciales(oferta)}
+          onGuardar={guardarEdicion}
+          onCancelar={() => setEditando(false)}
+          textoBoton="Guardar cambios"
+          textoEnviando="Guardando…"
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-5">
@@ -192,9 +236,14 @@ function TarjetaOferta({ oferta, onCambiado }: { oferta: OfertaEmpleo; onCambiad
 
       <div className="flex flex-wrap gap-2 mt-3">
         {oferta.estado === 'BORRADOR' && (
-          <button onClick={() => cambiar('PUBLICADA')} disabled={procesando} className="rounded-lg bg-[#2D6A4F] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#245a42] disabled:opacity-50">
-            Publicar
-          </button>
+          <>
+            <button onClick={() => cambiar('PUBLICADA')} disabled={procesando} className="rounded-lg bg-[#2D6A4F] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#245a42] disabled:opacity-50">
+              Publicar
+            </button>
+            <button onClick={() => setEditando(true)} disabled={procesando} className="rounded-lg border border-[#1A1A1A]/15 px-3 py-1.5 text-xs font-semibold text-[#1A1A1A]/60 hover:bg-[#F8F5F0] disabled:opacity-50">
+              Editar
+            </button>
+          </>
         )}
         {oferta.estado === 'PUBLICADA' && (
           <>

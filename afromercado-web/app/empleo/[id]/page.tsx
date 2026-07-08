@@ -7,6 +7,7 @@ import Footer from '@/components/layout/Footer'
 import { useAuth } from '@/context/AuthContext'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import ModalDenunciarOferta from '@/components/empleo/ModalDenunciarOferta'
+import TarjetaOfertaEmpleo from '@/components/empleo/TarjetaOfertaEmpleo'
 import {
   obtenerOfertaEmpleo,
   postularseOferta,
@@ -19,6 +20,7 @@ import {
   type OfertaEmpleo,
   type TipoContratoEmpleo,
   type EstadoPostulacionEmpleo,
+  type PostulacionEmpleo,
 } from '@/lib/api/empleo'
 
 const TIPO_LABEL: Record<TipoContratoEmpleo, string> = {
@@ -52,6 +54,7 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
   const [errorPostular, setErrorPostular] = useState<string | null>(null)
   const [favorito, setFavorito] = useState(false)
   const [otrasOfertas, setOtrasOfertas] = useState<OfertaEmpleo[]>([])
+  const [otrasPostulaciones, setOtrasPostulaciones] = useState<Record<number, PostulacionEmpleo>>({})
   const [copiado, setCopiado] = useState(false)
   const [yaDenuncio, setYaDenuncio] = useState(false)
   const [mostrarModalDenuncia, setMostrarModalDenuncia] = useState(false)
@@ -128,7 +131,14 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
         ) : (
           <>
             <Link href="/empleo" className="text-xs text-[#2D6A4F] hover:underline">← Volver a empleo</Link>
-            <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 mt-3">
+            <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 overflow-hidden mt-3">
+              {oferta.imagenUrl && (
+                <div className="relative h-48 md:h-64 w-full bg-[#1B4332]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={oferta.imagenUrl} alt="" className="h-full w-full object-cover" />
+                </div>
+              )}
+              <div className="p-6">
               <div className="flex items-start justify-between gap-3">
                 <h1 className="text-2xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
                   {oferta.titulo}
@@ -235,6 +245,14 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
                   Contactar por WhatsApp
                 </a>
               )}
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-[#D4A017]/25 bg-[#D4A017]/8 px-4 py-3">
+              <span className="text-base leading-none" aria-hidden="true">⚠️</span>
+              <p className="text-xs leading-relaxed text-[#6B4E0D]">
+                <span className="font-semibold">Nunca pagues por inscribirte, tomar un curso o &quot;asegurar&quot; tu cupo.</span> Ninguna oferta real te pedirá dinero para postularte. Si te lo piden, es una estafa — denúnciala.
+              </p>
             </div>
 
             <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 mt-4">
@@ -247,7 +265,10 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
               ) : cerrada ? (
                 <p className="text-sm text-[#1A1A1A]/50 text-center">Esta oferta ya cerró el plazo de postulaciones.</p>
               ) : miEstadoPostulacion ? (
-                <p className="text-sm text-[#2D6A4F] font-semibold text-center">✓ Ya te postulaste · {ESTADO_POSTULACION_LABEL[miEstadoPostulacion]}</p>
+                <div className="text-center">
+                  <p className="text-sm text-[#2D6A4F] font-semibold">✓ Ya te postulaste · {ESTADO_POSTULACION_LABEL[miEstadoPostulacion]}</p>
+                  <p className="mt-1 text-xs text-[#1A1A1A]/40">Recuerda: nunca debes pagar para continuar tu proceso de selección.</p>
+                </div>
               ) : tieneHojaDeVida === false ? (
                 <div className="text-center">
                   <p className="text-sm text-[#1A1A1A]/60 mb-3">Necesitas completar tu hoja de vida antes de postularte.</p>
@@ -323,12 +344,17 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
                 <p className="text-sm font-semibold text-[#1A1A1A] mb-3">
                   Otras ofertas de {oferta.comercio?.nombre ?? oferta.publicadoPor?.nombre}
                 </p>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-4">
                   {otrasOfertas.map((o) => (
-                    <Link key={o.id} href={`/empleo/${o.id}`} className="block rounded-xl border border-[#1A1A1A]/8 px-3 py-2.5 hover:border-[#2D6A4F]/30 transition-colors">
-                      <p className="text-sm font-semibold text-[#1A1A1A]">{o.titulo}</p>
-                      <p className="text-xs text-[#1A1A1A]/50 mt-0.5">📍 {o.municipio} · {TIPO_LABEL[o.tipoContrato]}</p>
-                    </Link>
+                    <TarjetaOfertaEmpleo
+                      key={o.id}
+                      oferta={o}
+                      usuarioId={usuario?.id}
+                      postulacion={otrasPostulaciones[o.id]}
+                      tieneHojaDeVida={tieneHojaDeVida}
+                      onPostulado={(p) => setOtrasPostulaciones((prev) => ({ ...prev, [o.id]: p }))}
+                      autenticado={autenticado}
+                    />
                   ))}
                 </div>
               </div>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import ModalConfirmarRetiro from '@/components/empleo/ModalConfirmarRetiro'
 import { useAuth } from '@/context/AuthContext'
 import { misPostulacionesEmpleo, retirarPostulacionEmpleo, type PostulacionEmpleo, type EstadoPostulacionEmpleo } from '@/lib/api/empleo'
 
@@ -25,6 +26,7 @@ export default function PaginaMisPostulacionesEmpleo() {
   const [postulaciones, setPostulaciones] = useState<PostulacionEmpleo[]>([])
   const [cargando, setCargando] = useState(true)
   const [retirandoId, setRetirandoId] = useState<number | null>(null)
+  const [idParaRetirar, setIdParaRetirar] = useState<number | null>(null)
 
   useEffect(() => {
     if (!cargandoAuth && !autenticado) router.replace('/ingresar?redirect=/empleo/mis-postulaciones')
@@ -36,13 +38,13 @@ export default function PaginaMisPostulacionesEmpleo() {
   }, [autenticado, cargandoAuth])
 
   async function retirar(id: number) {
-    if (!window.confirm('¿Retirar tu postulación? Podrás volver a postularte más tarde si cambias de opinión.')) return
     setRetirandoId(id)
     try {
       const actualizada = await retirarPostulacionEmpleo(id)
       setPostulaciones((prev) => prev.map((p) => (p.id === id ? actualizada : p)))
     } finally {
       setRetirandoId(null)
+      setIdParaRetirar(null)
     }
   }
 
@@ -83,7 +85,7 @@ export default function PaginaMisPostulacionesEmpleo() {
                 {RETIRABLE.includes(p.estado) && (
                   <button
                     type="button"
-                    onClick={() => retirar(p.id)}
+                    onClick={() => setIdParaRetirar(p.id)}
                     disabled={retirandoId === p.id}
                     className="mt-3 rounded-lg border border-[#1A1A1A]/15 px-3 py-1.5 text-xs font-semibold text-[#1A1A1A]/60 hover:bg-red-50 hover:text-red-600 hover:border-red-200 disabled:opacity-50"
                   >
@@ -96,6 +98,13 @@ export default function PaginaMisPostulacionesEmpleo() {
         )}
       </main>
       <Footer />
+      {idParaRetirar !== null && (
+        <ModalConfirmarRetiro
+          confirmando={retirandoId === idParaRetirar}
+          onCancelar={() => setIdParaRetirar(null)}
+          onConfirmar={() => retirar(idParaRetirar)}
+        />
+      )}
     </div>
   )
 }
