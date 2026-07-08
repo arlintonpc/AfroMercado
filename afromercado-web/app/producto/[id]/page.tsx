@@ -36,27 +36,6 @@ const GRADIENTES = [
   'from-[#0f2a1a] to-[#2D6A4F]',
 ]
 
-// ——— Estrellas ———
-function Estrellas({ calificacion }: { calificacion: number }) {
-  return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <svg
-          key={n}
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill={n <= Math.round(calificacion) ? '#D4A017' : 'none'}
-          stroke="#D4A017"
-          strokeWidth="2"
-        >
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-        </svg>
-      ))}
-    </div>
-  )
-}
-
 // ——— Acordeón ———
 function Acordeon({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   const [abierto, setAbierto] = useState(false)
@@ -762,31 +741,6 @@ export default function PaginaProducto({
           </div>
         </section>
 
-        {/* ——— RESEÑAS ——— */}
-        <section className="max-w-6xl mx-auto w-full px-4 md:px-6 py-6">
-          <h2 className="text-lg font-bold text-[#1A1A1A] mb-4" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
-            Reseñas
-          </h2>
-
-          {producto.comercio.totalReviews > 0 ? (
-            <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <p className="text-4xl font-bold text-[#1A1A1A]">{producto.comercio.calificacion.toFixed(1)}</p>
-                <div className="flex flex-col gap-1">
-                  <Estrellas calificacion={producto.comercio.calificacion} />
-                  <p className="text-xs text-[#1A1A1A]/50">{producto.comercio.totalReviews} reseñas</p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-[#52B788]/8 rounded-2xl border border-[#52B788]/20 p-6 text-center">
-              <p className="text-base text-[#2D6A4F] font-medium">Aún no hay reseñas</p>
-              <p className="text-sm text-[#1A1A1A]/50 mt-1">
-                Sé el primero en comprar este producto y compartir tu experiencia
-              </p>
-            </div>
-          )}
-        </section>
       </main>
 
       {/* ——— CTA STICKY MOBILE ——— */}

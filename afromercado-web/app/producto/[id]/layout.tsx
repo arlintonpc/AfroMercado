@@ -92,6 +92,97 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export default function ProductoLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
+interface ProductoJsonLdData {
+  nombre?:      string
+  descripcion?: string
+  precio?:      string | number
+  imagenes?:    ({ url?: string } | string)[]
+  fotoUrl?:     string | null
+  videoPosterUrl?: string | null
+  comercio?:  { nombre?: string }
+  categoria?: { nombre?: string; slug?: string } | null
+}
+
+async function fetchProductoParaJsonLd(id: string): Promise<ProductoJsonLdData | null> {
+  try {
+    const res = await fetch(`${API}/productos/${id}`, {
+      next: { revalidate: 60 },
+    })
+    if (!res.ok) return null
+    const json = await res.json() as { producto?: ProductoJsonLdData; data?: ProductoJsonLdData }
+    return json.producto ?? json.data ?? null
+  } catch {
+    return null
+  }
+}
+
+export default async function ProductoLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const p = await fetchProductoParaJsonLd(id)
+
+  const imagenRaw = p?.imagenes?.[0]
+  const imagen = imagenRaw
+    ? (typeof imagenRaw === 'string' ? imagenRaw : imagenRaw.url ?? null)
+    : p?.videoPosterUrl ?? p?.fotoUrl ?? null
+
+  const jsonLd = p?.nombre ? {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Product',
+        '@id': `${SITE}/producto/${id}`,
+        name: p.nombre,
+        description: p.descripcion ?? undefined,
+        image: imagen ? [imagen] : undefined,
+        url: `${SITE}/producto/${id}`,
+        offers: {
+          '@type': 'Offer',
+          price: p.precio !== undefined ? Number(p.precio) : undefined,
+          priceCurrency: 'COP',
+          availability: 'https://schema.org/InStock',
+          url: `${SITE}/producto/${id}`,
+        },
+        ...(p.comercio?.nombre ? {
+          brand:  { '@type': 'Organization', name: p.comercio.nombre },
+          seller: { '@type': 'Organization', name: p.comercio.nombre },
+        } : {}),
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Inicio', item: SITE },
+          ...(p.categoria?.nombre ? [{
+            '@type': 'ListItem',
+            position: 2,
+            name: p.categoria.nombre,
+            item: `${SITE}/buscar?categoria=${p.categoria.slug ?? ''}`,
+          }] : []),
+          {
+            '@type': 'ListItem',
+            position: p.categoria?.nombre ? 3 : 2,
+            name: p.nombre,
+            item: `${SITE}/producto/${id}`,
+          },
+        ],
+      },
+    ],
+  } : null
+
+  return (
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      {children}
+    </>
+  )
 }
