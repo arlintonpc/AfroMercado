@@ -18,6 +18,7 @@ const NAV_LINKS = [
   { href: '/admin/facturas',             label: 'Facturas'       },
   { href: '/admin/pqrsd',                label: 'PQRSD'          },
   { href: '/admin/empleo',               label: 'Empleo'         },
+  { href: '/admin/cultura',              label: '🎭 Cultura'     },
   { href: '/admin/entregas',             label: 'Entregas'       },
   { href: '/admin/envios',              label: 'Envíos'         },
   { href: '/admin/pedidos',              label: 'Pedidos'        },

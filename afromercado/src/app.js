@@ -112,6 +112,22 @@ app.use(
   "/uploads/hojas-de-vida",
   express.static(path.join(__dirname, "..", "uploads", "hojas-de-vida"))
 );
+app.use("/uploads/reviews-cultura", (req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
+app.use(
+  "/uploads/reviews-cultura",
+  express.static(path.join(__dirname, "..", "uploads", "reviews-cultura"))
+);
+app.use("/uploads/publicaciones-cultura", (req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
+app.use(
+  "/uploads/publicaciones-cultura",
+  express.static(path.join(__dirname, "..", "uploads", "publicaciones-cultura"))
+);
 
 // Rate limiting — se omite completamente en desarrollo para no interferir con hot-reload
 const esProd = process.env.NODE_ENV === "production";

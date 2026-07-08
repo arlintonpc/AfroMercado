@@ -2,9 +2,18 @@ const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
 const FacturacionService = require("./facturacion.service");
+const CulturaRepository = require("../repositories/cultura.repository");
 
 const TASA_COMISION_CULTURA = 0.10;
 const ESTADOS_EVENTO = ["BORRADOR", "PUBLICADO", "FINALIZADO", "CANCELADO", "POSPUESTO"];
+const MOTIVOS_DENUNCIA_PUBLICACION = ["CONTENIDO_INAPROPIADO", "SPAM", "DERECHOS_DE_AUTOR", "NO_RELACIONADO", "OTRO"];
+const ESTADOS_RESERVA_CULTURA_TRANSICIONES = {
+  PENDIENTE: ["CONFIRMADA", "RECHAZADA", "CANCELADA"],
+  CONFIRMADA: ["USADA", "CANCELADA"],
+};
+const ESTADOS_RESERVA_CULTURA_EQUIVALENTES = {
+  COMPLETADA: "USADA",
+};
 
 function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -23,6 +32,19 @@ function numeroONull(valor) {
   if (valor === null || valor === "") return null;
   const num = Number(valor);
   return Number.isFinite(num) ? num : null;
+}
+
+function enteroPositivoRequerido(valor, nombreCampo) {
+  const num = Number(valor);
+  if (!Number.isInteger(num) || num < 1) {
+    throw new ErrorValidacion(`El ${nombreCampo} no es valido`);
+  }
+  return num;
+}
+
+function normalizarEstadoReservaCultural(estado) {
+  const normalizado = String(estado || "").trim().toUpperCase();
+  return ESTADOS_RESERVA_CULTURA_EQUIVALENTES[normalizado] || normalizado;
 }
 
 function boolOpcional(valor) {
@@ -108,7 +130,7 @@ async function notificarCambioEstadoSiAplica(evento, estado) {
 
 const CulturaService = {
   // ── PÚBLICO ──────────────────────────────────────────────────
-  async listarAgenda({ departamento, municipio, categoria } = {}) {
+  async listarAgenda({ departamento, municipio, categoria, search, patrimonio, fechaDesde, fechaHasta } = {}) {
     const inicioHoy = new Date(new Date().setHours(0, 0, 0, 0));
     const where = {
       estado: "PUBLICADO",
@@ -120,6 +142,21 @@ const CulturaService = {
     if (departamento) where.departamento = { contains: departamento, mode: "insensitive" };
     if (municipio) where.municipio = { contains: municipio, mode: "insensitive" };
     if (categoria) where.categoria = { contains: categoria, mode: "insensitive" };
+    if (search && String(search).trim()) {
+      where.titulo = { contains: String(search).trim(), mode: "insensitive" };
+    }
+    const esPatrimonio = boolOpcional(patrimonio);
+    if (esPatrimonio === true) where.patrimonio = true;
+
+    const desde = fechaOUndefined(fechaDesde);
+    const hasta = fechaOUndefined(fechaHasta);
+    if (desde || hasta) {
+      where.fechaInicio = {
+        ...(where.fechaInicio || {}),
+        ...(desde ? { gte: desde } : {}),
+        ...(hasta ? { lte: hasta } : {}),
+      };
+    }
 
     return prisma.eventoCultural.findMany({
       where,
@@ -141,13 +178,14 @@ const CulturaService = {
 
   // ── CLIENTE ──────────────────────────────────────────────────
   async crearReserva(clienteId, { entradaCulturalId, cantidad, metodoPago, notasCliente, nombreContacto, telefonoContacto }) {
-    const cant = Math.max(1, Number(cantidad) || 1);
+    const cant = enteroPositivoRequerido(cantidad, "cantidad");
+    const entradaId = enteroPositivoRequerido(entradaCulturalId, "entrada cultural");
     if (!nombreContacto || !telefonoContacto) {
       throw new ErrorValidacion("El nombre y el teléfono de contacto son obligatorios");
     }
 
     const entrada = await prisma.entradaCultural.findUnique({
-      where: { id: Number(entradaCulturalId) },
+      where: { id: entradaId },
       include: { evento: true },
     });
     if (!entrada || !entrada.activa) throw new ErrorValidacion("Entrada no disponible");
@@ -204,21 +242,31 @@ const CulturaService = {
   },
 
   async cancelarReserva(clienteId, reservaId) {
-    const reserva = await prisma.reservaCultural.findFirst({
-      where: { id: Number(reservaId), clienteId },
-    });
-    if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
-    if (!["PENDIENTE", "CONFIRMADA"].includes(reserva.estado)) {
-      throw new ErrorValidacion("Esta reserva no se puede cancelar");
-    }
     return prisma.$transaction(async (tx) => {
+      const reserva = await tx.reservaCultural.findFirst({
+        where: { id: enteroPositivoRequerido(reservaId, "reserva"), clienteId },
+      });
+      if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
+
+      const actualizadas = await tx.reservaCultural.updateMany({
+        where: {
+          id: reserva.id,
+          clienteId,
+          estado: { in: ["PENDIENTE", "CONFIRMADA"] },
+        },
+        data: { estado: "CANCELADA", updatedAt: new Date() },
+      });
+      if (actualizadas.count === 0) {
+        throw new ErrorValidacion("Esta reserva no se puede cancelar");
+      }
+
       await tx.entradaCultural.update({
         where: { id: reserva.entradaCulturalId },
         data: { vendidas: { decrement: reserva.cantidad } },
       });
-      return tx.reservaCultural.update({
+      return tx.reservaCultural.findUnique({
         where: { id: reserva.id },
-        data: { estado: "CANCELADA", updatedAt: new Date() },
+        include: { evento: { include: EVENTO_INCLUDE }, entrada: true },
       });
     });
   },
@@ -308,6 +356,63 @@ const CulturaService = {
   },
 
   // ── ADMIN ────────────────────────────────────────────────────
+  async cambiarEstadoReserva(comercioId, reservaId, nuevoEstado) {
+    const estadoNormalizado = normalizarEstadoReservaCultural(nuevoEstado);
+    if (!["CONFIRMADA", "RECHAZADA", "CANCELADA", "USADA"].includes(estadoNormalizado)) {
+      throw new ErrorValidacion("Estado invalido");
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const reserva = await tx.reservaCultural.findFirst({
+        where: {
+          id: enteroPositivoRequerido(reservaId, "reserva"),
+          evento: { comercioId },
+        },
+        include: {
+          cliente: { select: { id: true, nombre: true, telefono: true } },
+          entrada: true,
+          evento: { select: { id: true, titulo: true } },
+        },
+      });
+
+      if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
+
+      const permitidos = ESTADOS_RESERVA_CULTURA_TRANSICIONES[reserva.estado] ?? [];
+      if (!permitidos.includes(estadoNormalizado)) {
+        throw new ErrorValidacion(`No se puede pasar de ${reserva.estado} a ${estadoNormalizado}`);
+      }
+
+      const actualizadas = await tx.reservaCultural.updateMany({
+        where: {
+          id: reserva.id,
+          estado: reserva.estado,
+          eventoCulturalId: reserva.eventoCulturalId,
+        },
+        data: { estado: estadoNormalizado, updatedAt: new Date() },
+      });
+
+      if (actualizadas.count === 0) {
+        throw new ErrorValidacion("La reserva ya fue modificada");
+      }
+
+      if (estadoNormalizado === "CANCELADA") {
+        await tx.entradaCultural.update({
+          where: { id: reserva.entradaCulturalId },
+          data: { vendidas: { decrement: reserva.cantidad } },
+        });
+      }
+
+      return tx.reservaCultural.findUnique({
+        where: { id: reserva.id },
+        include: {
+          evento: { include: EVENTO_INCLUDE },
+          entrada: true,
+          cliente: { select: { id: true, nombre: true, telefono: true } },
+        },
+      });
+    });
+  },
+
   async adminListar() {
     return prisma.eventoCultural.findMany({
       include: {
@@ -342,6 +447,134 @@ const CulturaService = {
     });
     await notificarCambioEstadoSiAplica(evento, estado);
     return evento;
+  },
+
+  // ── COMPARTE TU CHOCÓ (publicaciones comunitarias) ───────────
+  // Cualquier usuario autenticado publica sin moderación previa; control
+  // solo reactivo vía denuncias (ver sección de denuncias más abajo).
+  async crearPublicacion(usuarioId, { titulo, descripcion, fotoUrls, videoUrl, departamento, municipio }) {
+    if (!titulo?.trim()) throw new ErrorValidacion("El título es obligatorio");
+    if (!departamento?.trim()) throw new ErrorValidacion("El departamento es obligatorio");
+    const fotos = Array.isArray(fotoUrls) ? fotoUrls.slice(0, 6) : [];
+    if (fotos.length === 0 && !videoUrl) {
+      throw new ErrorValidacion("Debes adjuntar al menos una foto o un video");
+    }
+    return CulturaRepository.crearPublicacion({
+      autorId: usuarioId,
+      titulo: titulo.trim(),
+      descripcion: descripcion?.trim() || null,
+      fotoUrls: fotos,
+      videoUrl: videoUrl || null,
+      departamento: departamento.trim(),
+      municipio: municipio?.trim() || null,
+    });
+  },
+
+  async listarPublicaciones(filtros = {}) {
+    const resultado = await CulturaRepository.listarPublicaciones(filtros);
+    return {
+      ...resultado,
+      items: resultado.items.map((p) => {
+        const { _count, likes, ...resto } = p;
+        return {
+          ...resto,
+          totalLikes: _count?.likes ?? 0,
+          meGusta: Array.isArray(likes) && likes.length > 0,
+        };
+      }),
+    };
+  },
+
+  // ── Denuncias de publicaciones ───────────────────────────────
+  async denunciarPublicacion(usuarioId, publicacionId, { motivo, descripcion }) {
+    if (!MOTIVOS_DENUNCIA_PUBLICACION.includes(motivo)) {
+      throw new ErrorValidacion(`Motivo inválido. Opciones: ${MOTIVOS_DENUNCIA_PUBLICACION.join(", ")}`);
+    }
+    const publicacion = await CulturaRepository.buscarPublicacionPorId(publicacionId);
+    if (!publicacion || !publicacion.activa) throw new ErrorNoEncontrado("Publicación no encontrada");
+    if (publicacion.autorId === usuarioId) throw new ErrorValidacion("No puedes denunciar tu propia publicación");
+    const existente = await CulturaRepository.buscarDenunciaPublicacion(publicacionId, usuarioId);
+    if (existente) throw new ErrorValidacion("Ya denunciaste esta publicación");
+    return CulturaRepository.crearDenunciaPublicacion({
+      publicacionCulturalId: publicacionId,
+      denuncianteId: usuarioId,
+      motivo,
+      descripcion: descripcion?.trim() || null,
+    });
+  },
+
+  async listarDenunciasPublicacionPendientes() {
+    return CulturaRepository.listarDenunciasPublicacionPendientes();
+  },
+
+  async resolverDenunciaPublicacion(adminId, denunciaId, { accion, motivo }) {
+    if (!["DESESTIMAR", "OCULTAR"].includes(accion)) throw new ErrorValidacion("Acción inválida");
+    const denuncia = await CulturaRepository.buscarDenunciaPublicacionPorId(denunciaId);
+    if (!denuncia) throw new ErrorNoEncontrado("Denuncia no encontrada");
+    if (denuncia.estado !== "PENDIENTE") throw new ErrorValidacion("Esta denuncia ya fue resuelta");
+
+    if (accion === "DESESTIMAR") {
+      return CulturaRepository.actualizarDenunciaPublicacion(denunciaId, {
+        estado: "DESESTIMADA",
+        revisadoPor: adminId,
+        revisadoAt: new Date(),
+        notaRevision: motivo?.trim() || null,
+      });
+    }
+
+    // OCULTAR
+    await CulturaRepository.ocultarPublicacion(denuncia.publicacionCulturalId);
+    return CulturaRepository.actualizarDenunciaPublicacion(denunciaId, {
+      estado: "PUBLICACION_OCULTADA",
+      revisadoPor: adminId,
+      revisadoAt: new Date(),
+      notaRevision: motivo?.trim() || null,
+    });
+  },
+
+  // ── LIKES DE PUBLICACIONES CULTURALES ────────────────────────
+
+  async toggleLikePublicacion(usuarioId, publicacionId) {
+    const existe = await prisma.likePublicacionCultural.findUnique({
+      where: { usuarioId_publicacionCulturalId: { usuarioId, publicacionCulturalId: publicacionId } },
+    });
+    if (existe) {
+      await prisma.likePublicacionCultural.delete({ where: { id: existe.id } });
+    } else {
+      await prisma.likePublicacionCultural.create({ data: { usuarioId, publicacionCulturalId: publicacionId } });
+    }
+    const totalLikes = await prisma.likePublicacionCultural.count({ where: { publicacionCulturalId: publicacionId } });
+    return { meGusta: !existe, totalLikes };
+  },
+
+  // ── FAVORITOS CULTURA ───────────────────────────────────────────
+
+  async toggleFavoritoCultura(usuarioId, eventoCulturalId) {
+    const existe = await prisma.favoritoCultura.findUnique({
+      where: { usuarioId_eventoCulturalId: { usuarioId, eventoCulturalId } },
+    });
+    if (existe) {
+      await prisma.favoritoCultura.delete({ where: { id: existe.id } });
+      return { esFavorito: false };
+    }
+    await prisma.favoritoCultura.create({ data: { usuarioId, eventoCulturalId } });
+    return { esFavorito: true };
+  },
+
+  async misFavoritosCultura(usuarioId) {
+    const favs = await prisma.favoritoCultura.findMany({
+      where: { usuarioId },
+      include: { evento: { include: EVENTO_INCLUDE } },
+      orderBy: { createdAt: "desc" },
+    });
+    return favs.map(f => f.evento);
+  },
+
+  async esFavoritoCultura(usuarioId, eventoCulturalId) {
+    const existe = await prisma.favoritoCultura.findUnique({
+      where: { usuarioId_eventoCulturalId: { usuarioId, eventoCulturalId } },
+    });
+    return { esFavorito: !!existe };
   },
 };
 

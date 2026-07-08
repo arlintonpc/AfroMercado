@@ -1206,6 +1206,102 @@ async function aplicarMigraciones() {
     END $$`,
     `ALTER TABLE "CampanaHero" ADD COLUMN IF NOT EXISTS "videoUrl" TEXT`,
     `ALTER TABLE "CampanaHero" ADD COLUMN IF NOT EXISTS "etiqueta" TEXT NOT NULL DEFAULT 'Patrocinado'`,
+    `ALTER TABLE "ReviewCultura" ADD COLUMN IF NOT EXISTS "fotoUrls" TEXT[] NOT NULL DEFAULT '{}'`,
+    `ALTER TABLE "ReviewCultura" ADD COLUMN IF NOT EXISTS "videoUrl" TEXT`,
+
+    // ── Comparte tu Chocó: publicaciones comunitarias + denuncias ──
+    `CREATE TABLE IF NOT EXISTS "PublicacionCultural" (
+      "id"           SERIAL PRIMARY KEY,
+      "autorId"      INTEGER NOT NULL,
+      "titulo"       TEXT NOT NULL,
+      "descripcion"  TEXT,
+      "fotoUrls"     TEXT[] NOT NULL DEFAULT '{}',
+      "videoUrl"     TEXT,
+      "departamento" TEXT NOT NULL,
+      "municipio"    TEXT,
+      "activa"       BOOLEAN NOT NULL DEFAULT true,
+      "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE INDEX IF NOT EXISTS "PublicacionCultural_activa_departamento_createdAt_idx" ON "PublicacionCultural"("activa", "departamento", "createdAt")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'PublicacionCultural_autorId_fkey') THEN
+        ALTER TABLE "PublicacionCultural" ADD CONSTRAINT "PublicacionCultural_autorId_fkey" FOREIGN KEY ("autorId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'MotivoDenunciaPublicacion') THEN
+        CREATE TYPE "MotivoDenunciaPublicacion" AS ENUM ('CONTENIDO_INAPROPIADO','SPAM','DERECHOS_DE_AUTOR','NO_RELACIONADO','OTRO');
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoDenunciaPublicacion') THEN
+        CREATE TYPE "EstadoDenunciaPublicacion" AS ENUM ('PENDIENTE','DESESTIMADA','PUBLICACION_OCULTADA');
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "DenunciaPublicacionCultural" (
+      "id"                    SERIAL PRIMARY KEY,
+      "publicacionCulturalId" INTEGER NOT NULL,
+      "denuncianteId"         INTEGER NOT NULL,
+      "motivo"                "MotivoDenunciaPublicacion" NOT NULL,
+      "descripcion"           TEXT,
+      "estado"                "EstadoDenunciaPublicacion" NOT NULL DEFAULT 'PENDIENTE',
+      "revisadoPor"           INTEGER,
+      "revisadoAt"            TIMESTAMP(3),
+      "notaRevision"          TEXT,
+      "createdAt"             TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "DenunciaPublicacionCultural_publicacionCulturalId_denuncian_key" ON "DenunciaPublicacionCultural"("publicacionCulturalId", "denuncianteId")`,
+    `CREATE INDEX IF NOT EXISTS "DenunciaPublicacionCultural_estado_createdAt_idx" ON "DenunciaPublicacionCultural"("estado", "createdAt")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'DenunciaPublicacionCultural_publicacionCulturalId_fkey') THEN
+        ALTER TABLE "DenunciaPublicacionCultural" ADD CONSTRAINT "DenunciaPublicacionCultural_publicacionCulturalId_fkey" FOREIGN KEY ("publicacionCulturalId") REFERENCES "PublicacionCultural"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'DenunciaPublicacionCultural_denuncianteId_fkey') THEN
+        ALTER TABLE "DenunciaPublicacionCultural" ADD CONSTRAINT "DenunciaPublicacionCultural_denuncianteId_fkey" FOREIGN KEY ("denuncianteId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+
+    // ── Favoritos de Cultura ──
+    `CREATE TABLE IF NOT EXISTS "FavoritoCultura" (
+      "id"               SERIAL PRIMARY KEY,
+      "usuarioId"        INTEGER NOT NULL,
+      "eventoCulturalId" INTEGER NOT NULL,
+      "createdAt"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "FavoritoCultura_usuarioId_eventoCulturalId_key" ON "FavoritoCultura"("usuarioId", "eventoCulturalId")`,
+    `CREATE INDEX IF NOT EXISTS "FavoritoCultura_usuarioId_idx" ON "FavoritoCultura"("usuarioId")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'FavoritoCultura_usuarioId_fkey') THEN
+        ALTER TABLE "FavoritoCultura" ADD CONSTRAINT "FavoritoCultura_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'FavoritoCultura_eventoCulturalId_fkey') THEN
+        ALTER TABLE "FavoritoCultura" ADD CONSTRAINT "FavoritoCultura_eventoCulturalId_fkey" FOREIGN KEY ("eventoCulturalId") REFERENCES "EventoCultural"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+
+    // ── Likes de publicaciones culturales ──
+    `CREATE TABLE IF NOT EXISTS "LikePublicacionCultural" (
+      "id"                    SERIAL PRIMARY KEY,
+      "usuarioId"             INTEGER NOT NULL,
+      "publicacionCulturalId" INTEGER NOT NULL,
+      "createdAt"             TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "LikePublicacionCultural_usuarioId_publicacionCulturalId_key" ON "LikePublicacionCultural"("usuarioId", "publicacionCulturalId")`,
+    `CREATE INDEX IF NOT EXISTS "LikePublicacionCultural_publicacionCulturalId_idx" ON "LikePublicacionCultural"("publicacionCulturalId")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'LikePublicacionCultural_usuarioId_fkey') THEN
+        ALTER TABLE "LikePublicacionCultural" ADD CONSTRAINT "LikePublicacionCultural_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'LikePublicacionCultural_publicacionCulturalId_fkey') THEN
+        ALTER TABLE "LikePublicacionCultural" ADD CONSTRAINT "LikePublicacionCultural_publicacionCulturalId_fkey" FOREIGN KEY ("publicacionCulturalId") REFERENCES "PublicacionCultural"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$`,
   ];
   for (const sql of migraciones) {
     try {

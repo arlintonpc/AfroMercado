@@ -1,13 +1,107 @@
+const path = require("path");
+const fs = require("fs");
+const multer = require("multer");
 const express = require("express");
-const { autenticar, autorizar } = require("../middlewares/auth");
+const { autenticar, autorizar, autenticarOpcional } = require("../middlewares/auth");
 const CulturaController = require("../controllers/cultura.controller");
 const ReviewController = require("../controllers/review.controller");
+const { subirACloudinary, subirVideoACloudinary } = require("../utils/cloudinary");
 
 const router = express.Router();
 
 const soloAuth     = [autenticar];
 const soloComercio = [autenticar, autorizar("COMERCIANTE")];
 const soloAdmin    = [autenticar, autorizar("ADMIN")];
+
+// ── Multer para fotos/video adjuntos a Cultura (reseñas y publicaciones) ──
+// Cualquier usuario autenticado puede adjuntar (no solo comerciantes),
+// mismo patrón que empleo.routes.js::uploadCv (sin autorizar por rol).
+// Factories reutilizables: mismo storage+fileFilter+límites que ya usaban
+// las reseñas, para no duplicar el multer al agregar publicaciones.
+function crearUploaderFoto(dirLocal, prefijoArchivo) {
+  fs.mkdirSync(dirLocal, { recursive: true });
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, dirLocal),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+      cb(null, `${prefijoArchivo}_${req.usuario.id}_${Date.now()}${ext}`);
+    },
+  });
+  return multer({
+    storage,
+    fileFilter: (req, file, cb) => cb(null, file.mimetype.startsWith("image/")),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  });
+}
+
+function crearUploaderVideo(dirLocal, prefijoArchivo) {
+  fs.mkdirSync(dirLocal, { recursive: true });
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, dirLocal),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || ".mp4";
+      cb(null, `${prefijoArchivo}_${req.usuario.id}_${Date.now()}${ext}`);
+    },
+  });
+  return multer({
+    storage,
+    fileFilter: (req, file, cb) => cb(null, file.mimetype.startsWith("video/")),
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB
+  });
+}
+
+function crearHandlerSubidaFoto(carpetaCloudinary, nombreCarpetaUrl) {
+  return async (req, res, next) => {
+    const filePath = req.file?.path;
+    try {
+      if (!req.file) return res.status(400).json({ ok: false, error: "No se recibió imagen" });
+      const secureUrl = await subirACloudinary(req.file.path, carpetaCloudinary);
+      if (secureUrl) {
+        fs.unlink(filePath, () => {});
+        return res.json({ ok: true, url: secureUrl });
+      }
+      const url = `${req.protocol}://${req.get("host")}/uploads/${nombreCarpetaUrl}/${req.file.filename}`;
+      res.json({ ok: true, url });
+    } catch (e) { next(e); }
+  };
+}
+
+function crearHandlerSubidaVideo(carpetaCloudinary, nombreCarpetaUrl) {
+  return async (req, res, next) => {
+    const filePath = req.file?.path;
+    try {
+      if (!req.file) return res.status(400).json({ ok: false, error: "No se recibió video" });
+      const resultado = await subirVideoACloudinary(req.file.path, carpetaCloudinary);
+      if (resultado) {
+        fs.unlink(filePath, () => {});
+        return res.json({ ok: true, url: resultado.optimizedUrl || resultado.secureUrl });
+      }
+      const url = `${req.protocol}://${req.get("host")}/uploads/${nombreCarpetaUrl}/${req.file.filename}`;
+      res.json({ ok: true, url });
+    } catch (e) { next(e); }
+  };
+}
+
+// Reseñas de Cultura (comportamiento idéntico al original, ahora vía factory)
+const DIR_REVIEWS_CULTURA = path.join(__dirname, "..", "..", "uploads", "reviews-cultura");
+const uploadFotoReviewCultura = crearUploaderFoto(DIR_REVIEWS_CULTURA, "review-cultura");
+const uploadVideoReviewCultura = crearUploaderVideo(DIR_REVIEWS_CULTURA, "review-cultura");
+const handlerSubidaFotoReviewCultura = crearHandlerSubidaFoto("afromercado/reviews-cultura", "reviews-cultura");
+const handlerSubidaVideoReviewCultura = crearHandlerSubidaVideo("afromercado/reviews-cultura", "reviews-cultura");
+
+// Publicaciones comunitarias ("Comparte tu Chocó")
+const DIR_PUBLICACIONES_CULTURA = path.join(__dirname, "..", "..", "uploads", "publicaciones-cultura");
+const uploadFotoPublicacion = crearUploaderFoto(DIR_PUBLICACIONES_CULTURA, "publicacion-cultura");
+const uploadVideoPublicacion = crearUploaderVideo(DIR_PUBLICACIONES_CULTURA, "publicacion-cultura");
+const handlerSubidaFotoPublicacion = crearHandlerSubidaFoto("afromercado/publicaciones-cultura", "publicaciones-cultura");
+const handlerSubidaVideoPublicacion = crearHandlerSubidaVideo("afromercado/publicaciones-cultura", "publicaciones-cultura");
+
+// Media de eventos (organizador): portada, galería de fotos y video del evento
+const DIR_EVENTOS_CULTURA = path.join(__dirname, "..", "..", "uploads", "eventos-cultura");
+const uploadFotoEvento = crearUploaderFoto(DIR_EVENTOS_CULTURA, "evento-cultura");
+const uploadVideoEvento = crearUploaderVideo(DIR_EVENTOS_CULTURA, "evento-cultura");
+const handlerSubidaFotoEvento = crearHandlerSubidaFoto("afromercado/eventos-cultura", "eventos-cultura");
+const handlerSubidaVideoEvento = crearHandlerSubidaVideo("afromercado/eventos-cultura", "eventos-cultura");
 
 // ── PÚBLICO ──────────────────────────────────────────────────
 router.get("/", CulturaController.listarAgenda);
@@ -16,7 +110,10 @@ router.get("/", CulturaController.listarAgenda);
 router.get(   "/mis-eventos",              ...soloComercio, CulturaController.misEventos);
 router.post(  "/mis-eventos",              ...soloComercio, CulturaController.crearEvento);
 router.get(   "/mis-eventos/reservas",     ...soloComercio, CulturaController.reservasOrganizador);
+router.patch( "/mis-eventos/reservas/:id/estado", ...soloComercio, CulturaController.cambiarEstadoReserva);
 router.patch( "/mis-eventos/:id",          ...soloComercio, CulturaController.actualizarEvento);
+router.post(  "/mis-eventos/foto",         ...soloComercio, uploadFotoEvento.single("foto"),   handlerSubidaFotoEvento);
+router.post(  "/mis-eventos/video",        ...soloComercio, uploadVideoEvento.single("video"), handlerSubidaVideoEvento);
 router.post(  "/mis-eventos/:id/entradas", ...soloComercio, CulturaController.crearEntrada);
 router.patch( "/entradas/:id",             ...soloComercio, CulturaController.actualizarEntrada);
 router.delete("/entradas/:id",             ...soloComercio, CulturaController.eliminarEntrada);
@@ -27,13 +124,42 @@ router.get(  "/reservas/mis",          ...soloAuth, CulturaController.misReserva
 router.patch("/reservas/:id/cancelar", ...soloAuth, CulturaController.cancelarReserva);
 router.post( "/reservas/:id/review",   ...soloAuth, ReviewController.crearReviewCultura);
 
+// ── RESEÑAS: adjuntos de foto/video (cualquier usuario autenticado) ──
+router.post("/reviews/foto",  ...soloAuth, uploadFotoReviewCultura.single("foto"),   handlerSubidaFotoReviewCultura);
+router.post("/reviews/video", ...soloAuth, uploadVideoReviewCultura.single("video"), handlerSubidaVideoReviewCultura);
+
+// Galería pública — antes de "/:id" para evitar ambigüedad de rutas
+router.get("/galeria", ReviewController.galeriaCultura);
+
+// ── COMPARTE TU CHOCÓ (publicaciones comunitarias, sin moderación previa) ──
+// Cualquier usuario autenticado publica; control solo reactivo vía denuncias.
+router.post("/publicaciones",               ...soloAuth, CulturaController.crearPublicacion);
+router.get(  "/publicaciones",                            autenticarOpcional, CulturaController.listarPublicaciones);
+router.post("/publicaciones/foto",          ...soloAuth, uploadFotoPublicacion.single("foto"),   handlerSubidaFotoPublicacion);
+router.post("/publicaciones/video",         ...soloAuth, uploadVideoPublicacion.single("video"), handlerSubidaVideoPublicacion);
+router.post("/publicaciones/:id/denunciar", ...soloAuth, CulturaController.denunciarPublicacion);
+router.post("/publicaciones/:id/like/toggle", ...soloAuth, CulturaController.toggleLikePublicacion);
+
 // ── ADMIN ─────────────────────────────────────────────────────
 router.get(  "/admin/todos",      ...soloAdmin, CulturaController.adminListar);
 router.post( "/admin/eventos",    ...soloAdmin, CulturaController.adminCrearEvento);
 router.patch("/admin/:id/estado", ...soloAdmin, CulturaController.adminCambiarEstado);
 
+// Nota de diseño: dado el mount point router.use("/cultura", ...) en
+// routes/index.js, las rutas admin de publicaciones se declaran aquí como
+// "/admin/publicaciones/..." (no "/admin/cultura/publicaciones/...") para
+// que el path HTTP final sea /cultura/admin/publicaciones/denuncias y no
+// un duplicado /cultura/admin/cultura/publicaciones/denuncias.
+router.get(  "/admin/publicaciones/denuncias",              ...soloAdmin, CulturaController.listarDenunciasPublicacionPendientes);
+router.patch("/admin/publicaciones/denuncias/:id/resolver", ...soloAdmin, CulturaController.resolverDenunciaPublicacion);
+
 // ── PÚBLICO (reviews) ─────────────────────────────────────────
 router.get("/:id/reviews", ReviewController.reviewsCultura);
+
+// Favoritos — antes de "/:id" para evitar ambigüedad de rutas
+router.get(  "/favoritos/mis",        ...soloAuth, CulturaController.misFavoritos);
+router.post( "/favoritos/:id/toggle", ...soloAuth, CulturaController.toggleFavorito);
+router.get(  "/favoritos/:id",        ...soloAuth, CulturaController.esFavorito);
 
 // Detalle público del evento — al final para no capturar rutas específicas
 router.get("/:id", CulturaController.obtener);

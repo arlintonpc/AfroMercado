@@ -7,6 +7,12 @@
       "runtimeArgs": ["--prefix", "afromercado-web", "run", "dev"],
       "port": 3002,
       "autoPort": true
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "afromercado", "run", "dev"],
+      "port": 3001
     }
   ]
 }

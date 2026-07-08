@@ -183,10 +183,17 @@ function TarjetaParada({ lugar, numero, onOpenFotos }: {
 
   return (
     <div className="group">
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setAbierto(v => !v)}
-        className="w-full text-left"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setAbierto(v => !v)
+          }
+        }}
+        className="w-full text-left cursor-pointer"
       >
         <div className="flex gap-4 items-start">
           {/* Número + línea vertical */}
@@ -252,7 +259,7 @@ function TarjetaParada({ lugar, numero, onOpenFotos }: {
                 {fotos.length > 0 && (
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {fotos.slice(0, 8).map((foto, idx) => (
-                      <button key={foto.id} type="button" onClick={() => onOpenFotos(fotos.map(f => f.url), idx)}
+                      <button key={foto.id} type="button" onClick={(e) => { e.stopPropagation(); onOpenFotos(fotos.map(f => f.url), idx) }}
                         className="aspect-square rounded-xl overflow-hidden bg-gray-100">
                         <img src={foto.url} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" loading="lazy" />
                       </button>
@@ -282,7 +289,7 @@ function TarjetaParada({ lugar, numero, onOpenFotos }: {
             )}
           </div>
         </div>
-      </button>
+      </div>
     </div>
   )
 }

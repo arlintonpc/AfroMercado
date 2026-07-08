@@ -4,8 +4,11 @@ const CulturaController = {
   // ── Público ──
   async listarAgenda(req, res, next) {
     try {
-      const { departamento, municipio, categoria } = req.query;
-      res.json({ ok: true, data: await CulturaService.listarAgenda({ departamento, municipio, categoria }) });
+      const { departamento, municipio, categoria, search, patrimonio, fechaDesde, fechaHasta } = req.query;
+      res.json({
+        ok: true,
+        data: await CulturaService.listarAgenda({ departamento, municipio, categoria, search, patrimonio, fechaDesde, fechaHasta }),
+      });
     } catch (e) { next(e); }
   },
 
@@ -36,6 +39,17 @@ const CulturaController = {
   },
 
   // ── Organizador (comercio) ──
+  async cambiarEstadoReserva(req, res, next) {
+    try {
+      const data = await CulturaService.cambiarEstadoReserva(
+        req.usuario.comercio.id,
+        Number(req.params.id),
+        req.body.estado
+      );
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
   async misEventos(req, res, next) {
     try {
       res.json({ ok: true, data: await CulturaService.misEventos(req.usuario.comercio.id) });
@@ -99,6 +113,68 @@ const CulturaController = {
     try {
       res.json({ ok: true, data: await CulturaService.adminCambiarEstado(Number(req.params.id), req.body.estado) });
     } catch (e) { next(e); }
+  },
+
+  // ── Comparte tu Chocó (publicaciones comunitarias) ──
+  async crearPublicacion(req, res, next) {
+    try {
+      res.status(201).json({ ok: true, data: await CulturaService.crearPublicacion(req.usuario.id, req.body) });
+    } catch (e) { next(e); }
+  },
+
+  async listarPublicaciones(req, res, next) {
+    try {
+      const { departamento, page } = req.query;
+      res.json({ ok: true, data: await CulturaService.listarPublicaciones({ departamento, page, usuarioId: req.usuario?.id }) });
+    } catch (e) { next(e); }
+  },
+
+  async denunciarPublicacion(req, res, next) {
+    try {
+      res.status(201).json({ ok: true, data: await CulturaService.denunciarPublicacion(req.usuario.id, Number(req.params.id), req.body) });
+    } catch (e) { next(e); }
+  },
+
+  async listarDenunciasPublicacionPendientes(req, res, next) {
+    try {
+      res.json({ ok: true, data: await CulturaService.listarDenunciasPublicacionPendientes() });
+    } catch (e) { next(e); }
+  },
+
+  async resolverDenunciaPublicacion(req, res, next) {
+    try {
+      res.json({ ok: true, data: await CulturaService.resolverDenunciaPublicacion(req.usuario.id, Number(req.params.id), req.body) });
+    } catch (e) { next(e); }
+  },
+
+  // ── Likes de publicaciones culturales ──
+  async toggleLikePublicacion(req, res, next) {
+    try {
+      const data = await CulturaService.toggleLikePublicacion(req.usuario.id, Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  // ── Favoritos Cultura ──
+  async toggleFavorito(req, res, next) {
+    try {
+      const data = await CulturaService.toggleFavoritoCultura(req.usuario.id, Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async misFavoritos(req, res, next) {
+    try {
+      const data = await CulturaService.misFavoritosCultura(req.usuario.id);
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async esFavorito(req, res, next) {
+    try {
+      const data = await CulturaService.esFavoritoCultura(req.usuario.id, Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
   },
 };
 

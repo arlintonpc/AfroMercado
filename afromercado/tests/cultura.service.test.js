@@ -13,9 +13,66 @@ const NotificacionService = require("../src/services/notificacion.service");
 let mockEntrada = null;
 let mockFilasActualizadas = 1; // lo que retorna el UPDATE ... WHERE cupo/vendidas de $executeRaw
 let reservaCreadaData = null;
+let reservasDB = [];
+let entradasDB = [];
+
+function reiniciarDB() {
+  reservasDB = [];
+  entradasDB = [];
+}
+
+function crearReservaDB({
+  id = 1,
+  estado = "PENDIENTE",
+  cantidad = 2,
+  eventoCulturalId = 10,
+  entradaCulturalId = 1,
+  clienteId = "cliente-1",
+  comercioId = "comercio-1",
+  codigo = `RC-${id}`,
+  nombreContacto = "María López",
+  telefonoContacto = "3009876543",
+} = {}) {
+  const reserva = {
+    id,
+    codigo,
+    eventoCulturalId,
+    entradaCulturalId,
+    clienteId,
+    cantidad,
+    total: cantidad * 10000,
+    comision: 1000,
+    tasaComision: 0.1,
+    estado,
+    metodoPago: "EFECTIVO",
+    notasCliente: null,
+    nombreContacto,
+    telefonoContacto,
+    updatedAt: null,
+    creadoAt: new Date("2026-01-01T00:00:00.000Z"),
+    evento: { comercioId, titulo: "Festival de Currulao", id: eventoCulturalId },
+    entrada: { id: entradaCulturalId, nombre: "Entrada general" },
+    cliente: { id: clienteId, nombre: "Cliente Test", telefono: "3000000000", email: "cliente@test.com" },
+  };
+  reservasDB.push(reserva);
+  return reserva;
+}
 
 prisma.entradaCultural = {
   findUnique: async () => mockEntrada,
+  update: async ({ where, data }) => {
+    const entrada = entradasDB.find((e) => e.id === where.id);
+    if (!entrada) return null;
+    if (data.vendidas && typeof data.vendidas.decrement === "number") {
+      entrada.vendidas -= data.vendidas.decrement;
+    }
+    Object.assign(entrada, Object.fromEntries(Object.entries(data).filter(([, v]) => !v || typeof v !== "object" || !("decrement" in v))));
+    return { ...entrada };
+  },
+  delete: async ({ where }) => {
+    entradasDB = entradasDB.filter((e) => e.id !== where.id);
+    return { ok: true };
+  },
 };
 
 // crearReserva() usa prisma.$transaction(async (tx) => {...}) y dentro de tx
@@ -32,6 +89,37 @@ prisma.reservaCultural = {
   create: async (args) => {
     reservaCreadaData = args.data;
     return { id: "reserva-cultural-nueva", ...args.data };
+  },
+  findFirst: async ({ where }) => {
+    return reservasDB.find((r) => {
+      if (where.id !== undefined && r.id !== where.id) return false;
+      if (where.clienteId !== undefined && r.clienteId !== where.clienteId) return false;
+      if (where.evento?.comercioId !== undefined && r.evento?.comercioId !== where.evento.comercioId) return false;
+      return true;
+    }) || null;
+  },
+  findUnique: async ({ where }) => {
+    return reservasDB.find((r) => r.id === where.id) || null;
+  },
+  findMany: async () => reservasDB.map((r) => ({ ...r })),
+  updateMany: async ({ where, data }) => {
+    let count = 0;
+    for (const reserva of reservasDB) {
+      if (where.id !== undefined && reserva.id !== where.id) continue;
+      if (where.clienteId !== undefined && reserva.clienteId !== where.clienteId) continue;
+      if (where.estado?.in && !where.estado.in.includes(reserva.estado)) continue;
+      if (where.estado !== undefined && !where.estado?.in && reserva.estado !== where.estado) continue;
+      if (where.eventoCulturalId !== undefined && reserva.eventoCulturalId !== where.eventoCulturalId) continue;
+      Object.assign(reserva, data);
+      count++;
+    }
+    return { count };
+  },
+  update: async ({ where, data }) => {
+    const reserva = reservasDB.find((r) => r.id === where.id);
+    if (!reserva) return null;
+    Object.assign(reserva, data);
+    return { ...reserva };
   },
 };
 

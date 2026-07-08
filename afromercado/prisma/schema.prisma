@@ -226,6 +226,7 @@ model Usuario {
   cuponesExpressUsos        CuponExpressUso[]
   favoritosTour             FavoritoTour[]
   favoritosTransporte       FavoritoTransporte[]
+  favoritosCultura          FavoritoCultura[]
   cuponesTourUsos           CuponTourUso[]
   cuponesTransporteUsos     CuponTransporteUso[]
   disputasComoComprador     Disputa[]           @relation("DisputasComprador")
@@ -240,6 +241,9 @@ model Usuario {
   postulacionesEmpleoEnviadas PostulacionEmpleo[]    @relation("PostulacionesEmpleoEnviadas")
   favoritosOfertaEmpleo     FavoritoOfertaEmpleo[]
   denunciasEmpleoHechas     DenunciaOfertaEmpleo[]
+  publicacionesCulturales            PublicacionCultural[]
+  denunciasPublicacionCulturalHechas DenunciaPublicacionCultural[]
+  likesPublicacionesCultura          LikePublicacionCultural[]
 }
 
 model Comercio {
@@ -2299,6 +2303,8 @@ model ReviewCultura {
   reservaCulturalId Int      @unique
   calificacion      Int
   comentario        String?
+  fotoUrls          String[] @default([])
+  videoUrl          String?
   creadoAt          DateTime @default(now())
 
   evento         EventoCultural   @relation(fields: [eventoCulturalId],  references: [id], onDelete: Cascade)
@@ -2583,10 +2589,24 @@ model EventoCultural {
   entradas EntradaCultural[]
   reservas ReservaCultural[]
   reviews  ReviewCultura[]
+  favoritos FavoritoCultura[]
 
   @@index([estado, fechaInicio])
   @@index([departamento, municipio])
   @@index([comercioId])
+}
+
+model FavoritoCultura {
+  id               Int      @id @default(autoincrement())
+  usuarioId        Int
+  eventoCulturalId Int
+  createdAt        DateTime @default(now())
+
+  usuario Usuario        @relation(fields: [usuarioId],        references: [id])
+  evento  EventoCultural @relation(fields: [eventoCulturalId], references: [id])
+
+  @@unique([usuarioId, eventoCulturalId])
+  @@index([usuarioId])
 }
 
 model EntradaCultural {
@@ -2633,6 +2653,76 @@ model ReservaCultural {
 
   @@index([eventoCulturalId, estado])
   @@index([clienteId])
+}
+
+// ─── COMPARTE TU CHOCÓ (publicaciones comunitarias) ───────────
+// Cualquier usuario autenticado publica foto(s)/video de un sitio turístico
+// o historia cultural sin moderación previa. Control reactivo: cualquiera
+// puede denunciar; un admin desestima la denuncia u oculta la publicación
+// (no hay bloqueo de cuenta en este flujo).
+model PublicacionCultural {
+  id           Int      @id @default(autoincrement())
+  autorId      Int
+  titulo       String
+  descripcion  String?
+  fotoUrls     String[] @default([])
+  videoUrl     String?
+  departamento String
+  municipio    String?
+  activa       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  autor     Usuario                       @relation(fields: [autorId], references: [id])
+  denuncias DenunciaPublicacionCultural[]
+  likes     LikePublicacionCultural[]
+
+  @@index([activa, departamento, createdAt])
+}
+
+model LikePublicacionCultural {
+  id                     Int      @id @default(autoincrement())
+  usuarioId              Int
+  publicacionCulturalId  Int
+  createdAt              DateTime @default(now())
+
+  usuario     Usuario             @relation(fields: [usuarioId], references: [id])
+  publicacion PublicacionCultural @relation(fields: [publicacionCulturalId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, publicacionCulturalId])
+  @@index([publicacionCulturalId])
+}
+
+enum MotivoDenunciaPublicacion {
+  CONTENIDO_INAPROPIADO
+  SPAM
+  DERECHOS_DE_AUTOR
+  NO_RELACIONADO
+  OTRO
+}
+
+enum EstadoDenunciaPublicacion {
+  PENDIENTE
+  DESESTIMADA
+  PUBLICACION_OCULTADA
+}
+
+model DenunciaPublicacionCultural {
+  id                    Int                       @id @default(autoincrement())
+  publicacionCulturalId Int
+  denuncianteId         Int
+  motivo                MotivoDenunciaPublicacion
+  descripcion           String?
+  estado                EstadoDenunciaPublicacion @default(PENDIENTE)
+  revisadoPor           Int?
+  revisadoAt            DateTime?
+  notaRevision          String?
+  createdAt             DateTime                  @default(now())
+
+  publicacion PublicacionCultural @relation(fields: [publicacionCulturalId], references: [id], onDelete: Cascade)
+  denunciante Usuario             @relation(fields: [denuncianteId], references: [id])
+
+  @@unique([publicacionCulturalId, denuncianteId])
+  @@index([estado, createdAt])
 }
 
 // ─── ALIANZAS COMERCIALES ─────────────────────────────────────

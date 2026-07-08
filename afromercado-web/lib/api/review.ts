@@ -103,19 +103,76 @@ export interface ReviewCultura {
   reservaCulturalId: number
   calificacion: number
   comentario?: string | null
+  fotoUrls: string[]
+  videoUrl?: string | null
   creadoAt: string
   cliente?: { nombre: string; avatarUrl?: string | null }
 }
 
-export async function reviewsCultura(eventoCulturalId: number): Promise<ReviewCultura[]> {
-  const r = await apiFetch<{ ok: boolean; data: ReviewCultura[] }>(`/cultura/${eventoCulturalId}/reviews`)
-  return r.data
+function normalizarReviewCultura(review: ReviewCultura): ReviewCultura {
+  return {
+    ...review,
+    comentario: review.comentario ?? null,
+    fotoUrls: Array.isArray(review.fotoUrls) ? review.fotoUrls : [],
+    videoUrl: review.videoUrl ?? null,
+    cliente: review.cliente ?? undefined,
+  }
 }
 
-export async function crearReviewCultura(reservaCulturalId: number, calificacion: number, comentario?: string): Promise<ReviewCultura> {
+export async function reviewsCultura(eventoCulturalId: number): Promise<ReviewCultura[]> {
+  const r = await apiFetch<{ ok: boolean; data: ReviewCultura[] }>(`/cultura/${eventoCulturalId}/reviews`)
+  return Array.isArray(r.data) ? r.data.map(normalizarReviewCultura) : []
+}
+
+export async function crearReviewCultura(
+  reservaCulturalId: number,
+  calificacion: number,
+  comentario?: string,
+  adjuntos?: { fotoUrls?: string[]; videoUrl?: string | null },
+): Promise<ReviewCultura> {
   const r = await apiFetch<{ ok: boolean; data: ReviewCultura }>(`/cultura/reservas/${reservaCulturalId}/review`, {
     method: 'POST',
-    body: { reservaCulturalId, calificacion, comentario },
+    body: {
+      reservaCulturalId,
+      calificacion,
+      comentario,
+      fotoUrls: adjuntos?.fotoUrls,
+      videoUrl: adjuntos?.videoUrl,
+    },
   })
-  return r.data
+  return normalizarReviewCultura(r.data)
+}
+
+export async function subirFotoReviewCultura(file: File): Promise<string> {
+  const fd = new FormData()
+  fd.append('foto', file)
+  const r = await apiFetch<{ ok: boolean; url: string }>('/cultura/reviews/foto', { method: 'POST', body: fd })
+  return r.url
+}
+
+export async function subirVideoReviewCultura(file: File): Promise<string> {
+  const fd = new FormData()
+  fd.append('video', file)
+  const r = await apiFetch<{ ok: boolean; url: string }>('/cultura/reviews/video', { method: 'POST', body: fd })
+  return r.url
+}
+
+export interface ReviewGaleria extends ReviewCultura {
+  evento: { id: number; titulo: string; municipio: string; departamento: string }
+}
+
+export async function galeriaCultura(page = 1, departamento?: string): Promise<{ items: ReviewGaleria[]; total: number; pagina: number }> {
+  const params = new URLSearchParams()
+  params.set('page', String(page))
+  if (departamento) params.set('departamento', departamento)
+  const r = await apiFetch<{ ok: boolean; data: { items: ReviewGaleria[]; total: number; pagina: number } }>(`/cultura/galeria?${params.toString()}`)
+  return {
+    ...r.data,
+    items: Array.isArray(r.data.items)
+      ? r.data.items.map((item) => ({
+          ...normalizarReviewCultura(item),
+          evento: item.evento,
+        }))
+      : [],
+  }
 }

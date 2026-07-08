@@ -46,6 +46,14 @@ const ReviewController = {
     } catch (e) { next(e); }
   },
 
+  async galeriaCultura(req, res, next) {
+    try {
+      const { page, departamento } = req.query;
+      const data = await ReviewService.galeriaCultura({ page, departamento });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
   // ── TRANSPORTE ──────────────────────────────────────────────
   async crearReviewTransporte(req, res, next) {
     try {

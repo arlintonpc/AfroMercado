@@ -127,7 +127,7 @@ const ReviewService = {
   },
 
   // ── CULTURA ─────────────────────────────────────────────────
-  async crearReviewCultura(clienteId, { reservaCulturalId, calificacion, comentario }) {
+  async crearReviewCultura(clienteId, { reservaCulturalId, calificacion, comentario, fotoUrls, videoUrl }) {
     const reserva = await prisma.reservaCultural.findFirst({
       where: { id: reservaCulturalId, clienteId, estado: "USADA" },
     });
@@ -137,7 +137,15 @@ const ReviewService = {
     if (existente) throw new ErrorValidacion("Ya dejaste una reseña para esta reserva");
 
     return prisma.reviewCultura.create({
-      data: { eventoCulturalId: reserva.eventoCulturalId, clienteId, reservaCulturalId, calificacion, comentario: comentario || null },
+      data: {
+        eventoCulturalId: reserva.eventoCulturalId,
+        clienteId,
+        reservaCulturalId,
+        calificacion,
+        comentario: comentario || null,
+        fotoUrls: Array.isArray(fotoUrls) ? fotoUrls.slice(0, 6) : [],
+        videoUrl: videoUrl || null,
+      },
       include: { cliente: { select: { nombre: true, avatarUrl: true } } },
     });
   },
@@ -149,6 +157,29 @@ const ReviewService = {
       orderBy: { creadoAt: "desc" },
       take: 50,
     });
+  },
+
+  async galeriaCultura({ page = 1, departamento } = {}) {
+    const take = 20;
+    const where = {
+      OR: [{ fotoUrls: { isEmpty: false } }, { videoUrl: { not: null } }],
+      ...(departamento ? { evento: { departamento } } : {}),
+    };
+    const skip = (Math.max(1, Number(page)) - 1) * take;
+    const [items, total] = await Promise.all([
+      prisma.reviewCultura.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { creadoAt: "desc" },
+        include: {
+          cliente: { select: { nombre: true } },
+          evento: { select: { id: true, titulo: true, municipio: true, departamento: true } },
+        },
+      }),
+      prisma.reviewCultura.count({ where }),
+    ]);
+    return { items, total, pagina: Math.max(1, Number(page)) };
   },
 };
 
