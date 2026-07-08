@@ -8,6 +8,8 @@ const crypto = require("crypto");
 const EmpleoRepository = require("../repositories/empleo.repository");
 const UsuarioRepository = require("../repositories/usuario.repository");
 const UsuarioService = require("./usuario.service");
+const ComercioRepository = require("../repositories/comercio.repository");
+const Reglas = require("../config/reglas");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
 
@@ -88,9 +90,17 @@ const EmpleoService = {
   // ── Ofertas ──────────────────────────────────────────────────
   async crearOferta(usuarioId, datos) {
     validarDatosOferta(datos);
+
+    // El publicador puede tener su propio comercio (comerciante) — si lo tiene, la
+    // oferta queda vinculada automáticamente (antes no se vinculaba nunca, porque el
+    // formulario no envía comercioId). Un comercio ya verificado (mismo KYC que el
+    // resto de la plataforma) puede saltarse la moderación previa si la regla lo permite.
+    const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
+    const autoAprobar = !!comercio?.verificado && (await Reglas.bool("empleo_auto_aprobar_comercio_verificado"));
+
     return EmpleoRepository.crearOferta({
       publicadoPorId: usuarioId,
-      comercioId: datos.comercioId ? Number(datos.comercioId) : null,
+      comercioId: comercio ? comercio.id : null,
       titulo: datos.titulo.trim(),
       descripcion: datos.descripcion.trim(),
       categoria: datos.categoria?.trim() || null,
@@ -106,6 +116,7 @@ const EmpleoService = {
       fechaCierre: datos.fechaCierre ? new Date(datos.fechaCierre) : null,
       imagenUrl: datos.imagenUrl?.trim() || null,
       preguntas: normalizarPreguntas(datos.preguntas),
+      ...(autoAprobar ? { estadoModeracion: "APROBADA" } : {}),
     });
   },
 

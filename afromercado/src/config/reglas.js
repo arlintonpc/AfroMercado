@@ -111,6 +111,15 @@ const DEFAULTS = {
     desc: "Si es 'fijo': monto en $ por cada entrega. Si es 'porcentaje del envío': el % a pagar (ej. 70).",
   },
 
+  // ── Empleo ────────────────────────────────────────────────
+  empleo_auto_aprobar_comercio_verificado: {
+    valor: "true",
+    tipo: "bool",
+    grupo: "Empleo",
+    etiqueta: "Auto-aprobar ofertas de comercios verificados",
+    desc: "Si está activo, las ofertas de empleo publicadas por un comercio ya verificado se publican de inmediato, sin pasar por moderación. Las publicadas por usuarios sin comercio o con comercio no verificado siempre requieren aprobación del admin.",
+  },
+
   // ── General ───────────────────────────────────────────────
   whatsapp_boton_activo: {
     valor: "false",
