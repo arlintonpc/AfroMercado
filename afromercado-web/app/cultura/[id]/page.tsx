@@ -18,6 +18,7 @@ import { listarAlianzasPorRegion, type AlianzaResumen } from '@/lib/api/alianzas
 import SeccionReviewsCultura from '@/components/cultura/SeccionReviewsCultura'
 import BotonFavoritoCultura from '@/components/cultura/BotonFavoritoCultura'
 import ModalGaleriaHistoria from '@/components/cultura/ModalGaleriaHistoria'
+import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 import {
   CulturaCard,
   CulturaHero,
@@ -29,6 +30,13 @@ import {
 } from '@/components/cultura/CulturaUI'
 
 const MapaCultura = dynamic(() => import('@/components/cultura/MapaCultura'), { ssr: false })
+
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+function fechaCortaSinDe(iso: string): string {
+  const f = new Date(iso)
+  return `${f.getDate()} ${MESES_CORTOS[f.getMonth()]}`
+}
 
 function rangoFechas(inicio: string, fin?: string | null): string {
   const opt: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' }
@@ -279,8 +287,8 @@ export default function EventoCulturalPage() {
             </div>
           }
           badge={
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <CulturaStat label="Inicio" value={new Date(evento.fechaInicio).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })} />
+            <div className="grid grid-cols-2 gap-2">
+              <CulturaStat label="Inicio" value={fechaCortaSinDe(evento.fechaInicio)} />
               <CulturaStat label="Entradas" value={String(entradas.length)} accent="green" />
               <CulturaStat label="Desde" value={desde == null ? 'Libre' : desde === 0 ? 'Gratis' : `$${desde.toLocaleString('es-CO')}`} accent="gold" />
               <CulturaStat label="Fotos" value={String(fotosEvento.length)} />
@@ -327,13 +335,8 @@ export default function EventoCulturalPage() {
             )}
 
             {evento.videoUrl && (
-              <CulturaCard className="overflow-hidden">
-                <video
-                  src={evento.videoUrl}
-                  poster={evento.portadaUrl ?? undefined}
-                  controls
-                  className="aspect-video w-full bg-[#10251C] object-cover"
-                />
+              <CulturaCard className="overflow-hidden p-4">
+                <ReproductorVideo url={evento.videoUrl} />
               </CulturaCard>
             )}
 

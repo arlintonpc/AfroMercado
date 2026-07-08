@@ -162,9 +162,9 @@ export function CulturaStat({
         : 'border-[#1A1A1A]/8 bg-white text-[#1A1A1A]'
 
   return (
-    <div className={`rounded-2xl border p-4 shadow-sm ${accentClass}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] opacity-65">{label}</p>
-      <p className="mt-2 font-serif text-2xl leading-none">{value}</p>
+    <div className={`min-w-0 rounded-2xl border p-4 shadow-sm ${accentClass}`}>
+      <p className="truncate text-[11px] font-semibold uppercase tracking-[0.2em] opacity-65">{label}</p>
+      <p className="mt-2 truncate font-serif text-2xl leading-tight" title={value}>{value}</p>
     </div>
   )
 }
