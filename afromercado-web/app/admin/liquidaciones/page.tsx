@@ -6,6 +6,7 @@ import { formatearPrecio } from '@/lib/formatearPrecio'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -219,6 +220,7 @@ export default function AdminLiquidacionesPage() {
   const [mostrarModal, setMostrarModal] = useState(false)
   const [procesandoId, setProcesandoId] = useState<number | null>(null)
   const [aviso, setAviso] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null)
+  const [liquidacionACancelar, setLiquidacionACancelar] = useState<number | null>(null)
 
   const cargarResumen = useCallback(async () => {
     setCargandoResumen(true)
@@ -282,8 +284,13 @@ export default function AdminLiquidacionesPage() {
     }
   }
 
-  async function cancelarLiquidacion(id: number) {
-    if (!window.confirm('¿Cancelar esta liquidación pendiente? El saldo volverá a estar disponible.')) return
+  function cancelarLiquidacion(id: number) {
+    setLiquidacionACancelar(id)
+  }
+
+  async function confirmarCancelarLiquidacion() {
+    if (liquidacionACancelar == null) return
+    const id = liquidacionACancelar
     setProcesandoId(id)
     try {
       await apiFetch(`/liquidaciones/admin/liquidaciones/${id}/cancelar`, {
@@ -298,6 +305,7 @@ export default function AdminLiquidacionesPage() {
       })
     } finally {
       setProcesandoId(null)
+      setLiquidacionACancelar(null)
     }
   }
 
@@ -522,6 +530,16 @@ export default function AdminLiquidacionesPage() {
             void Promise.all([cargarResumen(), cargarTabla()])
           }}
           onCerrar={() => setMostrarModal(false)}
+        />
+      )}
+
+      {liquidacionACancelar != null && (
+        <ModalConfirmacion
+          titulo="Cancelar liquidación"
+          mensaje="¿Cancelar esta liquidación pendiente? El saldo volverá a estar disponible."
+          onCancelar={() => setLiquidacionACancelar(null)}
+          onConfirmar={() => void confirmarCancelarLiquidacion()}
+          confirmando={procesandoId === liquidacionACancelar}
         />
       )}
     </div>

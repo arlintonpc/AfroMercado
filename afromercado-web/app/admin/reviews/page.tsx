@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { apiFetch } from '@/lib/api/client'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 interface ReviewBase {
   id: number
@@ -35,6 +36,7 @@ export default function AdminReviewsPage() {
   const [pagina, setPagina]     = useState(1)
   const [cargando, setCargando] = useState(true)
   const [eliminandoId, setEliminandoId] = useState<number | null>(null)
+  const [reviewAEliminar, setReviewAEliminar] = useState<number | null>(null)
   const LIMITE = 30
 
   const cargar = useCallback(async (p = pagina, t = tipo) => {
@@ -62,8 +64,13 @@ export default function AdminReviewsPage() {
     cargar(p, tipo)
   }
 
-  async function eliminar(id: number) {
-    if (!window.confirm('¿Eliminar esta calificacion? Esta accion no se puede deshacer.')) return
+  function eliminar(id: number) {
+    setReviewAEliminar(id)
+  }
+
+  async function confirmarEliminar() {
+    if (reviewAEliminar == null) return
+    const id = reviewAEliminar
     setEliminandoId(id)
     try {
       await apiFetch(`/admin/reviews/${id}?tipo=${tipo}`, { method: 'DELETE' })
@@ -71,6 +78,7 @@ export default function AdminReviewsPage() {
       setTotal(t => t - 1)
     } catch { /* silent */ }
     setEliminandoId(null)
+    setReviewAEliminar(null)
   }
 
   const totalPaginas = Math.ceil(total / LIMITE)
@@ -153,6 +161,16 @@ export default function AdminReviewsPage() {
             </div>
           )}
         </>
+      )}
+
+      {reviewAEliminar != null && (
+        <ModalConfirmacion
+          titulo="Eliminar calificación"
+          mensaje="¿Eliminar esta calificacion? Esta accion no se puede deshacer."
+          onCancelar={() => setReviewAEliminar(null)}
+          onConfirmar={() => void confirmarEliminar()}
+          confirmando={eliminandoId === reviewAEliminar}
+        />
       )}
     </div>
   )

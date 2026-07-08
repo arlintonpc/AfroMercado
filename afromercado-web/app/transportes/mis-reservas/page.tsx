@@ -6,6 +6,7 @@ import { misReservasTransporte, cancelarReservaTransporte, type ReservaTransport
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import ModalReportarProblema from '@/components/disputas/ModalReportarProblema'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 const ESTADO_INFO: Record<string, { label: string; color: string }> = {
   PENDIENTE:  { label: '⏳ Pendiente',   color: 'bg-amber-100 text-amber-700' },
@@ -20,20 +21,29 @@ export default function MisReservasTransportePage() {
   const [reservas, setReservas] = useState<ReservaTransporte[]>([])
   const [cargando, setCargando] = useState(true)
   const [cancelando, setCancelando] = useState<number | null>(null)
+  const [reservaACancelar, setReservaACancelar] = useState<number | null>(null)
 
   useEffect(() => {
     if (!usuario) return
     misReservasTransporte().then(d => { setReservas(d); setCargando(false) })
   }, [usuario])
 
-  async function cancelar(id: number) {
-    if (!confirm('¿Cancelar esta reserva?')) return
+  function cancelar(id: number) {
+    setReservaACancelar(id)
+  }
+
+  async function confirmarCancelar() {
+    if (reservaACancelar == null) return
+    const id = reservaACancelar
     setCancelando(id)
     try {
       await cancelarReservaTransporte(id)
       setReservas(prev => prev.map(r => r.id === id ? { ...r, estado: 'CANCELADA' } : r))
     } catch (e: any) { alert(e.message) }
-    finally { setCancelando(null) }
+    finally {
+      setCancelando(null)
+      setReservaACancelar(null)
+    }
   }
 
   const activas = reservas.filter(r => ['PENDIENTE', 'CONFIRMADA'].includes(r.estado))
@@ -146,6 +156,16 @@ export default function MisReservasTransportePage() {
           </div>
         )}
       </main>
+
+      {reservaACancelar != null && (
+        <ModalConfirmacion
+          titulo="Cancelar reserva"
+          mensaje="¿Cancelar esta reserva?"
+          onCancelar={() => setReservaACancelar(null)}
+          onConfirmar={() => void confirmarCancelar()}
+          confirmando={cancelando === reservaACancelar}
+        />
+      )}
     </div>
   )
 }

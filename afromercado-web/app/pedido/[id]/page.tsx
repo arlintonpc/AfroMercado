@@ -14,6 +14,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useNotificaciones } from '@/context/NotificacionContext'
 import { BadgeEstado, infoEstado } from '@/components/checkout/estadoPedido'
 import ModalCalificarRepartidor from '@/components/pedido/ModalCalificarRepartidor'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 const MapaSeguimientoRepartidor = dynamic(() => import('@/components/pedido/MapaSeguimientoRepartidor'), {
   ssr: false,
@@ -51,6 +52,7 @@ export default function PaginaPedido({
   const [cancelando, setCancelando] = useState(false)
   const [cancelado, setCancelado] = useState(false)
   const [cambioEstado, setCambioEstado] = useState(false)
+  const [confirmarCancelacion, setConfirmarCancelacion] = useState(false)
 
   // Calificación de tienda
   const [puedeCalificar, setPuedeCalificar] = useState<boolean>(false)
@@ -189,8 +191,12 @@ export default function PaginaPedido({
     }
   }
 
-  async function handleCancelar() {
-    if (!window.confirm('¿Seguro que quieres cancelar este pedido? Esta acción no se puede deshacer.')) return
+  function handleCancelar() {
+    setConfirmarCancelacion(true)
+  }
+
+  async function confirmarCancelacionPedido() {
+    setConfirmarCancelacion(false)
     setCancelando(true)
     try {
       await apiFetch(`/pedidos/${id}/cancelar`, { method: 'POST' })
@@ -559,6 +565,16 @@ export default function PaginaPedido({
             setEntregasCalificadas((prev) => [...prev, entregaACalificar])
             setEntregaACalificar(null)
           }}
+        />
+      )}
+
+      {confirmarCancelacion && (
+        <ModalConfirmacion
+          titulo="Cancelar pedido"
+          mensaje="¿Seguro que quieres cancelar este pedido? Esta acción no se puede deshacer."
+          onCancelar={() => setConfirmarCancelacion(false)}
+          onConfirmar={() => void confirmarCancelacionPedido()}
+          confirmando={cancelando}
         />
       )}
     </div>

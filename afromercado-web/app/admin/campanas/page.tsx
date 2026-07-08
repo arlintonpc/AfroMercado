@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DEPARTAMENTOS } from '@/lib/data/colombia'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 interface Campana {
   id:         number
@@ -94,6 +95,7 @@ export default function AdminCampanasPage() {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [orden, setOrden] = useState<OrdenCampana>('RECIENTES')
   const imgInputRef = useRef<HTMLInputElement>(null)
+  const [campanaADesactivar, setCampanaADesactivar] = useState<{ id: number; titulo: string } | null>(null)
 
   function getToken() { return localStorage.getItem('afromercado_token') ?? '' }
 
@@ -173,12 +175,18 @@ export default function AdminCampanasPage() {
     } finally { setGuardando(false) }
   }
 
-  async function desactivar(id: number, titulo: string) {
-    if (!confirm(`¿Desactivar la campaña "${titulo}"?`)) return
+  function desactivar(id: number, titulo: string) {
+    setCampanaADesactivar({ id, titulo })
+  }
+
+  async function confirmarDesactivar() {
+    if (!campanaADesactivar) return
+    const { id } = campanaADesactivar
     try {
       await fetch(`${API_URL}/campanas/${id}/desactivar`, { method: 'PATCH', headers: { Authorization: `Bearer ${getToken()}` } })
       cargar()
     } catch { /* silencioso */ }
+    finally { setCampanaADesactivar(null) }
   }
 
   function campo(field: CampoTexto) {
@@ -585,6 +593,16 @@ export default function AdminCampanasPage() {
           </div>
         )}
       </section>
+
+      {campanaADesactivar && (
+        <ModalConfirmacion
+          titulo="Desactivar campaña"
+          mensaje={`¿Desactivar la campaña "${campanaADesactivar.titulo}"?`}
+          onCancelar={() => setCampanaADesactivar(null)}
+          onConfirmar={() => void confirmarDesactivar()}
+          confirmando={false}
+        />
+      )}
     </div>
   )
 }

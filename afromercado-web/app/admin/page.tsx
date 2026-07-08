@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { ComprobanteModal } from '@/components/admin/ComprobanteModal'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 import {
   obtenerEstadisticas,
   obtenerPagosPendientes,
@@ -192,6 +193,7 @@ export default function AdminDashboardPage() {
   const [procesandoId, setProcesandoId] = useState<string | null>(null)
   const [aviso, setAviso] = useState<Aviso | null>(null)
   const [comprobante, setComprobante] = useState<PagoPendiente | null>(null)
+  const [pagoAAprobar, setPagoAAprobar] = useState<PagoPendiente | null>(null)
 
   const cargarStats = useCallback(async () => {
     setCargandoStats(true)
@@ -288,11 +290,13 @@ export default function AdminDashboardPage() {
   }
 
   function manejarAprobar(pago: PagoPendiente) {
-    const ok = window.confirm(
-      `¿Aprobar el pago de ${formatearPrecio(pago.monto)} del pedido #${pago.pedido.id}?`,
-    )
-    if (!ok) return
-    void ejecutarVerificacion(pago, 'APROBAR')
+    setPagoAAprobar(pago)
+  }
+
+  async function confirmarAprobar() {
+    if (!pagoAAprobar) return
+    await ejecutarVerificacion(pagoAAprobar, 'APROBAR')
+    setPagoAAprobar(null)
   }
 
   function manejarRechazar(pago: PagoPendiente) {
@@ -470,6 +474,18 @@ export default function AdminDashboardPage() {
           pagoId={comprobante.id}
           titulo={`Pedido #${comprobante.pedido.id}`}
           onCerrar={() => setComprobante(null)}
+        />
+      )}
+
+      {/* Modal confirmar aprobación de pago */}
+      {pagoAAprobar && (
+        <ModalConfirmacion
+          titulo="Aprobar pago"
+          mensaje={`¿Aprobar el pago de ${formatearPrecio(pagoAAprobar.monto)} del pedido #${pagoAAprobar.pedido.id}?`}
+          onCancelar={() => setPagoAAprobar(null)}
+          onConfirmar={() => void confirmarAprobar()}
+          confirmando={procesandoId === pagoAAprobar.id}
+          destructivo={false}
         />
       )}
 

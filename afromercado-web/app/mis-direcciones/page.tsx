@@ -13,6 +13,7 @@ import {
 } from '@/lib/api/direcciones'
 import type { Direccion, CrearDireccionInput } from '@/lib/api/direcciones'
 import { DEPARTAMENTOS } from '@/lib/data/colombia'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 const VACIO: CrearDireccionInput = {
   alias: '',
@@ -276,6 +277,7 @@ export default function MisDireccionesPage() {
   const [errorForm, setErrorForm] = useState<string | null>(null)
 
   const [procesando, setProcesando] = useState<number | null>(null)
+  const [direccionAEliminar, setDireccionAEliminar] = useState<number | null>(null)
 
   useEffect(() => {
     if (!cargandoAuth && !autenticado) {
@@ -337,8 +339,13 @@ export default function MisDireccionesPage() {
     }
   }
 
-  async function handleEliminar(id: number) {
-    if (!window.confirm('¿Eliminar esta dirección?')) return
+  function handleEliminar(id: number) {
+    setDireccionAEliminar(id)
+  }
+
+  async function confirmarEliminar() {
+    if (direccionAEliminar == null) return
+    const id = direccionAEliminar
     setProcesando(id)
     try {
       await eliminarDireccion(id)
@@ -347,6 +354,7 @@ export default function MisDireccionesPage() {
       alert(err instanceof Error ? err.message : 'No se pudo eliminar.')
     } finally {
       setProcesando(null)
+      setDireccionAEliminar(null)
     }
   }
 
@@ -477,6 +485,16 @@ export default function MisDireccionesPage() {
         )}
 
       </div>
+
+      {direccionAEliminar != null && (
+        <ModalConfirmacion
+          titulo="Eliminar dirección"
+          mensaje="¿Eliminar esta dirección?"
+          onCancelar={() => setDireccionAEliminar(null)}
+          onConfirmar={() => void confirmarEliminar()}
+          confirmando={procesando === direccionAEliminar}
+        />
+      )}
     </div>
   )
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import FormularioDeclaracionTerritorial from '@/components/comerciante/FormularioDeclaracionTerritorial'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 import { revocarDeclaracionTerritorial, type Comercio } from '@/components/comerciante/api'
 
 /**
@@ -31,17 +32,19 @@ export default function PanelDeclaracionTerritorial({ comercio, onActualizado }:
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [revocando, setRevocando] = useState(false)
   const [aviso, setAviso] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null)
+  const [confirmarRevocar, setConfirmarRevocar] = useState(false)
 
   const tieneDeclaracionAprobada = Boolean(comercio.organizacionTerritorialTipo)
   const tienePendiente = comercio.cambiosCriticos?.some(
     (c) => c.tipo === 'DECLARACION_TERRITORIAL' && c.estado === 'PENDIENTE',
   ) ?? false
 
-  async function handleRevocar() {
-    const confirmado = window.confirm(
-      '¿Seguro? Esto no afecta tu cuenta, solo elimina esta declaración específica.',
-    )
-    if (!confirmado) return
+  function handleRevocar() {
+    setConfirmarRevocar(true)
+  }
+
+  async function confirmarRevocarDeclaracion() {
+    setConfirmarRevocar(false)
     setRevocando(true)
     setAviso(null)
     try {
@@ -129,6 +132,16 @@ export default function PanelDeclaracionTerritorial({ comercio, onActualizado }:
         <FormularioDeclaracionTerritorial
           onExito={handleExitoFormulario}
           onCerrar={() => setMostrarFormulario(false)}
+        />
+      )}
+
+      {confirmarRevocar && (
+        <ModalConfirmacion
+          titulo="Revocar declaración"
+          mensaje="¿Seguro? Esto no afecta tu cuenta, solo elimina esta declaración específica."
+          onCancelar={() => setConfirmarRevocar(false)}
+          onConfirmar={confirmarRevocarDeclaracion}
+          confirmando={revocando}
         />
       )}
     </div>

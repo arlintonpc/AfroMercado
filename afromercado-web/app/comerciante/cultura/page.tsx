@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { CampoTexto, CampoArea, CampoSelect } from '@/components/comerciante/Campos'
 import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 import { CATEGORIAS_CULTURA } from '@/lib/data/culturaCategorias'
 import {
@@ -140,6 +141,9 @@ export default function ComercianteCulturaPage() {
   // Patrimonio
   const [patrimonio, setPatrimonio] = useState(false)
   const [patrimonioNota, setPatrimonioNota] = useState('')
+
+  // Confirmación de posponer/cancelar evento
+  const [pendienteAccion, setPendienteAccion] = useState<{ tipo: 'posponer' | 'cancelar'; evento: EventoCultural } | null>(null)
 
   const subiendoAlgo = subiendoPortada || subiendoFotos > 0 || subiendoVideo
 
@@ -306,15 +310,19 @@ export default function ComercianteCulturaPage() {
     await cargar()
   }
 
-  async function posponerEvento(evento: EventoCultural) {
-    if (!window.confirm(`¿Posponer "${evento.titulo}"? Avisaremos a los compradores con reserva activa.`)) return
-    await actualizarEventoCultura(evento.id, { estado: 'POSPUESTO' })
-    await cargar()
+  function posponerEvento(evento: EventoCultural) {
+    setPendienteAccion({ tipo: 'posponer', evento })
   }
 
-  async function cancelarEvento(evento: EventoCultural) {
-    if (!window.confirm(`¿Cancelar "${evento.titulo}"? Avisaremos a los compradores con reserva activa.`)) return
-    await actualizarEventoCultura(evento.id, { estado: 'CANCELADO' })
+  function cancelarEvento(evento: EventoCultural) {
+    setPendienteAccion({ tipo: 'cancelar', evento })
+  }
+
+  async function confirmarAccionEvento() {
+    if (!pendienteAccion) return
+    const { tipo, evento } = pendienteAccion
+    setPendienteAccion(null)
+    await actualizarEventoCultura(evento.id, { estado: tipo === 'posponer' ? 'POSPUESTO' : 'CANCELADO' })
     await cargar()
   }
 
@@ -631,6 +639,21 @@ export default function ComercianteCulturaPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {pendienteAccion && (
+        <ModalConfirmacion
+          titulo={pendienteAccion.tipo === 'posponer' ? 'Posponer evento' : 'Cancelar evento'}
+          mensaje={
+            pendienteAccion.tipo === 'posponer'
+              ? `¿Posponer "${pendienteAccion.evento.titulo}"? Avisaremos a los compradores con reserva activa.`
+              : `¿Cancelar "${pendienteAccion.evento.titulo}"? Avisaremos a los compradores con reserva activa.`
+          }
+          onCancelar={() => setPendienteAccion(null)}
+          onConfirmar={confirmarAccionEvento}
+          confirmando={false}
+          destructivo={pendienteAccion.tipo === 'cancelar'}
+        />
       )}
     </div>
   )

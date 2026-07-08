@@ -10,6 +10,7 @@ import { apiFetch } from '@/lib/api/client'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 export default function MisProductosPage() {
   const [productos, setProductos]     = useState<ProductoComerciante[]>([])
@@ -19,6 +20,7 @@ export default function MisProductosPage() {
   const [aviso, setAviso]             = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null)
   const [editandoStockId, setEditandoStockId] = useState<number | null>(null)
   const [stockTemporal, setStockTemporal]     = useState<string>('')
+  const [pendienteToggle, setPendienteToggle] = useState<ProductoComerciante | null>(null)
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -57,9 +59,14 @@ export default function MisProductosPage() {
     }
   }
 
-  async function toggleActivo(p: ProductoComerciante) {
-    const accion = p.activo ? 'desactivar' : 'activar'
-    if (!window.confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} "${p.nombre}"?`)) return
+  function toggleActivo(p: ProductoComerciante) {
+    setPendienteToggle(p)
+  }
+
+  async function confirmarToggleActivo() {
+    const p = pendienteToggle
+    if (!p) return
+    setPendienteToggle(null)
     setProcesando(p.id)
     try {
       if (p.activo) {
@@ -264,6 +271,17 @@ export default function MisProductosPage() {
           </div>
         )}
       </div>
+
+      {pendienteToggle && (
+        <ModalConfirmacion
+          titulo={pendienteToggle.activo ? 'Desactivar producto' : 'Activar producto'}
+          mensaje={`¿${pendienteToggle.activo ? 'Desactivar' : 'Activar'} "${pendienteToggle.nombre}"?`}
+          onCancelar={() => setPendienteToggle(null)}
+          onConfirmar={confirmarToggleActivo}
+          confirmando={procesandoId === pendienteToggle.id}
+          destructivo={pendienteToggle.activo}
+        />
+      )}
     </div>
   )
 }

@@ -20,6 +20,7 @@ import { MUNICIPIOS_POR_DEPARTAMENTO } from '@/components/comerciante/constantes
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import GestorComplementos from '@/components/comerciante/GestorComplementos'
 import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 const DIAS: { dia: DiaSemana; label: string }[] = [
   { dia: 'LUNES',     label: 'Lunes' },
@@ -116,6 +117,9 @@ export default function ExpressComerciante() {
   })
   const [guardandoCupon, setGuardandoCupon] = useState(false)
   const [errorCupon, setErrorCupon]         = useState('')
+  const [pendienteEliminarSeccion, setPendienteEliminarSeccion] = useState<MenuSeccion | null>(null)
+  const [pendienteDesactivarCupon, setPendienteDesactivarCupon] = useState<CuponExpress | null>(null)
+  const [confirmandoAccion, setConfirmandoAccion] = useState(false)
   const [videoEstadoExpress, setVideoEstadoExpress] = useState<VideoEstado>({
     videoUrl: null,
     videoPosterUrl: null,
@@ -222,6 +226,33 @@ export default function ExpressComerciante() {
       if (menu) setProductosExpress(menu.productos)
     } catch {}
     finally { setCargandoMenu(false) }
+  }
+
+  async function confirmarEliminarSeccion() {
+    const seccion = pendienteEliminarSeccion
+    if (!seccion) return
+    setConfirmandoAccion(true)
+    try {
+      await eliminarSeccionExpress(seccion.id)
+      setSecciones(await listarSeccionesExpress())
+      setProductosExpress(prev => prev.map(p => p.menuSeccionId === seccion.id ? { ...p, menuSeccionId: null } : p))
+    } finally {
+      setConfirmandoAccion(false)
+      setPendienteEliminarSeccion(null)
+    }
+  }
+
+  async function confirmarDesactivarCupon() {
+    const cupon = pendienteDesactivarCupon
+    if (!cupon) return
+    setConfirmandoAccion(true)
+    try {
+      await eliminarCuponExpress(cupon.id)
+      setCupones(prev => prev.map(x => x.id === cupon.id ? { ...x, activo: false } : x))
+    } finally {
+      setConfirmandoAccion(false)
+      setPendienteDesactivarCupon(null)
+    }
   }
 
   async function cargarEstadisticasExpress(params?: { desde?: string; hasta?: string }) {
@@ -506,12 +537,7 @@ export default function ExpressComerciante() {
                         Editar
                       </button>
                       <button
-                        onClick={async () => {
-                          if (!confirm(`¿Eliminar la sección "${s.nombre}"? Los productos quedarán sin sección.`)) return
-                          await eliminarSeccionExpress(s.id)
-                          setSecciones(await listarSeccionesExpress())
-                          setProductosExpress(prev => prev.map(p => p.menuSeccionId === s.id ? { ...p, menuSeccionId: null } : p))
-                        }}
+                        onClick={() => setPendienteEliminarSeccion(s)}
                         className="text-xs text-red-500 border border-red-200 px-2 py-1 rounded-lg"
                       >
                         Eliminar
@@ -881,11 +907,7 @@ export default function ExpressComerciante() {
                         </div>
                       </div>
                       <button
-                        onClick={async () => {
-                          if (!confirm(`¿Desactivar el cupón ${c.codigo}?`)) return
-                          await eliminarCuponExpress(c.id)
-                          setCupones(prev => prev.map(x => x.id === c.id ? { ...x, activo: false } : x))
-                        }}
+                        onClick={() => setPendienteDesactivarCupon(c)}
                         className="text-xs text-red-500 border border-red-200 px-2 py-1 rounded-lg flex-shrink-0"
                       >
                         Desactivar
@@ -1295,6 +1317,28 @@ export default function ExpressComerciante() {
           productoId={complementoProducto.id}
           nombreProducto={complementoProducto.nombre}
           onClose={() => setComplementoProducto(null)}
+        />
+      )}
+
+      {pendienteEliminarSeccion && (
+        <ModalConfirmacion
+          titulo="Eliminar sección"
+          mensaje={`¿Eliminar la sección "${pendienteEliminarSeccion.nombre}"? Los productos quedarán sin sección.`}
+          onCancelar={() => setPendienteEliminarSeccion(null)}
+          onConfirmar={confirmarEliminarSeccion}
+          confirmando={confirmandoAccion}
+          destructivo={true}
+        />
+      )}
+
+      {pendienteDesactivarCupon && (
+        <ModalConfirmacion
+          titulo="Desactivar cupón"
+          mensaje={`¿Desactivar el cupón ${pendienteDesactivarCupon.codigo}?`}
+          onCancelar={() => setPendienteDesactivarCupon(null)}
+          onConfirmar={confirmarDesactivarCupon}
+          confirmando={confirmandoAccion}
+          destructivo={true}
         />
       )}
     </div>

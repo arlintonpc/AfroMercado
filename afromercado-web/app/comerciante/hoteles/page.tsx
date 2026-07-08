@@ -21,6 +21,7 @@ import { obtenerToken } from '@/lib/api/client'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
 import { Switch } from '@/components/ui'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 const SERVICIOS_OPCIONES = ['wifi', 'desayuno', 'parking', 'piscina', 'restaurante', 'aire', 'ventilador', 'gym', 'spa', 'bar', 'mascotas', 'tv', 'cocina', 'lavadora', 'agua_caliente', 'balcon']
 const SERVICIOS_LABELS: Record<string, string> = {
@@ -855,6 +856,10 @@ export default function ComercianteHotelesPage() {
   const [errorFisica, setErrorFisica] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const primerasCarga               = useRef(true)
+  const [pendienteEliminarBloqueo, setPendienteEliminarBloqueo] = useState<string | null>(null)
+  const [pendienteEliminarFisica, setPendienteEliminarFisica] = useState<number | null>(null)
+  const [pendienteDesactivarHabitacion, setPendienteDesactivarHabitacion] = useState<number | null>(null)
+  const [confirmandoAccion, setConfirmandoAccion] = useState(false)
 
   const reservasRef = useRef<ReservaHotel[]>([])
 
@@ -985,11 +990,19 @@ export default function ComercianteHotelesPage() {
   }
 
   async function handleEliminarBloqueo(id: string) {
-    if (!window.confirm('¿Eliminar este bloqueo de fechas?')) return
+    setPendienteEliminarBloqueo(id)
+  }
+
+  async function confirmarEliminarBloqueo() {
+    const id = pendienteEliminarBloqueo
+    if (!id) return
+    setConfirmandoAccion(true)
     try {
       await eliminarBloqueo(id)
       setBloqueos(prev => prev.filter(b => b.id !== id))
-    } catch (e: any) { setErrorBloqueo(e.message) }
+    } catch (e) { setErrorBloqueo(e instanceof Error ? e.message : 'No se pudo eliminar el bloqueo') }
+    setConfirmandoAccion(false)
+    setPendienteEliminarBloqueo(null)
   }
 
   async function cargarHabitacionesFisicas() {
@@ -1036,13 +1049,21 @@ export default function ComercianteHotelesPage() {
   }
 
   async function handleEliminarHabitacionFisica(id: number) {
-    if (!window.confirm('Eliminar esta habitacion real del inventario operativo?')) return
+    setPendienteEliminarFisica(id)
+  }
+
+  async function confirmarEliminarHabitacionFisica() {
+    const id = pendienteEliminarFisica
+    if (!id) return
+    setConfirmandoAccion(true)
     try {
       await eliminarHabitacionFisica(id)
       setHabitacionesFisicas(prev => prev.filter(h => h.id !== id))
-    } catch (e: any) {
-      setErrorFisica(e.message)
+    } catch (e) {
+      setErrorFisica(e instanceof Error ? e.message : 'No se pudo eliminar la habitación')
     }
+    setConfirmandoAccion(false)
+    setPendienteEliminarFisica(null)
   }
 
   async function handleAsignarHabitacionFisica(reservaId: number, habitacionFisicaId: number) {
@@ -1054,6 +1075,18 @@ export default function ComercianteHotelesPage() {
     } catch (e: any) {
       setError(e.message)
     }
+  }
+
+  async function confirmarDesactivarHabitacion() {
+    const id = pendienteDesactivarHabitacion
+    if (!id) return
+    setConfirmandoAccion(true)
+    try {
+      await eliminarHabitacion(id)
+      await cargar()
+    } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo desactivar la habitación') }
+    setConfirmandoAccion(false)
+    setPendienteDesactivarHabitacion(null)
   }
 
   async function guardarConfig() {
@@ -1854,11 +1887,8 @@ export default function ComercianteHotelesPage() {
                     className="flex-1 border border-gray-200 text-gray-600 font-medium py-2 rounded-xl text-xs hover:bg-gray-50">
                     ✏️ Editar
                   </button>
-                  <button onClick={async () => {
-                    if (!confirm('¿Desactivar esta habitación?')) return
-                    await eliminarHabitacion(hab.id)
-                    cargar()
-                  }} className="flex-1 border border-red-200 text-red-500 font-medium py-2 rounded-xl text-xs hover:bg-red-50">
+                  <button onClick={() => setPendienteDesactivarHabitacion(hab.id)}
+                    className="flex-1 border border-red-200 text-red-500 font-medium py-2 rounded-xl text-xs hover:bg-red-50">
                     🗑️ Desactivar
                   </button>
                 </div>
@@ -2347,6 +2377,39 @@ export default function ComercianteHotelesPage() {
             setFormHab({ visible: false })
             cargar()
           }}
+        />
+      )}
+
+      {pendienteEliminarBloqueo && (
+        <ModalConfirmacion
+          titulo="Eliminar bloqueo"
+          mensaje="¿Eliminar este bloqueo de fechas?"
+          onCancelar={() => setPendienteEliminarBloqueo(null)}
+          onConfirmar={confirmarEliminarBloqueo}
+          confirmando={confirmandoAccion}
+          destructivo={true}
+        />
+      )}
+
+      {pendienteEliminarFisica && (
+        <ModalConfirmacion
+          titulo="Eliminar habitación"
+          mensaje="Eliminar esta habitacion real del inventario operativo?"
+          onCancelar={() => setPendienteEliminarFisica(null)}
+          onConfirmar={confirmarEliminarHabitacionFisica}
+          confirmando={confirmandoAccion}
+          destructivo={true}
+        />
+      )}
+
+      {pendienteDesactivarHabitacion && (
+        <ModalConfirmacion
+          titulo="Desactivar habitación"
+          mensaje="¿Desactivar esta habitación?"
+          onCancelar={() => setPendienteDesactivarHabitacion(null)}
+          onConfirmar={confirmarDesactivarHabitacion}
+          confirmando={confirmandoAccion}
+          destructivo={true}
         />
       )}
     </div>

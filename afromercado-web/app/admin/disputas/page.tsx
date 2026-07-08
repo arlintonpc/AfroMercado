@@ -11,6 +11,7 @@ import {
   type MotivoDisputa,
 } from '@/lib/api/disputas'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 const VENTANA_RESPUESTA_HORAS = 48
 const ESTADOS_RESOLVIBLES: EstadoDisputa[] = ['ABIERTA', 'RESPONDIDA_COMERCIO']
@@ -298,6 +299,10 @@ export default function AdminDisputasPage() {
   const [procesandoId, setProcesandoId] = useState<number | null>(null)
   const [filtroEstado, setFiltroEstado] = useState<EstadoDisputa | 'TODOS'>('TODOS')
   const [filtroModulo, setFiltroModulo] = useState<ModuloOrigenDisputa | 'TODOS'>('TODOS')
+  const [confirmacionPendiente, setConfirmacionPendiente] = useState<{
+    disputa: Disputa
+    accion: 'RECHAZAR' | 'APROBAR_TOTAL'
+  } | null>(null)
 
   const cargar = useCallback(() => {
     setCargando(true)
@@ -313,10 +318,15 @@ export default function AdminDisputasPage() {
 
   useEffect(() => { cargar() }, [cargar])
 
-  async function handleResolver(disputa: Disputa, accion: 'RECHAZAR' | 'APROBAR_TOTAL' | 'APROBAR_PARCIAL', montoReembolsoAprobado?: number) {
-    if (accion === 'RECHAZAR' && !confirm('¿Rechazar este reclamo?')) return
-    if (accion === 'APROBAR_TOTAL' && !confirm('¿Aprobar el reembolso total de este reclamo?')) return
+  function handleResolver(disputa: Disputa, accion: 'RECHAZAR' | 'APROBAR_TOTAL' | 'APROBAR_PARCIAL', montoReembolsoAprobado?: number) {
+    if (accion === 'RECHAZAR' || accion === 'APROBAR_TOTAL') {
+      setConfirmacionPendiente({ disputa, accion })
+      return
+    }
+    void ejecutarResolver(disputa, accion, montoReembolsoAprobado)
+  }
 
+  async function ejecutarResolver(disputa: Disputa, accion: 'RECHAZAR' | 'APROBAR_TOTAL' | 'APROBAR_PARCIAL', montoReembolsoAprobado?: number) {
     setProcesandoId(disputa.id)
     try {
       const actualizada = await resolverDisputaAdmin(disputa.id, { accion, montoReembolsoAprobado })
@@ -326,6 +336,13 @@ export default function AdminDisputasPage() {
     } finally {
       setProcesandoId(null)
     }
+  }
+
+  async function confirmarResolver() {
+    if (!confirmacionPendiente) return
+    const { disputa, accion } = confirmacionPendiente
+    setConfirmacionPendiente(null)
+    await ejecutarResolver(disputa, accion)
   }
 
   async function handleMarcarTransferido(disputa: Disputa) {
@@ -416,6 +433,21 @@ export default function AdminDisputasPage() {
           </div>
         )}
       </div>
+
+      {confirmacionPendiente && (
+        <ModalConfirmacion
+          titulo={confirmacionPendiente.accion === 'RECHAZAR' ? 'Rechazar reclamo' : 'Aprobar reembolso'}
+          mensaje={
+            confirmacionPendiente.accion === 'RECHAZAR'
+              ? '¿Rechazar este reclamo?'
+              : '¿Aprobar el reembolso total de este reclamo?'
+          }
+          onCancelar={() => setConfirmacionPendiente(null)}
+          onConfirmar={() => void confirmarResolver()}
+          confirmando={procesandoId === confirmacionPendiente.disputa.id}
+          destructivo={confirmacionPendiente.accion === 'RECHAZAR'}
+        />
+      )}
     </div>
   )
 }

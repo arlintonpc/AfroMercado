@@ -11,6 +11,7 @@ import {
   type GrupoComplementoBiblioteca, type ItemComplementoBiblioteca, type ProductoGrupoComplemento,
 } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 interface Props {
   productoId: number
@@ -40,6 +41,8 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
   const [nuevoItemBiblioteca, setNuevoItemBiblioteca] = useState<Record<number, { nombre: string; precio: string; icono: string }>>({})
   const [editandoGrupo, setEditandoGrupo] = useState<number | null>(null)
   const [editGrupo, setEditGrupo] = useState({ nombre: '', minimo: 0, maximo: 1, requerido: false })
+  const [pendienteEliminarGrupo, setPendienteEliminarGrupo] = useState<GrupoComplemento | null>(null)
+  const [eliminandoGrupo, setEliminandoGrupo] = useState(false)
 
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
   const fileInputRefsBiblioteca = useRef<Record<number, HTMLInputElement | null>>({})
@@ -163,15 +166,23 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
     }
   }
 
-  async function borrarGrupo(grupoId: number) {
-    if (!confirm('¿Eliminar este grupo y todos sus ítems?')) return
+  async function borrarGrupo(grupo: GrupoComplemento) {
+    setPendienteEliminarGrupo(grupo)
+  }
+
+  async function confirmarBorrarGrupo() {
+    const grupo = pendienteEliminarGrupo
+    if (!grupo) return
+    setEliminandoGrupo(true)
     setError(null)
     try {
-      await eliminarGrupoComplemento(grupoId)
-      setGrupos(prev => prev.filter(g => g.id !== grupoId))
+      await eliminarGrupoComplemento(grupo.id)
+      setGrupos(prev => prev.filter(g => g.id !== grupo.id))
     } catch (err) {
       setError(mensajeError(err, 'No se pudo eliminar el grupo.'))
     }
+    setEliminandoGrupo(false)
+    setPendienteEliminarGrupo(null)
   }
 
   async function agregarItem(grupoId: number) {
@@ -577,7 +588,7 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
                       className={`text-xs px-2 py-1 rounded-full font-medium ${grupo.activo ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
                       {grupo.activo ? 'Activo' : 'Oculto'}
                     </button>
-                    <button onClick={() => borrarGrupo(grupo.id)} className="text-red-400 hover:text-red-600 text-lg">×</button>
+                    <button onClick={() => borrarGrupo(grupo)} className="text-red-400 hover:text-red-600 text-lg">×</button>
                   </div>
                 )}
 
@@ -728,6 +739,17 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
           </button>
         </div>
       </div>
+
+      {pendienteEliminarGrupo && (
+        <ModalConfirmacion
+          titulo="Eliminar grupo"
+          mensaje="¿Eliminar este grupo y todos sus ítems?"
+          onCancelar={() => setPendienteEliminarGrupo(null)}
+          onConfirmar={confirmarBorrarGrupo}
+          confirmando={eliminandoGrupo}
+          destructivo={true}
+        />
+      )}
     </div>
   )
 }

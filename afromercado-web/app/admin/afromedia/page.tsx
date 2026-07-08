@@ -31,6 +31,7 @@ import {
 import { Button } from '@/components/ui/Button'
 import BotonExportar from '@/components/reportes/BotonExportar'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 const RESUMEN_VACIO: ResumenAfroMedia = {
   solicitudesPendientes: 0,
@@ -276,6 +277,7 @@ export default function AfroMediaAdminPage() {
   const [procesandoId, setProcesandoId] = useState<number | null>(null)
   const [guardandoPaquete, setGuardandoPaquete] = useState<string | null>(null)
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
+  const [pautaAConfirmar, setPautaAConfirmar] = useState<number | null>(null)
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -370,8 +372,13 @@ export default function AfroMediaAdminPage() {
     }
   }
 
-  async function crearPauta(id: number) {
-    if (!window.confirm('Crear la pauta automaticamente y marcar esta solicitud como convertida?')) return
+  function crearPauta(id: number) {
+    setPautaAConfirmar(id)
+  }
+
+  async function confirmarCrearPauta() {
+    if (pautaAConfirmar == null) return
+    const id = pautaAConfirmar
     setProcesandoId(id)
     setAviso(null)
     try {
@@ -385,6 +392,7 @@ export default function AfroMediaAdminPage() {
       setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo crear la pauta.' })
     } finally {
       setProcesandoId(null)
+      setPautaAConfirmar(null)
     }
   }
 
@@ -1196,6 +1204,17 @@ export default function AfroMediaAdminPage() {
           )}
         </div>
       </section>
+
+      {pautaAConfirmar != null && (
+        <ModalConfirmacion
+          titulo="Crear pauta"
+          mensaje="Crear la pauta automaticamente y marcar esta solicitud como convertida?"
+          onCancelar={() => setPautaAConfirmar(null)}
+          onConfirmar={() => void confirmarCrearPauta()}
+          confirmando={procesandoId === pautaAConfirmar}
+          destructivo={false}
+        />
+      )}
     </div>
   )
 }

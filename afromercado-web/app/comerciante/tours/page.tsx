@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 const SERVICIOS_OPCIONES = [
   { key: 'transporte', label: '🚐 Transporte' },
@@ -65,6 +66,9 @@ export default function ComercianteTourPage() {
   })
   const [guardandoCupon, setGuardandoCupon] = useState(false)
   const [errorCupon, setErrorCupon]         = useState('')
+  const [pendienteEliminarLugar, setPendienteEliminarLugar] = useState<TourLugar | null>(null)
+  const [pendienteDesactivarCupon, setPendienteDesactivarCupon] = useState<CuponTour | null>(null)
+  const [desactivandoCupon, setDesactivandoCupon] = useState(false)
   const [videoEstadoTour, setVideoEstadoTour] = useState<VideoEstado>({
     videoUrl: null,
     videoPosterUrl: null,
@@ -132,6 +136,19 @@ export default function ComercianteTourPage() {
       setReservas(prev => prev.map(r => r.id === id ? { ...r, estado } : r))
     } catch (e: any) {
       alert(e.message)
+    }
+  }
+
+  async function confirmarDesactivarCupon() {
+    const cupon = pendienteDesactivarCupon
+    if (!cupon) return
+    setDesactivandoCupon(true)
+    try {
+      await eliminarCuponTour(cupon.id)
+      setCupones(prev => prev.map(x => x.id === cupon.id ? { ...x, activo: false } : x))
+    } finally {
+      setDesactivandoCupon(false)
+      setPendienteDesactivarCupon(null)
     }
   }
 
@@ -266,17 +283,23 @@ export default function ComercianteTourPage() {
   }
 
   async function handleEliminarLugar(lugar: TourLugar) {
-    if (!confirm(`Eliminar "${lugar.titulo}" de la ruta?`)) return
+    setPendienteEliminarLugar(lugar)
+  }
+
+  async function confirmarEliminarLugar() {
+    const lugar = pendienteEliminarLugar
+    if (!lugar) return
     setGuardandoLugarId(lugar.id)
     setErrorLugar('')
     try {
       await eliminarLugarTour(lugar.id)
       reemplazarLugares(lugares.filter(item => item.id !== lugar.id))
       if (lugarAbiertoId === lugar.id) setLugarAbiertoId(null)
-    } catch (e: any) {
-      setErrorLugar(e?.message ?? 'No se pudo eliminar el lugar')
+    } catch (e) {
+      setErrorLugar(e instanceof Error ? e.message : 'No se pudo eliminar el lugar')
     } finally {
       setGuardandoLugarId(null)
+      setPendienteEliminarLugar(null)
     }
   }
 
@@ -634,11 +657,7 @@ export default function ComercianteTourPage() {
                         </div>
                       </div>
                       <button
-                        onClick={async () => {
-                          if (!confirm(`¿Desactivar ${c.codigo}?`)) return
-                          await eliminarCuponTour(c.id)
-                          setCupones(prev => prev.map(x => x.id === c.id ? { ...x, activo: false } : x))
-                        }}
+                        onClick={() => setPendienteDesactivarCupon(c)}
                         className="text-xs text-red-500 border border-red-200 px-2 py-1 rounded-lg flex-shrink-0"
                       >Desactivar</button>
                     </div>
@@ -1210,6 +1229,28 @@ export default function ComercianteTourPage() {
             {guardando ? 'Guardando…' : '💾 Guardar configuración'}
           </button>
         </div>
+      )}
+
+      {pendienteEliminarLugar && (
+        <ModalConfirmacion
+          titulo="Eliminar lugar"
+          mensaje={`Eliminar "${pendienteEliminarLugar.titulo}" de la ruta?`}
+          onCancelar={() => setPendienteEliminarLugar(null)}
+          onConfirmar={confirmarEliminarLugar}
+          confirmando={guardandoLugarId === pendienteEliminarLugar.id}
+          destructivo={true}
+        />
+      )}
+
+      {pendienteDesactivarCupon && (
+        <ModalConfirmacion
+          titulo="Desactivar cupón"
+          mensaje={`¿Desactivar ${pendienteDesactivarCupon.codigo}?`}
+          onCancelar={() => setPendienteDesactivarCupon(null)}
+          onConfirmar={confirmarDesactivarCupon}
+          confirmando={desactivandoCupon}
+          destructivo={true}
+        />
       )}
     </div>
   )

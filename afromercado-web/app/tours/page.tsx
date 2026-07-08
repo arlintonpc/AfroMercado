@@ -206,6 +206,7 @@ const SERVICIOS_FILTRO = [
 export default function ToursPage() {
   const [tours, setTours]           = useState<ConfigTour[]>([])
   const [cargando, setCargando]     = useState(true)
+  const [error, setError]           = useState('')
   const [tardando, setTardando]     = useState(false)
   const [busqueda, setBusqueda]     = useState('')
   const [userLat, setUserLat]       = useState<number | null>(null)
@@ -218,10 +219,17 @@ export default function ToursPage() {
   const [serviciosFiltro, setServiciosFiltro] = useState<string[]>([])
   const [vista, setVista]           = useState<'lista' | 'mapa'>('lista')
 
-  useEffect(() => {
+  function cargar() {
+    setCargando(true)
+    setError('')
     const t = setTimeout(() => setTardando(true), 6000)
-    listarTours().then(d => { setTours(d); setCargando(false) }).finally(() => clearTimeout(t))
-  }, [])
+    listarTours()
+      .then(d => setTours(d))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'No pudimos cargar los tours.'))
+      .finally(() => { setCargando(false); clearTimeout(t) })
+  }
+
+  useEffect(() => { cargar() }, [])
 
   function activarGPS() {
     if (!navigator.geolocation) return
@@ -425,6 +433,13 @@ export default function ToursPage() {
 
       {/* ── CONTENIDO ─────────────────────────────────────── */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+
+        {error && (
+          <div className="bg-red-50 text-red-700 border border-red-200 rounded-xl px-4 py-3 text-sm mb-4 flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <button onClick={cargar} className="shrink-0 font-semibold underline hover:no-underline">Reintentar</button>
+          </div>
+        )}
 
         {vista === 'mapa' && !cargando && (
           <div className="mb-6 rounded-2xl overflow-hidden shadow-md">

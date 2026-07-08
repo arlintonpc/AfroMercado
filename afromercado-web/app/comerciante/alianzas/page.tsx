@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CampoTexto, CampoArea, CampoSelect } from '@/components/comerciante/Campos'
 import { obtenerMiComercio, type Comercio } from '@/components/comerciante/api'
 import { Button } from '@/components/ui/Button'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 import {
   listarMisAlianzas,
@@ -263,18 +264,20 @@ function TarjetaAlianza({
 }) {
   const [invitando, setInvitando] = useState(false)
   const [procesando, setProcesando] = useState(false)
+  const [confirmarRetiro, setConfirmarRetiro] = useState(false)
 
   const esCreador = alianza.creadoPorComercioId === miComercioId
   const miFila = alianza.socios.find((s) => s.comercioId === miComercioId)
   const puedoInvitar = esCreador || Boolean(miFila?.aceptado)
   const puedoInvitarPorEstado = ['PENDIENTE_APROBACION', 'PUBLICADA'].includes(alianza.estado)
 
-  async function retirarme() {
+  function retirarme() {
     if (!miFila) return
-    const confirmacion = miFila.aceptado
-      ? `¿Retirarte de la alianza "${alianza.nombre}"? Ya no compartirás el código con los demás socios.`
-      : `¿Rechazar la invitación a "${alianza.nombre}"?`
-    if (!window.confirm(confirmacion)) return
+    setConfirmarRetiro(true)
+  }
+
+  async function confirmarRetirarme() {
+    setConfirmarRetiro(false)
     setProcesando(true)
     try {
       await rechazarOSalirAlianza(alianza.id)
@@ -350,6 +353,20 @@ function TarjetaAlianza({
           onCancelar={() => setInvitando(false)}
         />
       )}
+
+      {confirmarRetiro && miFila && (
+        <ModalConfirmacion
+          titulo={miFila.aceptado ? 'Retirarte de alianza' : 'Rechazar invitación'}
+          mensaje={
+            miFila.aceptado
+              ? `¿Retirarte de la alianza "${alianza.nombre}"? Ya no compartirás el código con los demás socios.`
+              : `¿Rechazar la invitación a "${alianza.nombre}"?`
+          }
+          onCancelar={() => setConfirmarRetiro(false)}
+          onConfirmar={confirmarRetirarme}
+          confirmando={procesando}
+        />
+      )}
     </article>
   )
 }
@@ -366,6 +383,7 @@ function AvisoInvitacionesPendientes({
   onCambio: () => Promise<void>
 }) {
   const [procesandoId, setProcesandoId] = useState<number | null>(null)
+  const [pendienteRechazo, setPendienteRechazo] = useState<{ alianzaId: number; nombre: string } | null>(null)
 
   const pendientes = alianzas
     .map((a) => ({ alianza: a, socio: a.socios.find((s) => s.comercioId === miComercioId && !s.aceptado) }))
@@ -385,8 +403,14 @@ function AvisoInvitacionesPendientes({
     }
   }
 
-  async function rechazar(alianzaId: number, nombre: string) {
-    if (!window.confirm(`¿Rechazar la invitación a "${nombre}"?`)) return
+  function rechazar(alianzaId: number, nombre: string) {
+    setPendienteRechazo({ alianzaId, nombre })
+  }
+
+  async function confirmarRechazo() {
+    if (!pendienteRechazo) return
+    const { alianzaId } = pendienteRechazo
+    setPendienteRechazo(null)
     setProcesandoId(alianzaId)
     try {
       await rechazarOSalirAlianza(alianzaId)
@@ -419,6 +443,16 @@ function AvisoInvitacionesPendientes({
           </div>
         </div>
       ))}
+
+      {pendienteRechazo && (
+        <ModalConfirmacion
+          titulo="Rechazar invitación"
+          mensaje={`¿Rechazar la invitación a "${pendienteRechazo.nombre}"?`}
+          onCancelar={() => setPendienteRechazo(null)}
+          onConfirmar={confirmarRechazo}
+          confirmando={procesandoId === pendienteRechazo.alianzaId}
+        />
+      )}
     </div>
   )
 }

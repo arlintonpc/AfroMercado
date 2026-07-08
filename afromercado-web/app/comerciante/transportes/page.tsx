@@ -13,6 +13,7 @@ import {
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 const TIPO_OPCIONES = [
   // Fluvial
@@ -182,6 +183,8 @@ export default function ComercianteTransportesPage() {
   const [hastaFiltro, setHastaFiltro] = useState('')
   const [cupones, setCupones] = useState<CuponTransporte[]>([])
   const [mostrarFormCupon, setMostrarFormCupon] = useState(false)
+  const [pendienteDesactivarRutaId, setPendienteDesactivarRutaId] = useState<number | null>(null)
+  const [desactivandoRuta, setDesactivandoRuta] = useState(false)
   const inputFotoRef = useRef<HTMLInputElement>(null)
   const reservasRef = useRef<ReservaTransporte[]>([])
   const [videoEstadoTransporte, setVideoEstadoTransporte] = useState<VideoEstado>({
@@ -271,9 +274,19 @@ export default function ComercianteTransportesPage() {
   }
 
   async function borrarRuta(id: number) {
-    if (!confirm('¿Desactivar esta ruta?')) return
+    setPendienteDesactivarRutaId(id)
+  }
+
+  async function confirmarDesactivarRuta() {
+    const id = pendienteDesactivarRutaId
+    if (!id) return
+    setDesactivandoRuta(true)
     try { await eliminarRuta(id); setCfg(prev => prev ? { ...prev, rutas: prev.rutas.map(r => r.id === id ? { ...r, activo: false } : r) } : prev) }
-    catch (e: any) { alert(e.message) }
+    catch (e) { alert(e instanceof Error ? e.message : 'No se pudo desactivar la ruta') }
+    finally {
+      setDesactivandoRuta(false)
+      setPendienteDesactivarRutaId(null)
+    }
   }
 
   async function subirFotos(files: FileList) {
@@ -740,6 +753,17 @@ export default function ComercianteTransportesPage() {
             {guardando ? 'Guardando…' : '💾 Guardar configuración'}
           </button>
         </div>
+      )}
+
+      {pendienteDesactivarRutaId !== null && (
+        <ModalConfirmacion
+          titulo="Desactivar ruta"
+          mensaje="¿Desactivar esta ruta?"
+          onCancelar={() => setPendienteDesactivarRutaId(null)}
+          onConfirmar={confirmarDesactivarRuta}
+          confirmando={desactivandoRuta}
+          destructivo={true}
+        />
       )}
     </div>
   )
