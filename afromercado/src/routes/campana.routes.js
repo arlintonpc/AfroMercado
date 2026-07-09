@@ -14,5 +14,6 @@ router.post("/:id/clic", CampanaController.registrarClic);
 router.get("/", ...soloAdmin, CampanaController.listarTodas);
 router.post("/", ...soloAdmin, CampanaController.crear);
 router.patch("/:id/desactivar", ...soloAdmin, CampanaController.desactivar);
+router.patch("/:id/activar", ...soloAdmin, CampanaController.activar);
 
 module.exports = router;

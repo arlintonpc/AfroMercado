@@ -114,6 +114,17 @@ const CampanaController = {
     } catch (err) { next(err); }
   },
 
+  /* PATCH /api/admin/campanas/:id/activar */
+  async activar(req, res, next) {
+    try {
+      const campana = await prisma.campanaHero.update({
+        where: { id: Number(req.params.id) },
+        data: { activa: true },
+      });
+      res.json({ ok: true, campana });
+    } catch (err) { next(err); }
+  },
+
   /* POST /api/campanas/:id/vista — público, fire-and-forget */
   async registrarVista(req, res, next) {
     try {

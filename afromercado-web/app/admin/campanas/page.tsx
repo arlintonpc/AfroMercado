@@ -190,6 +190,13 @@ export default function AdminCampanasPage() {
     finally { setCampanaADesactivar(null) }
   }
 
+  async function activar(id: number) {
+    try {
+      await fetch(`${API_URL}/campanas/${id}/activar`, { method: 'PATCH', headers: { Authorization: `Bearer ${getToken()}` } })
+      cargar()
+    } catch { /* silencioso */ }
+  }
+
   function campo(field: CampoTexto) {
     return {
       value: form[field],
@@ -597,12 +604,19 @@ export default function AdminCampanasPage() {
                     </div>
                   </div>
 
-                  {c.activa && (
+                  {c.activa ? (
                     <button
                       onClick={() => desactivar(c.id, c.titulo)}
                       className="text-xs text-[#C0392B]/70 hover:text-[#C0392B] font-medium transition-colors flex-shrink-0 mt-1"
                     >
                       Desactivar
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => activar(c.id)}
+                      className="text-xs text-[#2D6A4F]/70 hover:text-[#2D6A4F] font-medium transition-colors flex-shrink-0 mt-1"
+                    >
+                      Activar
                     </button>
                   )}
                 </div>
