@@ -39,6 +39,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
   const agotado    = disponible === 0
   const stockBajo  = !agotado && disponible <= 5
   const tieneVideo = Boolean(producto.videoUrl || producto.comercio.videoUrl)
+  const mostrarNacional = !agotado && (producto.alcance === 'NACIONAL' || producto.alcance === 'AMBOS')
 
   const mostrarPlaceholder = !producto.fotoUrl || imgError
   const href = `/producto/${producto.id}`
@@ -130,7 +131,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         )}
 
         {/* Badge Nacional */}
-        {!agotado && (producto.alcance === 'NACIONAL' || producto.alcance === 'AMBOS') && (
+        {mostrarNacional && (
           <span className="absolute top-3 right-3 bg-white/80 backdrop-blur text-[#1A1A1A] text-[10px] font-semibold px-2.5 py-1 rounded-full leading-none">
             📦 Nacional
           </span>
@@ -172,13 +173,15 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
           </span>
         )}
 
-        {/* Botón favorito */}
+        {/* Botón favorito — se desplaza debajo del badge Nacional cuando
+            ambos coinciden en la esquina superior derecha, para que no se
+            superpongan. */}
         {autenticado && (
           <button
             type="button"
             onClick={(e) => { e.preventDefault(); toggleFav(Number(producto.id)) }}
             aria-label={esFavorito(Number(producto.id)) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
-            className="absolute top-2.5 right-2.5 w-8 h-8 flex items-center justify-center rounded-full bg-white/80 backdrop-blur shadow-sm hover:bg-white transition-colors z-10"
+            className={`absolute right-2.5 ${mostrarNacional ? 'top-11' : 'top-2.5'} w-8 h-8 flex items-center justify-center rounded-full bg-white/80 backdrop-blur shadow-sm hover:bg-white transition-colors z-10`}
           >
             <svg viewBox="0 0 24 24" className="w-4 h-4" fill={esFavorito(Number(producto.id)) ? '#2D6A4F' : 'none'} stroke={esFavorito(Number(producto.id)) ? '#2D6A4F' : '#1A1A1A'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -253,40 +256,32 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
           </p>
         )}
 
-        {/* Precio + botones */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0 flex-1" style={{ lineHeight: 1 }}>
+        {/* Precio + botón */}
+        <div className="flex items-end justify-between gap-2">
+          {/* La unidad va en su propia línea debajo del precio (en vez de
+              inline) para que el precio nunca se corte y la unidad tampoco
+              se pierda — mismo espacio total, sin sacrificar información. */}
+          <div className="min-w-0 flex-1 truncate" style={{ lineHeight: 1 }}>
             {producto.oferta ? (
               <>
                 <span className="text-xs text-[#1A1A1A]/40 line-through block" style={{ lineHeight: '14px' }}>
                   {formatearPrecio(producto.precio)}
                 </span>
-                <span className="text-xl font-bold text-[#2D6A4F]">{formatearPrecio(producto.oferta.precioFinal)}</span>
-                <span className="text-xs text-[#1A1A1A]/50 ml-1">/ {producto.unidad.toLowerCase()}</span>
+                <span className="text-xl font-bold text-[#2D6A4F] block truncate">{formatearPrecio(producto.oferta.precioFinal)}</span>
+                <span className="text-[10px] text-[#1A1A1A]/50 block truncate" style={{ marginTop: 2 }}>/ {producto.unidad.toLowerCase()}</span>
               </>
             ) : (
               <>
-                <span className="text-xl font-bold text-[#1A1A1A]">{formatearPrecio(producto.precio)}</span>
-                <span className="text-xs text-[#1A1A1A]/50 ml-1">/ {producto.unidad.toLowerCase()}</span>
+                <span className="text-xl font-bold text-[#1A1A1A] block truncate">{formatearPrecio(producto.precio)}</span>
+                <span className="text-[10px] text-[#1A1A1A]/50 block truncate" style={{ marginTop: 2 }}>/ {producto.unidad.toLowerCase()}</span>
               </>
             )}
           </div>
 
           <div className="flex items-center gap-1 flex-shrink-0">
-            {/* Botón compartir WhatsApp */}
-            <a
-              href={`https://wa.me/?text=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : 'https://afromercado.vercel.app'}/producto/${producto.id}`)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              aria-label="Compartir por WhatsApp"
-              title="Compartir por WhatsApp"
-              className="w-8 h-8 min-w-[32px] rounded-full border border-[#25D366]/30 bg-[#25D366]/8 flex items-center justify-center text-[#128C7E] hover:bg-[#25D366]/20 transition-colors"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-              </svg>
-            </a>
+            {/* Compartir se quita de la tarjeta (compite por espacio con el
+                precio en la grilla angosta de 2 columnas) — queda disponible
+                solo en la ficha del producto. */}
 
             {/* Botón: Express → ir al restaurante / Normal → agregar al carrito */}
             {producto.esExpress ? (
