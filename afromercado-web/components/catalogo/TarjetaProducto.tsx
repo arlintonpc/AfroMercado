@@ -5,7 +5,6 @@ import Image from 'next/image'
 import { useState } from 'react'
 import type { Producto } from '@/types/producto'
 import { formatearPrecio } from '@/lib/formatearPrecio'
-import { useCarrito } from '@/context/CarritoContext'
 import { useFavoritos } from '@/context/FavoritoContext'
 import { useAuth } from '@/context/AuthContext'
 import { registrarEventoPatrocinado } from '@/lib/publicidadTracking'
@@ -21,14 +20,11 @@ interface TarjetaProductoProps {
 
 export default function TarjetaProducto({ producto, esDestacado = false, etiquetaDestacado, mostrarBadgeVerificado = false }: TarjetaProductoProps) {
   const selloTexto = etiquetaDestacado?.trim() || 'Patrocinado'
-  const { agregar } = useCarrito()
   const { toggle: toggleFav, esFavorito } = useFavoritos()
   const { autenticado } = useAuth()
   const [imgCargando, setImgCargando] = useState(true)
   const [imgError, setImgError]       = useState(false)
   const [hover, setHover]             = useState(false)
-  const [agregado, setAgregado]       = useState(false)
-  const [agregando, setAgregando]     = useState(false)
 
   const disponible = Math.max(0, producto.stock - (producto.stockReservado ?? 0))
   const descuentoPct = producto.oferta
@@ -47,23 +43,6 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
   function registrarPatrocinado(evento: 'clic' | 'carrito') {
     if (!esDestacado) return
     registrarEventoPatrocinado(producto.id, evento)
-  }
-
-  async function handleAgregar() {
-    if (agregando || agotado) return
-    setAgregando(true)
-    try {
-      await agregar(producto, 1)
-      registrarPatrocinado('carrito')
-      setAgregado(true)
-      setTimeout(() => setAgregado(false), 1600)
-    } catch {
-      // error de red — el carrito ya tiene fallback local
-      setAgregado(true)
-      setTimeout(() => setAgregado(false), 1600)
-    } finally {
-      setAgregando(false)
-    }
   }
 
   return (
@@ -256,77 +235,24 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
           </p>
         )}
 
-        {/* Precio + botón */}
-        <div className="flex items-end justify-between gap-2">
-          {/* La unidad va en su propia línea debajo del precio (en vez de
-              inline) para que el precio nunca se corte y la unidad tampoco
-              se pierda — mismo espacio total, sin sacrificar información. */}
-          <div className="min-w-0 flex-1 truncate" style={{ lineHeight: 1 }}>
-            {producto.oferta ? (
-              <>
-                <span className="text-xs text-[#1A1A1A]/40 line-through block" style={{ lineHeight: '14px' }}>
-                  {formatearPrecio(producto.precio)}
-                </span>
-                <span className="text-xl font-bold text-[#2D6A4F] block truncate">{formatearPrecio(producto.oferta.precioFinal)}</span>
-                <span className="text-[10px] text-[#1A1A1A]/50 block truncate" style={{ marginTop: 2 }}>/ {producto.unidad.toLowerCase()}</span>
-              </>
-            ) : (
-              <>
-                <span className="text-xl font-bold text-[#1A1A1A] block truncate">{formatearPrecio(producto.precio)}</span>
-                <span className="text-[10px] text-[#1A1A1A]/50 block truncate" style={{ marginTop: 2 }}>/ {producto.unidad.toLowerCase()}</span>
-              </>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {/* Compartir se quita de la tarjeta (compite por espacio con el
-                precio en la grilla angosta de 2 columnas) — queda disponible
-                solo en la ficha del producto. */}
-
-            {/* Botón: Express → ir al restaurante / Normal → agregar al carrito */}
-            {producto.esExpress ? (
-              <Link
-                href={`/express/${producto.comercioId}`}
-                onClick={(e) => e.stopPropagation()}
-                aria-label={`Pedir Express en ${producto.comercio.nombre}`}
-                title="Pedir ahora"
-                className="w-8 h-8 min-w-[32px] rounded-full bg-[#D4A017] hover:bg-[#B8891A] transition-colors flex items-center justify-center text-white shadow-sm"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 12h14M13 6l6 6-6 6" />
-                </svg>
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={handleAgregar}
-                disabled={agregando || agotado}
-                aria-label={agotado ? `${producto.nombre} agotado` : `Agregar ${producto.nombre} al pedido`}
-                title={agotado ? 'Sin stock disponible' : undefined}
-                className={`w-8 h-8 min-w-[32px] rounded-full transition-colors duration-200 flex items-center justify-center text-white shadow-sm ${
-                  agotado
-                    ? 'bg-[#1A1A1A]/20 cursor-not-allowed'
-                    : agregado
-                    ? 'bg-[#2D6A4F]'
-                    : 'bg-[#2D6A4F] hover:bg-[#D4A017] disabled:opacity-70'
-                }`}
-              >
-                {agregado ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6L9 17l-5-5" />
-                  </svg>
-                ) : agotado ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                )}
-              </button>
-            )}
-          </div>
+        {/* Precio — sin botón junto a él: la tarjeta completa ya es tappable
+            (imagen/nombre) para ir a la ficha y agregar ahí. Esto le da al
+            precio todo el ancho disponible, siempre visible sin recortes. */}
+        <div style={{ lineHeight: 1 }}>
+          {producto.oferta ? (
+            <>
+              <span className="text-xs text-[#1A1A1A]/40 line-through block" style={{ lineHeight: '14px' }}>
+                {formatearPrecio(producto.precio)}
+              </span>
+              <span className="text-xl font-bold text-[#2D6A4F] block truncate">{formatearPrecio(producto.oferta.precioFinal)}</span>
+              <span className="text-[10px] text-[#1A1A1A]/50 block truncate" style={{ marginTop: 2 }}>/ {producto.unidad.toLowerCase()}</span>
+            </>
+          ) : (
+            <>
+              <span className="text-xl font-bold text-[#1A1A1A] block truncate">{formatearPrecio(producto.precio)}</span>
+              <span className="text-[10px] text-[#1A1A1A]/50 block truncate" style={{ marginTop: 2 }}>/ {producto.unidad.toLowerCase()}</span>
+            </>
+          )}
         </div>
       </div>
     </article>

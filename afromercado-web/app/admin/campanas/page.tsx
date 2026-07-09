@@ -11,6 +11,7 @@ interface Campana {
   titulo:     string
   subtitulo?: string
   imagenUrl:  string
+  videoUrl?:  string
   ctaTexto:   string
   urlDestino: string
   activa:     boolean
@@ -40,7 +41,7 @@ const SEMANA = localISO(new Date(Date.now() + 7 * 86400_000))
 
 const FORM_INIT = {
   tipo: 'PUBLICIDAD' as TipoCampana,
-  titulo: '', subtitulo: '', imagenUrl: '', ctaTexto: 'Ver más',
+  titulo: '', subtitulo: '', imagenUrl: '', videoUrl: '', ctaTexto: 'Ver más',
   urlDestino: '', inicio: HOY, fin: SEMANA,
   montoCOP: '', notas: '', prioridad: '0',
   etiqueta: 'Patrocinado',
@@ -419,6 +420,20 @@ export default function AdminCampanasPage() {
               <input ref={imgInputRef} type="file" accept="image/*" onChange={subirImagen} className="hidden" />
             </div>
 
+            {/* Video publicitario — solo enlace, nunca se sube un archivo aquí */}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-[#1A1A1A]/60 mb-1">Video (opcional) — solo enlace</label>
+              <input {...campo('videoUrl')} placeholder="https://... (archivo .mp4 directo, o link de YouTube)" className={ctr} />
+              <p className="text-xs text-[#1A1A1A]/40 mt-1 leading-snug">
+                No se sube ningún archivo aquí, solo se pega el link del video alojado en otra plataforma. Se
+                reproduce automático, sin sonido y en bucle, ajustado a la tarjeta — igual que un anuncio de video
+                en Facebook. Esto se logra limpio con un <strong>archivo de video directo</strong> o un{' '}
+                <strong>link de YouTube</strong>. Con TikTok, Instagram o Facebook se muestra la imagen con un
+                indicador de &quot;Video&quot; en su lugar, porque esas plataformas no permiten un autoplay silencioso
+                sin su propia interfaz encima. Si lo dejas vacío, se usa solo la imagen.
+              </p>
+            </div>
+
             {/* CTA */}
             <div>
               <label className="block text-xs font-semibold text-[#1A1A1A]/60 mb-1">Texto del botón</label>
@@ -549,6 +564,9 @@ export default function AdminCampanasPage() {
                       <p className="font-semibold text-[#1A1A1A] text-sm truncate">{c.titulo}</p>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full leading-none border ${tb.cls}`}>{tb.label}</span>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full leading-none ${b.cls}`}>{b.label}</span>
+                      {c.videoUrl && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full leading-none bg-[#2A4AB8]/10 text-[#2A4AB8]">🎥 Video</span>
+                      )}
                     </div>
                     {c.subtitulo && <p className="text-xs text-[#1A1A1A]/50 truncate">{c.subtitulo}</p>}
                     <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5 text-xs text-[#1A1A1A]/50">

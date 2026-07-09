@@ -68,7 +68,7 @@ const CampanaController = {
   /* POST /api/admin/campanas */
   async crear(req, res, next) {
     try {
-      const { tipo = "PUBLICIDAD", titulo, subtitulo, imagenUrl, ctaTexto,
+      const { tipo = "PUBLICIDAD", titulo, subtitulo, imagenUrl, videoUrl, ctaTexto,
               urlDestino, inicio, fin, montoCOP, notas, prioridad, etiqueta,
               alcance, departamento } = req.body;
       if (!titulo || !imagenUrl || !urlDestino || !inicio || !fin) {
@@ -88,7 +88,8 @@ const CampanaController = {
         data: {
           tipo: tipoFinal,
           titulo, subtitulo: subtitulo || null,
-          imagenUrl, ctaTexto: ctaTexto || ctaDefault,
+          imagenUrl, videoUrl: videoUrl || null,
+          ctaTexto: ctaTexto || ctaDefault,
           urlDestino, inicio: new Date(inicio), fin: new Date(fin),
           montoCOP: tipoFinal === "SOCIAL" ? null : (montoCOP ? Number(montoCOP) : null),
           notas: notas || null, prioridad: Number(prioridad ?? (tipoFinal === "SOCIAL" ? 8 : 0)),

@@ -51,6 +51,78 @@ const FALLBACK: FotoHero[] = [
   { url: 'https://images.unsplash.com/photo-1775817590687-f1da5d70d9ad?w=600&q=80&auto=format&fit=crop', alt: 'Panela negra artesanal',    etiqueta: 'Panela negra',   precio: '$8.000',  href: '/' },
 ]
 
+/* ─── Video de campaña: solo YouTube y archivo directo logran el
+   autoplay silencioso en loop sin interfaz de la plataforma (el look
+   "estilo Facebook" que se busca). TikTok/Instagram/Facebook muestran su
+   propia marca/controles al incrustarse, así que ahí se usa una miniatura
+   estática en vez de fingir un autoplay que no se ve limpio. ─────── */
+type TipoVideoAnuncio = 'directo' | 'youtube' | 'otro'
+
+function detectarVideoAnuncio(url?: string): { tipo: TipoVideoAnuncio; embedUrl?: string } {
+  if (!url) return { tipo: 'otro' }
+  try {
+    const u = new URL(url)
+    const host = u.hostname.replace(/^www\./, '')
+    if (host === 'youtube.com' || host === 'youtu.be') {
+      const vid = host === 'youtu.be' ? u.pathname.slice(1) : u.searchParams.get('v')
+      if (vid) {
+        return {
+          tipo: 'youtube',
+          embedUrl: `https://www.youtube.com/embed/${vid}?autoplay=1&mute=1&loop=1&playlist=${vid}&controls=0&modestbranding=1&playsinline=1&rel=0`,
+        }
+      }
+    }
+    if (/\.(mp4|webm|mov|m3u8)(\?|$)/i.test(u.pathname)) return { tipo: 'directo' }
+    if (host.includes('cloudinary.com') && u.pathname.includes('/video/')) return { tipo: 'directo' }
+  } catch { /* URL invalida */ }
+  return { tipo: 'otro' }
+}
+
+/** Fondo de la tarjeta del hero: video directo, YouTube en loop silencioso, o imagen estática. */
+function MediaFondoHero({ foto, className, priority }: { foto: FotoHero; className: string; priority?: boolean }) {
+  const video = useMemo(() => detectarVideoAnuncio(foto.videoUrl), [foto.videoUrl])
+
+  if (video.tipo === 'directo') {
+    return (
+      <video src={foto.videoUrl} poster={foto.url} autoPlay muted loop playsInline className={className} />
+    )
+  }
+
+  if (video.tipo === 'youtube' && video.embedUrl) {
+    return (
+      <div className={`${className} relative overflow-hidden bg-black`}>
+        <iframe
+          src={video.embedUrl}
+          className="absolute top-1/2 left-1/2 pointer-events-none"
+          style={{ width: '250%', height: '250%', transform: 'translate(-50%, -50%)', border: 0 }}
+          allow="autoplay; encrypted-media"
+          tabIndex={-1}
+          aria-hidden="true"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <Image
+        src={foto.url}
+        alt={foto.alt}
+        fill
+        sizes="(max-width: 1024px) 160px, 25vw"
+        className={className}
+        priority={priority}
+      />
+      {foto.videoUrl && (
+        <span className="absolute top-3 left-3 flex items-center gap-1 bg-black/50 backdrop-blur text-white text-[10px] font-semibold px-2 py-1 rounded-full">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+          Video
+        </span>
+      )}
+    </>
+  )
+}
+
 /* ─── Utilidades ─────────────────────────────────────────────── */
 function mezclar<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -91,26 +163,11 @@ function Collage({ fotos, priority = false, onClic }: {
           style={{ aspectRatio: '3 / 4' }}
           tabIndex={0}
         >
-          {foto.videoUrl ? (
-            <video
-              src={foto.videoUrl}
-              poster={foto.url}
-              autoPlay
-              muted
-              loop
-              playsInline
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-            />
-          ) : (
-            <Image
-              src={foto.url}
-              alt={foto.alt}
-              fill
-              sizes="(max-width: 1024px) 0px, 25vw"
-              className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-              priority={priority && idx < 2}
-            />
-          )}
+          <MediaFondoHero
+            foto={foto}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            priority={priority && idx < 2}
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
 
           {/* Badge campaña */}
@@ -156,19 +213,11 @@ function CollageMobile({ fotos, onClic }: {
           className="group relative flex-shrink-0 w-40 block rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A017]"
           style={{ aspectRatio: '3 / 4' }}
         >
-          {foto.videoUrl ? (
-            <video
-              src={foto.videoUrl}
-              poster={foto.url}
-              autoPlay
-              muted
-              loop
-              playsInline
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-            />
-          ) : (
-            <Image src={foto.url} alt={foto.alt} fill sizes="160px" className="object-cover transition-transform duration-500 group-hover:scale-[1.04]" priority={idx === 0} />
-          )}
+          <MediaFondoHero
+            foto={foto}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            priority={idx === 0}
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
           {foto.esCampaña && (
             <span className={`absolute top-2 right-2 text-[8px] font-bold px-1.5 py-0.5 rounded-full leading-none tracking-wide uppercase ${badgeCampana(foto).cls}`}>
