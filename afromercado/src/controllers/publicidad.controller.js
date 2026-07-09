@@ -3,6 +3,7 @@ const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils
 const { generarExcelAfroMedia } = require("../services/reporteExcel.service");
 const PagoPublicidadService = require("../services/pago-publicidad.service");
 const VisibilidadService = require("../services/visibilidad.service");
+const NotificacionService = require("../services/notificacion.service");
 
 async function registrarAuditoria({ tipo, entidad, entidadId = null, usuarioId = null, datos = null, ip = null }) {
   try {
@@ -780,6 +781,9 @@ const PublicidadController = {
         datos: { paquete, objetivo, presupuestoCOP: solicitud.presupuestoCOP, alcance, departamento, municipio },
         ip: limpiarTexto(req.headers["x-forwarded-for"] || req.ip, 120),
       });
+
+      NotificacionService.solicitudPublicidadCreada({ solicitud, comercioNombre: comercio.nombre })
+        .catch((e) => console.error("[PUBLICIDAD] notificar admins:", e.message));
 
       res.status(201).json({ ok: true, data: solicitud });
     } catch (err) { next(err); }

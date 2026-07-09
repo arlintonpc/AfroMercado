@@ -859,6 +859,28 @@ const NotificacionService = {
       url: "/",
     });
   },
+
+  // AfroMedia — nueva solicitud de publicidad (incluye Video Historia): avisa a los admins
+  async solicitudPublicidadCreada({ solicitud, comercioNombre }) {
+    await notificarAdmins({
+      tipo: "SOLICITUD_PUBLICIDAD_CREADA_ADMIN",
+      titulo: "Nueva solicitud de publicidad",
+      mensaje: `${comercioNombre || "Un comercio"} solicitó "${solicitud.paquete}"${solicitud.objetivo ? ` — ${solicitud.objetivo}` : ""}.`,
+      url: "/admin/afromedia",
+      datos: { solicitudId: solicitud.id },
+    });
+  },
+
+  // Alianzas comerciales — nueva alianza pendiente de aprobación: avisa a los admins
+  async alianzaCreada({ alianza }) {
+    await notificarAdmins({
+      tipo: "ALIANZA_CREADA_ADMIN",
+      titulo: "Nueva alianza comercial pendiente",
+      mensaje: `"${alianza.nombre}" (código ${alianza.codigoCompartido}) espera aprobación.`,
+      url: "/admin/alianzas",
+      datos: { alianzaId: alianza.id },
+    });
+  },
 };
 
 module.exports = NotificacionService;

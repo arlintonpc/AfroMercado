@@ -10,6 +10,7 @@
 // ============================================================
 const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
+const NotificacionService = require("./notificacion.service");
 
 const MODULOS_VALIDOS = ["PEDIDO", "EXPRESS", "HOTEL", "TOUR", "TRANSPORTE"];
 const TIPOS_DESCUENTO_VALIDOS = ["PORCENTAJE", "VALOR_FIJO"];
@@ -130,7 +131,7 @@ const AlianzaService = {
 
     const codigoCompartido = await generarCodigoUnico(nombre);
 
-    return prisma.alianzaComercial.create({
+    const alianza = await prisma.alianzaComercial.create({
       data: {
         nombre: String(nombre).trim().slice(0, 160),
         descripcion: descripcion ? String(descripcion).trim().slice(0, 2000) : null,
@@ -154,6 +155,10 @@ const AlianzaService = {
       },
       include: ALIANZA_INCLUDE,
     });
+
+    NotificacionService.alianzaCreada({ alianza }).catch((e) => console.error("[ALIANZA] notificar admins:", e.message));
+
+    return alianza;
   },
 
   /**
