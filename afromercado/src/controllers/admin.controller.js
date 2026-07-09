@@ -870,8 +870,11 @@ const AdminController = {
   // POST /admin/categorias
   async crearCategoria(req, res, next) {
     try {
-      const { nombre, icono } = req.body;
+      const { nombre, icono, grupo } = req.body;
       if (!nombre?.trim()) throw new ErrorValidacion("El nombre es obligatorio");
+      if (grupo !== undefined && !["ANCESTRAL", "LOCAL"].includes(grupo)) {
+        throw new ErrorValidacion("grupo debe ser ANCESTRAL o LOCAL");
+      }
       const slug = nombre
         .trim()
         .toLowerCase()
@@ -880,7 +883,7 @@ const AdminController = {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
       const data = await prisma.categoria.create({
-        data: { nombre: nombre.trim(), slug, icono: icono?.trim() ?? null, activa: true },
+        data: { nombre: nombre.trim(), slug, icono: icono?.trim() ?? null, activa: true, grupo: grupo ?? "ANCESTRAL" },
       });
       res.status(201).json({ ok: true, data });
     } catch (e) { next(e); }
@@ -909,6 +912,23 @@ const AdminController = {
       const data = await prisma.categoria.update({
         where: { id: c.id },
         data: { activa: !c.activa },
+      });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // PATCH /admin/categorias/:id/grupo  body: { grupo: "ANCESTRAL"|"LOCAL" }
+  async cambiarGrupoCategoria(req, res, next) {
+    try {
+      const { grupo } = req.body;
+      if (!["ANCESTRAL", "LOCAL"].includes(grupo)) {
+        throw new ErrorValidacion("grupo debe ser ANCESTRAL o LOCAL");
+      }
+      const c = await prisma.categoria.findUnique({ where: { id: Number(req.params.id) } });
+      if (!c) throw new ErrorNoEncontrado("Categoría no encontrada");
+      const data = await prisma.categoria.update({
+        where: { id: c.id },
+        data: { grupo },
       });
       res.json({ ok: true, data });
     } catch (e) { next(e); }

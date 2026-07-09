@@ -9,14 +9,17 @@ import { useCarrito } from '@/context/CarritoContext'
 import { useFavoritos } from '@/context/FavoritoContext'
 import { useAuth } from '@/context/AuthContext'
 import { registrarEventoPatrocinado } from '@/lib/publicidadTracking'
+import BadgeVendedorVerificado from '@/components/ui/BadgeVendedorVerificado'
 
 interface TarjetaProductoProps {
   producto: Producto
   esDestacado?: boolean
   etiquetaDestacado?: string
+  /** Muestra la insignia "Vendedor verificado" (usado en la pestaña Tienda Local del buscador). */
+  mostrarBadgeVerificado?: boolean
 }
 
-export default function TarjetaProducto({ producto, esDestacado = false, etiquetaDestacado }: TarjetaProductoProps) {
+export default function TarjetaProducto({ producto, esDestacado = false, etiquetaDestacado, mostrarBadgeVerificado = false }: TarjetaProductoProps) {
   const selloTexto = etiquetaDestacado?.trim() || 'Patrocinado'
   const { agregar } = useCarrito()
   const { toggle: toggleFav, esFavorito } = useFavoritos()
@@ -207,6 +210,12 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
             : <>{producto.comercio.nombre}{producto.comercio.verificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}</>
           }
         </p>
+
+        {mostrarBadgeVerificado && (
+          <div className="mb-1.5">
+            <BadgeVendedorVerificado verificado={producto.comercio.verificado} size="sm" mostrarTooltip={false} />
+          </div>
+        )}
 
         {/* Nombre */}
         <Link

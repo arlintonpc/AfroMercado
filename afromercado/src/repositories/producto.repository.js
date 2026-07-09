@@ -60,6 +60,7 @@ const ProductoRepository = {
   async listar({
     q,
     categoriaId,
+    grupo,
     municipio,
     departamento,
     comercioId,
@@ -100,6 +101,12 @@ const ProductoRepository = {
     // Filtro por categoría
     if (categoriaId) {
       where.categoriaId = Number(categoriaId);
+    }
+
+    // Filtro por grupo de categoría (ANCESTRAL | LOCAL) — distingue
+    // "Productos ancestrales" de "Tienda Local"
+    if (grupo) {
+      where.categoria = { ...where.categoria, grupo };
     }
 
     // Filtro por municipio del comercio

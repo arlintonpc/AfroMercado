@@ -118,6 +118,7 @@ router.get("/categorias",                ...soloAdmin, AdminController.listarCat
 router.post("/categorias",               ...soloAdmin, AdminController.crearCategoria);
 router.patch("/categorias/:id",          ...soloAdmin, AdminController.actualizarCategoria);
 router.patch("/categorias/:id/activo",   ...soloAdmin, AdminController.toggleActivoCategoria);
+router.patch("/categorias/:id/grupo",    ...soloAdmin, AdminController.cambiarGrupoCategoria);
 
 // Pedidos (vista admin)
 router.get("/pedidos",     ...soloAdmin, AdminController.listarPedidos);

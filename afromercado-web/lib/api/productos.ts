@@ -5,6 +5,7 @@ import type { Categoria } from '@/types/categoria'
 export interface FiltrosProductos {
   q?: string
   categoriaId?: string
+  grupo?: 'ANCESTRAL' | 'LOCAL'
   municipio?: string
   departamento?: string
   precioMin?: number

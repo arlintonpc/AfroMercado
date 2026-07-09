@@ -25,6 +25,7 @@ const FILTROS_VACIOS = {
   precioMax: '',
   alcance: '' as '' | 'LOCAL' | 'NACIONAL' | 'AMBOS',
   enOferta: false,
+  grupo: 'ANCESTRAL' as 'ANCESTRAL' | 'LOCAL',
 }
 
 function contarFiltrosActivos(f: typeof FILTROS_VACIOS): number {
@@ -167,7 +168,8 @@ function Resultados() {
   const cargarProductos = useCallback(async (texto: string, paginaNum: number, append: boolean) => {
     const f = filtrosRef.current
     const hayTermino = !!texto.trim()
-    const hayFiltros = contarFiltrosActivos(f) > 0
+    const grupoEsLocal = f.grupo === 'LOCAL'
+    const hayFiltros = contarFiltrosActivos(f) > 0 || grupoEsLocal
     if (!hayTermino && !hayFiltros) { setProductos([]); setTotal(0); setPaginas(0); return }
     if (append) setCargandoMas(true); else setCargandoProductos(true)
     setErrorProductos(null)
@@ -175,6 +177,7 @@ function Resultados() {
       const { items, total: tot, paginas: pags } = await listarProductos({
         q: texto.trim() || undefined,
         categoriaId: f.categoriaId || undefined,
+        grupo: f.grupo,
         precioMin: f.precioMin ? Number(f.precioMin) : undefined,
         precioMax: f.precioMax ? Number(f.precioMax) : undefined,
         alcance: f.alcance || undefined,
@@ -216,6 +219,16 @@ function Resultados() {
 
   function limpiarFiltros() { setFiltros(FILTROS_VACIOS) }
 
+  function cambiarGrupo(g: 'ANCESTRAL' | 'LOCAL') {
+    setFiltros(prev => {
+      if (prev.grupo === g) return prev
+      const catSeleccionada = categorias.find(c => c.id === prev.categoriaId)
+      // Si la categoría elegida no pertenece al nuevo grupo (y sí tiene grupo asignado), se limpia.
+      const siguePerteneciendo = !catSeleccionada || !catSeleccionada.grupo || catSeleccionada.grupo === g
+      return { ...prev, grupo: g, categoriaId: siguePerteneciendo ? prev.categoriaId : '' }
+    })
+  }
+
   function cargarMas() { const sig = pagina + 1; setPagina(sig); cargarProductos(q, sig, true) }
 
   // Filtrado cliente-side para turismo
@@ -238,7 +251,9 @@ function Resultados() {
   ) : transportes
 
   const filtrosActivos = contarFiltrosActivos(filtros)
-  const sinTerminoNiFiltros = !q && filtrosActivos === 0 && !cargandoProductos
+  const grupoEsLocal = filtros.grupo === 'LOCAL'
+  const sinTerminoNiFiltros = !q && filtrosActivos === 0 && !grupoEsLocal && !cargandoProductos
+  const categoriasDelGrupo = categorias.filter(c => !c.grupo || c.grupo === filtros.grupo)
 
   const inputCls = 'h-10 px-3 rounded-xl border border-[#1A1A1A]/15 bg-white focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] text-sm w-full'
   const btnPrimario = 'bg-[#2D6A4F] hover:bg-[#245a42] text-white font-semibold rounded-xl px-4 py-2 text-sm transition-colors'
@@ -280,7 +295,7 @@ function Resultados() {
           className={inputCls}
         >
           <option value="">Todas las categorías</option>
-          {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.icono ? `${cat.icono} ` : ''}{cat.nombre}</option>)}
+          {categoriasDelGrupo.map(cat => <option key={cat.id} value={cat.id}>{cat.icono ? `${cat.icono} ` : ''}{cat.nombre}</option>)}
         </select>
       </div>
       <div className="flex flex-col gap-1.5">
@@ -341,6 +356,32 @@ function Resultados() {
           ))}
         </div>
 
+        {/* Toggle Productos ancestrales / Tienda local — secundario, solo dentro del tab Productos */}
+        {tab === 'productos' && (
+          <div className="inline-flex self-start bg-white border border-[#1A1A1A]/10 rounded-full p-1 gap-1">
+            <button
+              type="button"
+              onClick={() => cambiarGrupo('ANCESTRAL')}
+              aria-pressed={filtros.grupo === 'ANCESTRAL'}
+              className={`px-3.5 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                filtros.grupo === 'ANCESTRAL' ? 'bg-[#1B4332] text-white' : 'text-[#1A1A1A]/60 hover:text-[#1A1A1A]'
+              }`}
+            >
+              🌿 Productos ancestrales
+            </button>
+            <button
+              type="button"
+              onClick={() => cambiarGrupo('LOCAL')}
+              aria-pressed={filtros.grupo === 'LOCAL'}
+              className={`px-3.5 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                filtros.grupo === 'LOCAL' ? 'bg-[#023E8A] text-white' : 'text-[#1A1A1A]/60 hover:text-[#1A1A1A]'
+              }`}
+            >
+              🏬 Tienda local
+            </button>
+          </div>
+        )}
+
         {/* Encabezado */}
         {q && (
           <div className="flex items-start justify-between gap-4">
@@ -373,11 +414,11 @@ function Resultados() {
                 {errorProductos && !cargandoProductos && <EmptyState titulo="No pudimos buscar" descripcion={errorProductos} onReintentar={() => cargarProductos(q, pagina, false)} />}
                 {cargandoProductos && <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}</div>}
                 {sinTerminoNiFiltros && <EmptyState titulo="¿Qué estás buscando?" descripcion="Escribe el nombre de un producto, un sabor o un productor, o usa los filtros." />}
-                {!cargandoProductos && !errorProductos && productos.length === 0 && (q || filtrosActivos > 0) && (
-                  <EmptyState titulo={q ? `Sin resultados para «${q}»` : 'Sin resultados'} descripcion="Prueba con otra palabra o ajusta los filtros." />
+                {!cargandoProductos && !errorProductos && productos.length === 0 && (q || filtrosActivos > 0 || grupoEsLocal) && (
+                  <EmptyState titulo={q ? `Sin resultados para «${q}»` : 'Sin resultados'} descripcion={grupoEsLocal ? 'Aún no hay productos en Tienda Local que coincidan.' : 'Prueba con otra palabra o ajusta los filtros.'} />
                 )}
                 {!cargandoProductos && !errorProductos && productos.length > 0 && (
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">{productos.map(p => <TarjetaProducto key={p.id} producto={p} />)}</div>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">{productos.map(p => <TarjetaProducto key={p.id} producto={p} mostrarBadgeVerificado={grupoEsLocal} />)}</div>
                 )}
                 {cargandoMas && <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={`mas-${i}`} />)}</div>}
                 {!cargandoProductos && !errorProductos && productos.length > 0 && pagina < paginas && (

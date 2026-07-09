@@ -340,12 +340,18 @@ model ConfigFiscalComercio {
   comercio Comercio @relation(fields: [comercioId], references: [id])
 }
 
+enum GrupoCategoria {
+  ANCESTRAL
+  LOCAL
+}
+
 model Categoria {
-  id       Int       @id @default(autoincrement())
-  nombre   String    @unique
-  slug     String    @unique
+  id       Int            @id @default(autoincrement())
+  nombre   String         @unique
+  slug     String         @unique
   icono    String?
-  activa   Boolean   @default(true)
+  activa   Boolean        @default(true)
+  grupo    GrupoCategoria @default(ANCESTRAL)
 
   productos Producto[]
 }

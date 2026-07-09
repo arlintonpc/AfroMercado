@@ -3,4 +3,5 @@ export interface Categoria {
   nombre: string
   slug: string
   icono?: string
+  grupo?: 'ANCESTRAL' | 'LOCAL'
 }
