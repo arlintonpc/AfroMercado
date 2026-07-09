@@ -1305,6 +1305,13 @@ async function aplicarMigraciones() {
 
     // ── Rediseño de Empleo: imagen tipo banner por vacante ──
     `ALTER TABLE "OfertaEmpleo" ADD COLUMN IF NOT EXISTS "imagenUrl" TEXT`,
+
+    // ── Turismo Comunitario Certificado: RNT en Tour (mismo patron que ConfigHotel) ──
+    `ALTER TABLE "ConfigTour" ADD COLUMN IF NOT EXISTS "rnt" TEXT`,
+    `ALTER TABLE "ConfigTour" ADD COLUMN IF NOT EXISTS "rntVerificado" BOOLEAN NOT NULL DEFAULT false`,
+
+    // ── Programas y Subsidios con Trazabilidad: agrupa cupones de un mismo programa ──
+    `ALTER TABLE "Cupon" ADD COLUMN IF NOT EXISTS "programaNombre" TEXT`,
   ];
   for (const sql of migraciones) {
     try {

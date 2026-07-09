@@ -12,6 +12,17 @@ import { apiFetch } from './client'
  *  - PATCH  /alianzas/:id/socios/mio   → AlianzaSocio (acepta mi propia invitación)
  *  - DELETE /alianzas/:id/socios/mio   → { ok, accion }  (rechaza o me retiro)
  *  - GET    /alianzas/codigo/:codigo   → público, no se consume desde el panel de comerciante
+ *
+ * Rutas admin (ver afromercado/src/routes/admin.routes.js — montadas bajo /admin,
+ * requieren rol ADMIN; también envuelven la data en { ok: true, data }):
+ *  - GET   /admin/alianzas                  → AlianzaComercial[] (?estado= opcional)
+ *  - PATCH /admin/alianzas/:id/aprobar      → AlianzaComercial (publica; requiere ≥2 socios aceptados)
+ *  - PATCH /admin/alianzas/:id/rechazar     → AlianzaComercial (requiere motivo)
+ *  - PATCH /admin/alianzas/:id/despublicar  → AlianzaComercial
+ *
+ * Buscador de comercios para invitar socios (ver afromercado/src/routes/comercio.routes.js
+ * y comercio.controller.js — requiere rol COMERCIANTE o ADMIN, responde { ok: true, comercios }):
+ *  - GET /comercios/buscar?q=texto
  */
 
 export type ModuloAlianza = 'PEDIDO' | 'EXPRESS' | 'HOTEL' | 'TOUR' | 'TRANSPORTE'
@@ -23,6 +34,13 @@ export interface ComercioResumenAlianza {
   nombre: string
   municipio?: string | null
   departamento?: string | null
+}
+
+export interface ComercioBusqueda {
+  id: number
+  nombre: string
+  municipio?: string | null
+  logoUrl?: string | null
 }
 
 export interface AlianzaSocio {
@@ -124,4 +142,47 @@ export async function rechazarOSalirAlianza(alianzaId: number): Promise<Resultad
     method: 'DELETE',
   })
   return res.data
+}
+
+// ── ADMIN ──────────────────────────────────────────────────────
+
+/** Lista todas las alianzas, opcionalmente filtradas por estado. */
+export async function adminListarAlianzas(estado?: EstadoAlianza): Promise<AlianzaComercial[]> {
+  const qs = estado ? `?estado=${encodeURIComponent(estado)}` : ''
+  const res = await apiFetch<{ ok: boolean; data: AlianzaComercial[] }>(`/admin/alianzas${qs}`)
+  return res.data
+}
+
+/** Aprueba y publica una alianza pendiente (requiere al menos 2 socios aceptados). */
+export async function adminAprobarAlianza(alianzaId: number): Promise<AlianzaComercial> {
+  const res = await apiFetch<{ ok: boolean; data: AlianzaComercial }>(`/admin/alianzas/${alianzaId}/aprobar`, {
+    method: 'PATCH',
+  })
+  return res.data
+}
+
+/** Rechaza una alianza pendiente. El motivo es obligatorio en el backend. */
+export async function adminRechazarAlianza(alianzaId: number, motivoRechazo: string): Promise<AlianzaComercial> {
+  const res = await apiFetch<{ ok: boolean; data: AlianzaComercial }>(`/admin/alianzas/${alianzaId}/rechazar`, {
+    method: 'PATCH',
+    body: { motivoRechazo },
+  })
+  return res.data
+}
+
+/** Despublica una alianza que estaba PUBLICADA. */
+export async function adminDespublicarAlianza(alianzaId: number): Promise<AlianzaComercial> {
+  const res = await apiFetch<{ ok: boolean; data: AlianzaComercial }>(`/admin/alianzas/${alianzaId}/despublicar`, {
+    method: 'PATCH',
+  })
+  return res.data
+}
+
+// ── Buscador de comercios (para invitar un socio) ────────────────
+
+/** Autocomplete de comercios activos/verificados por nombre. Excluye el comercio propio. */
+export async function buscarComercios(q: string): Promise<ComercioBusqueda[]> {
+  if (!q.trim()) return []
+  const res = await apiFetch<{ ok: boolean; comercios: ComercioBusqueda[] }>(`/comercios/buscar?q=${encodeURIComponent(q)}`)
+  return res.comercios
 }

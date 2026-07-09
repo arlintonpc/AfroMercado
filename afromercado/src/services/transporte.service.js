@@ -510,8 +510,8 @@ const TransporteService = {
 
   // ── CUPONES DE TRANSPORTE ──────────────────────────────────────
 
-  async validarCuponTransporte(codigo, configTransporteId, asientos, clienteId, totalOriginal) {
-    return validarCuponTransporteInterno(prisma, codigo, configTransporteId, asientos, clienteId, totalOriginal);
+  async validarCuponTransporte(codigo, configTransporteId, asientos, clienteId, totalOriginal, comercioId = null) {
+    return validarCuponTransporteInterno(prisma, codigo, configTransporteId, asientos, clienteId, totalOriginal, { comercioId });
   },
 
   async crearCuponTransporte(comercioId, datos) {

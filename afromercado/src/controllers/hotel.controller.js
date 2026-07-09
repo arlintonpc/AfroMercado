@@ -372,12 +372,12 @@ const HotelController = {
       const modalidadNormalizada = String(modalidad || "NOCHE").trim().toUpperCase();
       const duracionHoras = Math.max(0, (salida - entrada) / 3600000);
       const noches  = modalidadNormalizada === "HORAS" ? 1 : Math.ceil((salida - entrada) / 86400000);
-      const tipo    = await prisma.habitacionTipo.findUnique({ where: { id: Number(habitacionTipoId) } });
+      const tipo    = await prisma.habitacionTipo.findUnique({ where: { id: Number(habitacionTipoId) }, include: { configHotel: true } });
       if (!tipo) return res.status(404).json({ ok: false, error: "Habitación no encontrada" });
       const totalOriginal = modalidadNormalizada === "HORAS"
         ? Number(tipo.precioPorHora || 0) * duracionHoras
         : Number(tipo.precioPorNoche) * noches;
-      const data = await HotelService.validarCuponHotel(codigo, tipo.configHotelId, noches, req.usuario?.id, totalOriginal);
+      const data = await HotelService.validarCuponHotel(codigo, tipo.configHotelId, noches, req.usuario?.id, totalOriginal, tipo.configHotel?.comercioId ?? null);
       res.json({ ok: true, data });
     } catch (e) { next(e); }
   },

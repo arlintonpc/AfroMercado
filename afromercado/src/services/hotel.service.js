@@ -1626,8 +1626,8 @@ const HotelService = {
 
   // ── CUPONES DE HOTEL ──────────────────────────────────────────
 
-  async validarCuponHotel(codigo, configHotelId, noches, clienteId, totalOriginal) {
-    return validarCuponHotelInterno(prisma, codigo, configHotelId, noches, clienteId, totalOriginal);
+  async validarCuponHotel(codigo, configHotelId, noches, clienteId, totalOriginal, comercioId = null) {
+    return validarCuponHotelInterno(prisma, codigo, configHotelId, noches, clienteId, totalOriginal, { comercioId });
   },
 
   async crearCuponHotel(comercioId, datos) {

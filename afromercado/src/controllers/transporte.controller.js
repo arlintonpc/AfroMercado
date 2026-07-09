@@ -130,10 +130,10 @@ const TransporteController = {
     try {
       const { codigo, rutaTransporteId, asientos } = req.body;
       const cantidadAsientos = Number(asientos) || 1;
-      const ruta = await prisma.rutaTransporte.findUnique({ where: { id: Number(rutaTransporteId) } });
+      const ruta = await prisma.rutaTransporte.findUnique({ where: { id: Number(rutaTransporteId) }, include: { configTransporte: true } });
       if (!ruta) return res.status(404).json({ ok: false, error: "Ruta no encontrada" });
       const totalOriginal = Number(ruta.precioAsiento) * cantidadAsientos;
-      const data = await TransporteService.validarCuponTransporte(codigo, ruta.configTransporteId, cantidadAsientos, req.usuario?.id, totalOriginal);
+      const data = await TransporteService.validarCuponTransporte(codigo, ruta.configTransporteId, cantidadAsientos, req.usuario?.id, totalOriginal, ruta.configTransporte?.comercioId ?? null);
       res.json({ ok: true, data });
     } catch (e) { next(e); }
   },

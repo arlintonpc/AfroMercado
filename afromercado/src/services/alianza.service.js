@@ -425,6 +425,7 @@ const AlianzaService = {
         aprobadoPor: Number(adminId),
         aprobadoAt: new Date(),
       },
+      include: ALIANZA_INCLUDE,
     });
   },
 
@@ -437,6 +438,7 @@ const AlianzaService = {
     return prisma.alianzaComercial.update({
       where: { id: alianza.id },
       data: { estado: "DESPUBLICADA", aprobadoPor: Number(adminId), aprobadoAt: new Date() },
+      include: ALIANZA_INCLUDE,
     });
   },
 
@@ -445,10 +447,9 @@ const AlianzaService = {
   /**
    * Valida un código de alianza para un checkout de un comercio+módulo específico.
    *
-   * Esta función NO se conecta aquí a los checkouts de Express/Hotel/Tour/
-   * Transporte/Pedido — esa integración es una tarea aparte. Se deja exportada
-   * y documentada para que cada servicio de checkout la invoque en su momento,
-   * de forma análoga a como ya validan CuponExpress/CuponHotel/CuponTour/etc.
+   * Esta función es invocada por los servicios de checkout de Express/Hotel/Tour/
+   * Transporte/Pedido, de forma análoga a como ya validan CuponExpress/CuponHotel/
+   * CuponTour/etc.
    *
    * @param {string} codigoCompartido  El código que el cliente ingresó en el checkout.
    * @param {number} comercioId        El comercio dueño del checkout (Express/Hotel/etc en curso).

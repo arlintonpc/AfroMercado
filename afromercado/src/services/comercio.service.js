@@ -178,6 +178,34 @@ const ComercioService = {
     return { ...comercio, alianzasActivas };
   },
 
+  /**
+   * Autocomplete de comercios por nombre, para uso de un comerciante (ej.
+   * buscar a quién invitar a una alianza comercial). A diferencia del
+   * buscador de admin (AdminController.buscarComercios), acá:
+   *  - Solo se devuelven comercios activos y verificados (los no verificados
+   *    de todas formas no pueden participar en alianzas, ver alianza.service.js).
+   *  - Se excluye el comercio propio del que busca (no tiene sentido invitarse
+   *    a sí mismo).
+   *  - El `select` es deliberadamente mínimo (id, nombre, municipio, logoUrl):
+   *    no expone whatsapp ni ningún otro dato de contacto del comercio.
+   */
+  async buscar(texto, comercioIdExcluir) {
+    const q = String(texto || "").trim();
+    if (!q) return [];
+    return prisma.comercio.findMany({
+      where: {
+        activo: true,
+        verificado: true,
+        deletedAt: null,
+        nombre: { contains: q, mode: "insensitive" },
+        ...(comercioIdExcluir ? { id: { not: Number(comercioIdExcluir) } } : {}),
+      },
+      select: { id: true, nombre: true, municipio: true, logoUrl: true },
+      orderBy: { nombre: "asc" },
+      take: 10,
+    });
+  },
+
   async actualizar(usuarioId, datos) {
     const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
     if (!comercio) {

@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { subirACloudinary, subirVideoACloudinary, construirUrlVideoOptimizada, construirPosterVideo } = require("../utils/cloudinary");
 const TourService = require("../services/tour.service");
+const prisma = require("../config/prisma");
 const {
   crearUploadVideo,
   extraerVideoMeta,
@@ -192,7 +193,8 @@ const TourController = {
       if (!codigo || !participantes || !configTourId) {
         return res.status(400).json({ ok: false, error: "codigo, participantes y configTourId requeridos" });
       }
-      const data = await TourService.validarCuponTour(codigo, Number(configTourId), Number(participantes), req.usuario?.id ?? null);
+      const tour = await prisma.configTour.findUnique({ where: { id: Number(configTourId) }, select: { comercioId: true } });
+      const data = await TourService.validarCuponTour(codigo, Number(configTourId), Number(participantes), req.usuario?.id ?? null, tour?.comercioId ?? null);
       res.json({ ok: true, data });
     } catch (err) { next(err); }
   },

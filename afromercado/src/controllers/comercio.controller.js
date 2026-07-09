@@ -115,6 +115,18 @@ const ComercioController = {
     }
   },
 
+  // GET /comercios/buscar?q=texto — autocomplete de comercios activos/verificados
+  // para que un comerciante ubique a otro comercio (ej. invitar socio a una
+  // alianza comercial). Excluye el comercio propio del usuario autenticado.
+  async buscar(req, res, next) {
+    try {
+      const comercios = await ComercioService.buscar(req.query.q, req.usuario.comercio?.id ?? null);
+      res.json({ ok: true, comercios });
+    } catch (e) {
+      next(e);
+    }
+  },
+
   async actualizar(req, res, next) {
     try {
       const comercio = await ComercioService.actualizar(req.usuario.id, req.body);

@@ -24,6 +24,7 @@ const NAV_LINKS = [
   { href: '/admin/pedidos',              label: 'Pedidos'        },
   { href: '/admin/pagos-config',         label: 'Pasarela'       },
   { href: '/admin/cupones',              label: 'Cupones'        },
+  { href: '/admin/alianzas',             label: 'Alianzas'       },
   { href: '/admin/afromedia',            label: 'AfroMedia'      },
   { href: '/admin/visibilidad',          label: 'Visibilidad'    },
   { href: '/admin/campanas',             label: 'Campañas'       },

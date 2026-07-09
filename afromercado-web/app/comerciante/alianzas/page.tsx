@@ -12,11 +12,13 @@ import {
   invitarSocioAlianza,
   aceptarInvitacionAlianza,
   rechazarOSalirAlianza,
+  buscarComercios,
   type AlianzaComercial,
   type AlianzaSocio,
   type ModuloAlianza,
   type TipoDescuentoAlianza,
   type EstadoAlianza,
+  type ComercioBusqueda,
 } from '@/lib/api/alianza'
 
 const MODULOS: Array<{ valor: ModuloAlianza; etiqueta: string }> = [
@@ -175,6 +177,96 @@ function FormularioCrearAlianza({
   )
 }
 
+// ── Buscador de comercios (autocomplete) ─────────────────────────────────
+
+function BuscadorComercio({
+  seleccionado,
+  onSeleccionar,
+}: {
+  seleccionado: ComercioBusqueda | null
+  onSeleccionar: (comercio: ComercioBusqueda | null) => void
+}) {
+  const [texto, setTexto] = useState('')
+  const [resultados, setResultados] = useState<ComercioBusqueda[]>([])
+  const [buscando, setBuscando] = useState(false)
+  const [abierto, setAbierto] = useState(false)
+
+  useEffect(() => {
+    if (seleccionado || texto.trim().length < 2) {
+      setResultados([])
+      return
+    }
+    setBuscando(true)
+    const id = setTimeout(() => {
+      buscarComercios(texto.trim())
+        .then((r) => { setResultados(r); setAbierto(true) })
+        .catch(() => setResultados([]))
+        .finally(() => setBuscando(false))
+    }, 300)
+    return () => clearTimeout(id)
+  }, [texto, seleccionado])
+
+  if (seleccionado) {
+    return (
+      <div>
+        <p className="mb-1 text-sm font-semibold text-[#1A1A1A]">Comercio a invitar</p>
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-[#2D6A4F]/30 bg-white px-3 py-2">
+          <span className="text-sm text-[#1A1A1A]">
+            {seleccionado.nombre}
+            {seleccionado.municipio && <span className="text-[#1A1A1A]/50"> · {seleccionado.municipio}</span>}
+          </span>
+          <button
+            type="button"
+            onClick={() => { onSeleccionar(null); setTexto('') }}
+            className="text-xs font-bold text-[#C0392B] hover:underline"
+          >
+            Cambiar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative">
+      <label className="mb-1 block text-sm font-semibold text-[#1A1A1A]" htmlFor="buscador-comercio-socio">
+        Buscar comercio por nombre
+      </label>
+      <input
+        id="buscador-comercio-socio"
+        type="text"
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        onFocus={() => resultados.length > 0 && setAbierto(true)}
+        placeholder="Ej: Cooperativa Cacao Chocó"
+        autoComplete="off"
+        className="w-full rounded-lg border border-[#1A1A1A]/15 px-3 py-2 text-sm focus:border-[#2D6A4F] focus:outline-none"
+      />
+      {abierto && texto.trim().length >= 2 && (
+        <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-[#1A1A1A]/10 bg-white shadow-lg">
+          {buscando ? (
+            <p className="px-3 py-2 text-xs text-[#1A1A1A]/50">Buscando…</p>
+          ) : resultados.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-[#1A1A1A]/50">Sin resultados. Prueba con otro nombre.</p>
+          ) : (
+            resultados.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => { onSeleccionar(c); setAbierto(false) }}
+                className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-[#F7F5F2]"
+              >
+                <span className="font-semibold text-[#1A1A1A]">{c.nombre}</span>
+                {c.municipio && <span className="text-xs text-[#1A1A1A]/50">{c.municipio}</span>}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Formulario: invitar socio ────────────────────────────────────────────
 
 function FormularioInvitarSocio({
@@ -186,7 +278,7 @@ function FormularioInvitarSocio({
   onInvitado: () => Promise<void>
   onCancelar: () => void
 }) {
-  const [comercioId, setComercioId] = useState('')
+  const [comercio, setComercio] = useState<ComercioBusqueda | null>(null)
   const [modulo, setModulo] = useState<ModuloAlianza | ''>('')
   const [tipoDescuento, setTipoDescuento] = useState<TipoDescuentoAlianza>('PORCENTAJE')
   const [valorDescuento, setValorDescuento] = useState('')
@@ -198,18 +290,14 @@ function FormularioInvitarSocio({
     if (guardando) return
     setError(null)
 
-    const idComercio = Number(comercioId)
-    if (!comercioId || !Number.isFinite(idComercio) || idComercio <= 0) {
-      setError('Ingresa un ID de comercio válido.')
-      return
-    }
+    if (!comercio) { setError('Busca y selecciona el comercio que quieres invitar.'); return }
     if (!modulo) { setError('Elige el módulo en el que participará el socio invitado.'); return }
     const valor = Number(valorDescuento)
     if (!valorDescuento || Number.isNaN(valor) || valor <= 0) { setError('Ingresa un valor de descuento mayor a cero.'); return }
 
     setGuardando(true)
     try {
-      await invitarSocioAlianza(alianzaId, { comercioId: idComercio, modulo, tipoDescuento, valorDescuento: valor })
+      await invitarSocioAlianza(alianzaId, { comercioId: comercio.id, modulo, tipoDescuento, valorDescuento: valor })
       await onInvitado()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo invitar al comercio.')
@@ -221,10 +309,7 @@ function FormularioInvitarSocio({
   return (
     <form onSubmit={enviar} className="mt-3 flex flex-col gap-3 rounded-xl bg-[#F7F5F2] p-4">
       <p className="text-sm font-semibold text-[#1B4332]">Invitar un comercio socio</p>
-      <p className="text-xs text-[#1A1A1A]/55">
-        Pídele al comercio que quieres invitar el número de ID de su tienda (lo puede ver en su propio panel).
-      </p>
-      <CampoTexto label="ID del comercio" name="comercioId" type="number" placeholder="Ej: 42" value={comercioId} onChange={setComercioId} />
+      <BuscadorComercio seleccionado={comercio} onSeleccionar={setComercio} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <CampoSelect
           label="Módulo del socio" name="moduloSocio" placeholder="Elige"

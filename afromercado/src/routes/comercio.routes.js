@@ -149,6 +149,16 @@ router.patch(
   ComercioController.toggleComprasPublicas,
 );
 
+// GET /comercios/buscar?q=texto - autocomplete de comercios activos/verificados
+// (ej. para invitar un socio a una alianza comercial). Debe declararse ANTES
+// de "/:id" para que Express no interprete "buscar" como el parametro :id.
+router.get(
+  "/buscar",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.buscar,
+);
+
 // GET /comercios/:id - ver cualquier comercio (publico)
 router.get("/:id", ComercioController.obtener);
 

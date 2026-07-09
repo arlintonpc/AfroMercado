@@ -231,7 +231,7 @@ const ExpressController = {
         const cfg = await prisma.configExpress.findUnique({ where: { comercioId: Number(comercioId) } });
         configExpressId = cfg?.id ?? null;
       }
-      const data = await ExpressService.validarCuponExpress(codigo, configExpressId, Number(subtotal), req.usuario?.id ?? null);
+      const data = await ExpressService.validarCuponExpress(codigo, configExpressId, Number(subtotal), req.usuario?.id ?? null, comercioId ? Number(comercioId) : null);
       res.json({ ok: true, data });
     } catch (err) { next(err); }
   },
