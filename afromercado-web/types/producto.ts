@@ -43,7 +43,7 @@ export interface Producto {
   }
   categoriaId?: string
   comercioId?: string
-  categoria?: { id: string; nombre: string; slug?: string }
+  categoria?: { id: string; nombre: string; slug?: string; grupo?: 'ANCESTRAL' | 'LOCAL' }
   pesoKg?: number | null
   esExpress?: boolean
   tiempoEntregaMin?: number | null

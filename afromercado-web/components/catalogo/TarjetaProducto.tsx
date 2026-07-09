@@ -202,12 +202,14 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
 
         {/* Comercio */}
         <p className="truncate text-[#52B788] font-semibold uppercase" style={{ fontSize: 10, lineHeight: '12px', letterSpacing: '0.07em', marginBottom: 2 }}>
+          {/* El check ✓ se omite cuando ya se muestra el badge "Vendedor verificado"
+              completo debajo (mismo dato, ya comunicado) — evita repetirlo dos veces. */}
           {producto.comercioId
             ? <Link href={`/comercio/${producto.comercioId}`} onClick={e => e.stopPropagation()} className="hover:underline">
                 {producto.comercio.nombre}
-                {producto.comercio.verificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}
+                {producto.comercio.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}
               </Link>
-            : <>{producto.comercio.nombre}{producto.comercio.verificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}</>
+            : <>{producto.comercio.nombre}{producto.comercio.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}</>
           }
         </p>
 

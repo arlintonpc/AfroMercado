@@ -20,6 +20,7 @@ import { precioVigente } from '@/lib/precioProducto'
 import { useCarrito } from '@/context/CarritoContext'
 import { useFavoritos } from '@/context/FavoritoContext'
 import BadgeProductorCertificado from '@/components/ui/BadgeProductorCertificado'
+import BadgeVendedorVerificado from '@/components/ui/BadgeVendedorVerificado'
 import { useAuth } from '@/context/AuthContext'
 import { apiFetch } from '@/lib/api/client'
 import { obtenerMenuComercioExpress, type MenuComercioExpress } from '@/lib/api/express'
@@ -576,11 +577,15 @@ export default function PaginaProducto({
               El productor
             </h2>
 
-            {/* Badges de certificación */}
+            {/* Badges de certificación — en Tienda Local la confianza se comunica
+                como verificación de identidad, no como autenticidad ancestral
+                (ese mensaje sería engañoso para un producto no artesanal). */}
             {(producto.comercio.verificado || producto.comercio.verificadoEtnico) && (
               <div className="flex flex-wrap gap-2">
                 {producto.comercio.verificado && (
-                  <BadgeProductorCertificado size="md" variante="base" />
+                  producto.categoria?.grupo === 'LOCAL'
+                    ? <BadgeVendedorVerificado verificado size="md" />
+                    : <BadgeProductorCertificado size="md" variante="base" />
                 )}
                 {producto.comercio.verificadoEtnico && (
                   <BadgeProductorCertificado size="md" variante="etnico" />

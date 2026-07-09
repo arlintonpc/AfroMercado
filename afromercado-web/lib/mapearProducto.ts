@@ -17,6 +17,7 @@ interface CategoriaCruda {
   id?: number | string
   nombre?: string
   slug?: string
+  grupo?: 'ANCESTRAL' | 'LOCAL'
 }
 
 interface ComercioCrudo {
@@ -149,7 +150,7 @@ export function mapearProducto(crudo: ProductoCrudo): Producto {
     categoriaId: aId(crudo.categoriaId) || undefined,
     comercioId: aId(crudo.comercioId) || undefined,
     categoria: crudo.categoria
-      ? { id: aId(crudo.categoria.id), nombre: crudo.categoria.nombre ?? '', slug: crudo.categoria.slug }
+      ? { id: aId(crudo.categoria.id), nombre: crudo.categoria.nombre ?? '', slug: crudo.categoria.slug, grupo: crudo.categoria.grupo }
       : undefined,
     oferta: (() => {
       const o = crudo.ofertas?.[0]
