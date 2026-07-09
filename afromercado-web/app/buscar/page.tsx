@@ -382,13 +382,18 @@ function Resultados() {
           </div>
         )}
 
-        {/* Encabezado */}
-        {q && (
+        {/* Encabezado — el botón de Filtros en móvil no depende de tener un
+            término de búsqueda: en escritorio el panel de filtros siempre
+            está visible, así que en móvil también debe poder abrirse sin
+            haber buscado texto primero. */}
+        {(q || tab === 'productos') && (
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[#52B788] text-xs font-semibold tracking-widest uppercase mb-1">Resultados</p>
-              <h1 className="text-2xl md:text-3xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>«{q}»</h1>
-            </div>
+            {q ? (
+              <div>
+                <p className="text-[#52B788] text-xs font-semibold tracking-widest uppercase mb-1">Resultados</p>
+                <h1 className="text-2xl md:text-3xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>«{q}»</h1>
+              </div>
+            ) : <div />}
             {tab === 'productos' && (
               <button onClick={() => setMostrarFiltros(v => !v)}
                 className="md:hidden flex items-center gap-2 border border-[#1A1A1A]/15 bg-white rounded-xl px-3 py-2 text-sm font-medium text-[#1A1A1A] shrink-0">

@@ -192,6 +192,7 @@ export default function AdminCategoriasPage() {
             <p className="text-sm text-[#1A1A1A]/45">Sin categorías. Crea la primera arriba.</p>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-[#1A1A1A]/8 text-xs uppercase tracking-wide text-[#1A1A1A]/50">
@@ -326,6 +327,7 @@ export default function AdminCategoriasPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>
