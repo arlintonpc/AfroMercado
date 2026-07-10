@@ -12,6 +12,7 @@ import SeccionReviewsHotel from '@/components/hoteles/SeccionReviewsHotel'
 import { Toast, useToast } from '@/components/ui/Toast'
 import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 import BadgeTurismoComunitario from '@/components/ui/BadgeTurismoComunitario'
+import { urlComoLlegar } from '@/lib/comoLlegar'
 
 const MapaHoteles = dynamic(() => import('@/components/hoteles/MapaHoteles'), { ssr: false })
 
@@ -1371,7 +1372,14 @@ export default function HotelDetallePage() {
             {/* MAPA */}
             {hotel.comercio.latitud && hotel.comercio.longitud && (
               <div className="py-6 border-b border-gray-100">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Ubicación</h2>
+                <div className="flex items-center justify-between mb-4 gap-3">
+                  <h2 className="text-xl font-bold text-gray-900">Ubicación</h2>
+                  <a href={urlComoLlegar(hotel.comercio.latitud, hotel.comercio.longitud)} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-[#1B4332] text-white text-sm font-medium rounded-full hover:bg-[#2D6A4F] transition-colors flex-shrink-0">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                    Cómo llegar
+                  </a>
+                </div>
                 <div className="rounded-2xl overflow-hidden">
                   <MapaHoteles hoteles={[hotel]} userLat={null} userLon={null} />
                 </div>

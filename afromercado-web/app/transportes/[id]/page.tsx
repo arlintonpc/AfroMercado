@@ -10,6 +10,7 @@ import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import { Toast, useToast } from '@/components/ui/Toast'
+import { urlComoLlegar } from '@/lib/comoLlegar'
 
 const TIPO_ICONO: Record<string, string> = { LANCHA: '🛥️', BOTE: '⛵', CHALUPA: '🚤', CANOA: '🛶' }
 const DIAS_LABEL: Record<string, string> = {
@@ -617,10 +618,16 @@ export default function TransporteDetallePage() {
                     {transporte.comercio.nombre[0]}
                   </div>
                 )}
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="font-bold text-gray-900">{transporte.comercio.nombre}</p>
                   <p className="text-sm text-gray-500 mt-0.5">{transporte.comercio.municipio}{transporte.comercio.departamento ? `, ${transporte.comercio.departamento}` : ''}</p>
                 </div>
+                <a href={urlComoLlegar(transporte.comercio.latitud, transporte.comercio.longitud, `${transporte.comercio.municipio}${transporte.comercio.departamento ? `, ${transporte.comercio.departamento}` : ''}`)}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex-shrink-0 flex items-center gap-1.5 bg-[#1B4332] text-white rounded-xl px-3.5 py-2 text-sm font-bold hover:bg-[#2D6A4F] transition-colors">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                  Cómo llegar
+                </a>
               </div>
             </div>
 

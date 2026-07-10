@@ -10,6 +10,7 @@ import SeccionReviewsTour from '@/components/tours/SeccionReviewsTour'
 import { Toast, useToast } from '@/components/ui/Toast'
 import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 import BadgeTurismoComunitario from '@/components/ui/BadgeTurismoComunitario'
+import { urlComoLlegar } from '@/lib/comoLlegar'
 
 const SERVICIOS_LABELS: Record<string, { icon: string; label: string }> = {
   transporte:  { icon: '🚐', label: 'Transporte incluido' },
@@ -766,6 +767,12 @@ export default function TourDetallePage() {
               </div>
               <p className="text-sm text-gray-500">{tour.comercio.municipio}{tour.comercio.departamento ? `, ${tour.comercio.departamento}` : ''}</p>
             </div>
+            <a href={urlComoLlegar(tour.comercio.latitud, tour.comercio.longitud, `${tour.comercio.municipio}${tour.comercio.departamento ? `, ${tour.comercio.departamento}` : ''}`)}
+              target="_blank" rel="noopener noreferrer"
+              className="flex-shrink-0 flex items-center gap-1.5 bg-[#1B4332] text-white rounded-2xl px-4 py-2.5 text-sm font-bold hover:bg-[#2D6A4F] transition-colors">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+              Cómo llegar
+            </a>
             {tour.comercio.whatsapp && (
               <a href={`https://wa.me/57${tour.comercio.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, me interesa el tour "${tour.nombre}"`)}`}
                 target="_blank" rel="noopener"

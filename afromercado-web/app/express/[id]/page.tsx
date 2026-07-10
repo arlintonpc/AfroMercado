@@ -26,6 +26,7 @@ import SeccionReviews, { type ReviewItem } from '@/components/ui/SeccionReviews'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import ModalComplementos from '@/components/express/ModalComplementos'
+import { urlComoLlegar } from '@/lib/comoLlegar'
 
 interface ItemCarrito {
   productoId: number
@@ -710,12 +711,17 @@ function MenuExpressContent() {
             )}
             <div className="flex-1 min-w-0">
               <h1 className="text-xl font-bold text-[#1A1A1A]">{menu.comercio.nombre}</h1>
-              <p className="text-sm text-[#666] flex items-center gap-1">
+              <p className="text-sm text-[#666] flex items-center gap-1 flex-wrap">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
                 {menu.comercio.municipio}
                 {Number(menu.comercio.calificacion) > 0 && (
                   <span className="ml-2">⭐ {Number(menu.comercio.calificacion).toFixed(1)}</span>
                 )}
+                <a href={urlComoLlegar(menu.comercio.latitud, menu.comercio.longitud, menu.comercio.municipio)}
+                  target="_blank" rel="noopener noreferrer"
+                  className="ml-2 text-[#2D6A4F] font-semibold underline hover:no-underline">
+                  Cómo llegar
+                </a>
               </p>
               <span className={`inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded-full ${
                 menu.abiertoAhora ? 'bg-[#D4EDDA] text-[#155724]' : 'bg-[#F8D7DA] text-[#721C24]'
