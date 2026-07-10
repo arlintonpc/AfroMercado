@@ -333,34 +333,36 @@ export default function HotelesPage() {
           </div>
 
           {/* Barra de búsqueda */}
-          <div className="mt-6 bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-2 flex gap-2">
+          <div className="mt-6 bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-2 flex flex-col sm:flex-row gap-2">
             <div className="flex-1 relative">
               <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
                 placeholder="Ciudad, hotel, hospedaje…"
                 className="w-full pl-10 pr-4 py-2.5 bg-transparent text-white placeholder-white/40 text-sm focus:outline-none" />
             </div>
-            <button onClick={activarGPS}
-              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                userLat ? 'bg-blue-500/80 text-white' : 'bg-white/10 hover:bg-white/20 text-white/70'
-              }`}>
-              {gpsCargando ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              )}
-              {gpsCiudad || 'Cerca de mí'}
-            </button>
-            <button onClick={() => setMostrarFiltros(true)}
-              className={`relative flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                filtrosActivos ? 'bg-[#D4A017] text-white' : 'bg-white/10 hover:bg-white/20 text-white/70'
-              }`}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
-              Filtros
-              {filtrosActivos && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-white text-[#D4A017] text-[9px] font-black rounded-full flex items-center justify-center">
-                  {nFiltros}
-                </span>
-              )}
-            </button>
+            <div className="flex gap-2">
+              <button onClick={activarGPS}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  userLat ? 'bg-blue-500/80 text-white' : 'bg-white/10 hover:bg-white/20 text-white/70'
+                }`}>
+                {gpsCargando ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                )}
+                {gpsCiudad || 'Cerca de mí'}
+              </button>
+              <button onClick={() => setMostrarFiltros(true)}
+                className={`relative flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  filtrosActivos ? 'bg-[#D4A017] text-white' : 'bg-white/10 hover:bg-white/20 text-white/70'
+                }`}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+                Filtros
+                {filtrosActivos && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-white text-[#D4A017] text-[9px] font-black rounded-full flex items-center justify-center">
+                    {nFiltros}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>

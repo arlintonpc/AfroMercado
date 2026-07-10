@@ -251,7 +251,7 @@ export default function ExpressPage() {
           </div>
 
           {/* Barra de búsqueda */}
-          <div className="mt-6 bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-2 flex gap-2">
+          <div className="mt-6 bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-2 flex flex-col sm:flex-row gap-2">
             <div className="flex-1 relative">
               <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <input ref={inputRef} value={busqueda}
@@ -260,7 +260,7 @@ export default function ExpressPage() {
                 className="w-full pl-10 pr-4 py-2.5 bg-transparent text-white placeholder-white/40 text-sm focus:outline-none" />
             </div>
             <button onClick={usarUbicacion} disabled={gpsEstado === 'buscando'}
-              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                 gpsEstado === 'ok' ? 'bg-blue-500/80 text-white' : 'bg-white/10 hover:bg-white/20 text-white/70'
               }`}>
               {gpsEstado === 'buscando' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : (
