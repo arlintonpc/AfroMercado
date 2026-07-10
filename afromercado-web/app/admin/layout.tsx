@@ -1,31 +1,32 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
+import { obtenerConteosPendientes, type ConteosPendientesAdmin } from '@/lib/api/admin'
 
 const NAV_LINKS = [
   { href: '/admin',                      label: 'Resumen'        },
   { href: '/admin/categorias',           label: 'Categorías'     },
   { href: '/admin/usuarios',             label: 'Usuarios'       },
-  { href: '/admin/comercios',            label: '🏪 Comercios'   },
+  { href: '/admin/comercios',            label: '🏪 Comercios',  contador: 'comercios' as const },
   { href: '/admin/comerciantes',         label: 'Comerciantes'   },
-  { href: '/admin/solicitudes-repartidor', label: 'Repartidores' },
+  { href: '/admin/solicitudes-repartidor', label: 'Repartidores', contador: 'repartidores' as const },
   { href: '/admin/liquidaciones',        label: 'Liquidaciones'  },
-  { href: '/admin/disputas',             label: 'Reclamos'       },
+  { href: '/admin/disputas',             label: 'Reclamos',      contador: 'disputas' as const },
   { href: '/admin/facturas',             label: 'Facturas'       },
-  { href: '/admin/pqrsd',                label: 'PQRSD'          },
-  { href: '/admin/empleo',               label: 'Empleo'         },
-  { href: '/admin/cultura',              label: '🎭 Cultura'     },
+  { href: '/admin/pqrsd',                label: 'PQRSD',         contador: 'pqrsd' as const },
+  { href: '/admin/empleo',               label: 'Empleo',        contador: 'denunciasEmpleo' as const },
+  { href: '/admin/cultura',              label: '🎭 Cultura',    contador: 'denunciasCultura' as const },
   { href: '/admin/entregas',             label: 'Entregas'       },
   { href: '/admin/envios',              label: 'Envíos'         },
   { href: '/admin/pedidos',              label: 'Pedidos'        },
   { href: '/admin/pagos-config',         label: 'Pasarela'       },
   { href: '/admin/cupones',              label: 'Cupones'        },
-  { href: '/admin/alianzas',             label: 'Alianzas'       },
-  { href: '/admin/afromedia',            label: 'AfroMedia'      },
+  { href: '/admin/alianzas',             label: 'Alianzas',      contador: 'alianzas' as const },
+  { href: '/admin/afromedia',            label: 'AfroMedia',     contador: 'publicidad' as const },
   { href: '/admin/visibilidad',          label: 'Visibilidad'    },
   { href: '/admin/campanas',             label: 'Campañas'       },
   { href: '/admin/hero',                 label: 'Hero'           },
@@ -80,6 +81,7 @@ export default function AdminLayout({
   const router = useRouter()
   const pathname = usePathname()
   const { usuario, cargando, logout } = useAuth()
+  const [conteos, setConteos] = useState<ConteosPendientesAdmin | null>(null)
 
   // La página de login no está protegida (evita un bucle de redirección).
   const esRutaLogin = pathname === '/admin/ingresar'
@@ -91,6 +93,17 @@ export default function AdminLayout({
       router.replace('/admin/ingresar')
     }
   }, [cargando, esRutaLogin, esAdmin, router])
+
+  useEffect(() => {
+    if (!esAdmin) return
+    let activo = true
+    function cargarConteos() {
+      obtenerConteosPendientes().then(c => { if (activo) setConteos(c) }).catch(() => {})
+    }
+    cargarConteos()
+    const interval = setInterval(cargarConteos, 60_000)
+    return () => { activo = false; clearInterval(interval) }
+  }, [esAdmin])
 
   // La pantalla de login se renderiza con su propio chrome, sin protección.
   if (esRutaLogin) {
@@ -149,21 +162,27 @@ export default function AdminLayout({
       <nav className="border-b border-[#1A1A1A]/10 bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ul className="flex flex-wrap gap-1 py-2">
-            {NAV_LINKS.map(({ href, label }) => {
+            {NAV_LINKS.map(({ href, label, contador }) => {
               const activo = href === '/admin'
                 ? pathname === '/admin'
                 : pathname === href || pathname.startsWith(href + '/')
+              const pendientes = contador && conteos ? conteos[contador] : 0
               return (
                 <li key={href}>
                   <Link
                     href={href}
-                    className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                       activo
                         ? 'bg-[#2D6A4F]/10 text-[#2D6A4F] font-semibold'
                         : 'text-[#1A1A1A]/60 hover:text-[#1A1A1A] hover:bg-[#1A1A1A]/5'
                     }`}
                   >
                     {label}
+                    {pendientes > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#C0392B] text-white text-[10px] font-bold leading-none">
+                        {pendientes > 99 ? '99+' : pendientes}
+                      </span>
+                    )}
                   </Link>
                 </li>
               )

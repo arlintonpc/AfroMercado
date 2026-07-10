@@ -28,6 +28,7 @@ router.get("/pagos/:id/comprobante", ...soloAdmin, AdminController.comprobante);
 
 // Métricas globales del marketplace
 router.get("/estadisticas", ...soloAdmin, AdminController.estadisticas);
+router.get("/conteos-pendientes", ...soloAdmin, AdminController.conteosPendientes);
 
 // WhatsApp
 router.get("/whatsapp/estado", ...soloAdmin, AdminController.estadoWhatsApp);

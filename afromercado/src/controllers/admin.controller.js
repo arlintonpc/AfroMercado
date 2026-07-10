@@ -55,6 +55,30 @@ const AdminController = {
     } catch (e) { next(e); }
   },
 
+  // GET /admin/conteos-pendientes — cuántos elementos esperan revisión en
+  // cada módulo, para pintar badges en la barra de navegación del admin.
+  async conteosPendientes(req, res, next) {
+    try {
+      const [
+        comercios, repartidores, disputas, pqrsd,
+        denunciasEmpleo, denunciasCultura, alianzas, publicidad,
+      ] = await Promise.all([
+        prisma.comercio.count({ where: { estadoRegistro: "PENDIENTE_REVISION" } }),
+        prisma.solicitudRepartidor.count({ where: { estado: "PENDIENTE" } }),
+        prisma.disputa.count({ where: { estado: { in: ["ABIERTA", "RESPONDIDA_COMERCIO"] } } }),
+        prisma.pqrsd.count({ where: { estado: "ABIERTO" } }),
+        prisma.denunciaOfertaEmpleo.count({ where: { estado: "PENDIENTE" } }),
+        prisma.denunciaPublicacionCultural.count({ where: { estado: "PENDIENTE" } }),
+        prisma.alianzaComercial.count({ where: { estado: "PENDIENTE_APROBACION" } }),
+        prisma.solicitudPublicidad.count({ where: { estado: "PENDIENTE" } }),
+      ]);
+      res.json({
+        ok: true,
+        data: { comercios, repartidores, disputas, pqrsd, denunciasEmpleo, denunciasCultura, alianzas, publicidad },
+      });
+    } catch (e) { next(e); }
+  },
+
   async estadoWhatsApp(req, res, next) {
     try {
       res.json({ ok: true, data: obtenerEstadoWA() });

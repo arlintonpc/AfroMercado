@@ -48,6 +48,22 @@ export async function obtenerDashboard(): Promise<DashboardAdmin> {
   return r.data
 }
 
+export interface ConteosPendientesAdmin {
+  comercios: number
+  repartidores: number
+  disputas: number
+  pqrsd: number
+  denunciasEmpleo: number
+  denunciasCultura: number
+  alianzas: number
+  publicidad: number
+}
+
+export async function obtenerConteosPendientes(): Promise<ConteosPendientesAdmin> {
+  const r = await apiFetch<{ ok: boolean; data: ConteosPendientesAdmin }>('/admin/conteos-pendientes')
+  return r.data
+}
+
 export async function listarComerciosAdmin(params?: {
   pagina?: number
   estado?: string
