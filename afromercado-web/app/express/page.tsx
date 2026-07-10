@@ -16,6 +16,8 @@ const MapaExpress = dynamic(() => import('@/components/express/MapaExpress'), {
   ),
 })
 
+const RADIO_CERCA_KM = 150
+
 function distanciaKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -174,13 +176,23 @@ export default function ExpressPage() {
       (c.comercio.municipio ?? '').toLowerCase().includes(termino)
     )
 
-  const comercios = userLat && userLon
+  const ordenados = userLat && userLon
     ? [...filtrados].sort((a, b) => {
         const dA = a.comercio.latitud && a.comercio.longitud ? distanciaKm(userLat!, userLon!, a.comercio.latitud, a.comercio.longitud) : Infinity
         const dB = b.comercio.latitud && b.comercio.longitud ? distanciaKm(userLat!, userLon!, b.comercio.latitud, b.comercio.longitud) : Infinity
         return dA - dB
       })
     : filtrados
+
+  const comercios = userLat && userLon
+    ? ordenados.filter(c => c.comercio.latitud && c.comercio.longitud && distanciaKm(userLat, userLon, c.comercio.latitud, c.comercio.longitud) <= RADIO_CERCA_KM)
+    : ordenados
+
+  const sinCercania = userLat != null && userLon != null && comercios.length === 0 && ordenados.length > 0
+
+  function limpiarGPS() {
+    setUserLat(null); setUserLon(null); setGpsCiudad(''); setGpsEstado('idle')
+  }
 
   async function usarUbicacion() {
     if (!navigator.geolocation) { setGpsEstado('error'); return }
@@ -300,7 +312,7 @@ export default function ExpressPage() {
           <div className="flex items-center gap-3">
             <p className="text-sm text-gray-500">
               {cargando ? 'Buscando…' : (
-                <><span className="font-semibold text-gray-800">{comercios.length}</span> {comercios.length !== 1 ? 'restaurantes' : 'restaurante'}{userLat ? <span className="text-[#2D6A4F]"> · por cercanía</span> : ''}</>
+                <><span className="font-semibold text-gray-800">{comercios.length}</span> {comercios.length !== 1 ? 'restaurantes' : 'restaurante'}{userLat ? <span className="text-[#2D6A4F]"> · a menos de {RADIO_CERCA_KM}km</span> : ''}</>
               )}
             </p>
             <button onClick={() => setSoloAbiertos(v => !v)}
@@ -347,16 +359,27 @@ export default function ExpressPage() {
               <span className="text-4xl">🍳</span>
             </div>
             <p className="font-semibold text-gray-700 text-lg">
-              {termino ? `Sin resultados para "${busqueda}"` : 'Ningún restaurante disponible'}
+              {termino ? `Sin resultados para "${busqueda}"` : sinCercania ? 'Nada cerca de ti todavía' : 'Ningún restaurante disponible'}
             </p>
             <p className="text-sm text-gray-400 mt-1">
-              {termino ? 'Prueba con otra ciudad o nombre' : 'Vuelve más tarde'}
+              {termino
+                ? 'Prueba con otra ciudad o nombre'
+                : sinCercania
+                ? `No hay restaurantes a menos de ${RADIO_CERCA_KM}km de tu ubicación.`
+                : 'Vuelve más tarde'}
             </p>
-            {termino && (
-              <button onClick={limpiar} className="mt-4 px-5 py-2 bg-[#1B4332] text-white text-sm rounded-full font-medium">
-                Limpiar búsqueda
-              </button>
-            )}
+            <div className="flex gap-3 mt-4 justify-center">
+              {termino && (
+                <button onClick={limpiar} className="px-5 py-2 bg-[#1B4332] text-white text-sm rounded-full font-medium">
+                  Limpiar búsqueda
+                </button>
+              )}
+              {sinCercania && (
+                <button onClick={limpiarGPS} className="px-5 py-2 bg-[#1B4332] text-white text-sm rounded-full font-medium">
+                  Ver todos los restaurantes
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

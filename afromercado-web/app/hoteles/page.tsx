@@ -23,6 +23,8 @@ const SERVICIOS_FILTRO = [
   { key: 'aire', label: '❄️ Aire acond.' },
 ]
 
+const RADIO_CERCA_KM = 150
+
 function distanciaKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -285,6 +287,16 @@ export default function HotelesPage() {
       })
     : filtrados
 
+  const cercanos = userLat && userLon
+    ? ordenados.filter(h => h.comercio.latitud && h.comercio.longitud && distanciaKm(userLat, userLon, h.comercio.latitud, h.comercio.longitud) <= RADIO_CERCA_KM)
+    : ordenados
+
+  const sinCercania = userLat != null && userLon != null && cercanos.length === 0 && ordenados.length > 0
+
+  function limpiarGPS() {
+    setUserLat(null); setUserLon(null); setGpsCiudad('')
+  }
+
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
 
@@ -372,7 +384,7 @@ export default function HotelesPage() {
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-500">
             {cargando ? 'Buscando alojamientos…' : (
-              <><span className="font-semibold text-gray-800">{ordenados.length}</span> {ordenados.length !== 1 ? 'alojamientos' : 'alojamiento'}{userLat ? <span className="text-[#2D6A4F]"> · ordenados por cercanía</span> : ''}</>
+              <><span className="font-semibold text-gray-800">{cercanos.length}</span> {cercanos.length !== 1 ? 'alojamientos' : 'alojamiento'}{userLat ? <span className="text-[#2D6A4F]"> · a menos de {RADIO_CERCA_KM}km</span> : ''}</>
             )}
           </p>
           <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -393,7 +405,7 @@ export default function HotelesPage() {
 
         {vista === 'mapa' && !cargando && (
           <div className="mb-6 rounded-2xl overflow-hidden shadow-md">
-            <MapaHoteles hoteles={ordenados} userLat={userLat} userLon={userLon} />
+            <MapaHoteles hoteles={cercanos} userLat={userLat} userLon={userLon} />
           </div>
         )}
 
@@ -407,22 +419,24 @@ export default function HotelesPage() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
-        ) : vista === 'mapa' ? null : ordenados.length === 0 ? (
+        ) : vista === 'mapa' ? null : cercanos.length === 0 ? (
           <div className="text-center py-24">
             <div className="w-20 h-20 bg-[#1B4332]/8 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             </div>
             <p className="font-semibold text-gray-700 text-lg">
-              {busqueda || filtrosActivos ? 'Sin resultados' : 'Próximamente'}
+              {busqueda || filtrosActivos ? 'Sin resultados' : sinCercania ? 'Nada cerca de ti todavía' : 'Próximamente'}
             </p>
             <p className="text-sm text-gray-400 mt-1 max-w-xs mx-auto">
               {busqueda
                 ? `No encontramos hoteles para "${busqueda}"`
                 : filtrosActivos
                 ? 'Ningún hotel cumple los filtros seleccionados'
+                : sinCercania
+                ? `No hay alojamientos a menos de ${RADIO_CERCA_KM}km de tu ubicación.`
                 : 'Estamos incorporando hoteles y hospedajes de todo el país. Vuelve pronto.'}
             </p>
-            {(busqueda || filtrosActivos) && (
+            {(busqueda || filtrosActivos || sinCercania) && (
               <div className="flex gap-3 mt-5 justify-center">
                 {busqueda && (
                   <button onClick={() => setBusqueda('')}
@@ -436,12 +450,18 @@ export default function HotelesPage() {
                     Quitar filtros
                   </button>
                 )}
+                {sinCercania && (
+                  <button onClick={limpiarGPS}
+                    className="px-5 py-2 bg-[#1B4332] text-white rounded-full text-sm font-medium hover:bg-[#2D6A4F] transition-colors">
+                    Ver todos los alojamientos
+                  </button>
+                )}
               </div>
             )}
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {ordenados.map(h => <TarjetaHotel key={h.id} hotel={h} userLat={userLat} userLon={userLon} />)}
+            {cercanos.map(h => <TarjetaHotel key={h.id} hotel={h} userLat={userLat} userLon={userLon} />)}
           </div>
         )}
       </main>

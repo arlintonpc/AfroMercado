@@ -14,6 +14,8 @@ const SERVICIOS_ICONOS: Record<string, string> = {
   seguro: '🛡️', snacks: '🍎', audio: '🎧',
 }
 
+const RADIO_CERCA_KM = 150
+
 function distanciaKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -273,6 +275,16 @@ export default function ToursPage() {
       })
     : filtrados
 
+  const cercanos = userLat && userLon
+    ? ordenados.filter(i => i.latitud && i.longitud && distanciaKm(userLat, userLon, i.latitud, i.longitud) <= RADIO_CERCA_KM)
+    : ordenados
+
+  const sinCercania = userLat != null && userLon != null && cercanos.length === 0 && ordenados.length > 0
+
+  function limpiarGPS() {
+    setUserLat(null); setUserLon(null); setGpsCiudad('')
+  }
+
   const filtrosActivos = (precioMax > 0 ? 1 : 0) + (durMax > 0 ? 1 : 0) + serviciosFiltro.length
 
   return (
@@ -417,7 +429,7 @@ export default function ToursPage() {
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-500">
             {cargando ? 'Cargando…' : (
-              <><span className="font-semibold text-gray-800">{ordenados.length}</span> {ordenados.length !== 1 ? 'experiencias' : 'experiencia'}{userLat ? <span className="text-[#2D6A4F]"> · ordenadas por cercanía</span> : ''}</>
+              <><span className="font-semibold text-gray-800">{cercanos.length}</span> {cercanos.length !== 1 ? 'experiencias' : 'experiencia'}{userLat ? <span className="text-[#2D6A4F]"> · a menos de {RADIO_CERCA_KM}km</span> : ''}</>
             )}
           </p>
           <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -459,23 +471,33 @@ export default function ToursPage() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => <SkeletonTour key={i} />)}
           </div>
-        ) : vista === 'mapa' ? null : ordenados.length === 0 ? (
+        ) : vista === 'mapa' ? null : cercanos.length === 0 ? (
           <div className="text-center py-24">
             <div className="w-20 h-20 bg-[#1B4332]/8 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="1.5"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
             </div>
-            <p className="font-semibold text-gray-700 text-lg">No hay tours disponibles</p>
-            <p className="text-sm text-gray-400 mt-1">Intenta con otra búsqueda o limpia los filtros</p>
-            {filtrosActivos > 0 && (
-              <button onClick={() => { setPrecioMax(0); setDurMax(0); setServiciosFiltro([]) }}
-                className="mt-4 px-5 py-2 bg-[#1B4332] text-white text-sm rounded-full font-medium">
-                Limpiar filtros
-              </button>
-            )}
+            <p className="font-semibold text-gray-700 text-lg">{sinCercania ? 'Nada cerca de ti todavía' : 'No hay tours disponibles'}</p>
+            <p className="text-sm text-gray-400 mt-1">
+              {sinCercania ? `No hay experiencias a menos de ${RADIO_CERCA_KM}km de tu ubicación.` : 'Intenta con otra búsqueda o limpia los filtros'}
+            </p>
+            <div className="flex gap-3 mt-4 justify-center">
+              {filtrosActivos > 0 && (
+                <button onClick={() => { setPrecioMax(0); setDurMax(0); setServiciosFiltro([]) }}
+                  className="px-5 py-2 bg-[#1B4332] text-white text-sm rounded-full font-medium">
+                  Limpiar filtros
+                </button>
+              )}
+              {sinCercania && (
+                <button onClick={limpiarGPS}
+                  className="px-5 py-2 bg-[#1B4332] text-white text-sm rounded-full font-medium">
+                  Ver todas las experiencias
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {ordenados.map((item, i) => <TarjetaItem key={`${item.tourId}-${item.lugarId ?? i}`} item={item} userLat={userLat} userLon={userLon} />)}
+            {cercanos.map((item, i) => <TarjetaItem key={`${item.tourId}-${item.lugarId ?? i}`} item={item} userLat={userLat} userLon={userLon} />)}
           </div>
         )}
       </main>

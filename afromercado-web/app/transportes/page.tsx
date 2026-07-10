@@ -20,6 +20,8 @@ const TIPO_ICONO: Record<string, string> = {
   TOUR_FLUVIAL: '🌊', PAQUETE_MIXTO: '🗺️',
 }
 
+const RADIO_CERCA_KM = 150
+
 function distanciaKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -210,6 +212,16 @@ export default function TransportesPage() {
       })
     : filtrados
 
+  const cercanos = userLat && userLon
+    ? ordenados.filter(t => t.comercio.latitud && t.comercio.longitud && distanciaKm(userLat, userLon, t.comercio.latitud, t.comercio.longitud) <= RADIO_CERCA_KM)
+    : ordenados
+
+  const sinCercania = userLat != null && userLon != null && cercanos.length === 0 && ordenados.length > 0
+
+  function limpiarGPS() {
+    setUserLat(null); setUserLon(null); setGpsCiudad('')
+  }
+
   const tiposDisponibles = TIPOS.filter(tp => transportes.some(t => t.tipo === tp))
 
   return (
@@ -300,7 +312,7 @@ export default function TransportesPage() {
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-500">
             {cargando ? 'Buscando…' : (
-              <><span className="font-semibold text-gray-800">{ordenados.length}</span> servicio{ordenados.length !== 1 ? 's' : ''}{userLat ? <span className="text-[#2D6A4F]"> · por cercanía</span> : ''}</>
+              <><span className="font-semibold text-gray-800">{cercanos.length}</span> servicio{cercanos.length !== 1 ? 's' : ''}{userLat ? <span className="text-[#2D6A4F]"> · a menos de {RADIO_CERCA_KM}km</span> : ''}</>
             )}
           </p>
           <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -328,7 +340,7 @@ export default function TransportesPage() {
 
         {vista === 'mapa' && !cargando && (
           <div className="mb-6 rounded-2xl overflow-hidden shadow-md">
-            <MapaTransportes transportes={ordenados} userLat={userLat} userLon={userLon} />
+            <MapaTransportes transportes={cercanos} userLat={userLat} userLon={userLon} />
           </div>
         )}
 
@@ -342,25 +354,37 @@ export default function TransportesPage() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => <SkeletonTransporte key={i} />)}
           </div>
-        ) : vista === 'mapa' ? null : ordenados.length === 0 ? (
+        ) : vista === 'mapa' ? null : cercanos.length === 0 ? (
           <div className="text-center py-24">
             <div className="w-20 h-20 bg-[#1B4332]/8 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-4xl">🛥️</span>
             </div>
-            <p className="font-semibold text-gray-700 text-lg">Sin servicios disponibles</p>
+            <p className="font-semibold text-gray-700 text-lg">{sinCercania ? 'Nada cerca de ti todavía' : 'Sin servicios disponibles'}</p>
             <p className="text-sm text-gray-400 mt-1">
-              {busqueda ? `No encontramos servicios para "${busqueda}"` : 'Prueba con otra ruta o ciudad'}
+              {busqueda
+                ? `No encontramos servicios para "${busqueda}"`
+                : sinCercania
+                ? `No hay servicios a menos de ${RADIO_CERCA_KM}km de tu ubicación.`
+                : 'Prueba con otra ruta o ciudad'}
             </p>
-            {(busqueda || tipoFiltro) && (
-              <button onClick={() => { setBusqueda(''); setTipoFiltro('') }}
-                className="mt-4 px-5 py-2 bg-[#1B4332] text-white text-sm rounded-full font-medium">
-                Limpiar filtros
-              </button>
-            )}
+            <div className="flex gap-3 mt-4 justify-center">
+              {(busqueda || tipoFiltro) && (
+                <button onClick={() => { setBusqueda(''); setTipoFiltro('') }}
+                  className="px-5 py-2 bg-[#1B4332] text-white text-sm rounded-full font-medium">
+                  Limpiar filtros
+                </button>
+              )}
+              {sinCercania && (
+                <button onClick={limpiarGPS}
+                  className="px-5 py-2 bg-[#1B4332] text-white text-sm rounded-full font-medium">
+                  Ver todos los servicios
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {ordenados.map(t => <TarjetaTransporte key={t.id} t={t} userLat={userLat} userLon={userLon} />)}
+            {cercanos.map(t => <TarjetaTransporte key={t.id} t={t} userLat={userLat} userLon={userLon} />)}
           </div>
         )}
       </main>
