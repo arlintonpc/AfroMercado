@@ -79,6 +79,7 @@ router.post(  "/complementos/:grupoId/copiar-a-todos",  ...soloComercio, Express
 // ── REVIEWS ──────────────────────────────────────────────────
 router.get( "/comercios/:id/reviews",        ReviewController.reviewsExpress);
 router.post("/pedidos/:id/review", ...soloAuth, ReviewController.crearReviewExpress);
+router.post("/reviews/foto", ...soloAuth, ExpressController.uploadFotoReviewExpress, ExpressController.subirFotoReviewExpress);
 
 // ── ADMIN ────────────────────────────────────────────────────
 router.get(  "/admin/deudas",                          ...soloAdmin, ExpressController.deudasAdmin);

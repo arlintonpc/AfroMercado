@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { misPedidosExpress, type PedidoExpress } from '@/lib/api/express'
-import { crearReviewExpress } from '@/lib/api/review'
+import { crearReviewExpress, subirFotoReviewExpress } from '@/lib/api/review'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { obtenerToken } from '@/lib/api/client'
 import ModalReportarProblema from '@/components/disputas/ModalReportarProblema'
+import EstrellaRating from '@/components/ui/EstrellaRating'
+import { Toast, useToast } from '@/components/ui/Toast'
 
 const ESTADO_INFO: Record<string, { label: string; color: string; paso: number }> = {
   PENDIENTE:      { label: 'Pendiente de confirmacion', color: 'bg-amber-100 text-amber-700',   paso: 0 },
@@ -50,18 +52,6 @@ function BarraProgreso({ estado }: { estado: string }) {
   )
 }
 
-function EstrellaReview({ valor, onClick }: { valor: number; onClick: (n: number) => void }) {
-  return (
-    <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map(n => (
-        <button key={n} onClick={() => onClick(n)} className="text-2xl transition-transform hover:scale-110">
-          <span className={n <= valor ? 'text-[#D4A017]' : 'text-gray-300'}>★</span>
-        </button>
-      ))}
-    </div>
-  )
-}
-
 function ModalReview({
   pedidoId,
   restaurante,
@@ -75,14 +65,32 @@ function ModalReview({
 }) {
   const [estrellas, setEstrellas] = useState(0)
   const [comentario, setComentario] = useState('')
+  const [fotoUrls, setFotoUrls] = useState<string[]>([])
+  const [subiendoFoto, setSubiendoFoto] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  async function agregarFotos(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setSubiendoFoto(true)
+    try {
+      const restantes = 6 - fotoUrls.length
+      const subidas = await Promise.all(
+        Array.from(files).slice(0, restantes).map(f => subirFotoReviewExpress(f))
+      )
+      setFotoUrls(prev => [...prev, ...subidas])
+    } catch (e: any) {
+      setError(e.message ?? 'No se pudo subir la foto')
+    } finally {
+      setSubiendoFoto(false)
+    }
+  }
+
   async function enviar() {
-    if (estrellas === 0) { setError('Elige una calificacion'); return }
+    if (estrellas === 0) { setError('Elige una calificación'); return }
     setEnviando(true)
     try {
-      await crearReviewExpress(pedidoId, estrellas, comentario.trim() || undefined)
+      await crearReviewExpress(pedidoId, estrellas, comentario.trim() || undefined, fotoUrls)
       onGuardado()
     } catch (e: any) {
       setError(e.message ?? 'Error al enviar')
@@ -97,7 +105,7 @@ function ModalReview({
       style={{ background: 'rgba(0,0,0,0.5)' }}
       onClick={e => { if (e.target === e.currentTarget) onCerrar() }}
     >
-      <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl p-6">
+      <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-[#1A1A1A] text-lg">Califica tu pedido</h2>
           <button onClick={onCerrar} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 text-xl">×</button>
@@ -105,7 +113,7 @@ function ModalReview({
         <p className="text-sm text-gray-500 mb-4">{restaurante}</p>
 
         <div className="flex justify-center mb-4">
-          <EstrellaReview valor={estrellas} onClick={setEstrellas} />
+          <EstrellaRating valor={estrellas} onChange={setEstrellas} tamaño="lg" />
         </div>
 
         <textarea
@@ -116,6 +124,33 @@ function ModalReview({
           className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F] resize-none"
         />
 
+        <div className="mt-3">
+          <label className="text-xs text-gray-500 block mb-1.5">Fotos (opcional)</label>
+          <div className="flex flex-wrap gap-2">
+            {fotoUrls.map((url, i) => (
+              <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element -- foto ya subida a Cloudinary */}
+                <img src={url} alt="" className="w-full h-full object-cover" />
+                <button
+                  onClick={() => setFotoUrls(prev => prev.filter((_, idx) => idx !== i))}
+                  className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 text-white flex items-center justify-center text-[10px]"
+                >×</button>
+              </div>
+            ))}
+            {fotoUrls.length < 6 && (
+              <label className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-400 cursor-pointer flex-shrink-0">
+                {subiendoFoto ? (
+                  <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                )}
+                <input type="file" accept="image/*" multiple className="hidden" disabled={subiendoFoto}
+                  onChange={e => { agregarFotos(e.target.files); e.target.value = '' }} />
+              </label>
+            )}
+          </div>
+        </div>
+
         {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
 
         <button
@@ -123,7 +158,7 @@ function ModalReview({
           disabled={enviando || estrellas === 0}
           className="mt-4 w-full bg-[#1B4332] text-white rounded-2xl py-3 font-bold text-sm disabled:opacity-40"
         >
-          {enviando ? 'Enviando...' : 'Publicar resena'}
+          {enviando ? 'Enviando...' : 'Publicar reseña'}
         </button>
       </div>
     </div>
@@ -198,7 +233,17 @@ function TarjetaPedido({
         {expandido && (
           <div className="px-4 pb-4 space-y-3">
             {/* Barra de progreso */}
-            {activo && <BarraProgreso estado={pedido.estado} />}
+            {activo && (
+              <>
+                <BarraProgreso estado={pedido.estado} />
+                {(pedido.tiempoAjustadoMin ?? pedido.tiempoEstimadoMin) > 0 && (
+                  <p className="text-xs text-gray-500 -mt-1">
+                    ⏱ Tiempo estimado: ~{pedido.tiempoAjustadoMin ?? pedido.tiempoEstimadoMin} min
+                    {' '}(llega ~{new Date(new Date(pedido.creadoAt).getTime() + (pedido.tiempoAjustadoMin ?? pedido.tiempoEstimadoMin) * 60_000).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })})
+                  </p>
+                )}
+              </>
+            )}
 
             {/* Modalidad + dirección */}
             {pedido.direccionTexto && (
@@ -331,6 +376,7 @@ export default function MisPedidosExpressPage() {
   const [pedidos, setPedidos] = useState<PedidoExpress[]>([])
   const [cargando, setCargando] = useState(true)
   const sseRef = useRef<EventSource | null>(null)
+  const { mostrar: mostrarToast, toastProps } = useToast(3500)
 
   async function cargar() {
     const data = await misPedidosExpress()
@@ -354,7 +400,10 @@ export default function MisPedidosExpressPage() {
     es.addEventListener('notificacion', (e) => {
       try {
         const notif = JSON.parse((e as MessageEvent).data)
-        if (notif?.tipo?.startsWith('EXPRESS_') || notif?.url?.includes('mis-pedidos')) cargar()
+        if (notif?.tipo?.startsWith('EXPRESS_') || notif?.url?.includes('mis-pedidos')) {
+          cargar()
+          if (notif?.titulo || notif?.mensaje) mostrarToast(notif.titulo || notif.mensaje)
+        }
       } catch {}
     })
     return () => { es.close(); sseRef.current = null }
@@ -419,6 +468,7 @@ export default function MisPedidosExpressPage() {
           </>
         )}
       </main>
+      <Toast {...toastProps} />
     </div>
   )
 }

@@ -1320,6 +1320,11 @@ async function aplicarMigraciones() {
       END IF;
     END $$`,
     `ALTER TABLE "Categoria" ADD COLUMN IF NOT EXISTS "grupo" "GrupoCategoria" NOT NULL DEFAULT 'ANCESTRAL'`,
+
+    // ── Rediseño de Express: video de la tienda (columnas que faltaban) + fotos en reseñas ──
+    `ALTER TABLE "ConfigExpress" ADD COLUMN IF NOT EXISTS "videoUrl" TEXT`,
+    `ALTER TABLE "ConfigExpress" ADD COLUMN IF NOT EXISTS "videoPosterUrl" TEXT`,
+    `ALTER TABLE "ReviewExpress" ADD COLUMN IF NOT EXISTS "fotoUrls" TEXT[] NOT NULL DEFAULT '{}'`,
   ];
   for (const sql of migraciones) {
     try {

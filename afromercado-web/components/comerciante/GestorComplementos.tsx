@@ -12,6 +12,7 @@ import {
 } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
+import { Toast, useToast } from '@/components/ui/Toast'
 
 interface Props {
   productoId: number
@@ -24,6 +25,7 @@ function mensajeError(err: unknown, fallback: string) {
 }
 
 export default function GestorComplementos({ productoId, nombreProducto, onClose }: Props) {
+  const { mostrar: mostrarToast, toastProps } = useToast(3000)
   const [grupos, setGrupos] = useState<GrupoComplemento[]>([])
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
@@ -266,6 +268,7 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+      <Toast {...toastProps} />
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b">
@@ -577,7 +580,7 @@ export default function GestorComplementos({ productoId, nombreProducto, onClose
                     <button
                       onClick={async () => {
                         const r = await copiarGrupoATodos(grupo.id)
-                        alert(`✅ Grupo "${grupo.nombre}" copiado a ${r.productosActualizados} plato${r.productosActualizados !== 1 ? 's' : ''} más.`)
+                        mostrarToast(`✅ "${grupo.nombre}" copiado a ${r.productosActualizados} plato${r.productosActualizados !== 1 ? 's' : ''} más`)
                       }}
                       className="text-xs px-2 py-1 rounded-full font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
                       title="Copiar este grupo a todos tus platos Express"

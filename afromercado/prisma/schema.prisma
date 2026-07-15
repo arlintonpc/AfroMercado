@@ -1682,6 +1682,8 @@ model ConfigExpress {
   costoEnvioBase    Decimal  @default(3000) @db.Decimal(10, 2)
   limiteCreditoEfectivo Decimal @default(30000) @db.Decimal(10, 2)
   deudaEfectivoActual   Decimal @default(0)   @db.Decimal(10, 2)
+  videoUrl       String?
+  videoPosterUrl String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -2294,6 +2296,7 @@ model ReviewExpress {
   pedidoExpressId Int      @unique
   calificacion    Int
   comentario      String?
+  fotoUrls        String[] @default([])
   creadoAt        DateTime @default(now())
 
   configExpress ConfigExpress @relation(fields: [configExpressId], references: [id], onDelete: Cascade)

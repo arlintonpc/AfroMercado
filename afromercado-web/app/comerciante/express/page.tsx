@@ -14,7 +14,7 @@ import {
 } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
-import { obtenerMiComercio } from '@/components/comerciante/api'
+import { obtenerMiComercio, crearProducto, actualizarProducto, subirImagenesProducto, quitarImagenProducto, fotoPrincipalProducto } from '@/components/comerciante/api'
 import { Switch } from '@/components/ui'
 import { MUNICIPIOS_POR_DEPARTAMENTO } from '@/components/comerciante/constantes'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
@@ -77,6 +77,166 @@ const ACCION_AVANZAR: Record<string, string> = {
 
 type Pestana = 'activos' | 'config' | 'historial' | 'menu' | 'cupones' | 'estadisticas'
 
+type PlatoExpress = MenuComercioExpress['productos'][0]
+
+/** Crear/editar un plato de Express sin salir del panel — antes había que ir a "Mis productos". */
+function FormPlato({
+  plato, onGuardado, onCerrar,
+}: {
+  plato: PlatoExpress | null // null = nuevo
+  onGuardado: () => void
+  onCerrar: () => void
+}) {
+  const [nombre, setNombre] = useState(plato?.nombre ?? '')
+  const [descripcion, setDescripcion] = useState(plato?.descripcion ?? '')
+  const [precio, setPrecio] = useState(plato ? String(plato.precio) : '')
+  const [stock, setStock] = useState(plato ? String(plato.stock) : '20')
+  const [fotos, setFotos] = useState<string[]>(plato?.fotoUrl ? [plato.fotoUrl] : [])
+  const [subiendoFoto, setSubiendoFoto] = useState(false)
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+  const productoIdRef = useRef<number | null>(plato?.id ?? null)
+
+  async function subirFotos(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setSubiendoFoto(true)
+    setError('')
+    try {
+      let id = productoIdRef.current
+      if (!id) {
+        // Primero se crea el producto (con lo que haya en el formulario) para poder subirle fotos.
+        if (!nombre.trim() || !precio) { setError('Pon nombre y precio antes de subir fotos'); return }
+        const creado = await crearProducto({
+          nombre: nombre.trim(), descripcion: descripcion.trim() || undefined,
+          precio: Number(precio), unidad: 'UNIDAD', stock: Number(stock) || 0,
+          diasAlistamientoMin: 0, diasAlistamientoMax: 0, alcance: 'LOCAL',
+          esExpress: true, tiempoEntregaMin: 20,
+        })
+        id = creado.id
+        productoIdRef.current = id
+      }
+      const actualizado = await subirImagenesProducto(id, Array.from(files).slice(0, 6 - fotos.length))
+      setFotos(actualizado.imagenes?.length ? actualizado.imagenes : (actualizado.fotoUrl ? [actualizado.fotoUrl] : []))
+    } catch (e: any) {
+      setError(e.message ?? 'No se pudo subir la foto')
+    } finally {
+      setSubiendoFoto(false)
+    }
+  }
+
+  async function quitarFoto(url: string) {
+    if (!productoIdRef.current) return
+    try {
+      const actualizado = await quitarImagenProducto(productoIdRef.current, url)
+      setFotos(actualizado.imagenes?.length ? actualizado.imagenes : (actualizado.fotoUrl ? [actualizado.fotoUrl] : []))
+    } catch (e: any) {
+      setError(e.message ?? 'No se pudo quitar la foto')
+    }
+  }
+
+  async function guardar() {
+    if (!nombre.trim()) { setError('El nombre es obligatorio'); return }
+    if (!precio || Number(precio) <= 0) { setError('Pon un precio válido'); return }
+    setGuardando(true)
+    setError('')
+    try {
+      if (productoIdRef.current) {
+        await actualizarProducto(productoIdRef.current, {
+          nombre: nombre.trim(), descripcion: descripcion.trim() || undefined,
+          precio: Number(precio), stock: Number(stock) || 0, esExpress: true,
+        })
+      } else {
+        const creado = await crearProducto({
+          nombre: nombre.trim(), descripcion: descripcion.trim() || undefined,
+          precio: Number(precio), unidad: 'UNIDAD', stock: Number(stock) || 0,
+          diasAlistamientoMin: 0, diasAlistamientoMax: 0, alcance: 'LOCAL',
+          esExpress: true, tiempoEntregaMin: 20,
+        })
+        if (fotos.length > 0) {
+          // No debería pasar (las fotos ya crean el producto), pero por si acaso.
+          productoIdRef.current = creado.id
+        }
+      }
+      onGuardado()
+    } catch (e: any) {
+      setError(e.message ?? 'No se pudo guardar el plato')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={e => { if (e.target === e.currentTarget) onCerrar() }}>
+      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-3xl shadow-2xl p-6 max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-bold text-[#1A1A1A] text-lg">{plato ? 'Editar plato' : 'Nuevo plato'}</h2>
+          <button onClick={onCerrar} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Nombre</label>
+            <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Pescado sudado"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Descripción (opcional)</label>
+            <textarea value={descripcion} onChange={e => setDescripcion(e.target.value)} rows={2}
+              placeholder="Ingredientes, preparación..."
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F] resize-none" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Precio</label>
+              <input type="number" min="0" value={precio} onChange={e => setPrecio(e.target.value)} placeholder="15000"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Stock disponible hoy</label>
+              <input type="number" min="0" value={stock} onChange={e => setStock(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 block mb-1.5">Fotos del plato</label>
+            <div className="flex flex-wrap gap-2">
+              {fotos.map((url, i) => (
+                <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- foto ya subida a Cloudinary */}
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <button onClick={() => quitarFoto(url)} className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 text-white flex items-center justify-center text-[10px]">×</button>
+                </div>
+              ))}
+              {fotos.length < 6 && (
+                <label className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-400 cursor-pointer flex-shrink-0">
+                  {subiendoFoto ? (
+                    <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                  )}
+                  <input type="file" accept="image/*" multiple className="hidden" disabled={subiendoFoto}
+                    onChange={e => { subirFotos(e.target.files); e.target.value = '' }} />
+                </label>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mt-1">La primera foto que subas queda como principal en el menú y el listado.</p>
+          </div>
+        </div>
+
+        {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
+
+        <button onClick={guardar} disabled={guardando}
+          className="mt-5 w-full bg-[#1B4332] text-white rounded-2xl py-3 font-bold text-sm disabled:opacity-50">
+          {guardando ? 'Guardando...' : plato ? 'Guardar cambios' : 'Crear plato'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function ExpressComerciante() {
   const [pestana, setPestana]   = useState<Pestana>('activos')
   const [config, setConfig]           = useState<ConfigExpress | null>(null)
@@ -96,6 +256,7 @@ export default function ExpressComerciante() {
   const [error, setError]         = useState('')
   const [secciones, setSecciones]         = useState<MenuSeccion[]>([])
   const [productosExpress, setProductosExpress] = useState<MenuComercioExpress['productos']>([])
+  const [formPlato, setFormPlato] = useState<{ plato: PlatoExpress | null } | null>(null)
   const [miComercioId, setMiComercioId]   = useState<number | null>(null)
   const miComercioIdRef = useRef<number | null>(null)
   const [nuevaSeccion, setNuevaSeccion]   = useState({ nombre: '', icono: '🍽️' })
@@ -104,6 +265,9 @@ export default function ExpressComerciante() {
   const [editSeccionNombre, setEditSeccionNombre] = useState('')
   const [editSeccionIcono, setEditSeccionIcono]   = useState('')
   const [complementoProducto, setComplementoProducto] = useState<{ id: number; nombre: string } | null>(null)
+  const [rechazandoPedido, setRechazandoPedido] = useState<number | null>(null)
+  const [motivoRechazo, setMotivoRechazo] = useState('')
+  const [mostrarDesgloseDeuda, setMostrarDesgloseDeuda] = useState(false)
   const [cupones, setCupones]           = useState<CuponExpress[]>([])
   const [estadisticas, setEstadisticas] = useState<EstadisticasExpress | null>(null)
   const [cargandoStats, setCargandoStats] = useState(false)
@@ -315,12 +479,18 @@ export default function ExpressComerciante() {
     } catch (e: any) { setError(e.message) }
   }
 
-  async function rechazar(id: number) {
-    const motivo = prompt('Motivo del rechazo (opcional):') ?? undefined
+  function rechazar(id: number) {
+    setMotivoRechazo('')
+    setRechazandoPedido(id)
+  }
+
+  async function confirmarRechazo() {
+    if (rechazandoPedido == null) return
     try {
-      const updated = await rechazarPedidoExpress(id, motivo)
-      setPedidos(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p))
+      const updated = await rechazarPedidoExpress(rechazandoPedido, motivoRechazo.trim() || undefined)
+      setPedidos(prev => prev.map(p => p.id === rechazandoPedido ? { ...p, ...updated } : p))
     } catch (e: any) { setError(e.message) }
+    setRechazandoPedido(null)
   }
 
   async function avanzar(id: number) {
@@ -332,6 +502,7 @@ export default function ExpressComerciante() {
 
   const activos   = pedidos.filter(p => !['ENTREGADO','CANCELADO','RECHAZADO'].includes(p.estado))
   const historial = pedidos.filter(p =>  ['ENTREGADO','CANCELADO','RECHAZADO'].includes(p.estado))
+  const pedidosEfectivoEntregados = pedidos.filter(p => p.estado === 'ENTREGADO' && p.metodoPago === 'EFECTIVO')
 
   if (cargando) return (
     <div className="flex items-center justify-center min-h-64">
@@ -358,7 +529,7 @@ export default function ExpressComerciante() {
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
-              {config.abierto ? '🟢 Módulo activo' : '⏸ Módulo pausado'}
+              {config.abierto ? '🟢 Recibiendo pedidos' : '⏸ Pedidos pausados'}
             </button>
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
               (config as any).abiertoAhora
@@ -380,9 +551,27 @@ export default function ExpressComerciante() {
       {/* Deuda de efectivo */}
       {config && Number(config.deudaEfectivoActual) > 0 && (
         <div className="bg-yellow-50 border border-yellow-300 rounded-xl px-4 py-3 text-sm text-yellow-800">
-          ⚠️ Deuda por pedidos en efectivo: <strong>{formatearPrecio(Number(config.deudaEfectivoActual))}</strong>
-          {' '}— Límite: {formatearPrecio(Number(config.limiteCreditoEfectivo))}.
-          Contacta a Teravia para saldarla.
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span>
+              ⚠️ Deuda por pedidos en efectivo: <strong>{formatearPrecio(Number(config.deudaEfectivoActual))}</strong>
+              {' '}— Límite: {formatearPrecio(Number(config.limiteCreditoEfectivo))}. Contacta a Teravia para saldarla.
+            </span>
+            {pedidosEfectivoEntregados.length > 0 && (
+              <button onClick={() => setMostrarDesgloseDeuda(v => !v)} className="text-xs font-semibold underline flex-shrink-0">
+                {mostrarDesgloseDeuda ? 'Ocultar desglose' : `Ver desglose (${pedidosEfectivoEntregados.length})`}
+              </button>
+            )}
+          </div>
+          {mostrarDesgloseDeuda && pedidosEfectivoEntregados.length > 0 && (
+            <div className="mt-3 border-t border-yellow-200 pt-3 space-y-1.5">
+              {pedidosEfectivoEntregados.map(p => (
+                <div key={p.id} className="flex justify-between text-xs">
+                  <span>{p.codigo} · {new Date(p.entregadoAt ?? p.creadoAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}</span>
+                  <span className="font-semibold">+{formatearPrecio(Number(p.comision))}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -581,16 +770,24 @@ export default function ExpressComerciante() {
             </div>
           </div>
 
-          {/* Asignar secciones a productos */}
+          {/* Platos del menú */}
           <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-gray-800">Organizar productos por sección</h2>
-              <button
-                onClick={cargarMenuExpressPropio}
-                className="text-xs text-[#2D6A4F] border border-[#2D6A4F] px-3 py-1 rounded-lg"
-              >
-                Recargar
-              </button>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold text-gray-800">Tus platos</h2>
+              <div className="flex gap-2 flex-shrink-0">
+                <button
+                  onClick={() => setFormPlato({ plato: null })}
+                  className="text-xs bg-[#2D6A4F] text-white px-3 py-1.5 rounded-lg font-medium"
+                >
+                  + Nuevo plato
+                </button>
+                <button
+                  onClick={cargarMenuExpressPropio}
+                  className="text-xs text-[#2D6A4F] border border-[#2D6A4F] px-3 py-1.5 rounded-lg"
+                >
+                  Recargar
+                </button>
+              </div>
             </div>
 
             {cargandoMenu ? (
@@ -600,8 +797,11 @@ export default function ExpressComerciante() {
             ) : productosExpress.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-sm">
                 <p className="text-2xl mb-2">🥘</p>
-                <p>No tienes productos Express activos.</p>
-                <p className="mt-1">Ve a <a href="/comerciante/mis-productos" className="text-[#2D6A4F] underline">Mis productos</a> y activa &quot;Express&quot; en los que quieras mostrar aquí.</p>
+                <p>Aún no tienes platos en tu menú Express.</p>
+                <button onClick={() => setFormPlato({ plato: null })} className="mt-3 text-sm text-white bg-[#2D6A4F] px-4 py-2 rounded-xl font-medium">
+                  Crear tu primer plato
+                </button>
+                <p className="mt-3 text-xs">También puedes activar &quot;Express&quot; en un producto ya creado desde <a href="/comerciante/mis-productos" className="text-[#2D6A4F] underline">Mis productos</a>.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -613,6 +813,13 @@ export default function ExpressComerciante() {
                       <div className="w-10 h-10 rounded-lg bg-[#F0EBE3] flex items-center justify-center text-sm flex-shrink-0">🥘</div>
                     )}
                     <p className="flex-1 text-sm font-medium text-gray-800 truncate">{p.nombre}</p>
+                    <button
+                      onClick={() => setFormPlato({ plato: p })}
+                      className="text-xs border border-gray-300 text-gray-600 rounded-lg px-2 py-1.5 hover:bg-gray-50 transition flex-shrink-0"
+                      title="Editar plato"
+                    >
+                      ✏️ Editar
+                    </button>
                     <button
                       onClick={() => setComplementoProducto({ id: p.id, nombre: p.nombre })}
                       className="text-xs border border-[#2D6A4F] text-[#2D6A4F] rounded-lg px-2 py-1.5 hover:bg-[#2D6A4F]/10 transition flex-shrink-0"
@@ -1048,15 +1255,20 @@ export default function ExpressComerciante() {
         <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-5">
           <h2 className="font-semibold text-gray-800">Configuración del servicio Express</h2>
 
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="activo"
-              checked={editConfig.activo ?? false}
-              onChange={e => setEditConfig(prev => ({ ...prev, activo: e.target.checked }))}
-              className="w-4 h-4 accent-green-600"
-            />
-            <label htmlFor="activo" className="text-sm font-medium">Módulo Express activo</label>
+          <div>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="activo"
+                checked={editConfig.activo ?? false}
+                onChange={e => setEditConfig(prev => ({ ...prev, activo: e.target.checked }))}
+                className="w-4 h-4 accent-green-600"
+              />
+              <label htmlFor="activo" className="text-sm font-medium">Módulo Express habilitado</label>
+            </div>
+            <p className="text-xs text-gray-400 mt-1 ml-7">
+              Esto activa el servicio Express para tu comercio de forma permanente. Para pausar la recepción de pedidos hoy sin desactivarlo del todo, usa el botón &quot;Recibiendo pedidos / Pedidos pausados&quot; arriba.
+            </p>
           </div>
 
           {/* Editor de horarios por día */}
@@ -1318,6 +1530,39 @@ export default function ExpressComerciante() {
           nombreProducto={complementoProducto.nombre}
           onClose={() => setComplementoProducto(null)}
         />
+      )}
+
+      {formPlato && (
+        <FormPlato
+          plato={formPlato.plato}
+          onCerrar={() => setFormPlato(null)}
+          onGuardado={() => { setFormPlato(null); cargarMenuExpressPropio() }}
+        />
+      )}
+
+      {rechazandoPedido != null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={e => { if (e.target === e.currentTarget) setRechazandoPedido(null) }}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6">
+            <h3 className="font-bold text-[#1A1A1A] mb-1">Rechazar pedido</h3>
+            <p className="text-sm text-gray-500 mb-3">Cuéntale al cliente por qué (opcional).</p>
+            <textarea
+              value={motivoRechazo}
+              onChange={e => setMotivoRechazo(e.target.value)}
+              rows={3}
+              placeholder="Ej: Nos quedamos sin ese plato por hoy"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F] resize-none"
+              autoFocus
+            />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setRechazandoPedido(null)} className="flex-1 border border-gray-200 text-gray-600 py-2 rounded-xl text-sm">
+                Cancelar
+              </button>
+              <button onClick={confirmarRechazo} className="flex-1 bg-[#C0392B] text-white py-2 rounded-xl text-sm font-bold">
+                Rechazar pedido
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {pendienteEliminarSeccion && (

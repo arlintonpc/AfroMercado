@@ -379,6 +379,30 @@ const ExpressService = {
 
   // ── LISTADOS ─────────────────────────────────────────────────
 
+  // Las reseñas de Express (ReviewExpress) nunca tocan Comercio.calificacion/
+  // totalReviews (ese campo compartido lo actualiza Hotel y quedaría pisado
+  // o vacío para comercios que solo venden por Express). Se calcula aparte,
+  // directo desde ReviewExpress, y se sobreescribe en la respuesta.
+  async _aplicarRatingExpress(configs) {
+    const lista = Array.isArray(configs) ? configs : [configs];
+    const ids = lista.filter(Boolean).map(c => c.id);
+    if (ids.length === 0) return configs;
+    const agregados = await prisma.reviewExpress.groupBy({
+      by: ['configExpressId'],
+      where: { configExpressId: { in: ids } },
+      _avg: { calificacion: true },
+      _count: true,
+    });
+    const porId = new Map(agregados.map(a => [a.configExpressId, a]));
+    for (const cfg of lista) {
+      if (!cfg?.comercio) continue;
+      const a = porId.get(cfg.id);
+      cfg.comercio.calificacion = a ? Math.round((a._avg.calificacion ?? 0) * 100) / 100 : 0;
+      cfg.comercio.totalReviews = a ? a._count : 0;
+    }
+    return configs;
+  },
+
   async listarComerciosExpress(municipio) {
     const where = { activo: true };
     if (municipio) where.municipiosEntrega = { has: municipio };
@@ -392,10 +416,27 @@ const ExpressService = {
         },
       },
     });
+    await this._aplicarRatingExpress(configs);
+    // Una foto real de plato > logo del comercio como imagen hero de la tarjeta.
+    const platos = await prisma.producto.findMany({
+      where: { comercioId: { in: configs.map(c => c.comercioId) }, esExpress: true, activo: true, deletedAt: null, fotoUrl: { not: null } },
+      select: { comercioId: true, fotoUrl: true },
+      orderBy: { createdAt: "desc" },
+    });
+    const fotoPorComercio = new Map();
+    for (const p of platos) if (!fotoPorComercio.has(p.comercioId)) fotoPorComercio.set(p.comercioId, p.fotoUrl);
+    const ahora = new Date();
+    const cupones = await prisma.cuponExpress.findMany({
+      where: { configExpressId: { in: configs.map(c => c.id) }, activo: true, inicio: { lte: ahora }, fin: { gte: ahora } },
+      select: { configExpressId: true },
+    });
+    const conCupon = new Set(cupones.map(c => c.configExpressId));
     // Enriquecer con estado abierto real basado en horario
     return configs.map(cfg => ({
       ...cfg,
       abiertoAhora: cfg.abierto && comercioAbiertoAhora(cfg.horarios),
+      fotoPlato: fotoPorComercio.get(cfg.comercioId) ?? null,
+      tieneCupon: conCupon.has(cfg.id),
     }));
   },
 
@@ -415,6 +456,7 @@ const ExpressService = {
       },
     });
     if (!cfg || !cfg.activo) return null;
+    await this._aplicarRatingExpress(cfg);
     const productos = await prisma.producto.findMany({
       where: { comercioId, esExpress: true, activo: true, deletedAt: null },
       include: {
@@ -527,9 +569,18 @@ const ExpressService = {
       },
       orderBy: { createdAt: "desc" },
     });
+    await this._aplicarRatingExpress(favs.map(f => f.configExpress));
+    const platos = favs.length ? await prisma.producto.findMany({
+      where: { comercioId: { in: favs.map(f => f.configExpress.comercioId) }, esExpress: true, activo: true, deletedAt: null, fotoUrl: { not: null } },
+      select: { comercioId: true, fotoUrl: true },
+      orderBy: { createdAt: "desc" },
+    }) : [];
+    const fotoPorComercio = new Map();
+    for (const p of platos) if (!fotoPorComercio.has(p.comercioId)) fotoPorComercio.set(p.comercioId, p.fotoUrl);
     return favs.map(f => ({
       ...f.configExpress,
       abiertoAhora: f.configExpress.abierto && comercioAbiertoAhora(f.configExpress.horarios),
+      fotoPlato: fotoPorComercio.get(f.configExpress.comercioId) ?? null,
     }));
   },
 

@@ -18,8 +18,18 @@ export interface ReviewExpress {
   pedidoExpressId: number
   calificacion: number
   comentario?: string | null
+  fotoUrls: string[]
   creadoAt: string
   cliente?: { nombre: string; avatarUrl?: string | null }
+}
+
+function normalizarReviewExpress(review: ReviewExpress): ReviewExpress {
+  return {
+    ...review,
+    comentario: review.comentario ?? null,
+    fotoUrls: Array.isArray(review.fotoUrls) ? review.fotoUrls : [],
+    cliente: review.cliente ?? undefined,
+  }
 }
 
 export async function reviewsTransporte(configTransporteId: number): Promise<ReviewTransporte[]> {
@@ -37,15 +47,27 @@ export async function crearReviewTransporte(reservaTransporteId: number, calific
 
 export async function reviewsExpress(comercioId: number): Promise<ReviewExpress[]> {
   const r = await apiFetch<{ ok: boolean; data: ReviewExpress[] }>(`/express/comercios/${comercioId}/reviews`)
-  return r.data
+  return Array.isArray(r.data) ? r.data.map(normalizarReviewExpress) : []
 }
 
-export async function crearReviewExpress(pedidoExpressId: number, calificacion: number, comentario?: string): Promise<ReviewExpress> {
+export async function crearReviewExpress(
+  pedidoExpressId: number,
+  calificacion: number,
+  comentario?: string,
+  fotoUrls?: string[],
+): Promise<ReviewExpress> {
   const r = await apiFetch<{ ok: boolean; data: ReviewExpress }>(`/express/pedidos/${pedidoExpressId}/review`, {
     method: 'POST',
-    body: { pedidoExpressId, calificacion, comentario },
+    body: { pedidoExpressId, calificacion, comentario, fotoUrls },
   })
-  return r.data
+  return normalizarReviewExpress(r.data)
+}
+
+export async function subirFotoReviewExpress(file: File): Promise<string> {
+  const fd = new FormData()
+  fd.append('foto', file)
+  const r = await apiFetch<{ ok: boolean; url: string }>('/express/reviews/foto', { method: 'POST', body: fd })
+  return r.url
 }
 
 export interface ReviewHotel {

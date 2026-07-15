@@ -26,6 +26,8 @@ export interface ConfigExpress {
   costoEnvioBase: number
   limiteCreditoEfectivo: number
   deudaEfectivoActual: number
+  videoUrl?: string | null
+  videoPosterUrl?: string | null
   horarios?: HorarioExpress[]
 }
 
@@ -79,6 +81,11 @@ export interface ComercioExpress {
   costoEnvioBase: number
   municipiosEntrega: string[]
   comercio: { id: number; nombre: string; logoUrl: string | null; municipio: string; calificacion: number; totalReviews: number; latitud?: number | null; longitud?: number | null }
+  fotoPlato?: string | null
+  abiertoAhora?: boolean
+  tieneCupon?: boolean
+  videoUrl?: string | null
+  videoPosterUrl?: string | null
 }
 
 // ── CLIENTE ──────────────────────────────────────────────────

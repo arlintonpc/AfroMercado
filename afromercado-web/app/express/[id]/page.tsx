@@ -4,7 +4,6 @@ import { Suspense, useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 import {
   obtenerMenuComercioExpress,
   crearPedidoExpress,
@@ -50,6 +49,42 @@ function horarioDeHoy(horarios: HorarioExpress[] | undefined): HorarioExpress | 
 
 type Paso = 'menu' | 'checkout' | 'confirmado'
 
+function BotonAgregarQuitar({ p, cant, agotado, cerrado, agregar, quitar, tamano = 'sm' }: {
+  p: MenuComercioExpress['productos'][0]
+  cant: number
+  agotado: boolean
+  cerrado?: boolean
+  agregar: (p: any) => void
+  quitar: (id: number) => void
+  tamano?: 'sm' | 'lg'
+}) {
+  const alto = tamano === 'lg' ? 'py-2.5 text-sm' : 'py-1.5 text-sm'
+  if (agotado) return <span className="text-xs text-[#999]">Agotado</span>
+  if (cerrado) return <span className="text-xs text-[#721C24] bg-[#F8D7DA] px-2 py-1 rounded-lg">Cerrado</span>
+  if (cant === 0) {
+    return (
+      <button
+        onClick={() => agregar(p)}
+        className={`flex items-center gap-1 bg-[#2D6A4F] text-white font-semibold px-3 ${alto} rounded-xl`}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Agregar
+      </button>
+    )
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <button onClick={() => quitar(p.id)} className="w-7 h-7 rounded-full bg-[#F0EBE3] flex items-center justify-center">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M5 12h14"/></svg>
+      </button>
+      <span className="font-bold text-[#1A1A1A] w-4 text-center">{cant}</span>
+      <button onClick={() => agregar(p)} className="w-7 h-7 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+  )
+}
+
 function TarjetaProducto({
   p, cantidadItem, agregar, quitar, cerrado
 }: {
@@ -59,53 +94,72 @@ function TarjetaProducto({
   quitar: (id: number) => void
   cerrado?: boolean
 }) {
+  const [verDetalle, setVerDetalle] = useState(false)
   const disponible = Math.max(0, p.stock - (p.stockReservado ?? 0))
   const agotado = disponible === 0
   const bloqueado = agotado || !!cerrado
   const cant = cantidadItem(p.id)
   return (
-    <div className={`bg-white rounded-2xl shadow-sm flex gap-3 p-3 ${bloqueado ? 'opacity-50' : ''}`}>
-      {p.fotoUrl ? (
-        <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
-          <Image src={p.fotoUrl} alt={p.nombre} fill className="object-cover" />
-        </div>
-      ) : (
-        <div className="w-20 h-20 rounded-xl bg-[#F0EBE3] flex items-center justify-center text-2xl flex-shrink-0">🥘</div>
-      )}
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-[#1A1A1A] text-sm leading-tight">{p.nombre}</p>
-        {p.descripcion && <p className="text-xs text-[#999] mt-0.5 line-clamp-2">{p.descripcion}</p>}
-        <div className="flex items-center justify-between mt-2">
-          <div>
-            <span className="font-bold text-[#1A1A1A]">{formatearPrecio(Number(p.precio))}</span>
-            <span className="text-xs text-[#999] ml-1">/ {p.unidad.toLowerCase()}</span>
-          </div>
-          {agotado ? (
-            <span className="text-xs text-[#999]">Agotado</span>
-          ) : cerrado ? (
-            <span className="text-xs text-[#721C24] bg-[#F8D7DA] px-2 py-1 rounded-lg">Cerrado</span>
-          ) : cant === 0 ? (
-            <button
-              onClick={() => agregar(p)}
-              className="flex items-center gap-1 bg-[#2D6A4F] text-white text-sm font-semibold px-3 py-1.5 rounded-xl"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              Agregar
-            </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button onClick={() => quitar(p.id)} className="w-7 h-7 rounded-full bg-[#F0EBE3] flex items-center justify-center">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M5 12h14"/></svg>
-              </button>
-              <span className="font-bold text-[#1A1A1A] w-4 text-center">{cant}</span>
-              <button onClick={() => agregar(p)} className="w-7 h-7 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              </button>
+    <>
+      <div className={`bg-white rounded-2xl shadow-sm overflow-hidden ${bloqueado ? 'opacity-50' : ''}`}>
+        <div role="button" tabIndex={0}
+          onClick={() => setVerDetalle(true)}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setVerDetalle(true) } }}
+          className="w-full flex gap-3 p-3 text-left cursor-pointer">
+          {p.fotoUrl ? (
+            <div className="relative w-24 h-24 rounded-xl overflow-hidden flex-shrink-0">
+              <Image src={p.fotoUrl} alt={p.nombre} fill className="object-cover" sizes="96px" />
             </div>
+          ) : (
+            <div className="w-24 h-24 rounded-xl bg-[#F0EBE3] flex items-center justify-center text-3xl flex-shrink-0">🥘</div>
           )}
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-[#1A1A1A] text-sm leading-tight">{p.nombre}</p>
+            {p.descripcion && <p className="text-xs text-[#999] mt-0.5 line-clamp-2">{p.descripcion}</p>}
+            <div className="flex items-center justify-between mt-2">
+              <div>
+                <span className="font-bold text-[#1A1A1A]">{formatearPrecio(Number(p.precio))}</span>
+                <span className="text-xs text-[#999] ml-1">/ {p.unidad.toLowerCase()}</span>
+              </div>
+              <div onClick={e => e.stopPropagation()}>
+                <BotonAgregarQuitar p={p} cant={cant} agotado={agotado} cerrado={cerrado} agregar={agregar} quitar={quitar} />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+
+      {verDetalle && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" onClick={() => setVerDetalle(false)}>
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            {p.fotoUrl ? (
+              <div className="relative w-full aspect-[4/3]">
+                <Image src={p.fotoUrl} alt={p.nombre} fill className="object-cover sm:rounded-t-3xl" sizes="480px" />
+              </div>
+            ) : (
+              <div className="w-full aspect-[4/3] bg-[#F0EBE3] flex items-center justify-center text-6xl sm:rounded-t-3xl">🥘</div>
+            )}
+            <div className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="font-bold text-[#1A1A1A] text-lg leading-snug">{p.nombre}</h2>
+                <button onClick={() => setVerDetalle(false)} className="flex-shrink-0 w-8 h-8 rounded-full bg-[#F0EBE3] flex items-center justify-center">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+              {p.descripcion && <p className="text-sm text-[#666] mt-2 leading-relaxed">{p.descripcion}</p>}
+              <div className="flex items-center justify-between mt-5">
+                <div>
+                  <span className="font-bold text-[#1A1A1A] text-lg">{formatearPrecio(Number(p.precio))}</span>
+                  <span className="text-xs text-[#999] ml-1">/ {p.unidad.toLowerCase()}</span>
+                </div>
+                <BotonAgregarQuitar p={p} cant={cant} agotado={agotado} cerrado={cerrado}
+                  agregar={prod => { setVerDetalle(false); agregar(prod) }} quitar={quitar} tamano="lg" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -120,6 +174,7 @@ function MenuExpressContent() {
   const [menu, setMenu] = useState<MenuComercioExpress | null>(null)
   const [cargando, setCargando] = useState(true)
   const [carrito, setCarrito] = useState<ItemCarrito[]>([])
+  const [productosNoDisponibles, setProductosNoDisponibles] = useState<string[]>([])
   const [paso, setPaso] = useState<Paso>('menu')
   const [tabActiva, setTabActiva] = useState<number | 'todos'>('todos')
   const [enviando, setEnviando] = useState(false)
@@ -171,15 +226,19 @@ function MenuExpressContent() {
   useEffect(() => { cargar() }, [cargar])
 
   // "Pedir de nuevo": prellenar el carrito con los productos de un pedido anterior.
-  // Los productos que ya no existen o están inactivos se omiten silenciosamente.
+  // Los productos que ya no existen o están inactivos se avisan, no se omiten en silencio.
   useEffect(() => {
     if (!reorderId || !menu) return
     obtenerPedidoExpress(Number(reorderId)).then(pedidoAnterior => {
       const productosPorId = new Map(menu.productos.map(p => [p.id, p]))
       const itemsPrellenado: ItemCarrito[] = []
+      const noDisponibles: string[] = []
       for (const item of pedidoAnterior.items) {
         const prod = productosPorId.get(item.productoId)
-        if (!prod) continue // producto eliminado o ya no disponible en este comercio
+        if (!prod) {
+          noDisponibles.push(item.producto?.nombre ?? `Producto #${item.productoId}`)
+          continue
+        }
         const complementos = Array.isArray(item.complementos)
           ? (item.complementos as Array<{ nombre: string; precio: number }>)
           : undefined
@@ -195,6 +254,7 @@ function MenuExpressContent() {
         })
       }
       if (itemsPrellenado.length > 0) setCarrito(itemsPrellenado)
+      if (noDisponibles.length > 0) setProductosNoDisponibles(noDisponibles)
     }).catch(() => {})
   }, [reorderId, menu])
 
@@ -236,14 +296,22 @@ function MenuExpressContent() {
     agregarAlCarrito(p, [], Number(p.precio))
   }
 
+  // Dos líneas son "el mismo plato" si tienen el mismo producto y exactamente
+  // los mismos complementos (sin importar el orden en que se eligieron).
+  function mismosComplementos(a: Array<{ nombre: string; precio: number }>, b: Array<{ nombre: string; precio: number }>) {
+    if (a.length !== b.length) return false
+    const clave = (arr: typeof a) => [...arr].map(c => `${c.nombre}:${c.precio}`).sort().join('|')
+    return clave(a) === clave(b)
+  }
+
   function agregarAlCarrito(
     p: MenuComercioExpress['productos'][0],
     complementos: Array<{ nombre: string; precio: number }>,
     precioTotal: number
   ) {
     setCarrito(prev => {
-      const idx = prev.findIndex(i => i.productoId === p.id)
-      if (idx >= 0 && (complementos?.length ?? 0) === 0) {
+      const idx = prev.findIndex(i => i.productoId === p.id && mismosComplementos(i.complementos ?? [], complementos))
+      if (idx >= 0) {
         const copia = [...prev]
         copia[idx] = { ...copia[idx], cantidad: copia[idx].cantidad + 1 }
         return copia
@@ -252,9 +320,14 @@ function MenuExpressContent() {
     })
   }
 
+  // Quita una unidad de la última línea agregada para ese producto (un
+  // producto puede tener varias líneas si se personalizó de formas distintas).
   function quitar(productoId: number) {
     setCarrito(prev => {
-      const idx = prev.findIndex(i => i.productoId === productoId)
+      let idx = -1
+      for (let i = prev.length - 1; i >= 0; i--) {
+        if (prev[i].productoId === productoId) { idx = i; break }
+      }
       if (idx < 0) return prev
       const copia = [...prev]
       if (copia[idx].cantidad <= 1) copia.splice(idx, 1)
@@ -263,8 +336,20 @@ function MenuExpressContent() {
     })
   }
 
+  // Para la fila del resumen del carrito, que ya sabe exactamente qué línea es.
+  function quitarIdx(idx: number) {
+    setCarrito(prev => {
+      const linea = prev[idx]
+      if (!linea) return prev
+      if (linea.cantidad <= 1) return prev.filter((_, i) => i !== idx)
+      const copia = [...prev]
+      copia[idx] = { ...linea, cantidad: linea.cantidad - 1 }
+      return copia
+    })
+  }
+
   function cantidadItem(productoId: number) {
-    return carrito.find(i => i.productoId === productoId)?.cantidad ?? 0
+    return carrito.filter(i => i.productoId === productoId).reduce((sum, i) => sum + i.cantidad, 0)
   }
 
   const totalItems = carrito.reduce((s, i) => s + i.cantidad, 0)
@@ -692,45 +777,35 @@ function MenuExpressContent() {
   }
 
   // ── MENÚ ───────────────────────────────────────────────────
+  const mejorFotoPlato = menu.productos.find(p => p.fotoUrl)?.fotoUrl ?? null
   return (
     <div className="min-h-screen bg-[#FAF8F5]">
       {/* Header del restaurante */}
       <header className="bg-white border-b border-[#E8DCC8]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Link href="/express" className="inline-flex items-center gap-1.5 text-sm text-[#2D6A4F] mb-3">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-            Express
-          </Link>
-          <div className="flex items-center gap-4">
-            {menu.comercio.logoUrl ? (
-              <div className="relative w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0">
-                <Image src={menu.comercio.logoUrl} alt={menu.comercio.nombre} fill className="object-cover" />
-              </div>
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-[#F0EBE3] flex items-center justify-center text-2xl flex-shrink-0">🍽️</div>
-            )}
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-bold text-[#1A1A1A]">{menu.comercio.nombre}</h1>
-              <p className="text-sm text-[#666] flex items-center gap-1 flex-wrap">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                {menu.comercio.municipio}
-                {Number(menu.comercio.calificacion) > 0 && (
-                  <span className="ml-2">⭐ {Number(menu.comercio.calificacion).toFixed(1)}</span>
-                )}
-                <a href={urlComoLlegar(menu.comercio.latitud, menu.comercio.longitud, menu.comercio.municipio)}
-                  target="_blank" rel="noopener noreferrer"
-                  className="ml-2 text-[#2D6A4F] font-semibold underline hover:no-underline">
-                  Cómo llegar
-                </a>
-              </p>
-              <span className={`inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded-full ${
-                menu.abiertoAhora ? 'bg-[#D4EDDA] text-[#155724]' : 'bg-[#F8D7DA] text-[#721C24]'
-              }`}>
-                {menu.abiertoAhora ? '● Abierto' : '● Cerrado'}
-              </span>
+        {/* Banner — video de la tienda si existe, si no la mejor foto de plato, si no el logo */}
+        <div className="relative h-48 sm:h-56 overflow-hidden bg-[#1B4332]">
+          {menu.videoUrl ? (
+            <video src={menu.videoUrl} poster={menu.videoPosterUrl ?? undefined}
+              autoPlay muted loop playsInline
+              className="w-full h-full object-cover" />
+          ) : mejorFotoPlato ? (
+            <img src={mejorFotoPlato} alt={menu.comercio.nombre} className="w-full h-full object-cover" />
+          ) : menu.comercio.logoUrl ? (
+            <Image src={menu.comercio.logoUrl} alt={menu.comercio.nombre} fill className="object-cover" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#1B4332] via-[#2D6A4F] to-[#52B788] flex items-center justify-center">
+              <span className="text-7xl opacity-20">🍽️</span>
             </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-black/30" />
+
+          <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4">
+            <Link href="/express" className="inline-flex items-center gap-1.5 text-sm text-white/90 hover:text-white bg-black/20 backdrop-blur-sm rounded-full px-3 py-1.5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+              Express
+            </Link>
             <button onClick={toggleFav} disabled={toggling}
-              className={`flex-shrink-0 p-2 rounded-full transition-colors ${esFav ? 'bg-red-50 text-red-500' : 'bg-white/80 text-gray-400 hover:text-red-400'}`}
+              className={`flex-shrink-0 p-2 rounded-full backdrop-blur-sm transition-colors ${esFav ? 'bg-white text-red-500' : 'bg-black/20 text-white hover:bg-black/30'}`}
               title={esFav ? 'Quitar de favoritos' : 'Guardar en favoritos'}>
               <svg className="w-5 h-5" fill={esFav ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -738,6 +813,36 @@ function MenuExpressContent() {
             </button>
           </div>
 
+          <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-3">
+            {menu.comercio.logoUrl && (mejorFotoPlato || menu.videoUrl) && (
+              <div className="relative w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 ring-2 ring-white/80 shadow-lg">
+                <Image src={menu.comercio.logoUrl} alt={menu.comercio.nombre} fill className="object-cover" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl font-bold text-white leading-tight">{menu.comercio.nombre}</h1>
+              <p className="text-sm text-white/85 flex items-center gap-1.5 flex-wrap mt-0.5">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                {menu.comercio.municipio}
+                {Number(menu.comercio.calificacion) > 0 && (
+                  <span>· ⭐ {Number(menu.comercio.calificacion).toFixed(1)}</span>
+                )}
+                <a href={urlComoLlegar(menu.comercio.latitud, menu.comercio.longitud, menu.comercio.municipio)}
+                  target="_blank" rel="noopener noreferrer"
+                  className="font-semibold underline hover:no-underline text-white">
+                  Cómo llegar
+                </a>
+              </p>
+              <span className={`inline-block mt-1.5 text-xs font-bold px-2 py-0.5 rounded-full backdrop-blur-sm ${
+                menu.abiertoAhora ? 'bg-emerald-500/90 text-white' : 'bg-black/40 text-white/80'
+              }`}>
+                {menu.abiertoAhora ? '● Abierto' : '● Cerrado'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           {!menu.abiertoAhora && (
             <p className="mt-3 text-sm text-[#721C24] bg-[#F8D7DA] rounded-xl px-3 py-2">
               Este restaurante está cerrado ahora. Puedes ver el menú pero no hacer pedidos.
@@ -781,15 +886,18 @@ function MenuExpressContent() {
         </div>
       </header>
 
-      {/* Video del restaurante */}
-      {(menu as any).videoUrl && (
-        <div id="seccion-video" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
-          <ReproductorVideo url={(menu as any).videoUrl} />
-        </div>
-      )}
-
       {/* Menú */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 pb-40 lg:pb-8">
+        {productosNoDisponibles.length > 0 && (
+          <div className="mb-4 flex items-start justify-between gap-3 bg-[#FFF3EE] border border-[#F0C9AE] rounded-xl px-4 py-3">
+            <p className="text-sm text-[#8A4B1E]">
+              ⚠️ {productosNoDisponibles.length === 1 ? 'Este producto de tu pedido anterior ya no está disponible' : 'Estos productos de tu pedido anterior ya no están disponibles'}: {productosNoDisponibles.join(', ')}.
+            </p>
+            <button onClick={() => setProductosNoDisponibles([])} className="flex-shrink-0 text-[#8A4B1E]">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+        )}
         <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8 lg:items-start">
         <div className="space-y-6">
         {menu.productos.length === 0 ? (
@@ -883,7 +991,7 @@ function MenuExpressContent() {
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="flex items-center gap-1">
-                            <button onClick={() => quitar(i.productoId)} className="w-6 h-6 rounded-full bg-[#F0EBE3] flex items-center justify-center text-[#2D6A4F] font-bold">−</button>
+                            <button onClick={() => quitarIdx(idx)} className="w-6 h-6 rounded-full bg-[#F0EBE3] flex items-center justify-center text-[#2D6A4F] font-bold">−</button>
                             <span className="w-5 text-center font-semibold">{i.cantidad}</span>
                             <button onClick={() => setCarrito(prev => prev.map((x, xi) => xi === idx ? { ...x, cantidad: x.cantidad + 1 } : x))} className="w-6 h-6 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center font-bold">+</button>
                           </div>

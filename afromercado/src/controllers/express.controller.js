@@ -535,6 +535,27 @@ async function subirImagenItemBiblioteca(req, res, next) {
   }
 }
 
+// ── FOTO DE RESEÑA (cualquier cliente autenticado, no ligada a un pedido aún) ──
+
+async function uploadFotoReviewExpress(req, res, next) {
+  _uploadItemImagen.single('foto')(req, res, err => { if (err) return next(err); next(); });
+}
+
+async function subirFotoReviewExpress(req, res, next) {
+  const filePath = req.file?.path;
+  try {
+    if (!req.file) return res.status(400).json({ ok: false, error: 'No se recibió imagen' });
+    const secureUrl = await subirACloudinary(filePath, 'afromercado/reviews-express');
+    if (!secureUrl) return res.status(502).json({ ok: false, error: 'No se pudo subir la imagen' });
+    res.json({ ok: true, url: secureUrl });
+  } catch (err) { next(err); } finally {
+    if (filePath) fs.unlink(filePath, () => {});
+  }
+}
+
+ExpressController.uploadFotoReviewExpress = uploadFotoReviewExpress;
+ExpressController.subirFotoReviewExpress  = subirFotoReviewExpress;
+
 ExpressController.copiarGrupoATodos = async (req, res, next) => {
   try {
     const comercioId = await getComercioId(req.usuario.id);

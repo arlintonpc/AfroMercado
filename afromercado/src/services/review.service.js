@@ -78,7 +78,7 @@ const ReviewService = {
   },
 
   // ── EXPRESS ─────────────────────────────────────────────────
-  async crearReviewExpress(clienteId, { pedidoExpressId, calificacion, comentario }) {
+  async crearReviewExpress(clienteId, { pedidoExpressId, calificacion, comentario, fotoUrls }) {
     const pedido = await prisma.pedidoExpress.findFirst({
       where: { id: pedidoExpressId, clienteId, estado: "ENTREGADO" },
     });
@@ -88,7 +88,11 @@ const ReviewService = {
     if (existente) throw new ErrorValidacion("Ya dejaste una reseña para este pedido");
 
     return prisma.reviewExpress.create({
-      data: { configExpressId: pedido.configExpressId, clienteId, pedidoExpressId, calificacion, comentario: comentario || null },
+      data: {
+        configExpressId: pedido.configExpressId, clienteId, pedidoExpressId, calificacion,
+        comentario: comentario || null,
+        fotoUrls: Array.isArray(fotoUrls) ? fotoUrls.slice(0, 6).filter(u => typeof u === "string") : [],
+      },
       include: { cliente: { select: { nombre: true, avatarUrl: true } } },
     });
   },
