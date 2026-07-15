@@ -19,7 +19,7 @@ const DEFAULTS = {
     tipo: "porcentaje_decimal",
     grupo: "Comisiones",
     etiqueta: "Comisión global de la plataforma",
-    desc: "Porcentaje que AfroMercado cobra sobre cada venta. Se puede sobreescribir por comercio.",
+    desc: "Porcentaje que Teravia cobra sobre cada venta. Se puede sobreescribir por comercio.",
   },
   comision_base: {
     valor: "post_descuento",
@@ -66,7 +66,7 @@ const DEFAULTS = {
     tipo: "numero",
     grupo: "Envíos",
     etiqueta: "Envío gratis de plataforma sobre $ (0 = desactivado)",
-    desc: "Monto a partir del cual AfroMercado regala el envío (campaña de plataforma). 0 lo desactiva.",
+    desc: "Monto a partir del cual Teravia regala el envío (campaña de plataforma). 0 lo desactiva.",
   },
   envio_politica_multicomercio: {
     valor: "por_comercio",
@@ -135,7 +135,7 @@ const DEFAULTS = {
     tipo: "texto",
     grupo: "Marca",
     etiqueta: "Logo de la plataforma",
-    desc: "Se muestra en la cabecera. Súbelo desde el botón de arriba (o pega una URL de imagen). Vacío = se usa el texto 'AfroMercado'.",
+    desc: "Se muestra en la cabecera. Súbelo desde el botón de arriba (o pega una URL de imagen). Vacío = se usa el texto 'Teravia'.",
   },
 
   // ── Datos legales (aparecen en Términos y Habeas Data) ─────
@@ -144,7 +144,7 @@ const DEFAULTS = {
     tipo: "texto",
     grupo: "Datos legales",
     etiqueta: "Razón social",
-    desc: "Nombre legal de quien opera AfroMercado.",
+    desc: "Nombre legal de quien opera Teravia.",
   },
   legal_nit: {
     valor: "",

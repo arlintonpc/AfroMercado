@@ -33,12 +33,12 @@ export default function BadgeVendedorVerificado({ verificado, size = 'md', mostr
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 bg-white border border-gray-100 rounded-xl shadow-xl p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
           <p className="font-bold text-[#1A1A1A] text-xs mb-2">¿Qué significa?</p>
           <ul className="space-y-1.5">
-            <li className="text-[11px] text-gray-600 leading-snug">✅ Identidad y contacto verificados por AfroMercado</li>
+            <li className="text-[11px] text-gray-600 leading-snug">✅ Identidad y contacto verificados por Teravia</li>
             <li className="text-[11px] text-gray-600 leading-snug">✅ Cuenta de cobro validada</li>
             <li className="text-[11px] text-gray-600 leading-snug">✅ Historial de ventas sin incidentes</li>
           </ul>
           <div className="mt-3 pt-2 border-t border-gray-100">
-            <p className="text-[10px] text-gray-400">Verificado por el equipo AfroMercado</p>
+            <p className="text-[10px] text-gray-400">Verificado por el equipo Teravia</p>
           </div>
           <div className="absolute top-full left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-r border-b border-gray-100 rotate-45 -mt-1.5" />
         </div>

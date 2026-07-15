@@ -2207,7 +2207,7 @@ export default function ComercianteHotelesPage() {
                 className="w-full mt-1.5 px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
               />
               {cfg?.rntVerificado ? (
-                <p className="text-xs text-blue-600 mt-1">✓ RNT verificado por AfroMercado</p>
+                <p className="text-xs text-blue-600 mt-1">✓ RNT verificado por Teravia</p>
               ) : cfg?.rnt ? (
                 <p className="text-xs text-amber-600 mt-1">Pendiente de verificación</p>
               ) : (

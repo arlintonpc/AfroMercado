@@ -118,7 +118,7 @@ function BannerEstado({ solicitud }: { solicitud: Solicitud }) {
           Solicitud en revisión
         </h2>
         <p className="mt-2 text-[#1A1A1A]/60 text-sm max-w-sm mx-auto">
-          Recibimos tu solicitud. El equipo de AfroMercado está revisando tu información y te avisará pronto.
+          Recibimos tu solicitud. El equipo de Teravia está revisando tu información y te avisará pronto.
         </p>
         <div className="mt-4 rounded-xl bg-white border border-[#D4A017]/20 px-4 py-3 text-sm text-left inline-block">
           <p className="text-[#1A1A1A]/50 text-xs mb-1">Vehículo registrado</p>
@@ -506,7 +506,7 @@ export default function SerRepartidorPage() {
               </Button>
 
               <p className="text-xs text-[#1A1A1A]/40 text-center leading-relaxed">
-                Al enviar autorizas a AfroMercado a verificar la información de tu vehículo y licencia.
+                Al enviar autorizas a Teravia a verificar la información de tu vehículo y licencia.
                 La aprobación puede tardar 1–2 días hábiles.
               </p>
             </form>

@@ -51,7 +51,7 @@ export default function DatosAbiertosPage() {
               className="text-3xl md:text-4xl font-bold mb-3"
               style={{ fontFamily: 'var(--font-dm-serif)' }}
             >
-              Datos Abiertos de AfroMercado
+              Datos Abiertos de Teravia
             </h1>
             <p className="text-white/75 text-lg max-w-xl mx-auto leading-relaxed">
               Publicamos cifras agregadas de comercios, pedidos y volumen de ventas por región,
@@ -156,7 +156,7 @@ export default function DatosAbiertosPage() {
             </h3>
             <p className="text-white/70 text-sm max-w-xl mx-auto">
               Puedes usar, compartir y adaptar estos datos libremente, incluso con fines comerciales,
-              siempre que menciones a AfroMercado como fuente.
+              siempre que menciones a Teravia como fuente.
             </p>
           </div>
         </div>

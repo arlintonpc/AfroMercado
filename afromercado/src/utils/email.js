@@ -36,7 +36,7 @@ async function estaConfigurado() {
 function obtenerFrom(smtpUser) {
   return (
     process.env.EMAIL_FROM ||
-    (smtpUser ? `AfroMercado <${smtpUser}>` : "AfroMercado <notificaciones@afromercado.co>")
+    (smtpUser ? `Teravia <${smtpUser}>` : "Teravia <notificaciones@afromercado.co>")
   );
 }
 

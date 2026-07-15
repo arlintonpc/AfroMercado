@@ -414,7 +414,7 @@ function DashboardContenido() {
           <div className="min-w-0">
             <p className="text-sm font-bold text-[#9B7300]">Tu tienda está en revisión</p>
             <p className="mt-0.5 text-sm text-[#9B7300]/80 leading-relaxed">
-              El equipo de AfroMercado verificará tus documentos en 24–48 horas.
+              El equipo de Teravia verificará tus documentos en 24–48 horas.
               Te notificaremos cuando sea aprobada. Mientras tanto puedes configurar
               tu catálogo y tus productos.
             </p>
@@ -495,7 +495,7 @@ function DashboardContenido() {
               </p>
             )}
             <p className="mt-1 text-sm text-[#7B241C]/70">
-              Por favor contacta al equipo de AfroMercado para resolver la situación.
+              Por favor contacta al equipo de Teravia para resolver la situación.
             </p>
           </div>
         </div>
@@ -761,7 +761,7 @@ function DashboardContenido() {
           </p>
         </div>
         <a
-          href={`https://wa.me/${process.env.NEXT_PUBLIC_ADMIN_WHATSAPP ?? '573000000000'}?text=${encodeURIComponent('Hola, quiero promocionar mi producto con AfroMedia en AfroMercado. ¿Cómo funciona?')}`}
+          href={`https://wa.me/${process.env.NEXT_PUBLIC_ADMIN_WHATSAPP ?? '573000000000'}?text=${encodeURIComponent('Hola, quiero promocionar mi producto con AfroMedia en Teravia. ¿Cómo funciona?')}`}
           target="_blank"
           rel="noopener noreferrer"
           className="flex-shrink-0 inline-flex items-center gap-2 rounded-xl bg-[#2D6A4F] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#245a42] transition-colors"

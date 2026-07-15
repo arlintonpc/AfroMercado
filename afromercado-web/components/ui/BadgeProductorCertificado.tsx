@@ -10,7 +10,7 @@ const CONTENIDO = {
     colores: 'bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]',
     icono: 'text-[#059669]',
     criterios: [
-      '✅ Identidad y contacto verificados por AfroMercado',
+      '✅ Identidad y contacto verificados por Teravia',
       '✅ Productos auténticos y de origen directo',
       '✅ Cuenta de cobro validada',
       '✅ Historial de ventas sin incidentes',
@@ -22,7 +22,7 @@ const CONTENIDO = {
     icono: 'text-[#D4A017]',
     criterios: [
       '✅ Pertenece a una comunidad afro, indígena, raizal o campesina reconocida',
-      '✅ Verificado por videollamada o llamada con el equipo AfroMercado',
+      '✅ Verificado por videollamada o llamada con el equipo Teravia',
       '✅ Productos con historia y origen territorial confirmado',
     ],
   },
@@ -51,7 +51,7 @@ export default function BadgeProductorCertificado({ size = 'md', mostrarTooltip 
             ))}
           </ul>
           <div className="mt-3 pt-2 border-t border-gray-100">
-            <p className="text-[10px] text-gray-400">Certificado por el equipo AfroMercado</p>
+            <p className="text-[10px] text-gray-400">Certificado por el equipo Teravia</p>
           </div>
           <div className="absolute top-full left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-r border-b border-gray-100 rotate-45 -mt-1.5" />
         </div>

@@ -189,7 +189,7 @@ export default function AdminToursPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#1A1A1A]">Tours &amp; Experiencias</h1>
-        <p className="text-sm text-gray-500 mt-1">Gestion de tours registrados en AfroMercado. Haz clic en el numero de reservas para verlas.</p>
+        <p className="text-sm text-gray-500 mt-1">Gestion de tours registrados en Teravia. Haz clic en el numero de reservas para verlas.</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4 mb-6">

@@ -147,7 +147,7 @@ export default function RecuperarPassword() {
     <div className="min-h-screen bg-[#F8F5F0] flex flex-col items-center justify-center px-4 py-12">
       {/* Logo */}
       <Link href="/" className="mb-8 text-2xl font-bold" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
-        <span className="text-[#2D6A4F]">Afro</span><span className="text-[#D4A017]">Mercado</span>
+        <span className="text-[#2D6A4F]">Tera</span><span className="text-[#D4A017]">via</span>
       </Link>
 
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-[#1A1A1A]/8 p-8">

@@ -13,8 +13,8 @@ function Logo() {
   return (
     <Link href="/" className="inline-flex items-center justify-center">
       <span className="text-3xl" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
-        <span className="text-[#2D6A4F]">Afro</span>
-        <span className="text-[#D4A017]">Mercado</span>
+        <span className="text-[#2D6A4F]">Tera</span>
+        <span className="text-[#D4A017]">via</span>
       </span>
     </Link>
   )
@@ -234,7 +234,7 @@ function FormularioIngresar() {
                   <a href="/privacidad" target="_blank" className="text-[#2D6A4F] hover:underline font-medium">
                     política de tratamiento de datos personales
                   </a>{' '}
-                  de AfroMercado conforme a la Ley 1581 de 2012.
+                  de Teravia conforme a la Ley 1581 de 2012.
                 </span>
               </label>
             )}

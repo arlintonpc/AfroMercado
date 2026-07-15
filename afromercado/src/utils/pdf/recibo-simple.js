@@ -28,7 +28,7 @@ function fechaLegible(iso) {
 function generarReciboPedido(pedido) {
   const doc = new PDFDocument({ size: "A4", margin: 50 });
 
-  doc.fillColor(VERDE_OSCURO).fontSize(22).font("Helvetica-Bold").text("AfroMercado", { align: "left" });
+  doc.fillColor(VERDE_OSCURO).fontSize(22).font("Helvetica-Bold").text("Teravia", { align: "left" });
   doc.fillColor(GRIS_TEXTO).fontSize(10).font("Helvetica").text("Recibo de compra — comprobante interno, sin valor fiscal", { align: "left" });
   doc.moveDown(1.5);
 
@@ -86,7 +86,7 @@ function generarReciboPedido(pedido) {
 
   doc.moveDown(2);
   doc.fontSize(8).font("Helvetica").fillColor("#999999").text(
-    "Este documento es un comprobante interno de AfroMercado y no constituye una factura electrónica válida ante la DIAN.",
+    "Este documento es un comprobante interno de Teravia y no constituye una factura electrónica válida ante la DIAN.",
     { align: "center" }
   );
 

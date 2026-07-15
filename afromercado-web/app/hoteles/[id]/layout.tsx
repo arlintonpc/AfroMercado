@@ -9,11 +9,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     const nombre = hotel.comercio.nombre
     const municipio = hotel.comercio.municipio
     const descripcion = hotel.comercio.descripcion
-      ?? `Hospédate en ${nombre}, ${municipio}. Reserva en AfroMercado.`
+      ?? `Hospédate en ${nombre}, ${municipio}. Reserva en Teravia.`
     const imagen = hotel.habitaciones[0]?.fotos[0] ?? hotel.comercio.logoUrl
 
     return {
-      title: `${nombre} — ${municipio} | AfroMercado`,
+      title: `${nombre} — ${municipio} | Teravia`,
       description: descripcion.slice(0, 160),
       openGraph: {
         title: `${nombre} — ${municipio}`,
@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       alternates: { canonical: `/hoteles/${id}` },
     }
   } catch {
-    return { title: 'Hotel | AfroMercado' }
+    return { title: 'Hotel | Teravia' }
   }
 }
 
@@ -46,7 +46,7 @@ export default async function Layout({
         '@id': `${SITE}/hoteles/${id}`,
         name: hotel.comercio.nombre,
         description: hotel.comercio.descripcion
-          ?? `Hospédate en ${hotel.comercio.nombre}, ${hotel.comercio.municipio}. Reserva en AfroMercado.`,
+          ?? `Hospédate en ${hotel.comercio.nombre}, ${hotel.comercio.municipio}. Reserva en Teravia.`,
         url: `${SITE}/hoteles/${id}`,
         image: hotel.habitaciones[0]?.fotos[0] ?? hotel.comercio.logoUrl ?? undefined,
         address: {

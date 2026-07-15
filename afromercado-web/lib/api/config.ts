@@ -16,7 +16,7 @@ export interface ReglasPublicas {
   cuponCombinableConOferta: boolean
   /** Si el botón de WhatsApp está visible en la tienda. */
   whatsappBotonActivo: boolean
-  /** URL del logo de la plataforma (vacío = se usa el texto "AfroMercado"). */
+  /** URL del logo de la plataforma (vacío = se usa el texto "Teravia"). */
   logoUrl: string
   /** Datos legales (Términos / Habeas Data). Vacío = aún sin definir. */
   legalRazonSocial: string

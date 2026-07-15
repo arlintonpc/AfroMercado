@@ -146,7 +146,7 @@ const PagoService = {
         DAVIPLATA: process.env.PLATAFORMA_DAVIPLATA || null,
       },
       instrucciones:
-        "Transfiere el monto exacto al número Nequi o Daviplata de AfroMercado, " +
+        "Transfiere el monto exacto al número Nequi o Daviplata de Teravia, " +
         "usando la referencia sugerida en el mensaje. Luego sube el comprobante " +
         "para que verifiquemos tu pago.",
     };

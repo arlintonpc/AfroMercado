@@ -7,7 +7,7 @@ import BadgeProductorCertificado from '@/components/ui/BadgeProductorCertificado
 const CRITERIOS = [
   { icono: '📍', titulo: 'Origen verificado', desc: 'El productor debe ser residente del municipio y departamento donde dice operar, en cualquier parte de Colombia.' },
   { icono: '🛍️', titulo: 'Productos auténticos', desc: 'Los productos deben ser elaborados, cultivados o comercializados directamente por el productor, sin intermediarios externos.' },
-  { icono: '📞', titulo: 'Contacto validado', desc: 'Número de WhatsApp y datos de contacto verificados por el equipo AfroMercado mediante llamada directa.' },
+  { icono: '📞', titulo: 'Contacto validado', desc: 'Número de WhatsApp y datos de contacto verificados por el equipo Teravia mediante llamada directa.' },
   { icono: '⭐', titulo: 'Historial limpio', desc: 'Sin reportes de incumplimiento de pedidos, entregas falsas o comportamiento irregular en la plataforma.' },
   { icono: '📷', titulo: 'Fotos reales', desc: 'Las fotografías de productos y servicios deben ser originales y representar fielmente lo que se ofrece.' },
   { icono: '🔄', titulo: 'Renovación anual', desc: 'La certificación se revisa cada 12 meses para garantizar que los estándares se mantengan.' },
@@ -15,7 +15,7 @@ const CRITERIOS = [
 
 const CRITERIOS_ETNICO = [
   { icono: '🌿', titulo: 'Comunidad reconocida', desc: 'El productor pertenece a una comunidad afrocolombiana, indígena, raizal o campesina reconocida en su territorio.' },
-  { icono: '🎥', titulo: 'Verificación reforzada', desc: 'Además de la validación estándar, el equipo AfroMercado confirma el vínculo comunitario por videollamada o llamada.' },
+  { icono: '🎥', titulo: 'Verificación reforzada', desc: 'Además de la validación estándar, el equipo Teravia confirma el vínculo comunitario por videollamada o llamada.' },
   { icono: '🏺', titulo: 'Historia y origen', desc: 'El producto o servicio tiene una historia territorial y cultural que se muestra en el perfil del comercio.' },
 ]
 
@@ -35,7 +35,7 @@ export default function CertificacionPage() {
               Programa de Productores Certificados
             </h1>
             <p className="text-white/75 text-lg max-w-xl mx-auto leading-relaxed">
-              Garantizamos la autenticidad y origen de cada comerciante en AfroMercado, en cualquier departamento de Colombia.
+              Garantizamos la autenticidad y origen de cada comerciante en Teravia, en cualquier departamento de Colombia.
             </p>
           </div>
         </div>
@@ -90,7 +90,7 @@ export default function CertificacionPage() {
             <div className="space-y-4">
               {[
                 { num: '1', titulo: 'Solicitud', desc: 'Envías tu solicitud por WhatsApp con tus datos y municipio.' },
-                { num: '2', titulo: 'Revisión', desc: 'El equipo AfroMercado verifica tu información en 2-5 días hábiles.' },
+                { num: '2', titulo: 'Revisión', desc: 'El equipo Teravia verifica tu información en 2-5 días hábiles.' },
                 { num: '3', titulo: 'Validación', desc: 'Te contactamos por WhatsApp para confirmar datos e identidad.' },
                 { num: '4', titulo: 'Certificación', desc: 'Tu perfil recibe el badge "Productor Certificado" visible para todos los compradores.' },
               ].map(paso => (
@@ -116,7 +116,7 @@ export default function CertificacionPage() {
               Solicita tu certificación y destaca tu comercio ante miles de compradores en todo el país.
             </p>
             <a
-              href="https://wa.me/573000000000?text=Hola%2C%20quiero%20solicitar%20la%20certificaci%C3%B3n%20de%20Productor%20Certificado%20en%20AfroMercado"
+              href="https://wa.me/573000000000?text=Hola%2C%20quiero%20solicitar%20la%20certificaci%C3%B3n%20de%20Productor%20Certificado%20en%20Teravia"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-[#25D366] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#20b858] transition-colors"

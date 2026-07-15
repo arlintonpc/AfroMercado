@@ -489,9 +489,9 @@ export default function TransporteDetallePage() {
 
   useEffect(() => {
     if (transporte?.nombre) {
-      document.title = `${transporte.nombre} — Transporte AfroMercado`
+      document.title = `${transporte.nombre} — Transporte Teravia`
     }
-    return () => { document.title = 'AfroMercado' }
+    return () => { document.title = 'Teravia' }
   }, [transporte?.nombre])
 
   if (cargando) return (
@@ -748,7 +748,7 @@ export default function TransporteDetallePage() {
             </p>
             <div className="flex flex-col gap-3">
               <a
-                href={`https://wa.me/?text=${encodeURIComponent(`¡Acabo de reservar en AfroMercado! 🎉\n${transporte.nombre}\nhttps://afromercado.co`)}`}
+                href={`https://wa.me/?text=${encodeURIComponent(`¡Acabo de reservar en Teravia! 🎉\n${transporte.nombre}\nhttps://afromercado.co`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-xl font-semibold text-sm hover:bg-[#20b858] transition-colors"

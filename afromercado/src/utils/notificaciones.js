@@ -57,7 +57,7 @@ async function notificarReservaHotel({ hotelWhatsapp, reserva, habitacion, comer
     `💰 Total: $${formatPesos(reserva.total)}`,
     `💳 Método pago: ${labelMetodoPago(reserva.metodoPago)}`,
     "",
-    "Ingresa a tu panel AfroMercado para confirmar.",
+    "Ingresa a tu panel Teravia para confirmar.",
   ].join("\n");
 
   if (!hotelWhatsapp) {

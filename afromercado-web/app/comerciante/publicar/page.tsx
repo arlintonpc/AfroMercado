@@ -173,7 +173,7 @@ export default function PublicarProductoPage() {
           Aun no puedes publicar productos
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-[#1A1A1A]/60">
-          Para proteger a los compradores, AfroMercado solo permite publicar cuando el comercio ya paso la revision legal y de pagos.
+          Para proteger a los compradores, Teravia solo permite publicar cuando el comercio ya paso la revision legal y de pagos.
         </p>
         <ul className="mt-4 space-y-2 text-sm text-[#9B7300]">
           {bloqueosPublicacion.map((item) => (

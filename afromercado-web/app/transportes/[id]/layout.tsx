@@ -15,11 +15,11 @@ async function fetchTransporte(id: string) {
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
   const data = await fetchTransporte(id)
-  if (!data) return { title: 'Transporte | AfroMercado' }
+  if (!data) return { title: 'Transporte | Teravia' }
   const foto = data.fotos?.[0]
   const rutas = data.rutas?.filter((r: any) => r.activo) ?? []
   return {
-    title: `${data.nombre} — Transporte en ${data.comercio.municipio} | AfroMercado`,
+    title: `${data.nombre} — Transporte en ${data.comercio.municipio} | Teravia`,
     description: [
       data.descripcion?.slice(0, 120),
       rutas.length > 0 ? `${rutas.length} ruta${rutas.length !== 1 ? 's' : ''} disponible${rutas.length !== 1 ? 's' : ''}.` : null,

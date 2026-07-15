@@ -190,7 +190,7 @@ export default function PaginaPago({
               <p className="text-sm text-white/75">Total a pagar</p>
               <p className="text-4xl font-bold mt-1">{formatearPrecio(monto)}</p>
               <p className="mt-3 text-sm text-white/80 max-w-md">
-                El pago se procesa por pasarela. AfroMercado no solicita comprobantes,
+                El pago se procesa por pasarela. Teravia no solicita comprobantes,
                 no recibe transferencias manuales y solo confirma el pedido con respuesta
                 oficial de la pasarela.
               </p>
@@ -260,7 +260,7 @@ export default function PaginaPago({
               )}
 
               <p className="mt-3 text-center text-xs text-[#1A1A1A]/50">
-                No subas comprobantes ni transfieras por fuera de AfroMercado.
+                No subas comprobantes ni transfieras por fuera de Teravia.
               </p>
             </section>
 

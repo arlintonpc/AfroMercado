@@ -188,9 +188,9 @@ export default function PaginaProducto({
 
   useEffect(() => {
     if (producto?.nombre) {
-      document.title = `${producto.nombre} — AfroMercado`
+      document.title = `${producto.nombre} — Teravia`
     }
-    return () => { document.title = 'AfroMercado' }
+    return () => { document.title = 'Teravia' }
   }, [producto?.nombre])
 
   useEffect(() => {
@@ -223,7 +223,7 @@ export default function PaginaProducto({
         <main className="flex-1 flex flex-col items-center justify-center">
           <EmptyState
             titulo="Producto no encontrado"
-            descripcion="Este producto no existe o ya no está disponible en AfroMercado."
+            descripcion="Este producto no existe o ya no está disponible en Teravia."
           />
           <Link
             href="/"
@@ -334,7 +334,7 @@ export default function PaginaProducto({
   })()
 
   // Enlace de WhatsApp: solo se construye si hay número Y el comercio tiene whatsappVisible activo.
-  const mensajeWa = `Hola, me interesa el producto "${producto.nombre}" de ${producto.comercio.nombre} en AfroMercado`
+  const mensajeWa = `Hola, me interesa el producto "${producto.nombre}" de ${producto.comercio.nombre} en Teravia`
   const enlaceWa = whatsapp && producto.comercio.whatsappVisible
     ? `https://wa.me/57${whatsapp}?text=${encodeURIComponent(mensajeWa)}`
     : null
@@ -361,7 +361,7 @@ export default function PaginaProducto({
         {/* BREADCRUMB */}
         <div className="max-w-6xl mx-auto w-full px-4 md:px-6 pt-4 pb-2">
           <p className="text-xs text-[#1A1A1A]/40 truncate">
-            <Link href="/" className="hover:text-[#2D6A4F] transition-colors">AfroMercado</Link>
+            <Link href="/" className="hover:text-[#2D6A4F] transition-colors">Teravia</Link>
             {' / '}
             <Link href="/" className="hover:text-[#2D6A4F] transition-colors">Catálogo</Link>
             {' / '}
@@ -445,7 +445,7 @@ export default function PaginaProducto({
                   <>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="inline-flex items-center rounded-full bg-[#2D6A4F]/10 px-2.5 py-1 text-xs font-bold text-[#2D6A4F]">
-                        Temporada AfroMercado
+                        Temporada Teravia
                       </span>
                       <span className="inline-flex items-center rounded-full bg-[#2D6A4F] px-2.5 py-1 text-xs font-bold text-white">
                         -{descuentoPct}%
@@ -748,14 +748,14 @@ export default function PaginaProducto({
             <Acordeon titulo="Información de envío">
               <p>
                 Este producto requiere entre <strong>{producto.diasAlistamientoMin} y {producto.diasAlistamientoMax} días</strong> de alistamiento.
-                El productor prepara tu pedido con dedicación artesanal una vez AfroMercado verifica tu pago.
+                El productor prepara tu pedido con dedicación artesanal una vez Teravia verifica tu pago.
                 El envío se coordina directamente desde {producto.comercio.municipio}.
               </p>
             </Acordeon>
 
             <Acordeon titulo="Garantía">
               <p>
-                Si tu pedido no llega en buen estado, AfroMercado te ayuda a resolverlo.
+                Si tu pedido no llega en buen estado, Teravia te ayuda a resolverlo.
                 Escríbenos al WhatsApp de soporte y gestionaremos una solución contigo.
               </p>
             </Acordeon>

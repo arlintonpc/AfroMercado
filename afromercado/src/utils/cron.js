@@ -233,7 +233,7 @@ async function recordatoriosRecogida() {
       });
       if (repartidor?.telefono) {
         enviarMensajeWA(repartidor.telefono,
-          `📦 *Recordatorio — AfroMercado*\n\nHola ${primerNombre(repartidor.nombre)}, llevas más de 1 hora con la entrega del pedido *#${pedidoId}* asignada.\n\nRecuerda pasar por *${comercioNombre}* a recogerlo. El cliente está esperando. 🌿`
+          `📦 *Recordatorio — Teravia*\n\nHola ${primerNombre(repartidor.nombre)}, llevas más de 1 hora con la entrega del pedido *#${pedidoId}* asignada.\n\nRecuerda pasar por *${comercioNombre}* a recogerlo. El cliente está esperando. 🌿`
         ).catch((e) => console.error("[CRON] WA recordatorio recogida:", e.message));
       }
     }

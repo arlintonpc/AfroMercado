@@ -137,8 +137,8 @@ export default function ComercianteIngresarPage() {
             className="inline-block text-3xl"
             style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
           >
-            <span className="text-[#2D6A4F]">Afro</span>
-            <span className="text-[#D4A017]">Mercado</span>
+            <span className="text-[#2D6A4F]">Tera</span>
+            <span className="text-[#D4A017]">via</span>
           </Link>
           <p className="mt-1 text-sm font-semibold uppercase tracking-[0.18em] text-[#52B788]">
             Vendedor
@@ -150,7 +150,7 @@ export default function ComercianteIngresarPage() {
             Vende lo que produces a todo el país
           </h1>
           <p className="mt-2 text-base text-[#1A1A1A]/60 leading-relaxed">
-            Abre tu tienda en AfroMercado y llega a más compradores.
+            Abre tu tienda en Teravia y llega a más compradores.
           </p>
         </div>
 
@@ -265,7 +265,7 @@ export default function ComercianteIngresarPage() {
                     <a href="/privacidad" target="_blank" className="text-[#2D6A4F] hover:underline font-medium">
                       política de tratamiento de datos personales
                     </a>{' '}
-                    de AfroMercado conforme a la Ley 1581 de 2012.
+                    de Teravia conforme a la Ley 1581 de 2012.
                   </span>
                 </label>
               </>
@@ -298,7 +298,7 @@ export default function ComercianteIngresarPage() {
                 className="rounded-xl bg-[#D4A017]/10 border border-[#D4A017]/25 px-4 py-3 text-sm text-[#1A1A1A]"
               >
                 <p className="font-semibold text-[#9B7300]">
-                  Ya tienes una cuenta en AfroMercado con ese correo.
+                  Ya tienes una cuenta en Teravia con ese correo.
                 </p>
                 <p className="mt-1 text-[#1A1A1A]/70">
                   Inicia sesión y en un paso abrimos tu tienda desde ahí — no necesitas crear una cuenta nueva.

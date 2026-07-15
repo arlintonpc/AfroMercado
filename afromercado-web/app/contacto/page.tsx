@@ -95,7 +95,7 @@ function FormularioPqrsd() {
         ¿Nada de esto encajó? Escríbenos directamente
       </h2>
       <p className="mt-1 text-sm text-[#1A1A1A]/55">
-        Para peticiones, quejas, reclamos, sugerencias o denuncias dirigidas a AfroMercado (no a un comercio en particular).
+        Para peticiones, quejas, reclamos, sugerencias o denuncias dirigidas a Teravia (no a un comercio en particular).
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">

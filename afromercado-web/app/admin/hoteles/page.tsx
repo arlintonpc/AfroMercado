@@ -68,7 +68,7 @@ export default function AdminHotelesPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#1A1A1A]">🏨 Hoteles & Hospedaje</h1>
-        <p className="text-sm text-gray-500 mt-1">Gestión de hoteles registrados en AfroMercado</p>
+        <p className="text-sm text-gray-500 mt-1">Gestión de hoteles registrados en Teravia</p>
       </div>
 
       {/* Stats */}

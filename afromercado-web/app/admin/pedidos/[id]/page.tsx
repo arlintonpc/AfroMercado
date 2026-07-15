@@ -307,7 +307,7 @@ export default function AdminPedidoDetallePage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-[#1A1A1A]/50">
-                  Comisión AfroMercado
+                  Comisión Teravia
                   {sp.tasaComisionAplicada != null && (
                     <span className="ml-1 text-[#1A1A1A]/40">
                       ({(sp.tasaComisionAplicada * 100).toFixed(1)}%)
@@ -400,7 +400,7 @@ export default function AdminPedidoDetallePage() {
             </div>
           )}
           <div className="flex justify-between text-[#1A1A1A]/60 text-xs">
-            <span>Comisión total AfroMercado</span>
+            <span>Comisión total Teravia</span>
             <span>{formatearPrecio(pedido.comisionTotal)}</span>
           </div>
           <div className="border-t border-[#1A1A1A]/8 mt-1 pt-2 flex justify-between font-bold text-base">

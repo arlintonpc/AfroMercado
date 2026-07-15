@@ -10,7 +10,7 @@ function comprobanteSubido({ pedidoId, nombreComprador, monto }) {
       <tr><td style="padding-top:8px;"><strong>Monto</strong></td><td style="text-align:right;padding-top:8px;font-weight:700;">${monto}</td></tr>
     </table>
     <p style="color:#555;">Accede al panel de administración para aprobar o rechazar el pago.</p>`;
-  return base(contenido, `[VERIFICAR] Comprobante pedido #${pedidoId} — AfroMercado`);
+  return base(contenido, `[VERIFICAR] Comprobante pedido #${pedidoId} — Teravia`);
 }
 
 function pagoAprobadoComprador({ nombreComprador, pedidoId }) {

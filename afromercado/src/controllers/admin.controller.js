@@ -398,14 +398,14 @@ const AdminController = {
       }
       await enviarEmail({
         to: adminEmail,
-        subject: "Prueba de email — AfroMercado",
+        subject: "Prueba de email — Teravia",
         html: `
           <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
             <h2 style="color:#2D6A4F">¡El email está funcionando!</h2>
-            <p>Este es un correo de prueba enviado desde el panel de administración de <strong>AfroMercado</strong>.</p>
+            <p>Este es un correo de prueba enviado desde el panel de administración de <strong>Teravia</strong>.</p>
             <p style="color:#666;font-size:14px">Si recibiste este mensaje, las notificaciones por email están correctamente configuradas.</p>
             <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
-            <p style="color:#999;font-size:12px">AfroMercado — Del Chocó para toda Colombia</p>
+            <p style="color:#999;font-size:12px">Teravia — Del Chocó para toda Colombia</p>
           </div>
         `,
       });

@@ -15,14 +15,14 @@ async function fetchEvento(id: string) {
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
   const data = await fetchEvento(id)
-  if (!data) return { title: 'Evento cultural | AfroMercado' }
+  if (!data) return { title: 'Evento cultural | Teravia' }
 
   const ubicacion = `${data.municipio}, ${data.departamento}`
   const descripcion = data.descripcion?.slice(0, 160) ?? `Evento cultural en ${ubicacion}`
   const imagen = data.portadaUrl || data.fotos?.[0]
 
   return {
-    title: `${data.titulo} — ${ubicacion} | AfroMercado Cultura`,
+    title: `${data.titulo} — ${ubicacion} | Teravia Cultura`,
     description: descripcion,
     openGraph: {
       title: data.titulo,
@@ -85,7 +85,7 @@ export default async function CulturaDetalleLayout({
         ...(imagen ? { image: [imagen] } : {}),
         organizer: {
           '@type': 'Organization',
-          name: data.comercio?.nombre ?? 'AfroMercado',
+          name: data.comercio?.nombre ?? 'Teravia',
         },
         ...(desde != null ? {
           offers: {

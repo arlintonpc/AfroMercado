@@ -615,7 +615,7 @@ const PublicidadController = {
             "Todo contenido pagado debe identificarse como Patrocinado o Publicidad.",
             "No se aceptan promesas falsas, productos ilegales ni mensajes discriminatorios.",
             "Solo se pautan comercios verificados, con cuenta de dispersion verificada y productos con stock.",
-            "AfroMercado puede rechazar o suspender una pauta si afecta la confianza de la comunidad.",
+            "Teravia puede rechazar o suspender una pauta si afecta la confianza de la comunidad.",
           ],
         },
       });

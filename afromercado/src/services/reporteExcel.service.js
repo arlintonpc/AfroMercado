@@ -45,7 +45,7 @@ function filaTotal(ws, colDinero, totalRow) {
  */
 async function generarExcelVentasComercio({ res, comercio, filtros, subPedidosGen, productos, resumen }) {
   const wb = new ExcelJS.stream.xlsx.WorkbookWriter({ stream: res, useStyles: true });
-  wb.creator = "AfroMercado";
+  wb.creator = "Teravia";
 
   // ── Hoja "Resumen" ─────────────────────────────────────────────────────────
   const wsR = wb.addWorksheet("Resumen");
@@ -63,7 +63,7 @@ async function generarExcelVentasComercio({ res, comercio, filtros, subPedidosGe
     { k: "──────────────────────────────────", v: "" },
     { k: "Ventas (subpedidos)",  v: resumen.ventas,      fmt: "0" },
     { k: "Subtotal bruto",       v: resumen.subtotal,    fmt: FMT_COP },
-    { k: "Comisión AfroMercado (10%)", v: resumen.comision, fmt: FMT_COP },
+    { k: "Comisión Teravia (10%)", v: resumen.comision, fmt: FMT_COP },
     { k: "Tus ingresos netos",   v: resumen.neto,        fmt: FMT_COP, bold: true },
     { k: "Ventas con cupón",     v: resumen.conCupon,    fmt: "0" },
     { k: "Ticket promedio neto", v: resumen.ticketPromedio, fmt: FMT_COP },
@@ -186,7 +186,7 @@ async function generarExcelAdmin({
   subPedidosGen,
 }) {
   const wb = new ExcelJS.stream.xlsx.WorkbookWriter({ stream: res, useStyles: true });
-  wb.creator = "AfroMercado Admin";
+  wb.creator = "Teravia Admin";
 
   // ── Hoja "Resumen" ─────────────────────────────────────────────────────────
   const wsR = wb.addWorksheet("Resumen");
@@ -708,7 +708,7 @@ function agregarHojaRanking(wb, nombre, filas, extraCols = []) {
 
 async function generarExcelAfroMedia({ res, filtros, paquetes, solicitudes, visibilidades, campanas, analitica }) {
   const wb = new ExcelJS.stream.xlsx.WorkbookWriter({ stream: res, useStyles: true });
-  wb.creator = "AfroMercado AfroMedia";
+  wb.creator = "Teravia AfroMedia";
 
   const vistas = (visibilidades ?? []).reduce((acc, v) => acc + Number(v.vistas || 0), 0);
   const clics = (visibilidades ?? []).reduce((acc, v) => acc + Number(v.clics || 0), 0);

@@ -223,9 +223,9 @@ function MenuExpressContent() {
 
   useEffect(() => {
     if (menu?.comercio?.nombre) {
-      document.title = `${menu.comercio.nombre} — Pedidos AfroMercado`
+      document.title = `${menu.comercio.nombre} — Pedidos Teravia`
     }
-    return () => { document.title = 'AfroMercado' }
+    return () => { document.title = 'Teravia' }
   }, [menu?.comercio?.nombre])
 
   function agregar(p: MenuComercioExpress['productos'][0]) {
@@ -360,7 +360,7 @@ function MenuExpressContent() {
         </div>
         <div className="flex flex-col gap-3 w-full max-w-xs">
           <a
-            href={`https://wa.me/?text=${encodeURIComponent(`¡Acabo de hacer un pedido en AfroMercado! 🎉\n${menu?.comercio.nombre ?? ''}${pedidoId ? `\nPedido #${pedidoId}` : ''}\nhttps://afromercado.co`)}`}
+            href={`https://wa.me/?text=${encodeURIComponent(`¡Acabo de hacer un pedido en Teravia! 🎉\n${menu?.comercio.nombre ?? ''}${pedidoId ? `\nPedido #${pedidoId}` : ''}\nhttps://afromercado.co`)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-xl font-semibold text-sm hover:bg-[#20b858] transition-colors"

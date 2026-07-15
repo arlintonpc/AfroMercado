@@ -544,7 +544,7 @@ export default function PerfilComerciantePage() {
         <div>
           <h2 className="text-base font-bold text-[#1A1A1A]">Cuenta para recibir pagos</h2>
           <p className="mt-1 text-sm text-[#1A1A1A]/55">
-            La pasarela usara esta cuenta para dispersar tus ventas. AfroMercado no recibe pagos manuales ni comprobantes.
+            La pasarela usara esta cuenta para dispersar tus ventas. Teravia no recibe pagos manuales ni comprobantes.
           </p>
         </div>
 
@@ -895,7 +895,7 @@ export default function PerfilComerciantePage() {
             <h2 className="text-base font-bold text-[#1A1A1A]">Directorio de compras públicas</h2>
             <p className="mt-1 text-sm text-[#1A1A1A]/55">
               Aparece en un directorio público para que entidades del Estado (alcaldías, gobernaciones) te
-              encuentren como proveedor certificado. La compra y facturación ocurren fuera de AfroMercado,
+              encuentren como proveedor certificado. La compra y facturación ocurren fuera de Teravia,
               según las reglas de contratación pública vigentes (SECOP II).
             </p>
           </div>

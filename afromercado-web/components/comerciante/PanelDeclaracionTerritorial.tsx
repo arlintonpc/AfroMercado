@@ -78,7 +78,7 @@ export default function PanelDeclaracionTerritorial({ comercio, onActualizado }:
         <p className="mt-1 text-sm text-[#1A1A1A]/55">
           Declara si tu negocio pertenece a un Consejo Comunitario, Resguardo Indígena, Zona de
           Reserva Campesina u otra organización territorial. Es opcional y no afecta tu venta en
-          AfroMercado.
+          Teravia.
         </p>
       </div>
 

@@ -67,7 +67,7 @@ function PantallaSuspendido({
           </p>
         ) : (
           <p className="mt-3 text-sm leading-relaxed text-[#1A1A1A]/60">
-            Por favor contacta al equipo de AfroMercado para resolver la situación.
+            Por favor contacta al equipo de Teravia para resolver la situación.
           </p>
         )}
 
@@ -243,7 +243,7 @@ export default function ComercianteLayout({
               className="text-xl leading-none"
               style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
             >
-              AfroMercado
+              Teravia
             </span>
             <span className="hidden text-sm text-white/70 sm:inline">· Vendedor</span>
           </div>

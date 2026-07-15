@@ -98,7 +98,7 @@ function TabResumen({ m, serie }: { m: Metricas; serie: Serie[] }) {
           <KPI titulo="GMV atribuido" valor={formatearPrecio(e.gmvAtribuido)} sub="ventas generadas" />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-          <KPI titulo="Comisión generada" valor={formatearPrecio(e.comisionGenerada)} sub="para AfroMercado" color="text-[#2D6A4F]" />
+          <KPI titulo="Comisión generada" valor={formatearPrecio(e.comisionGenerada)} sub="para Teravia" color="text-[#2D6A4F]" />
           <KPI titulo="Descuento promedio" valor={formatearPrecio(e.descuentoPromedioPorRedencion)} sub="por redención confirmada" />
           <KPI titulo="Costo / venta" valor={pct(e.costoDescuentoSobreVentas)} sub="descuento sobre GMV" />
           <KPI titulo="Descuento bruto total" valor={formatearPrecio(e.descuentoOtorgadoBruto)} sub="todos los estados" />

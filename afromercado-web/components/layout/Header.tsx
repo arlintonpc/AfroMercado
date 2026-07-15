@@ -101,11 +101,11 @@ export default function Header({ itemsCarrito }: HeaderProps) {
         <Link href="/" className="flex items-center min-h-[44px]">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="AfroMercado" className="h-9 w-auto max-w-[180px] object-contain" />
+            <img src={logoUrl} alt="Teravia" className="h-9 w-auto max-w-[180px] object-contain" />
           ) : (
             <span className="text-2xl" style={{ fontFamily: 'var(--font-dm-serif)' }}>
-              <span className="text-[#2D6A4F]">Afro</span>
-              <span className="text-[#D4A017]">Mercado</span>
+              <span className="text-[#2D6A4F]">Tera</span>
+              <span className="text-[#D4A017]">via</span>
             </span>
           )}
         </Link>

@@ -15,11 +15,11 @@ async function fetchComercio(id: string) {
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
   const data = await fetchComercio(id)
-  if (!data) return { title: 'Restaurante | AfroMercado' }
+  if (!data) return { title: 'Restaurante | Teravia' }
   const { comercio } = data
   return {
-    title: `${comercio.nombre} — Comida en ${comercio.municipio} | AfroMercado`,
-    description: `Pide comida de ${comercio.nombre} en ${comercio.municipio}. Domicilio y recogida en tienda a través de AfroMercado.`,
+    title: `${comercio.nombre} — Comida en ${comercio.municipio} | Teravia`,
+    description: `Pide comida de ${comercio.nombre} en ${comercio.municipio}. Domicilio y recogida en tienda a través de Teravia.`,
     openGraph: {
       title: `${comercio.nombre} — ${comercio.municipio}`,
       description: `Pide comida de ${comercio.nombre} en ${comercio.municipio}`,

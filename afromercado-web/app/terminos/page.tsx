@@ -29,7 +29,7 @@ export default function PaginaTerminos() {
             Términos y condiciones
           </h1>
           <p className="mt-3 max-w-2xl text-sm md:text-base text-[#1A1A1A]/60 leading-relaxed">
-            Estas condiciones regulan el uso de AfroMercado y la relación entre compradores, comercios y la
+            Estas condiciones regulan el uso de Teravia y la relación entre compradores, comercios y la
             plataforma. Al crear una cuenta o realizar un pedido aceptas estos términos.
           </p>
           <p className="mt-2 text-xs text-[#1A1A1A]/45">Última actualización: 24 de junio de 2026 · Aplica legislación de la República de Colombia.</p>
@@ -38,12 +38,12 @@ export default function PaginaTerminos() {
         <div className="grid gap-4">
           <Bloque titulo="1. Quiénes somos">
             <p>
-              AfroMercado es operado por <strong><DatoLegal campo="razonSocial" /></strong>, identificada con
+              Teravia es operado por <strong><DatoLegal campo="razonSocial" /></strong>, identificada con
               NIT <strong><DatoLegal campo="nit" /></strong>, con domicilio en <strong><DatoLegal campo="direccion" /></strong>,
               correo <strong><DatoLegal campo="email" /></strong> y teléfono <strong><DatoLegal campo="telefono" /></strong>.
             </p>
             <p>
-              AfroMercado es un <strong>marketplace</strong>: una plataforma que conecta a compradores con productores
+              Teravia es un <strong>marketplace</strong>: una plataforma que conecta a compradores con productores
               y comercios de toda Colombia. Actuamos como intermediarios tecnológicos; la venta se celebra entre el comprador
               y el comercio que publica cada producto.
             </p>
@@ -66,7 +66,7 @@ export default function PaginaTerminos() {
               dependen del comercio que publica el producto. Revisa la información en pantalla antes de confirmar.
             </p>
             <p>
-              AfroMercado cobra una comisión sobre cada venta a los comercios (actualmente 10%). El pago se realiza por
+              Teravia cobra una comisión sobre cada venta a los comercios (actualmente 10%). El pago se realiza por
               la pasarela digital habilitada y es confirmado automaticamente por el proveedor antes
               de que el comercio prepare el pedido. Si el pago no se completa dentro del tiempo indicado, el pedido se
               cancela y el inventario se libera.
@@ -99,7 +99,7 @@ export default function PaginaTerminos() {
               precio, stock, condiciones) y de cumplir con la entrega de los pedidos confirmados.
             </p>
             <p>
-              AfroMercado puede ajustar, ocultar o retirar contenido o cuentas que incumplan estos términos, que sean
+              Teravia puede ajustar, ocultar o retirar contenido o cuentas que incumplan estos términos, que sean
               fraudulentos o que generen riesgo para los usuarios.
             </p>
           </Bloque>
@@ -107,7 +107,7 @@ export default function PaginaTerminos() {
           <Bloque titulo="7. Limitación de responsabilidad">
             <p>
               Hacemos lo posible por mantener la plataforma disponible, pero no garantizamos que esté libre de
-              interrupciones o errores. AfroMercado no es responsable por el incumplimiento atribuible exclusivamente a
+              interrupciones o errores. Teravia no es responsable por el incumplimiento atribuible exclusivamente a
               un comercio o a un tercero (pagos, transporte), sin perjuicio de la ayuda que brindamos para canalizar
               cada caso.
             </p>

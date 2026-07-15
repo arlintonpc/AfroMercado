@@ -46,6 +46,7 @@ const CATEGORIAS = [
   { emoji: '🏨', nombre: 'Hotelería', slug: '', fondo: 'bg-[#E8F5EE]', texto: 'text-[#2D6A4F]', proximamente: false, href: '/hoteles' },
   { emoji: '🗺️', nombre: 'Tours',     slug: '', fondo: 'bg-[#EEF3FF]', texto: 'text-[#2A4AB8]', proximamente: false, href: '/tours' },
   { emoji: '🛥️', nombre: 'Transporte', slug: '', fondo: 'bg-[#E8F0FF]', texto: 'text-[#023E8A]', proximamente: false, href: '/transportes' },
+  { emoji: '💼', nombre: 'Empleo', slug: '', fondo: 'bg-[#EAF6F6]', texto: 'text-[#0F6B72]', proximamente: false, href: '/empleo' },
 ]
 
 interface VisibilidadActiva {
@@ -402,7 +403,7 @@ function SeccionDestacados({ productos, destacadosPagados, etiquetasPagadas }: {
   )
 }
 
-/* ─── Sección: Temporada AfroMercado ────────────────────────────── */
+/* ─── Sección: Temporada Teravia ────────────────────────────── */
 function SeccionOfertas({ productos }: { productos: Producto[] }) {
   const conOferta = productos.filter(p => p.oferta)
   if (conOferta.length === 0) return null
@@ -415,7 +416,7 @@ function SeccionOfertas({ productos }: { productos: Producto[] }) {
               Tiempo limitado
             </p>
             <h2 className="text-2xl md:text-3xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif)' }}>
-              Temporada AfroMercado
+              Temporada Teravia
             </h2>
             <p className="mt-1 text-sm text-[#1A1A1A]/50">
               Productos con precio especial por tiempo limitado.

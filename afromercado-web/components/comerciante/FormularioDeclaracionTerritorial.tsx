@@ -69,7 +69,7 @@ export default function FormularioDeclaracionTerritorial({ onExito, onCerrar }: 
         <div className="overflow-y-auto px-6 py-5">
           <p className="text-sm leading-relaxed text-[#1A1A1A]/65">
             Esta declaración permite identificar tu negocio como parte de un Consejo Comunitario,
-            Resguardo Indígena, Zona de Reserva Campesina u otra organización territorial. AfroMercado
+            Resguardo Indígena, Zona de Reserva Campesina u otra organización territorial. Teravia
             la usa para fines de elegibilidad en programas de apoyo institucional y trazabilidad, no
             para restringir tu venta en la plataforma. Un administrador revisará tu solicitud antes de
             aprobarla.
@@ -103,7 +103,7 @@ export default function FormularioDeclaracionTerritorial({ onExito, onCerrar }: 
                 className="mt-0.5 h-4 w-4 shrink-0 accent-[#1B4332]"
               />
               <span>
-                Autorizo que AfroMercado almacene esta declaración para fines de elegibilidad en
+                Autorizo que Teravia almacene esta declaración para fines de elegibilidad en
                 programas de apoyo y trazabilidad institucional.
               </span>
             </label>
@@ -123,7 +123,7 @@ export default function FormularioDeclaracionTerritorial({ onExito, onCerrar }: 
           </div>
 
           <p className="mt-4 text-sm leading-relaxed text-[#1A1A1A]/70">
-            No autorizar esto no afecta tu cuenta ni tu capacidad de vender en AfroMercado. Puedes
+            No autorizar esto no afecta tu cuenta ni tu capacidad de vender en Teravia. Puedes
             revocar esta autorización en cualquier momento desde tu panel.
           </p>
 

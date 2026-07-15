@@ -14,16 +14,16 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     const desc = c.descripcion ?? `Productos artesanales y culturales de ${nombre} en ${municipio}.`
     const img = c.logoUrl ?? c.bannerUrl ?? null
     return {
-      title: `${nombre} — AfroMercado`,
+      title: `${nombre} — Teravia`,
       description: desc.slice(0, 160),
       openGraph: {
-        title: `${nombre} — AfroMercado`,
+        title: `${nombre} — Teravia`,
         description: desc.slice(0, 160),
         ...(img ? { images: [{ url: img }] } : {}),
       },
     }
   } catch {
-    return { title: 'Tienda — AfroMercado' }
+    return { title: 'Tienda — Teravia' }
   }
 }
 

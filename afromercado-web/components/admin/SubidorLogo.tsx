@@ -60,7 +60,7 @@ export default function SubidorLogo() {
             <img src={logoUrl} alt="Logo actual" className="h-12 w-auto max-w-[160px] object-contain" />
           ) : (
             <span className="text-lg" style={{ fontFamily: 'var(--font-dm-serif)' }}>
-              <span className="text-[#2D6A4F]">Afro</span><span className="text-[#D4A017]">Mercado</span>
+              <span className="text-[#2D6A4F]">Tera</span><span className="text-[#D4A017]">via</span>
             </span>
           )}
         </div>

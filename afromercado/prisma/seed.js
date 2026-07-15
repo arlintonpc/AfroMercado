@@ -85,7 +85,7 @@ async function main() {
 
   // ── 1. Admin ────────────────────────────────────────────────
   const admin = await upsertUsuario({
-    nombre: "Admin AfroMercado",
+    nombre: "Admin Teravia",
     email: "admin@afromercado.co",
     telefono: "3009990000",
     password: "Admin123",

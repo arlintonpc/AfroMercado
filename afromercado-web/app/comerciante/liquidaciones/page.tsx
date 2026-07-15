@@ -93,7 +93,7 @@ export default function LiquidacionesPage() {
             Aún no tienes liquidaciones registradas.
           </p>
           <p className="mt-2 text-sm text-[#1A1A1A]/40">
-            El equipo de AfroMercado procesará tu liquidación una vez acumulado el saldo mínimo.
+            El equipo de Teravia procesará tu liquidación una vez acumulado el saldo mínimo.
           </p>
         </div>
       ) : (

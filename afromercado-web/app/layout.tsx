@@ -20,12 +20,12 @@ const dmSerifDisplay = DM_Serif_Display({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://afro-mercado.vercel.app"),
-  title: "AfroMercado — Productos y Servicios de Colombia",
+  title: "Teravia — Productos y Servicios de Colombia",
   description: "Descubre productos artesanales, hoteles, tours, restaurantes, transporte y cultura de comunidades afro, indígenas y campesinas de todo el país, nacido en el Chocó.",
   openGraph: {
-    title: "AfroMercado — Productos y Servicios de Colombia",
+    title: "Teravia — Productos y Servicios de Colombia",
     description: "Descubre productos artesanales, hoteles, tours, restaurantes, transporte y cultura de comunidades afro, indígenas y campesinas de todo el país, nacido en el Chocó.",
-    images: [{ url: "/og-logo.png", width: 1200, height: 630, alt: "AfroMercado" }],
+    images: [{ url: "/og-logo.png", width: 1200, height: 630, alt: "Teravia" }],
     locale: "es_CO",
     type: "website",
   },
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "AfroMercado",
+    title: "Teravia",
   },
   other: {
     "mobile-web-app-capable": "yes",

@@ -300,7 +300,7 @@ export default function PaginaConfiguracionPagos() {
               Configuracion de pagos
             </h1>
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#1A1A1A]/55">
-              Controla la pasarela activa, revisa credenciales y valida si AfroMercado esta listo para cobrar y dispersar.
+              Controla la pasarela activa, revisa credenciales y valida si Teravia esta listo para cobrar y dispersar.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

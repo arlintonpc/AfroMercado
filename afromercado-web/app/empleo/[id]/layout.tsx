@@ -23,14 +23,14 @@ async function fetchOferta(id: string) {
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
   const data = await fetchOferta(id)
-  if (!data) return { title: 'Oferta de empleo | AfroMercado' }
+  if (!data) return { title: 'Oferta de empleo | Teravia' }
   const ubicacion = data.departamento ? `${data.municipio}, ${data.departamento}` : data.municipio
   return {
-    title: `${data.titulo} — Empleo en ${ubicacion} | AfroMercado`,
+    title: `${data.titulo} — Empleo en ${ubicacion} | Teravia`,
     description: data.descripcion?.slice(0, 160) ?? `Vacante en ${ubicacion}`,
     openGraph: {
       title: `${data.titulo} — ${ubicacion}`,
-      description: data.descripcion?.slice(0, 160) ?? `Bolsa de trabajo comunitaria AfroMercado`,
+      description: data.descripcion?.slice(0, 160) ?? `Bolsa de trabajo comunitaria Teravia`,
       type: 'website',
     },
   }
@@ -59,7 +59,7 @@ export default async function EmpleoDetalleLayout({
         employmentType: EMPLOYMENT_TYPE_SCHEMA[data.tipoContrato] ?? 'OTHER',
         hiringOrganization: {
           '@type': 'Organization',
-          name: data.comercio?.nombre ?? data.publicadoPor?.nombre ?? 'AfroMercado',
+          name: data.comercio?.nombre ?? data.publicadoPor?.nombre ?? 'Teravia',
         },
         jobLocation: {
           '@type': 'Place',

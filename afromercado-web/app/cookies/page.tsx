@@ -29,16 +29,16 @@ export default function PaginaCookies() {
             Política de cookies
           </h1>
           <p className="mt-3 max-w-2xl text-sm md:text-base text-[#1A1A1A]/60 leading-relaxed">
-            Esta página explica, de forma honesta y específica a cómo funciona AfroMercado, qué usamos para
+            Esta página explica, de forma honesta y específica a cómo funciona Teravia, qué usamos para
             mantener tu sesión y qué no.
           </p>
           <p className="mt-2 text-xs text-[#1A1A1A]/45">Última actualización: 4 de julio de 2026</p>
         </div>
 
         <div className="grid gap-4">
-          <Bloque titulo="1. AfroMercado no usa cookies propias">
+          <Bloque titulo="1. Teravia no usa cookies propias">
             <p>
-              A diferencia de la mayoría de sitios, AfroMercado <strong>no guarda cookies propias</strong> para
+              A diferencia de la mayoría de sitios, Teravia <strong>no guarda cookies propias</strong> para
               mantener tu sesión ni para rastrear tu navegación. Cuando inicias sesión, guardamos tu token de
               acceso en el <strong>almacenamiento local de tu navegador</strong> (<code>localStorage</code>), no en
               una cookie. Esto significa que cerrar el navegador no te desconecta automáticamente, y que ese token
@@ -57,7 +57,7 @@ export default function PaginaCookies() {
 
           <Bloque titulo="3. No hay cookies de publicidad ni de terceros con fines de rastreo">
             <p>
-              Hoy AfroMercado no integra Google Analytics, píxeles de redes sociales, ni ninguna cookie de
+              Hoy Teravia no integra Google Analytics, píxeles de redes sociales, ni ninguna cookie de
               publicidad o rastreo entre sitios. Si esto cambia en el futuro, actualizaremos esta página antes de
               activar cualquier herramienta nueva.
             </p>

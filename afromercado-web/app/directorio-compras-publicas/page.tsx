@@ -46,7 +46,7 @@ export default function DirectorioComprasPublicasPage() {
             </h1>
             <p className="text-white/75 text-lg max-w-xl mx-auto leading-relaxed">
               Entidades públicas (alcaldías, gobernaciones) pueden encontrar aquí productores y
-              comercios verificados de AfroMercado para sus procesos de contratación de mínima cuantía.
+              comercios verificados de Teravia para sus procesos de contratación de mínima cuantía.
             </p>
           </div>
         </div>
@@ -54,8 +54,8 @@ export default function DirectorioComprasPublicasPage() {
         <div className="max-w-4xl mx-auto px-4 py-12">
           <div className="bg-white rounded-2xl border border-[#E8DCC8] p-5 text-sm text-gray-600 leading-relaxed mb-8">
             Este directorio conecta entidades públicas con proveedores certificados. La compra y
-            facturación ocurren fuera de AfroMercado, según las reglas de contratación pública vigentes
-            (SECOP II). AfroMercado no participa en el proceso de contratación ni en el pago.
+            facturación ocurren fuera de Teravia, según las reglas de contratación pública vigentes
+            (SECOP II). Teravia no participa en el proceso de contratación ni en el pago.
           </div>
 
           <div className="flex flex-wrap gap-3 mb-6">

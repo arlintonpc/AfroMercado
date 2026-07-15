@@ -3,11 +3,11 @@ import type { Metadata } from 'next'
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
 
 export const metadata: Metadata = {
-  title: 'Transporte fluvial y terrestre en Colombia | AfroMercado',
+  title: 'Transporte fluvial y terrestre en Colombia | Teravia',
   description:
     'Encuentra servicios de transporte fluvial, marítimo y terrestre en toda Colombia. Rutas entre municipios operadas por comunidades locales.',
   openGraph: {
-    title: 'Transporte en Colombia | AfroMercado',
+    title: 'Transporte en Colombia | Teravia',
     description:
       'Servicios de transporte locales para moverse por el territorio: lanchas, buses, chivas y rutas terrestres operadas por la comunidad.',
     type: 'website',

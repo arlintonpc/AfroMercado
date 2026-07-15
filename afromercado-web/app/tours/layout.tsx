@@ -3,11 +3,11 @@ import type { Metadata } from 'next'
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
 
 export const metadata: Metadata = {
-  title: 'Tours culturales y naturales de Colombia | AfroMercado',
+  title: 'Tours culturales y naturales de Colombia | Teravia',
   description:
     'Descubre tours guiados por todo el país: selva, ríos, playas, montañas y cultura viva. Reserva directamente con comunidades locales en cada región de Colombia.',
   openGraph: {
-    title: 'Tours en Colombia | AfroMercado',
+    title: 'Tours en Colombia | Teravia',
     description:
       'Explora el territorio colombiano con guías locales. Naturaleza, cultura y aventura en tours auténticos de cada región.',
     type: 'website',

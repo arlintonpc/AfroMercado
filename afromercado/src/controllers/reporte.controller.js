@@ -94,7 +94,7 @@ const ReporteController = {
         ReporteRepository.productosConMetricas(filtros),
       ]);
 
-      const nombre = `AfroMercado_Ventas_${(comercio.nombre ?? "comercio").replace(/\s+/g, "_")}_${desde ?? "inicio"}_a_${hasta ?? "hoy"}.xlsx`;
+      const nombre = `Teravia_Ventas_${(comercio.nombre ?? "comercio").replace(/\s+/g, "_")}_${desde ?? "inicio"}_a_${hasta ?? "hoy"}.xlsx`;
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${nombre}"`);
       res.setHeader("Cache-Control", "no-store");
@@ -285,7 +285,7 @@ const ReporteController = {
         ReporteRepository.alertasAdmin({ desde, hasta }),
       ]);
 
-      const nombre = `AfroMercado_Admin_${desde ?? "inicio"}_a_${hasta ?? "hoy"}.xlsx`;
+      const nombre = `Teravia_Admin_${desde ?? "inicio"}_a_${hasta ?? "hoy"}.xlsx`;
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${nombre}"`);
       res.setHeader("Cache-Control", "no-store");

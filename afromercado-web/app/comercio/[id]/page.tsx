@@ -72,7 +72,7 @@ function Estrellas({ valor }: { valor: number }) {
 
 function CabeceraComercio({ c, onChatear }: { c: ComercioPublico; onChatear?: () => void }) {
   const cal = Number(c.calificacion)
-  const mensajeWa = `Hola, vi tu tienda "${c.nombre}" en AfroMercado y me gustaría hacer un pedido.`
+  const mensajeWa = `Hola, vi tu tienda "${c.nombre}" en Teravia y me gustaría hacer un pedido.`
   const waUrl = c.whatsapp && c.whatsappVisible
     ? `https://wa.me/${c.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(mensajeWa)}`
     : null

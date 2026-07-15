@@ -233,7 +233,7 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
 
               {oferta.contactoWhatsapp && (
                 <a
-                  href={`https://wa.me/57${oferta.contactoWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, vi tu oferta "${oferta.titulo}" en AfroMercado y quiero más información.`)}`}
+                  href={`https://wa.me/57${oferta.contactoWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, vi tu oferta "${oferta.titulo}" en Teravia y quiero más información.`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-4 flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-white font-semibold text-sm transition-colors"

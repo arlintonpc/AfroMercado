@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
     const p = json.producto ?? json.data ?? {}
     const nombre   = p.nombre ?? 'Producto artesanal'
-    const comercio = p.comercio?.nombre ?? 'AfroMercado'
+    const comercio = p.comercio?.nombre ?? 'Teravia'
     const municipio = p.comercio?.municipio ?? 'Colombia'
     const unidadLabel: Record<string, string> = {
       UNIDAD: 'unidad', KG: 'kg', PAQUETE: 'paquete', LITRO: 'litro', GRAMO: 'gramo'
@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const descripcion = (
       descripcionBase
         ? `${precioStr ? precioStr + ' · ' : ''}${descripcionBase}`
-        : `${precioStr ? precioStr + ' · ' : ''}${comercio} · ${municipio} · AfroMercado`
+        : `${precioStr ? precioStr + ' · ' : ''}${comercio} · ${municipio} · Teravia`
     ).slice(0, 160)
 
     const imagenRaw = p.imagenes?.[0]
@@ -62,31 +62,31 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const imagen = imagenProducto ?? OG_LOGO
 
     return {
-      title:       `${nombre} · ${comercio} — AfroMercado`,
+      title:       `${nombre} · ${comercio} — Teravia`,
       description: descripcion,
       openGraph: {
-        title:       `${nombre} · ${comercio} — AfroMercado`,
+        title:       `${nombre} · ${comercio} — Teravia`,
         description: descripcion,
         url:         `${SITE}/producto/${id}`,
-        siteName:    'AfroMercado',
+        siteName:    'Teravia',
         type:        'website',
         images: [{ url: imagen, width: 800, height: 600, alt: nombre }],
       },
       twitter: {
         card:        'summary_large_image',
-        title:       `${nombre} · ${comercio} — AfroMercado`,
+        title:       `${nombre} · ${comercio} — Teravia`,
         description: descripcion,
         images:      [imagen],
       },
     }
   } catch {
     return {
-      title:       'Producto — AfroMercado',
-      description: 'Descubre productos artesanales de Colombia en AfroMercado.',
+      title:       'Producto — Teravia',
+      description: 'Descubre productos artesanales de Colombia en Teravia.',
       openGraph: {
-        title:    'Producto — AfroMercado',
-        siteName: 'AfroMercado',
-        images:   [{ url: OG_LOGO, width: 800, height: 600, alt: 'AfroMercado' }],
+        title:    'Producto — Teravia',
+        siteName: 'Teravia',
+        images:   [{ url: OG_LOGO, width: 800, height: 600, alt: 'Teravia' }],
       },
     }
   }

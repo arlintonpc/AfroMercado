@@ -36,7 +36,7 @@ function mensajeNuevoPedido({ pedidoId, nombreComerciante, productosTexto, neto,
   const lineas = [
     `¡Hola, ${primerNombre(nombreComerciante)}! 🎉 Tienes un nuevo pedido.`,
     ``,
-    `*AfroMercado — Pedido #${pedidoId}*`,
+    `*Teravia — Pedido #${pedidoId}*`,
     ``,
     `📦 *Productos:*`,
     productosTexto,
@@ -72,7 +72,7 @@ function mensajePagoConfirmado({ pedidoId, nombreComerciante, productosTexto, ne
   ];
   if (comprador.telefono) lineas.push(`📞 ${comprador.telefono}`);
   if (notas) lineas.push(``, `📝 *Nota del comprador:* ${notas}`);
-  lineas.push(``, `Entra a tu panel en AfroMercado para gestionar el envío. 🌿`);
+  lineas.push(``, `Entra a tu panel en Teravia para gestionar el envío. 🌿`);
   return lineas.join("\n");
 }
 
@@ -120,7 +120,7 @@ const NotificacionService = {
     await dispararNotificacion(() =>
       enviarEmail({
         to: comprador.email,
-        subject: `Tu pedido #${pedidoId} fue recibido — AfroMercado`,
+        subject: `Tu pedido #${pedidoId} fue recibido — Teravia`,
         html: emailPedido.pedidoCreado({
           nombreComprador: comprador.nombre,
           pedidoId,
@@ -134,7 +134,7 @@ const NotificacionService = {
     if (comprador.telefono) {
       await dispararNotificacion(() =>
         enviarMensajeWA(comprador.telefono,
-          `Hola ${comprador.nombre} 👋\n\nTu pedido *#${pedidoId}* en AfroMercado quedó registrado.\n💰 Total: ${totalFormateado}\n\nSube el comprobante de pago en la app para que lo verifiquemos. 🌿`
+          `Hola ${comprador.nombre} 👋\n\nTu pedido *#${pedidoId}* en Teravia quedó registrado.\n💰 Total: ${totalFormateado}\n\nSube el comprobante de pago en la app para que lo verifiquemos. 🌿`
         ), "WA comprador checkout");
     }
 
@@ -163,7 +163,7 @@ const NotificacionService = {
         await dispararNotificacion(() =>
           enviarEmail({
             to: comercio.usuario.email,
-            subject: `Nuevo pedido #${pedidoId} en tu tienda — AfroMercado`,
+            subject: `Nuevo pedido #${pedidoId} en tu tienda — Teravia`,
             html: emailPedido.pedidoComercianteNuevo({
               nombreComerciante: comercio.usuario.nombre,
               pedidoId,
@@ -220,7 +220,7 @@ const NotificacionService = {
       await dispararNotificacion(() =>
         enviarEmail({
           to: adminEmail,
-          subject: `[VERIFICAR] Comprobante pedido #${pedidoId} — AfroMercado`,
+          subject: `[VERIFICAR] Comprobante pedido #${pedidoId} — Teravia`,
           html: emailPago.comprobanteSubido({
             pedidoId,
             nombreComprador: comprador?.nombre || "Comprador",
@@ -308,7 +308,7 @@ const NotificacionService = {
     await dispararNotificacion(() =>
       enviarEmail({
         to: comprador.email,
-        subject: `Tu pedido #${pedidoId} está listo para entrega — AfroMercado`,
+        subject: `Tu pedido #${pedidoId} está listo para entrega — Teravia`,
         html: emailPedido.pedidoListo({ nombreComprador: comprador.nombre, pedidoId }),
       }), "email comprador pedido listo");
 
@@ -332,14 +332,14 @@ const NotificacionService = {
     await dispararNotificacion(() =>
       enviarEmail({
         to: comprador.email,
-        subject: `¡Pedido #${pedidoId} entregado! — AfroMercado`,
+        subject: `¡Pedido #${pedidoId} entregado! — Teravia`,
         html: emailPedido.pedidoEntregado({ nombreComprador: comprador.nombre, pedidoId }),
       }), "email comprador pedido entregado");
 
     if (comprador.telefono) {
       await dispararNotificacion(() =>
         enviarMensajeWA(comprador.telefono,
-          `¡Entregado! ✅\n\nHola ${primerNombre(comprador.nombre)}, tu pedido *#${pedidoId}* fue marcado como entregado.\n\n¿Todo llegó bien? Deja tu reseña en AfroMercado y apoya a los productores locales. 🌿`
+          `¡Entregado! ✅\n\nHola ${primerNombre(comprador.nombre)}, tu pedido *#${pedidoId}* fue marcado como entregado.\n\n¿Todo llegó bien? Deja tu reseña en Teravia y apoya a los productores locales. 🌿`
         ), "WA comprador pedido entregado");
     }
   },
@@ -470,7 +470,7 @@ const NotificacionService = {
     if (repartidor.telefono) {
       await dispararNotificacion(() =>
         enviarMensajeWA(repartidor.telefono,
-          `🚴 *Nueva entrega asignada — AfroMercado*\n\n📦 Pedido #${pedidoId}\n🏪 Recoge en: *${comercioNombre}*${comercioMunicipio ? ` — ${comercioMunicipio}` : ""}\n📍 Entrega en: ${direccion || "ver en la app"}\n\nEntra a la app para ver los detalles.`
+          `🚴 *Nueva entrega asignada — Teravia*\n\n📦 Pedido #${pedidoId}\n🏪 Recoge en: *${comercioNombre}*${comercioMunicipio ? ` — ${comercioMunicipio}` : ""}\n📍 Entrega en: ${direccion || "ver en la app"}\n\nEntra a la app para ver los detalles.`
         ), "WA repartidor entrega asignada");
     }
   },
@@ -497,20 +497,20 @@ const NotificacionService = {
   async solicitudRepartidorAprobada({ usuario }) {
     await enviarPushAUsuario(prisma, usuario.id, {
       titulo: "¡Solicitud aprobada! 🎉",
-      cuerpo: "Ya eres repartidor oficial de AfroMercado. ¡Bienvenido al equipo!",
+      cuerpo: "Ya eres repartidor oficial de Teravia. ¡Bienvenido al equipo!",
       url: `/repartidor`,
     });
     await crearNotificacionDB(usuario.id, {
       tipo: "SOLICITUD_REPARTIDOR_APROBADA",
       titulo: "¡Solicitud aprobada! 🎉",
-      mensaje: "Tu solicitud fue aprobada. Ya eres repartidor oficial de AfroMercado. ¡Bienvenido al equipo!",
+      mensaje: "Tu solicitud fue aprobada. Ya eres repartidor oficial de Teravia. ¡Bienvenido al equipo!",
       url: `/repartidor`,
       datos: {},
     });
     if (usuario.telefono) {
       await dispararNotificacion(() =>
         enviarMensajeWA(usuario.telefono,
-          `¡Felicitaciones, ${primerNombre(usuario.nombre)}! 🎉🚴\n\nTu solicitud para ser repartidor de *AfroMercado* fue *aprobada*.\n\nYa puedes ingresar al panel de repartidor en la app y empezar a recibir entregas. ¡Bienvenido al equipo! 🌿`
+          `¡Felicitaciones, ${primerNombre(usuario.nombre)}! 🎉🚴\n\nTu solicitud para ser repartidor de *Teravia* fue *aprobada*.\n\nYa puedes ingresar al panel de repartidor en la app y empezar a recibir entregas. ¡Bienvenido al equipo! 🌿`
         ), "WA solicitud repartidor aprobada");
     }
   },
@@ -590,14 +590,14 @@ const NotificacionService = {
     await crearNotificacionDB(usuario.id, {
       tipo: "COMERCIO_VERIFICADO",
       titulo: "¡Tu comercio fue verificado! 🌿",
-      mensaje: `${comercio.nombre} está verificado en AfroMercado. Ya puedes publicar productos y comenzar a vender.`,
+      mensaje: `${comercio.nombre} está verificado en Teravia. Ya puedes publicar productos y comenzar a vender.`,
       url: `/comerciante`,
       datos: { comercioId: comercio.id },
     });
     if (usuario.telefono) {
       await dispararNotificacion(() =>
         enviarMensajeWA(usuario.telefono,
-          `¡Felicitaciones, ${primerNombre(usuario.nombre)}! 🎉🌿\n\nTu comercio *${comercio.nombre}* fue *verificado* en AfroMercado.\n\nYa puedes publicar tus productos y comenzar a recibir pedidos. ¡Mucho éxito!`
+          `¡Felicitaciones, ${primerNombre(usuario.nombre)}! 🎉🌿\n\nTu comercio *${comercio.nombre}* fue *verificado* en Teravia.\n\nYa puedes publicar tus productos y comenzar a recibir pedidos. ¡Mucho éxito!`
         ), "WA comercio verificado");
     }
   },
@@ -610,7 +610,7 @@ const NotificacionService = {
       ? `El evento "${titulo}" fue pospuesto. Te avisaremos la nueva fecha.`
       : `El evento "${titulo}" fue cancelado. Contáctanos para tu reembolso si ya pagaste.`;
     const mensajeWA = esPospuesto
-      ? `📅 *Evento pospuesto*\n\nHola, el evento *"${titulo}"* fue pospuesto. Te avisaremos la nueva fecha por AfroMercado.`
+      ? `📅 *Evento pospuesto*\n\nHola, el evento *"${titulo}"* fue pospuesto. Te avisaremos la nueva fecha por Teravia.`
       : `⚠️ *Evento cancelado*\n\nHola, el evento *"${titulo}"* fue cancelado.\n\nSi ya pagaste tu entrada, contáctanos para gestionar tu reembolso.`;
 
     for (const comprador of compradores || []) {
@@ -753,7 +753,7 @@ const NotificacionService = {
       enviarEmail({
         to: pqrsd.emailContacto,
         subject: `Respuesta a tu mensaje — ${pqrsd.asunto}`,
-        html: `<p>Hola ${pqrsd.nombreContacto},</p><p>Sobre tu mensaje "<strong>${pqrsd.asunto}</strong>":</p><p>${pqrsd.respuesta}</p><p>— Equipo AfroMercado</p>`,
+        html: `<p>Hola ${pqrsd.nombreContacto},</p><p>Sobre tu mensaje "<strong>${pqrsd.asunto}</strong>":</p><p>${pqrsd.respuesta}</p><p>— Equipo Teravia</p>`,
       }), "email PQRSD respondido");
   },
 

@@ -72,7 +72,7 @@ export default function MisLiquidacionesPage() {
           Mis liquidaciones
         </h1>
         <p className="mt-1 text-sm text-[#1A1A1A]/60">
-          Resumen de pagos que AfroMercado debe transferirte por tus ventas o entregas.
+          Resumen de pagos que Teravia debe transferirte por tus ventas o entregas.
         </p>
       </div>
 
@@ -118,7 +118,7 @@ export default function MisLiquidacionesPage() {
         ) : items.length === 0 ? (
           <EmptyState
             titulo="Aún no tienes liquidaciones"
-            descripcion="Cuando el equipo de AfroMercado procese tu pago, aparecerá aquí."
+            descripcion="Cuando el equipo de Teravia procese tu pago, aparecerá aquí."
           />
         ) : (
           <ul className="divide-y divide-[#1A1A1A]/5">

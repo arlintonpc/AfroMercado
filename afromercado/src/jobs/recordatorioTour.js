@@ -26,7 +26,7 @@ async function notifRecordatorioTour(reserva) {
     const telefono = reserva.telefonoContacto || reserva.cliente?.telefono
     if (telefono) {
       await enviarMensajeWA(telefono,
-        `🗺️ *Recordatorio — AfroMercado*\n\n` +
+        `🗺️ *Recordatorio — Teravia*\n\n` +
         `Hola ${reserva.nombreContacto || reserva.cliente?.nombre || ''}, tu tour *${reserva.configTour?.nombre || ''}* es *mañana*.\n\n` +
         `No olvides confirmar los detalles con el operador. 🌿`
       )

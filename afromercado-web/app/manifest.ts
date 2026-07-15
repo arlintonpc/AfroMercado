@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name:             'AfroMercado — Marketplace de Colombia',
-    short_name:       'AfroMercado',
+    name:             'Teravia — Marketplace de Colombia',
+    short_name:       'Teravia',
     description:      'Productos, tours, hoteles, transporte y cultura de comunidades afro, indígenas y campesinas de todo el país',
     start_url:        '/',
     display:          'standalone',

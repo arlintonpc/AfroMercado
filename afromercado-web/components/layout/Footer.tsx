@@ -9,8 +9,8 @@ export default function Footer() {
           {/* Logo y tagline */}
           <div className="col-span-2 md:col-span-1">
             <p className="text-2xl mb-2" style={{ fontFamily: 'var(--font-dm-serif)' }}>
-              <span className="text-white">Afro</span>
-              <span className="text-[#D4A017]">Mercado</span>
+              <span className="text-white">Tera</span>
+              <span className="text-[#D4A017]">via</span>
             </p>
             <p className="text-white/70 text-sm italic">Del Chocó para toda Colombia</p>
           </div>
@@ -49,7 +49,7 @@ export default function Footer() {
         </div>
 
         <div className="pt-6 border-t border-white/20 text-center text-xs text-white/50">
-          © 2026 AfroMercado. Nacido en el Chocó, hecho para toda Colombia.
+          © 2026 Teravia. Nacido en el Chocó, hecho para toda Colombia.
         </div>
       </div>
     </footer>

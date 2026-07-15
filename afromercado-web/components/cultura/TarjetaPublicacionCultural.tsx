@@ -210,7 +210,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
   }
 
   const urlGaleria = typeof window !== 'undefined' ? `${window.location.origin}/cultura/galeria` : 'https://afromercado.vercel.app/cultura/galeria'
-  const textoWhatsapp = `Mira esta historia en AfroMercado: "${publicacion.titulo}" — ${urlGaleria}`
+  const textoWhatsapp = `Mira esta historia en Teravia: "${publicacion.titulo}" — ${urlGaleria}`
 
   return (
     <article className="overflow-hidden rounded-2xl border border-[#1A1A1A]/8 bg-white shadow-sm">

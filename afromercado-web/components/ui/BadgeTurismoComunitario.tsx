@@ -7,7 +7,7 @@ interface Props {
 
 const CRITERIOS = [
   '✅ RNT — Registro Nacional de Turismo vigente',
-  '✅ Comunidad afro, indígena, raizal o campesina verificada por AfroMercado',
+  '✅ Comunidad afro, indígena, raizal o campesina verificada por Teravia',
   '✅ Territorio y origen cultural confirmados',
 ]
 
@@ -35,7 +35,7 @@ export default function BadgeTurismoComunitario({ verificadoEtnico, rntVerificad
             ))}
           </ul>
           <div className="mt-3 pt-2 border-t border-gray-100">
-            <p className="text-[10px] text-gray-400">Certificado por el equipo AfroMercado</p>
+            <p className="text-[10px] text-gray-400">Certificado por el equipo Teravia</p>
           </div>
           <div className="absolute top-full left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-r border-b border-gray-100 rotate-45 -mt-1.5" />
         </div>

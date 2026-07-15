@@ -71,7 +71,7 @@ function PanelConfianzaHotel({ hotel }: { hotel: ConfigHotel }) {
       detalle: hotel.rntVerificado && hotel.rnt
         ? `Registro ${hotel.rnt}`
         : hotel.rnt
-          ? 'AfroMercado revisa el registro del alojamiento.'
+          ? 'Teravia revisa el registro del alojamiento.'
           : 'Pide soporte si necesitas validar el registro turistico.',
     },
     {
@@ -1110,9 +1110,9 @@ export default function HotelDetallePage() {
 
   useEffect(() => {
     if (hotel?.comercio?.nombre) {
-      document.title = `${hotel.comercio.nombre} — Hoteles AfroMercado`
+      document.title = `${hotel.comercio.nombre} — Hoteles Teravia`
     }
-    return () => { document.title = 'AfroMercado' }
+    return () => { document.title = 'Teravia' }
   }, [hotel?.comercio?.nombre])
 
   async function toggleFav() {
@@ -1546,7 +1546,7 @@ export default function HotelDetallePage() {
 
             <div className="flex flex-col gap-3">
               <a
-                href={`https://wa.me/?text=${encodeURIComponent(`¡Acabo de reservar en AfroMercado! 🎉\n${reservaOk.habitacionTipo?.nombre ?? hotel.comercio.nombre}\nCódigo: ${reservaOk.codigo}\nhttps://afromercado.co`)}`}
+                href={`https://wa.me/?text=${encodeURIComponent(`¡Acabo de reservar en Teravia! 🎉\n${reservaOk.habitacionTipo?.nombre ?? hotel.comercio.nombre}\nCódigo: ${reservaOk.codigo}\nhttps://afromercado.co`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-xl font-semibold text-sm hover:bg-[#20b858] transition-colors"

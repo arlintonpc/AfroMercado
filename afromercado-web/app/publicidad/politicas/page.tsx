@@ -44,7 +44,7 @@ export default function PoliticasPublicidadPage() {
         <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-[#D4A017]/25 blur-3xl" aria-hidden="true" />
         <div className="relative mx-auto max-w-5xl">
           <Link href="/" className="text-sm font-bold text-white/70 hover:text-white">
-            AfroMercado
+            Teravia
           </Link>
           <p className="mt-10 text-xs font-black uppercase tracking-[0.35em] text-[#D4A017]">AfroMedia</p>
           <h1
@@ -55,7 +55,7 @@ export default function PoliticasPublicidadPage() {
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/72">
             Estas reglas protegen la confianza del comprador, la reputacion de los comerciantes
-            y el valor cultural de AfroMercado. Version vigente: 2026-06-27.
+            y el valor cultural de Teravia. Version vigente: 2026-06-27.
           </p>
         </div>
       </section>
@@ -66,7 +66,7 @@ export default function PoliticasPublicidadPage() {
           <h2 className="mt-3 text-2xl font-black text-[#1A1A1A]">No se vende confianza.</h2>
           <p className="mt-3 text-sm leading-relaxed text-[#1A1A1A]/65">
             La publicidad puede dar visibilidad, pero no puede reemplazar verificacion, calidad,
-            legalidad ni cumplimiento. AfroMercado puede rechazar, pausar o retirar pautas
+            legalidad ni cumplimiento. Teravia puede rechazar, pausar o retirar pautas
             cuando exista riesgo para compradores o comunidades.
           </p>
           <Link

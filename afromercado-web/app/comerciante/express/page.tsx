@@ -382,7 +382,7 @@ export default function ExpressComerciante() {
         <div className="bg-yellow-50 border border-yellow-300 rounded-xl px-4 py-3 text-sm text-yellow-800">
           ⚠️ Deuda por pedidos en efectivo: <strong>{formatearPrecio(Number(config.deudaEfectivoActual))}</strong>
           {' '}— Límite: {formatearPrecio(Number(config.limiteCreditoEfectivo))}.
-          Contacta a AfroMercado para saldarla.
+          Contacta a Teravia para saldarla.
         </div>
       )}
 

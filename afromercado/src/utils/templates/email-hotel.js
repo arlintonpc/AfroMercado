@@ -47,7 +47,7 @@ function reservaNueva({ nombreHotelero, nombreHuesped, habitacion, fechaEntrada,
       </a>
     </p>
     <p style="color:#888;font-size:13px;line-height:1.5;">Si tienes la confirmación automática activada, esta reserva ya fue confirmada. De lo contrario, recuerda confirmarla o rechazarla a tiempo.</p>`;
-  return base(contenido, "Nueva reserva en tu hotel — AfroMercado");
+  return base(contenido, "Nueva reserva en tu hotel — Teravia");
 }
 
 module.exports = { reservaNueva };

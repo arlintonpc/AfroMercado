@@ -70,7 +70,7 @@ export default function RepartidorLayout({
               className="text-xl leading-none"
               style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
             >
-              AfroMercado
+              Teravia
             </span>
             <span className="hidden text-sm text-white/70 sm:inline">· Repartidor</span>
           </div>

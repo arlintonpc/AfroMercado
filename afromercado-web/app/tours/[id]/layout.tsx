@@ -15,10 +15,10 @@ async function fetchTour(id: string) {
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
   const data = await fetchTour(id)
-  if (!data) return { title: 'Tour | AfroMercado' }
+  if (!data) return { title: 'Tour | Teravia' }
   const foto = data.fotos?.[0]
   return {
-    title: `${data.nombre} — Tour en ${data.comercio.municipio} | AfroMercado`,
+    title: `${data.nombre} — Tour en ${data.comercio.municipio} | Teravia`,
     description: [
       data.descripcion?.slice(0, 120),
       `${data.duracionHoras}h · Desde $${Number(data.precioPersona).toLocaleString('es-CO')}/persona.`,

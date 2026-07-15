@@ -544,7 +544,7 @@ const HotelService = {
       setImmediate(() => {
         enviarEmail({
           to: emailHotelero,
-          subject: `Nueva reserva - ${nombreHuesped} - ${tipo.nombre} - AfroMercado`,
+          subject: `Nueva reserva - ${nombreHuesped} - ${tipo.nombre} - Teravia`,
           html: emailHotel.reservaNueva({
             nombreHotelero: reserva.configHotel.comercio.usuario.nombre || "Hotelero",
             nombreHuesped,
@@ -798,7 +798,7 @@ const HotelService = {
       setImmediate(() => {
         enviarEmail({
           to: emailHotelero,
-          subject: `Nueva reserva grupal - ${nombreHuesped} - ${reservasCreadas.length} habitaciones - AfroMercado`,
+          subject: `Nueva reserva grupal - ${nombreHuesped} - ${reservasCreadas.length} habitaciones - Teravia`,
           html: emailHotel.reservaNueva({
             nombreHotelero: primeraReserva.configHotel.comercio.usuario.nombre || "Hotelero",
             nombreHuesped,

@@ -57,7 +57,7 @@ export default function PaginaTemporada() {
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
               <div>
                 <h1 className="text-3xl md:text-4xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
-                  Temporada AfroMercado
+                  Temporada Teravia
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm md:text-base text-[#1A1A1A]/60 leading-relaxed">
                   Productos con precio especial por tiempo limitado, publicados por productores de todo el país.

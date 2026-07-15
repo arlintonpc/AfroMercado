@@ -130,7 +130,7 @@ export default function AdminLayout({
               className="text-2xl leading-none"
               style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
             >
-              AfroMercado
+              Teravia
             </span>
             <span className="hidden text-sm font-medium text-white/70 sm:inline">
               Panel de administración

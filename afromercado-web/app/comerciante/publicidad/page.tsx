@@ -320,7 +320,7 @@ export default function PublicidadComerciantePage() {
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/70 sm:text-base">
               Impulsa productos, videos, turismo, gastronomia o tu tienda completa sin parecer un anuncio invasivo.
-              AfroMercado revisa cada solicitud para proteger la confianza de compradores y comerciantes.
+              Teravia revisa cada solicitud para proteger la confianza de compradores y comerciantes.
             </p>
           </div>
           <div className="rounded-3xl border border-white/12 bg-white/10 p-4 backdrop-blur">
@@ -621,7 +621,7 @@ export default function PublicidadComerciantePage() {
               />
               <span>
                 Confirmo que lei y acepto las politicas de publicidad de AfroMedia version 2026-06-27.
-                Entiendo que AfroMercado puede rechazar o suspender pautas con informacion falsa,
+                Entiendo que Teravia puede rechazar o suspender pautas con informacion falsa,
                 contenido engañoso o productos no permitidos.
                 <Link href="/publicidad/politicas" className="ml-1 font-black underline" target="_blank" rel="noopener noreferrer">
                   Ver politicas

@@ -44,7 +44,7 @@ export default function AdminIngresarPage() {
             className="text-4xl text-[#2D6A4F] leading-none"
             style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
           >
-            AfroMercado
+            Teravia
           </h1>
           <p className="mt-2 text-sm font-semibold uppercase tracking-[0.2em] text-[#D4A017]">
             Panel de administración
@@ -103,7 +103,7 @@ export default function AdminIngresarPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-[#1A1A1A]/40">
-          Área restringida · AfroMercado © {new Date().getFullYear()}
+          Área restringida · Teravia © {new Date().getFullYear()}
         </p>
       </div>
     </main>

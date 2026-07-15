@@ -48,7 +48,7 @@ const RecuperacionService = {
       setImmediate(() => {
         enviarEmail({
           to: usuario.email,
-          subject: "Código de recuperación — AfroMercado",
+          subject: "Código de recuperación — Teravia",
           html: codigoRecuperacion({ nombre: usuario.nombre, codigo }),
         }).catch((err) => console.error("[NOTIF] Error enviando código recuperación:", err.message));
       });

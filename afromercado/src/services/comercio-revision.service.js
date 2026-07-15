@@ -143,7 +143,7 @@ function notificarRevisionCritica(comercio, revision) {
           usuarioId: comercio.usuarioId,
           tipo: "COMERCIO_REQUIERE_REVISION",
           titulo: "Tu tienda volvio a revision",
-          mensaje: `Actualizaste ${revision.tipoCambio}. Por seguridad, AfroMercado debe revisar nuevamente tu tienda antes de volver a vender.`,
+          mensaje: `Actualizaste ${revision.tipoCambio}. Por seguridad, Teravia debe revisar nuevamente tu tienda antes de volver a vender.`,
           comercioId: comercio.id,
         });
       }
