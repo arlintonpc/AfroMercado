@@ -163,6 +163,39 @@ function TarjetaProducto({
   )
 }
 
+/** Fila compacta para secciones marcadas "vista compacta" (bebidas y otros ítems de
+ * decisión rápida): sin ficha de detalle, agregar directo con un toque. */
+function TarjetaProductoCompacta({
+  p, cantidadItem, agregar, quitar, cerrado
+}: {
+  p: MenuComercioExpress['productos'][0]
+  cantidadItem: (id: number) => number
+  agregar: (p: any) => void
+  quitar: (id: number) => void
+  cerrado?: boolean
+}) {
+  const disponible = Math.max(0, p.stock - (p.stockReservado ?? 0))
+  const agotado = disponible === 0
+  const bloqueado = agotado || !!cerrado
+  const cant = cantidadItem(p.id)
+  return (
+    <div className={`flex items-center gap-3 bg-white rounded-xl shadow-sm px-3 py-2 ${bloqueado ? 'opacity-50' : ''}`}>
+      {p.fotoUrl ? (
+        <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
+          <Image src={p.fotoUrl} alt={p.nombre} fill className="object-cover" sizes="40px" />
+        </div>
+      ) : (
+        <div className="w-10 h-10 rounded-lg bg-[#F0EBE3] flex items-center justify-center text-lg flex-shrink-0">🥤</div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-[#1A1A1A] text-sm truncate">{p.nombre}</p>
+        <span className="text-xs text-[#999]">{formatearPrecio(Number(p.precio))}</span>
+      </div>
+      <BotonAgregarQuitar p={p} cant={cant} agotado={agotado} cerrado={cerrado} agregar={agregar} quitar={quitar} />
+    </div>
+  )
+}
+
 function MenuExpressContent() {
   const params = useParams()
   const router = useRouter()
@@ -917,7 +950,11 @@ function MenuExpressContent() {
               ) : null
             })()}
             <div className="space-y-3">
-              {productosFiltrados.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} cerrado={!menu.abiertoAhora} />)}
+              {productosFiltrados.map(p => {
+                const sec = secciones.find(s => s.id === tabActiva)
+                const Tarjeta = sec?.vistaCompacta ? TarjetaProductoCompacta : TarjetaProducto
+                return <Tarjeta key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} cerrado={!menu.abiertoAhora} />
+              })}
             </div>
           </section>
         ) : hayTabs ? (
@@ -929,7 +966,10 @@ function MenuExpressContent() {
                   {seccion.icono} {seccion.nombre}
                 </h2>
                 <div className="space-y-3">
-                  {prods.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} cerrado={!menu.abiertoAhora} />)}
+                  {prods.map(p => {
+                    const Tarjeta = seccion.vistaCompacta ? TarjetaProductoCompacta : TarjetaProducto
+                    return <Tarjeta key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} cerrado={!menu.abiertoAhora} />
+                  })}
                 </div>
               </section>
             ))}

@@ -1325,6 +1325,9 @@ async function aplicarMigraciones() {
     `ALTER TABLE "ConfigExpress" ADD COLUMN IF NOT EXISTS "videoUrl" TEXT`,
     `ALTER TABLE "ConfigExpress" ADD COLUMN IF NOT EXISTS "videoPosterUrl" TEXT`,
     `ALTER TABLE "ReviewExpress" ADD COLUMN IF NOT EXISTS "fotoUrls" TEXT[] NOT NULL DEFAULT '{}'`,
+
+    // ── Vista compacta de sección de menú (ideal para bebidas) ──
+    `ALTER TABLE "MenuSeccion" ADD COLUMN IF NOT EXISTS "vistaCompacta" BOOLEAN NOT NULL DEFAULT false`,
   ];
   for (const sql of migraciones) {
     try {

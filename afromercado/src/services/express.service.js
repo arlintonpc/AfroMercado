@@ -917,7 +917,7 @@ const ExpressService = {
     });
   },
 
-  async crearSeccion(comercioId, { nombre, icono, orden }) {
+  async crearSeccion(comercioId, { nombre, icono, orden, vistaCompacta }) {
     const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
     if (!cfg) throw new ErrorValidacion("Activa primero el módulo Express");
     if (!nombre?.trim()) throw new ErrorValidacion("El nombre es requerido");
@@ -931,11 +931,12 @@ const ExpressService = {
         nombre: nombre.trim(),
         icono: icono ?? '🍽️',
         orden: orden ?? (maxOrden._max.orden ?? -1) + 1,
+        vistaCompacta: !!vistaCompacta,
       },
     });
   },
 
-  async actualizarSeccion(comercioId, seccionId, { nombre, icono, orden, activo }) {
+  async actualizarSeccion(comercioId, seccionId, { nombre, icono, orden, activo, vistaCompacta }) {
     const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
     if (!cfg) throw new ErrorNoEncontrado("Config no encontrada");
     const seccion = await prisma.menuSeccion.findFirst({
@@ -949,6 +950,7 @@ const ExpressService = {
         ...(icono  !== undefined && { icono }),
         ...(orden  !== undefined && { orden }),
         ...(activo !== undefined && { activo }),
+        ...(vistaCompacta !== undefined && { vistaCompacta: !!vistaCompacta }),
       },
     });
   },

@@ -259,11 +259,12 @@ export default function ExpressComerciante() {
   const [formPlato, setFormPlato] = useState<{ plato: PlatoExpress | null } | null>(null)
   const [miComercioId, setMiComercioId]   = useState<number | null>(null)
   const miComercioIdRef = useRef<number | null>(null)
-  const [nuevaSeccion, setNuevaSeccion]   = useState({ nombre: '', icono: '🍽️' })
+  const [nuevaSeccion, setNuevaSeccion]   = useState({ nombre: '', icono: '🍽️', vistaCompacta: false })
   const [cargandoMenu, setCargandoMenu]   = useState(false)
   const [editandoSeccion, setEditandoSeccion] = useState<number | null>(null)
   const [editSeccionNombre, setEditSeccionNombre] = useState('')
   const [editSeccionIcono, setEditSeccionIcono]   = useState('')
+  const [editSeccionCompacta, setEditSeccionCompacta] = useState(false)
   const [complementoProducto, setComplementoProducto] = useState<{ id: number; nombre: string } | null>(null)
   const [rechazandoPedido, setRechazandoPedido] = useState<number | null>(null)
   const [motivoRechazo, setMotivoRechazo] = useState('')
@@ -668,9 +669,18 @@ export default function ExpressComerciante() {
                         onChange={e => setEditSeccionNombre(e.target.value)}
                         className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
                       />
+                      <label className="flex items-center gap-1.5 text-xs text-gray-500 flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={editSeccionCompacta}
+                          onChange={e => setEditSeccionCompacta(e.target.checked)}
+                          className="rounded"
+                        />
+                        Vista compacta
+                      </label>
                       <button
                         onClick={async () => {
-                          await actualizarSeccionExpress(s.id, { nombre: editSeccionNombre, icono: editSeccionIcono })
+                          await actualizarSeccionExpress(s.id, { nombre: editSeccionNombre, icono: editSeccionIcono, vistaCompacta: editSeccionCompacta })
                           const updated = await listarSeccionesExpress()
                           setSecciones(updated)
                           setEditandoSeccion(null)
@@ -687,7 +697,14 @@ export default function ExpressComerciante() {
                     <>
                       <span className="text-xl">{s.icono}</span>
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800">{s.nombre}</p>
+                        <p className="text-sm font-medium text-gray-800">
+                          {s.nombre}
+                          {s.vistaCompacta && (
+                            <span className="ml-2 text-[10px] font-normal text-[#2D6A4F] bg-[#2D6A4F]/10 px-1.5 py-0.5 rounded-full align-middle">
+                              vista compacta
+                            </span>
+                          )}
+                        </p>
                         <p className="text-xs text-gray-400">
                           {productosExpress.filter(p => p.menuSeccionId === s.id).length} productos
                         </p>
@@ -720,6 +737,7 @@ export default function ExpressComerciante() {
                           setEditandoSeccion(s.id)
                           setEditSeccionNombre(s.nombre)
                           setEditSeccionIcono(s.icono)
+                          setEditSeccionCompacta(s.vistaCompacta)
                         }}
                         className="text-xs text-[#2D6A4F] border border-[#2D6A4F] px-2 py-1 rounded-lg"
                       >
@@ -759,13 +777,22 @@ export default function ExpressComerciante() {
                     if (!nuevaSeccion.nombre.trim()) return
                     await crearSeccionExpress(nuevaSeccion)
                     setSecciones(await listarSeccionesExpress())
-                    setNuevaSeccion({ nombre: '', icono: '🍽️' })
+                    setNuevaSeccion({ nombre: '', icono: '🍽️', vistaCompacta: false })
                   }}
                   className="bg-[#2D6A4F] text-white text-sm font-medium px-4 py-2 rounded-xl disabled:opacity-50"
                 >
                   + Crear
                 </button>
               </div>
+              <label className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
+                <input
+                  type="checkbox"
+                  checked={nuevaSeccion.vistaCompacta}
+                  onChange={e => setNuevaSeccion(p => ({ ...p, vistaCompacta: e.target.checked }))}
+                  className="rounded"
+                />
+                Vista compacta (fila con agregar rápido, sin foto grande — ideal para bebidas)
+              </label>
               <p className="text-xs text-gray-400 mt-1">El ícono puede ser un emoji. Ej: 🥤 Bebidas, 🍮 Postres, 🥗 Ensaladas</p>
             </div>
           </div>

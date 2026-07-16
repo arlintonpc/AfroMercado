@@ -97,6 +97,7 @@ export interface MenuSeccion {
   icono: string
   orden: number
   activo: boolean
+  vistaCompacta: boolean
   createdAt: string
 }
 
@@ -242,7 +243,7 @@ export async function listarSeccionesExpress(): Promise<MenuSeccion[]> {
   return r.data ?? []
 }
 
-export async function crearSeccionExpress(datos: { nombre: string; icono?: string }): Promise<MenuSeccion> {
+export async function crearSeccionExpress(datos: { nombre: string; icono?: string; vistaCompacta?: boolean }): Promise<MenuSeccion> {
   const r = await apiFetch<{ ok: boolean; data: MenuSeccion }>('/express/config/secciones', { method: 'POST', body: datos })
   return r.data
 }

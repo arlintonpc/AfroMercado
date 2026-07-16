@@ -1705,6 +1705,7 @@ model MenuSeccion {
   icono           String        @default("🍽️")
   orden           Int           @default(0)
   activo          Boolean       @default(true)
+  vistaCompacta   Boolean       @default(false)
   createdAt       DateTime      @default(now())
 
   configExpress   ConfigExpress @relation(fields: [configExpressId], references: [id], onDelete: Cascade)
