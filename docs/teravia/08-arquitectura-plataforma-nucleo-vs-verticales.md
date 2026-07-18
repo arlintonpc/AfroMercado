@@ -275,4 +275,13 @@ A partir de este documento, cualquier función nueva que necesite Reseñas, Favo
 
 ---
 
+## 8. Pendientes — deuda técnica menor detectada durante la ejecución
+
+Hallazgos reales, de bajo riesgo, encontrados mientras se ejecutaban las Fases 1-4. No bloquean nada ni corrompen datos — se documentan aquí para no perderlos, no para generar urgencia.
+
+- ~~**Bloques `CREATE TABLE IF NOT EXISTS` obsoletos en `aplicarMigraciones()` (server.js) para Favoritos (Fase 1) y Reseñas (Fase 3).**~~ ✅ Resuelto — 2026-07-18. Se eliminaron los 11 bloques restantes (7 de Favoritos, 4 de Reseñas — incluyendo dos `ALTER TABLE ... ADD COLUMN` sueltos sobre `ReviewCultura`/`ReviewExpress` que no estaban co-ubicados con su `CREATE TABLE` original y que la primera pasada de limpieza no detectó), 163 líneas en total. Verificado con dos reinicios consecutivos del backend sin ningún error en `[MIGRACIÓN]`.
+- **Lógica de descuento por Alianza Comercial (`esAlianza`) duplicada en los 5 validadores de cupón** (Marketplace + los 4 verticales), descubierto durante la Fase 4 pero fuera de su alcance aprobado (el usuario aprobó solo unificar los 4 verticales de servicio, no tocar Alianzas). Vive fuera de los 11/12 modelos de cupón, en `AlianzaComercial`/`AlianzaSocio`, con un patrón de fallback casi idéntico repetido en cada `*.service.js`. Candidato a extraer a un helper compartido en una sesión futura, con el mismo cuidado que ya se aplicó al helper `utils/cupon-vertical.js`.
+
+---
+
 *Referencia: [Capítulo 3 — Arquitectura del Ecosistema por Módulo](03-arquitectura-por-modulo.md) · [Anexo A — Auditoría técnica de los 4 módulos parciales](07-auditoria-tecnica-modulos-parciales.md)*

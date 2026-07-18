@@ -230,32 +230,6 @@ async function aplicarMigraciones() {
       VALUES ('Hotelería','hoteleria','🏨',true),
              ('Tours & Experiencias','tours','🗺️',true)
       ON CONFLICT ("slug") DO NOTHING`,
-    // Reviews de hoteles
-    `CREATE TABLE IF NOT EXISTS "ReviewHotel" (
-      "id" SERIAL PRIMARY KEY,
-      "configHotelId" INTEGER NOT NULL,
-      "clienteId" INTEGER NOT NULL,
-      "reservaHotelId" INTEGER NOT NULL UNIQUE,
-      "calificacion" INTEGER NOT NULL CHECK ("calificacion" BETWEEN 1 AND 5),
-      "comentario" TEXT,
-      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "ReviewHotel_configHotelId_fkey" FOREIGN KEY ("configHotelId") REFERENCES "ConfigHotel"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "ReviewHotel_clienteId_fkey"    FOREIGN KEY ("clienteId")    REFERENCES "Usuario"("id")     ON DELETE RESTRICT ON UPDATE CASCADE,
-      CONSTRAINT "ReviewHotel_reservaHotelId_fkey" FOREIGN KEY ("reservaHotelId") REFERENCES "ReservaHotel"("id") ON DELETE CASCADE ON UPDATE CASCADE
-    )`,
-    // Reviews de tours
-    `CREATE TABLE IF NOT EXISTS "ReviewTour" (
-      "id" SERIAL PRIMARY KEY,
-      "configTourId" INTEGER NOT NULL,
-      "clienteId" INTEGER NOT NULL,
-      "reservaTourId" INTEGER NOT NULL UNIQUE,
-      "calificacion" INTEGER NOT NULL CHECK ("calificacion" BETWEEN 1 AND 5),
-      "comentario" TEXT,
-      "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "ReviewTour_configTourId_fkey"   FOREIGN KEY ("configTourId")   REFERENCES "ConfigTour"("id")   ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "ReviewTour_clienteId_fkey"      FOREIGN KEY ("clienteId")      REFERENCES "Usuario"("id")      ON DELETE RESTRICT ON UPDATE CASCADE,
-      CONSTRAINT "ReviewTour_reservaTourId_fkey"  FOREIGN KEY ("reservaTourId")  REFERENCES "ReservaTour"("id")  ON DELETE CASCADE ON UPDATE CASCADE
-    )`,
     // Módulo Transporte fluvial
     `CREATE TABLE IF NOT EXISTS "ConfigTransporte" (
       "id" SERIAL PRIMARY KEY,
@@ -307,17 +281,6 @@ async function aplicarMigraciones() {
     )`,
     `ALTER TABLE "ConfigTransporte" ADD COLUMN IF NOT EXISTS "videoUrl" TEXT`,
     `ALTER TABLE "ConfigTransporte" ADD COLUMN IF NOT EXISTS "videoPosterUrl" TEXT`,
-    `CREATE TABLE IF NOT EXISTS "FavoritoTransporte" (
-      "id"                 SERIAL PRIMARY KEY,
-      "usuarioId"          INTEGER NOT NULL,
-      "configTransporteId" INTEGER NOT NULL,
-      "createdAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "FavoritoTransporte_usuarioId_fkey"          FOREIGN KEY ("usuarioId")          REFERENCES "Usuario"("id")          ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "FavoritoTransporte_configTransporteId_fkey" FOREIGN KEY ("configTransporteId") REFERENCES "ConfigTransporte"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "FavoritoTransporte_usuarioId_configTransporteId_key" UNIQUE ("usuarioId", "configTransporteId")
-    )`,
-    `CREATE INDEX IF NOT EXISTS "FavoritoTransporte_usuarioId_idx" ON "FavoritoTransporte"("usuarioId")`,
-
     // ── Columnas de video en tablas existentes ─────────────────────────
     `ALTER TABLE "ConfigTour" ADD COLUMN IF NOT EXISTS "videoUrl" TEXT`,
     `ALTER TABLE "ConfigTour" ADD COLUMN IF NOT EXISTS "videoPosterUrl" TEXT`,
@@ -396,36 +359,6 @@ async function aplicarMigraciones() {
     `CREATE INDEX IF NOT EXISTS "ProductoGrupoComplemento_productoId_idx" ON "ProductoGrupoComplemento"("productoId")`,
     `CREATE INDEX IF NOT EXISTS "ProductoGrupoComplemento_grupoBibliotecaId_idx" ON "ProductoGrupoComplemento"("grupoBibliotecaId")`,
 
-    // ── ReviewTransporte ───────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS "ReviewTransporte" (
-      "id"                  SERIAL PRIMARY KEY,
-      "configTransporteId"  INTEGER NOT NULL,
-      "clienteId"           INTEGER NOT NULL,
-      "reservaTransporteId" INTEGER NOT NULL UNIQUE,
-      "calificacion"        INTEGER NOT NULL CHECK ("calificacion" BETWEEN 1 AND 5),
-      "comentario"          TEXT,
-      "creadoAt"            TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "ReviewTransporte_configTransporteId_fkey"  FOREIGN KEY ("configTransporteId")  REFERENCES "ConfigTransporte"("id")  ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "ReviewTransporte_clienteId_fkey"           FOREIGN KEY ("clienteId")           REFERENCES "Usuario"("id")          ON DELETE RESTRICT ON UPDATE CASCADE,
-      CONSTRAINT "ReviewTransporte_reservaTransporteId_fkey" FOREIGN KEY ("reservaTransporteId") REFERENCES "ReservaTransporte"("id") ON DELETE CASCADE ON UPDATE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS "ReviewTransporte_configTransporteId_idx" ON "ReviewTransporte"("configTransporteId")`,
-
-    // ── ReviewExpress ──────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS "ReviewExpress" (
-      "id"              SERIAL PRIMARY KEY,
-      "configExpressId" INTEGER NOT NULL,
-      "clienteId"       INTEGER NOT NULL,
-      "pedidoExpressId" INTEGER NOT NULL UNIQUE,
-      "calificacion"    INTEGER NOT NULL CHECK ("calificacion" BETWEEN 1 AND 5),
-      "comentario"      TEXT,
-      "creadoAt"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "ReviewExpress_configExpressId_fkey" FOREIGN KEY ("configExpressId") REFERENCES "ConfigExpress"("id")  ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "ReviewExpress_clienteId_fkey"       FOREIGN KEY ("clienteId")       REFERENCES "Usuario"("id")        ON DELETE RESTRICT ON UPDATE CASCADE,
-      CONSTRAINT "ReviewExpress_pedidoExpressId_fkey" FOREIGN KEY ("pedidoExpressId") REFERENCES "PedidoExpress"("id")  ON DELETE CASCADE ON UPDATE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS "ReviewExpress_configExpressId_idx" ON "ReviewExpress"("configExpressId")`,
-
     // ── TemporadaHotel ───────────────────
     `CREATE TABLE IF NOT EXISTS "TemporadaHotel" (
       "id"               SERIAL PRIMARY KEY,
@@ -444,30 +377,6 @@ async function aplicarMigraciones() {
     `CREATE INDEX IF NOT EXISTS "TemporadaHotel_habitacionTipoId_activo_idx" ON "TemporadaHotel"("habitacionTipoId", "activo")`,
     `CREATE INDEX IF NOT EXISTS "TemporadaHotel_inicio_fin_idx"              ON "TemporadaHotel"("inicio", "fin")`,
 
-    // ── FavoritoHotel ──────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS "FavoritoHotel" (
-      "id"            SERIAL PRIMARY KEY,
-      "usuarioId"     INTEGER NOT NULL,
-      "configHotelId" INTEGER NOT NULL,
-      "createdAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "FavoritoHotel_usuarioId_fkey"     FOREIGN KEY ("usuarioId")     REFERENCES "Usuario"("id")     ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "FavoritoHotel_configHotelId_fkey" FOREIGN KEY ("configHotelId") REFERENCES "ConfigHotel"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "FavoritoHotel_usuarioId_configHotelId_key" UNIQUE ("usuarioId", "configHotelId")
-    )`,
-    `CREATE INDEX IF NOT EXISTS "FavoritoHotel_usuarioId_idx"     ON "FavoritoHotel"("usuarioId")`,
-    `CREATE INDEX IF NOT EXISTS "FavoritoHotel_configHotelId_idx" ON "FavoritoHotel"("configHotelId")`,
-
-    // ── FavoritoTour ───────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS "FavoritoTour" (
-      "id"           SERIAL PRIMARY KEY,
-      "usuarioId"    INTEGER NOT NULL,
-      "configTourId" INTEGER NOT NULL,
-      "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "FavoritoTour_usuarioId_fkey"    FOREIGN KEY ("usuarioId")    REFERENCES "Usuario"("id")    ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "FavoritoTour_configTourId_fkey" FOREIGN KEY ("configTourId") REFERENCES "ConfigTour"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "FavoritoTour_usuarioId_configTourId_key" UNIQUE ("usuarioId", "configTourId")
-    )`,
-    `CREATE INDEX IF NOT EXISTS "FavoritoTour_usuarioId_idx" ON "FavoritoTour"("usuarioId")`,
 
     // Desactivar categoría "Turismo" duplicada — reemplazada por "Tours & Experiencias" (slug 'tours')
     `UPDATE "Categoria" SET "activa" = false WHERE "slug" = 'turismo'`,
@@ -757,27 +666,6 @@ async function aplicarMigraciones() {
     // El panel del empleador necesita resumen y disponibilidad también snapshoteados.
     `ALTER TABLE "PostulacionEmpleo" ADD COLUMN IF NOT EXISTS "resumenPerfilSnap" TEXT`,
     `ALTER TABLE "PostulacionEmpleo" ADD COLUMN IF NOT EXISTS "disponibilidadSnap" TEXT`,
-    // Favoritos de ofertas de empleo (mismo patrón que FavoritoHotel/FavoritoTour).
-    `CREATE TABLE IF NOT EXISTS "FavoritoOfertaEmpleo" (
-      "id"             SERIAL PRIMARY KEY,
-      "usuarioId"      INTEGER NOT NULL,
-      "ofertaEmpleoId" INTEGER NOT NULL,
-      "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS "FavoritoOfertaEmpleo_usuarioId_ofertaEmpleoId_key" ON "FavoritoOfertaEmpleo"("usuarioId", "ofertaEmpleoId")`,
-    `CREATE INDEX IF NOT EXISTS "FavoritoOfertaEmpleo_usuarioId_idx" ON "FavoritoOfertaEmpleo"("usuarioId")`,
-    `CREATE INDEX IF NOT EXISTS "FavoritoOfertaEmpleo_ofertaEmpleoId_idx" ON "FavoritoOfertaEmpleo"("ofertaEmpleoId")`,
-    `DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'FavoritoOfertaEmpleo_usuarioId_fkey') THEN
-        ALTER TABLE "FavoritoOfertaEmpleo" ADD CONSTRAINT "FavoritoOfertaEmpleo_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-      END IF;
-    END $$`,
-    `DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'FavoritoOfertaEmpleo_ofertaEmpleoId_fkey') THEN
-        ALTER TABLE "FavoritoOfertaEmpleo" ADD CONSTRAINT "FavoritoOfertaEmpleo_ofertaEmpleoId_fkey" FOREIGN KEY ("ofertaEmpleoId") REFERENCES "OfertaEmpleo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-      END IF;
-    END $$`,
-
     // ── Fidelización / referidos (Fase 5.2) ────────────────────────
     `DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoMovimientoPuntos') THEN
@@ -958,36 +846,8 @@ async function aplicarMigraciones() {
     `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "montoDescuento" DECIMAL(10,2)`,
     `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "codigoCupon" TEXT`,
 
-    // ── ReviewCultura ─────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS "ReviewCultura" (
-      "id"                SERIAL PRIMARY KEY,
-      "eventoCulturalId"  INTEGER NOT NULL,
-      "clienteId"         INTEGER NOT NULL,
-      "reservaCulturalId" INTEGER NOT NULL UNIQUE,
-      "calificacion"      INTEGER NOT NULL,
-      "comentario"        TEXT,
-      "creadoAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "ReviewCultura_eventoCulturalId_fkey"  FOREIGN KEY ("eventoCulturalId")  REFERENCES "EventoCultural"("id")  ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "ReviewCultura_clienteId_fkey"         FOREIGN KEY ("clienteId")         REFERENCES "Usuario"("id")         ON DELETE RESTRICT ON UPDATE CASCADE,
-      CONSTRAINT "ReviewCultura_reservaCulturalId_fkey" FOREIGN KEY ("reservaCulturalId") REFERENCES "ReservaCultural"("id") ON DELETE CASCADE ON UPDATE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS "ReviewCultura_eventoCulturalId_idx" ON "ReviewCultura"("eventoCulturalId")`,
-
     // ── EstadoEventoCultural: agrega POSPUESTO ──────────────────────────
     `ALTER TYPE "EstadoEventoCultural" ADD VALUE IF NOT EXISTS 'POSPUESTO'`,
-
-    // ── FavoritoExpress ──────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS "FavoritoExpress" (
-      "id"              SERIAL PRIMARY KEY,
-      "usuarioId"       INTEGER NOT NULL,
-      "configExpressId" INTEGER NOT NULL,
-      "createdAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "FavoritoExpress_usuarioId_fkey"       FOREIGN KEY ("usuarioId")       REFERENCES "Usuario"("id")       ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "FavoritoExpress_configExpressId_fkey" FOREIGN KEY ("configExpressId") REFERENCES "ConfigExpress"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "FavoritoExpress_usuarioId_configExpressId_key" UNIQUE ("usuarioId", "configExpressId")
-    )`,
-    `CREATE INDEX IF NOT EXISTS "FavoritoExpress_usuarioId_idx"       ON "FavoritoExpress"("usuarioId")`,
-    `CREATE INDEX IF NOT EXISTS "FavoritoExpress_configExpressId_idx" ON "FavoritoExpress"("configExpressId")`,
 
     // ── PedidoExpress: pedido programado ("para más tarde") ─────────────
     `ALTER TABLE "PedidoExpress" ADD COLUMN IF NOT EXISTS "fechaProgramada" TIMESTAMP(3)`,
@@ -1086,8 +946,6 @@ async function aplicarMigraciones() {
     END $$`,
     `ALTER TABLE "CampanaHero" ADD COLUMN IF NOT EXISTS "videoUrl" TEXT`,
     `ALTER TABLE "CampanaHero" ADD COLUMN IF NOT EXISTS "etiqueta" TEXT NOT NULL DEFAULT 'Patrocinado'`,
-    `ALTER TABLE "ReviewCultura" ADD COLUMN IF NOT EXISTS "fotoUrls" TEXT[] NOT NULL DEFAULT '{}'`,
-    `ALTER TABLE "ReviewCultura" ADD COLUMN IF NOT EXISTS "videoUrl" TEXT`,
 
     // ── Comparte tu Chocó: publicaciones comunitarias + denuncias ──
     `CREATE TABLE IF NOT EXISTS "PublicacionCultural" (
@@ -1143,26 +1001,6 @@ async function aplicarMigraciones() {
       END IF;
     END $$`,
 
-    // ── Favoritos de Cultura ──
-    `CREATE TABLE IF NOT EXISTS "FavoritoCultura" (
-      "id"               SERIAL PRIMARY KEY,
-      "usuarioId"        INTEGER NOT NULL,
-      "eventoCulturalId" INTEGER NOT NULL,
-      "createdAt"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS "FavoritoCultura_usuarioId_eventoCulturalId_key" ON "FavoritoCultura"("usuarioId", "eventoCulturalId")`,
-    `CREATE INDEX IF NOT EXISTS "FavoritoCultura_usuarioId_idx" ON "FavoritoCultura"("usuarioId")`,
-    `DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'FavoritoCultura_usuarioId_fkey') THEN
-        ALTER TABLE "FavoritoCultura" ADD CONSTRAINT "FavoritoCultura_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-      END IF;
-    END $$`,
-    `DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'FavoritoCultura_eventoCulturalId_fkey') THEN
-        ALTER TABLE "FavoritoCultura" ADD CONSTRAINT "FavoritoCultura_eventoCulturalId_fkey" FOREIGN KEY ("eventoCulturalId") REFERENCES "EventoCultural"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-      END IF;
-    END $$`,
-
     // ── Likes de publicaciones culturales ──
     `CREATE TABLE IF NOT EXISTS "LikePublicacionCultural" (
       "id"                    SERIAL PRIMARY KEY,
@@ -1204,7 +1042,6 @@ async function aplicarMigraciones() {
     // ── Rediseño de Express: video de la tienda (columnas que faltaban) + fotos en reseñas ──
     `ALTER TABLE "ConfigExpress" ADD COLUMN IF NOT EXISTS "videoUrl" TEXT`,
     `ALTER TABLE "ConfigExpress" ADD COLUMN IF NOT EXISTS "videoPosterUrl" TEXT`,
-    `ALTER TABLE "ReviewExpress" ADD COLUMN IF NOT EXISTS "fotoUrls" TEXT[] NOT NULL DEFAULT '{}'`,
 
     // ── Vista compacta de sección de menú (ideal para bebidas) ──
     `ALTER TABLE "MenuSeccion" ADD COLUMN IF NOT EXISTS "vistaCompacta" BOOLEAN NOT NULL DEFAULT false`,
