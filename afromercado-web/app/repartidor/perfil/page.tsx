@@ -209,6 +209,7 @@ export default function PerfilRepartidorPage() {
 
           <div>
             <label className="block text-xs font-semibold text-[#1A1A1A]/60 mb-2">Municipios adicionales (opcional)</label>
+            <p className="text-xs text-[#1A1A1A]/45 mb-2">También verás entregas disponibles de estos municipios en tu bandeja, además de tu municipio principal.</p>
             <div className="flex flex-wrap gap-2">
               {municipiosDe(departamentoBase).filter(m => m !== form.municipioBase).map(m => {
                 const sel = (form.municipiosExtra ?? []).includes(m)

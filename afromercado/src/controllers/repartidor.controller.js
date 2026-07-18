@@ -209,17 +209,21 @@ const RepartidorController = {
   async disponibles(req, res, next) {
     try {
       // Geo-filtro: por defecto el repartidor solo ve entregas cuyo comercio
-      // está en su municipio base (de su solicitud aprobada). Con ?todos=1 ve
-      // todas las zonas. Si no tiene municipio base, ve todas.
+      // está en su municipio base o en alguno de sus municipiosExtra (de su
+      // solicitud aprobada). Con ?todos=1 ve todas las zonas. Si no tiene
+      // municipio base, ve todas.
       const verTodos = req.query.todos === "1" || req.query.todos === "true";
       let municipioBase = null;
+      let municipiosCobertura = null;
       if (!verTodos) {
         const sol = await prisma.solicitudRepartidor.findUnique({
           where: { usuarioId: req.usuario.id },
-          select: { municipioBase: true, estado: true },
+          select: { municipioBase: true, municipiosExtra: true, estado: true },
         });
         if (sol?.estado === "APROBADA" && sol.municipioBase?.trim()) {
           municipioBase = sol.municipioBase.trim();
+          const extras = (sol.municipiosExtra ?? []).map((m) => m.trim()).filter(Boolean);
+          municipiosCobertura = [municipioBase, ...extras];
         }
       }
 
@@ -234,16 +238,16 @@ const RepartidorController = {
             {
               subPedido: {
                 pedido: { compradorId: { not: req.usuario.id } },
-                ...(municipioBase
-                  ? { comercio: { municipio: { equals: municipioBase, mode: "insensitive" } } }
+                ...(municipiosCobertura
+                  ? { comercio: { municipio: { in: municipiosCobertura, mode: "insensitive" } } }
                   : {}),
               },
             },
             {
               pedidoExpress: {
                 clienteId: { not: req.usuario.id },
-                ...(municipioBase
-                  ? { configExpress: { comercio: { municipio: { equals: municipioBase, mode: "insensitive" } } } }
+                ...(municipiosCobertura
+                  ? { configExpress: { comercio: { municipio: { in: municipiosCobertura, mode: "insensitive" } } } }
                   : {}),
               },
             },
@@ -262,7 +266,8 @@ const RepartidorController = {
         return new Date(a.createdAt) - new Date(b.createdAt);
       });
       const data = await decorarEntregas(entregas);
-      res.json({ ok: true, data, municipioBase });
+      const municipiosExtra = municipiosCobertura ? municipiosCobertura.slice(1) : [];
+      res.json({ ok: true, data, municipioBase, municipiosExtra });
     } catch (err) {
       next(err);
     }

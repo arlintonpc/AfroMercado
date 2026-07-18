@@ -280,6 +280,7 @@ export default function PanelRepartidorPage() {
   const [disponiblesList, setDisponiblesList] = useState<EntregaDetalle[]>([])
   const [historialList, setHistorialList] = useState<EntregaDetalle[]>([])
   const [municipioBase, setMunicipioBase] = useState<string | null>(null)
+  const [municipiosExtra, setMunicipiosExtra] = useState<string[]>([])
   const [verTodasZonas, setVerTodasZonas] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -308,6 +309,7 @@ export default function PanelRepartidorPage() {
       setMisEntregasList(mis.filter((e) => estaActiva(e.estado)))
       setDisponiblesList(disp.items)
       setMunicipioBase(disp.municipioBase)
+      setMunicipiosExtra(disp.municipiosExtra)
       setHistorialList(hist)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar las entregas.')
@@ -537,7 +539,9 @@ export default function PanelRepartidorPage() {
               {verTodasZonas
                 ? '📍 Mostrando todas las zonas'
                 : municipioBase
-                ? <>📍 Tu zona: <span className="font-semibold text-[#2D6A4F]">{municipioBase}</span></>
+                ? <>📍 Tu zona: <span className="font-semibold text-[#2D6A4F]">{municipioBase}</span>
+                    {municipiosExtra.length > 0 && <> + {municipiosExtra.join(', ')}</>}
+                  </>
                 : '📍 Todas las zonas'}
             </span>
             {municipioBase && (

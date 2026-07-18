@@ -76,14 +76,16 @@ export interface EntregasDisponibles {
   items: EntregaDetalle[]
   /** Municipio base del repartidor por el que se filtró (null = todas las zonas). */
   municipioBase: string | null
+  /** Municipios de cobertura adicionales (de municipiosExtra) que también se están mostrando. */
+  municipiosExtra: string[]
 }
 
 export async function entregasDisponibles(todos = false): Promise<EntregasDisponibles> {
   const qs = todos ? '?todos=1' : ''
-  const res = await apiFetch<{ ok: boolean; data: EntregaDetalle[]; municipioBase: string | null }>(
+  const res = await apiFetch<{ ok: boolean; data: EntregaDetalle[]; municipioBase: string | null; municipiosExtra?: string[] }>(
     `/repartidor/entregas/disponibles${qs}`,
   )
-  return { items: res.data, municipioBase: res.municipioBase ?? null }
+  return { items: res.data, municipioBase: res.municipioBase ?? null, municipiosExtra: res.municipiosExtra ?? [] }
 }
 
 export async function tomarEntrega(id: number): Promise<EntregaDetalle> {
