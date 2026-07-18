@@ -20,6 +20,12 @@ function tieneDocumentoIdentidadCompleto(comercio) {
   );
 }
 
+// Requisito mínimo de formalización (validado con el territorio piloto:
+// la gran mayoría de comercios en Chocó ya tiene RUT y Cámara de Comercio).
+function tieneRutCompleto(comercio) {
+  return Boolean(comercio.rut && comercio.rut.trim());
+}
+
 const AdminService = {
   /**
    * Lista los pagos a la espera de verificación (estado VERIFICANDO).
@@ -276,8 +282,13 @@ const AdminService = {
     }
     const comercio = await prisma.comercio.findUnique({ where: { id: comercioId } });
     if (!comercio) throw new ErrorNoEncontrado("Comercio no encontrado");
-    if ((accion === "APROBAR" || accion === "REHABILITAR") && !tieneDocumentoIdentidadCompleto(comercio)) {
-      throw new ErrorValidacion("No se puede aprobar el comercio sin frente y reverso del documento de identidad.");
+    if (accion === "APROBAR" || accion === "REHABILITAR") {
+      if (!tieneDocumentoIdentidadCompleto(comercio)) {
+        throw new ErrorValidacion("No se puede aprobar el comercio sin frente y reverso del documento de identidad.");
+      }
+      if (!tieneRutCompleto(comercio)) {
+        throw new ErrorValidacion("No se puede aprobar el comercio sin RUT registrado.");
+      }
     }
 
     const ESTADO_MAP = {

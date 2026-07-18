@@ -12,6 +12,7 @@ import {
   obtenerCuentaDispersion,
   guardarCuentaDispersion,
   subirDocumentoComercio,
+  subirCamaraComercio,
   subirVideoComercio,
   quitarVideoComercio,
   guardarVideoLinkComercio,
@@ -262,6 +263,14 @@ export default function PerfilComerciantePage() {
   const inputDocFrenteRef = useRef<HTMLInputElement>(null)
   const inputDocReversoRef = useRef<HTMLInputElement>(null)
 
+  // RUT y Cámara de Comercio — requisito mínimo para aprobación
+  const [rut, setRut] = useState('')
+  const [camaraComercioNumero, setCamaraComercioNumero] = useState('')
+  const [camaraComercioUrl, setCamaraComercioUrl] = useState<string | null>(null)
+  const [subiendoCamaraComercio, setSubiendoCamaraComercio] = useState(false)
+  const [errorCamaraComercio, setErrorCamaraComercio] = useState<string | null>(null)
+  const inputCamaraComercioRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     obtenerMiComercio()
       .then((c) => {
@@ -278,6 +287,9 @@ export default function PerfilComerciantePage() {
         setFotoDocumentoReversoUrl(c.fotoDocumentoReversoUrl ?? null)
         setFotoDocumentoFrenteHash(c.fotoDocumentoFrenteHash ?? null)
         setFotoDocumentoReversoHash(c.fotoDocumentoReversoHash ?? null)
+        setRut(c.rut ?? '')
+        setCamaraComercioNumero(c.camaraComercioNumero ?? '')
+        setCamaraComercioUrl(c.camaraComercioUrl ?? null)
         setVereda(c.vereda ?? '')
         setLatitud(c.latitud ?? null)
         setLongitud(c.longitud ?? null)
@@ -332,6 +344,9 @@ export default function PerfilComerciantePage() {
       const tel = whatsapp.replace(/\D/g, '')
       if (tel.length !== 10) e.whatsapp = 'El WhatsApp debe tener 10 números.'
     }
+    if (rut.trim() && !/^\d{8,15}(-\d)?$/.test(rut.trim())) {
+      e.rut = 'Usa solo números, con guion y dígito de verificación si aplica (ej. 900123456-7).'
+    }
     setErrores(e)
     return Object.keys(e).length === 0
   }
@@ -366,6 +381,8 @@ export default function PerfilComerciantePage() {
         whatsapp: whatsapp.replace(/\D/g, '') || undefined,
         vereda: vereda.trim() || undefined,
         logoUrl: logoUrl.trim() || undefined,
+        rut: rut.trim() || undefined,
+        camaraComercioNumero: camaraComercioNumero.trim() || undefined,
         ...(envioGratisPermitido
           ? { envioGratisDesde: envioGratisDesde.trim() ? Number(envioGratisDesde) : null }
           : {}),
@@ -415,6 +432,25 @@ export default function PerfilComerciantePage() {
       setSubiendoDocLado(null)
       if (lado === 'FRENTE' && inputDocFrenteRef.current) inputDocFrenteRef.current.value = ''
       if (lado === 'REVERSO' && inputDocReversoRef.current) inputDocReversoRef.current.value = ''
+    }
+  }
+
+  async function subirCamaraComercioArchivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setSubiendoCamaraComercio(true)
+    setErrorCamaraComercio(null)
+    try {
+      await validarArchivoDocumento(file)
+      const respuesta = await subirCamaraComercio(file)
+      setCamaraComercioUrl(respuesta.url)
+      if (respuesta.comercio) setComercio(respuesta.comercio)
+      setAviso({ tipo: 'exito', texto: 'Certificado de Cámara de Comercio subido.' })
+    } catch (err) {
+      setErrorCamaraComercio(err instanceof Error ? err.message : 'No se pudo subir el archivo.')
+    } finally {
+      setSubiendoCamaraComercio(false)
+      if (inputCamaraComercioRef.current) inputCamaraComercioRef.current.value = ''
     }
   }
 
@@ -745,6 +781,25 @@ export default function PerfilComerciantePage() {
           hint="Opcional. Enlace directo a la imagen de tu logo."
         />
 
+        <CampoTexto
+          label="RUT"
+          name="rut"
+          placeholder="900123456-7"
+          value={rut}
+          onChange={setRut}
+          error={errores.rut}
+          hint="Requisito para que tu tienda quede aprobada — solo números, con guion y dígito de verificación si aplica."
+        />
+
+        <CampoTexto
+          label="Número de matrícula — Cámara de Comercio"
+          name="camaraComercioNumero"
+          placeholder="Ej: 123456-7"
+          value={camaraComercioNumero}
+          onChange={setCamaraComercioNumero}
+          hint="Opcional, pero recomendado. El número que aparece en tu certificado de matrícula mercantil."
+        />
+
         {envioGratisPermitido && (
           <CampoTexto
             label="Envío gratis desde ($)"
@@ -882,6 +937,54 @@ export default function PerfilComerciantePage() {
           capture="environment"
           className="hidden"
           onChange={(e) => subirDoc(e, 'REVERSO')}
+        />
+      </div>
+
+      {/* Sección Cámara de Comercio */}
+      <div className="rounded-2xl border border-[#1A1A1A]/5 bg-white p-5 sm:p-6 shadow-sm flex flex-col gap-4">
+        <div>
+          <h2 className="text-base font-bold text-[#1A1A1A]">Certificado de Cámara de Comercio</h2>
+          <p className="mt-1 text-sm text-[#1A1A1A]/55">
+            Opcional. Sube una foto de tu certificado de matrícula mercantil — ayuda a que la revisión de tu tienda sea más rápida.
+          </p>
+        </div>
+
+        <div className="relative h-40 w-full overflow-hidden rounded-xl border border-[#1A1A1A]/10 bg-[#F7F2EA]">
+          {camaraComercioUrl ? (
+            <Image
+              src={camaraComercioUrl}
+              alt="Certificado de Cámara de Comercio"
+              fill
+              className="object-contain"
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center px-4 text-center text-xs font-medium text-[#1A1A1A]/45">
+              Aún no has subido el certificado
+            </div>
+          )}
+        </div>
+
+        {errorCamaraComercio && (
+          <p className="text-sm text-[#C0392B]">{errorCamaraComercio}</p>
+        )}
+
+        <Button
+          type="button"
+          variant="secondary"
+          loading={subiendoCamaraComercio}
+          onClick={() => inputCamaraComercioRef.current?.click()}
+        >
+          {camaraComercioUrl ? 'Cambiar certificado' : 'Subir certificado'}
+        </Button>
+
+        <input
+          ref={inputCamaraComercioRef}
+          type="file"
+          accept="image/jpeg,image/png"
+          capture="environment"
+          className="hidden"
+          onChange={subirCamaraComercioArchivo}
         />
       </div>
 

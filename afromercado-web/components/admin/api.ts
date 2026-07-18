@@ -253,6 +253,9 @@ export interface AdminComercio {
   fotoDocumentoUrl?: string | null
   fotoDocumentoFrenteUrl?: string | null
   fotoDocumentoReversoUrl?: string | null
+  rut?: string | null
+  camaraComercioNumero?: string | null
+  camaraComercioUrl?: string | null
   totalVentas: number
   calificacion: number | string
   createdAt: string

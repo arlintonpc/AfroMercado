@@ -93,33 +93,34 @@ const EmpleoRepository = {
 
   // ── Favoritos ────────────────────────────────────────────────
   async buscarFavorito(usuarioId, ofertaEmpleoId) {
-    return prisma.favoritoOfertaEmpleo.findUnique({
-      where: { usuarioId_ofertaEmpleoId: { usuarioId, ofertaEmpleoId } },
+    return prisma.favorito.findUnique({
+      where: { usuarioId_tipoEntidad_entidadId: { usuarioId, tipoEntidad: "OFERTA_EMPLEO", entidadId: ofertaEmpleoId } },
     });
   },
 
   async crearFavorito(usuarioId, ofertaEmpleoId) {
-    return prisma.favoritoOfertaEmpleo.create({ data: { usuarioId, ofertaEmpleoId } });
+    return prisma.favorito.create({ data: { usuarioId, tipoEntidad: "OFERTA_EMPLEO", entidadId: ofertaEmpleoId } });
   },
 
   async eliminarFavorito(id) {
-    return prisma.favoritoOfertaEmpleo.delete({ where: { id } });
+    return prisma.favorito.delete({ where: { id } });
   },
 
   async listarFavoritos(usuarioId) {
-    const favs = await prisma.favoritoOfertaEmpleo.findMany({
-      where: { usuarioId },
+    const favs = await prisma.favorito.findMany({
+      where: { usuarioId, tipoEntidad: "OFERTA_EMPLEO" },
       orderBy: { createdAt: "desc" },
+    });
+    if (favs.length === 0) return [];
+    const ofertas = await prisma.ofertaEmpleo.findMany({
+      where: { id: { in: favs.map((f) => f.entidadId) } },
       include: {
-        oferta: {
-          include: {
-            publicadoPor: { select: { id: true, nombre: true } },
-            comercio: { select: { id: true, nombre: true, verificado: true, logoUrl: true } },
-          },
-        },
+        publicadoPor: { select: { id: true, nombre: true } },
+        comercio: { select: { id: true, nombre: true, verificado: true, logoUrl: true } },
       },
     });
-    return favs.map((f) => f.oferta);
+    const porId = new Map(ofertas.map((o) => [o.id, o]));
+    return favs.map((f) => porId.get(f.entidadId)).filter(Boolean);
   },
 
   // ── Hoja de vida ─────────────────────────────────────────────

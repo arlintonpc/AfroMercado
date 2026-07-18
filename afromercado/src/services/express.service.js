@@ -1,10 +1,15 @@
 const prisma = require("../config/prisma");
+const config = require("../config");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const { diaSemanaEnum, festivosAnio } = require("../utils/festivos-colombia");
 const { enviarPushAUsuario } = require("../utils/push");
 const sseManager = require("../utils/sse-manager");
 const AlianzaService = require("./alianza.service");
 const FacturacionService = require("./facturacion.service");
+const {
+  buscarCuponVertical, yaUsadoPorCliente, calcularDescuento,
+  intentarAlianza, registrarUsoVertical, mapearCuponVertical,
+} = require("../utils/cupon-vertical");
 
 const DIAS_ORDEN = ['LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO','DOMINGO','FESTIVO'];
 
@@ -60,8 +65,24 @@ const PEDIDO_INCLUDE = {
   cliente: { select: { nombre: true, email: true, telefono: true } },
 };
 
-const TASA_COMISION = 0.10;
 const TIMEOUT_ACEPTACION_MIN = 3;
+
+// Misma cascada que pedido.service.js usa para Marketplace: override por
+// comercio (ComisionComercio vigente) > comisión global configurada en admin
+// (Config["comision_global"]) > default de config/env.
+async function resolverTasaComision(comercioId) {
+  const ahora = new Date();
+  const [override, configGlobal] = await Promise.all([
+    prisma.comisionComercio.findFirst({
+      where: { comercioId, desde: { lte: ahora }, OR: [{ hasta: null }, { hasta: { gt: ahora } }] },
+      orderBy: { desde: "desc" },
+    }),
+    prisma.config.findUnique({ where: { clave: "comision_global" } }),
+  ]);
+  if (override) return Number(override.tasa);
+  if (configGlobal) return parseFloat(configGlobal.valor);
+  return config.comisionPorcentaje;
+}
 
 function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -244,7 +265,8 @@ const ExpressService = {
     }
 
     const costoEnvio = modalidad === "DOMICILIO" ? Number(cfg.costoEnvioBase) : 0;
-    const comision   = Math.round((subtotal - montoDescuento) * TASA_COMISION);
+    const tasaComision = await resolverTasaComision(comercioId);
+    const comision   = Math.round((subtotal - montoDescuento) * tasaComision);
     const total      = subtotal - montoDescuento + costoEnvio;
     const expiresAt  = new Date(Date.now() + TIMEOUT_ACEPTACION_MIN * 60 * 1000);
 
@@ -274,14 +296,11 @@ const ExpressService = {
     });
 
     // Registrar uso del cupón (solo cupones propios; una alianza no tiene fila
-    // CuponExpress que actualizar — su "un uso" ya lo garantiza AlianzaSocio)
+    // CuponVertical que actualizar — su "un uso" ya lo garantiza AlianzaSocio)
     if (cuponAplicado && !descuentoEsAlianza) {
-      await prisma.cuponExpressUso.create({
-        data: { cuponExpressId: cuponAplicado.id, clienteId, pedidoExpressId: pedido.id },
-      });
-      await prisma.cuponExpress.update({
-        where: { id: cuponAplicado.id },
-        data: { usosActuales: { increment: 1 } },
+      await registrarUsoVertical(prisma, {
+        cuponId: cuponAplicado.id, clienteId,
+        tipoEntidad: "CONFIG_EXPRESS", entidadId: pedido.id,
       });
     }
 
@@ -383,26 +402,6 @@ const ExpressService = {
   // totalReviews (ese campo compartido lo actualiza Hotel y quedaría pisado
   // o vacío para comercios que solo venden por Express). Se calcula aparte,
   // directo desde ReviewExpress, y se sobreescribe en la respuesta.
-  async _aplicarRatingExpress(configs) {
-    const lista = Array.isArray(configs) ? configs : [configs];
-    const ids = lista.filter(Boolean).map(c => c.id);
-    if (ids.length === 0) return configs;
-    const agregados = await prisma.reviewExpress.groupBy({
-      by: ['configExpressId'],
-      where: { configExpressId: { in: ids } },
-      _avg: { calificacion: true },
-      _count: true,
-    });
-    const porId = new Map(agregados.map(a => [a.configExpressId, a]));
-    for (const cfg of lista) {
-      if (!cfg?.comercio) continue;
-      const a = porId.get(cfg.id);
-      cfg.comercio.calificacion = a ? Math.round((a._avg.calificacion ?? 0) * 100) / 100 : 0;
-      cfg.comercio.totalReviews = a ? a._count : 0;
-    }
-    return configs;
-  },
-
   async listarComerciosExpress(municipio) {
     const where = { activo: true };
     if (municipio) where.municipiosEntrega = { has: municipio };
@@ -416,7 +415,6 @@ const ExpressService = {
         },
       },
     });
-    await this._aplicarRatingExpress(configs);
     // Una foto real de plato > logo del comercio como imagen hero de la tarjeta.
     const platos = await prisma.producto.findMany({
       where: { comercioId: { in: configs.map(c => c.comercioId) }, esExpress: true, activo: true, deletedAt: null, fotoUrl: { not: null } },
@@ -426,11 +424,11 @@ const ExpressService = {
     const fotoPorComercio = new Map();
     for (const p of platos) if (!fotoPorComercio.has(p.comercioId)) fotoPorComercio.set(p.comercioId, p.fotoUrl);
     const ahora = new Date();
-    const cupones = await prisma.cuponExpress.findMany({
-      where: { configExpressId: { in: configs.map(c => c.id) }, activo: true, inicio: { lte: ahora }, fin: { gte: ahora } },
-      select: { configExpressId: true },
+    const cupones = await prisma.cuponVertical.findMany({
+      where: { tipoEntidad: "CONFIG_EXPRESS", entidadId: { in: configs.map(c => c.id) }, activo: true, inicio: { lte: ahora }, fin: { gte: ahora } },
+      select: { entidadId: true },
     });
-    const conCupon = new Set(cupones.map(c => c.configExpressId));
+    const conCupon = new Set(cupones.map(c => c.entidadId));
     // Enriquecer con estado abierto real basado en horario
     return configs.map(cfg => ({
       ...cfg,
@@ -456,7 +454,6 @@ const ExpressService = {
       },
     });
     if (!cfg || !cfg.activo) return null;
-    await this._aplicarRatingExpress(cfg);
     const productos = await prisma.producto.findMany({
       where: { comercioId, esExpress: true, activo: true, deletedAt: null },
       include: {
@@ -541,52 +538,53 @@ const ExpressService = {
   // ── FAVORITOS ─────────────────────────────────────────────────
 
   async toggleFavorito(usuarioId, configExpressId) {
-    const existe = await prisma.favoritoExpress.findUnique({
-      where: { usuarioId_configExpressId: { usuarioId, configExpressId } },
+    const existe = await prisma.favorito.findUnique({
+      where: { usuarioId_tipoEntidad_entidadId: { usuarioId, tipoEntidad: "CONFIG_EXPRESS", entidadId: configExpressId } },
     });
     if (existe) {
-      await prisma.favoritoExpress.delete({ where: { id: existe.id } });
+      await prisma.favorito.delete({ where: { id: existe.id } });
       return { favorito: false };
     } else {
-      await prisma.favoritoExpress.create({ data: { usuarioId, configExpressId } });
+      await prisma.favorito.create({ data: { usuarioId, tipoEntidad: "CONFIG_EXPRESS", entidadId: configExpressId } });
       return { favorito: true };
     }
   },
 
   async misFavoritosExpress(usuarioId) {
-    const favs = await prisma.favoritoExpress.findMany({
-      where: { usuarioId },
-      include: {
-        configExpress: {
-          include: {
-            horarios: true,
-            comercio: {
-              select: { id: true, nombre: true, logoUrl: true, municipio: true,
-                        calificacion: true, totalReviews: true, latitud: true, longitud: true },
-            },
-          },
-        },
-      },
+    const favs = await prisma.favorito.findMany({
+      where: { usuarioId, tipoEntidad: "CONFIG_EXPRESS" },
       orderBy: { createdAt: "desc" },
     });
-    await this._aplicarRatingExpress(favs.map(f => f.configExpress));
-    const platos = favs.length ? await prisma.producto.findMany({
-      where: { comercioId: { in: favs.map(f => f.configExpress.comercioId) }, esExpress: true, activo: true, deletedAt: null, fotoUrl: { not: null } },
+    if (favs.length === 0) return [];
+    const configs = await prisma.configExpress.findMany({
+      where: { id: { in: favs.map(f => f.entidadId) } },
+      include: {
+        horarios: true,
+        comercio: {
+          select: { id: true, nombre: true, logoUrl: true, municipio: true,
+                    calificacion: true, totalReviews: true, latitud: true, longitud: true },
+        },
+      },
+    });
+    const porId = new Map(configs.map(c => [c.id, c]));
+    const ordenados = favs.map(f => porId.get(f.entidadId)).filter(Boolean);
+    const platos = ordenados.length ? await prisma.producto.findMany({
+      where: { comercioId: { in: ordenados.map(c => c.comercioId) }, esExpress: true, activo: true, deletedAt: null, fotoUrl: { not: null } },
       select: { comercioId: true, fotoUrl: true },
       orderBy: { createdAt: "desc" },
     }) : [];
     const fotoPorComercio = new Map();
     for (const p of platos) if (!fotoPorComercio.has(p.comercioId)) fotoPorComercio.set(p.comercioId, p.fotoUrl);
-    return favs.map(f => ({
-      ...f.configExpress,
-      abiertoAhora: f.configExpress.abierto && comercioAbiertoAhora(f.configExpress.horarios),
-      fotoPlato: fotoPorComercio.get(f.configExpress.comercioId) ?? null,
+    return ordenados.map(c => ({
+      ...c,
+      abiertoAhora: c.abierto && comercioAbiertoAhora(c.horarios),
+      fotoPlato: fotoPorComercio.get(c.comercioId) ?? null,
     }));
   },
 
   async esFavoritoExpress(usuarioId, configExpressId) {
-    const existe = await prisma.favoritoExpress.findUnique({
-      where: { usuarioId_configExpressId: { usuarioId, configExpressId } },
+    const existe = await prisma.favorito.findUnique({
+      where: { usuarioId_tipoEntidad_entidadId: { usuarioId, tipoEntidad: "CONFIG_EXPRESS", entidadId: configExpressId } },
     });
     return { favorito: !!existe };
   },
@@ -631,65 +629,41 @@ const ExpressService = {
   // ── CUPONES EXPRESS ──────────────────────────────────────────
 
   async validarCuponExpress(codigo, configExpressId, subtotal, clienteId, comercioId) {
-    const cupon = await prisma.cuponExpress.findFirst({
-      where: {
-        codigo: codigo.trim().toUpperCase(),
-        activo: true,
-        fin:   { gte: new Date() },
-        inicio: { lte: new Date() },
-        OR: [
-          { configExpressId: null },
-          { configExpressId },
-        ],
-      },
-    });
+    const cupon = await buscarCuponVertical(prisma, { codigo, tipoEntidad: "CONFIG_EXPRESS", entidadId: configExpressId });
     if (!cupon) {
-      // Fallback: no es un CuponExpress propio, ¿es un código de alianza
-      // comercial vigente para este comercio en el módulo EXPRESS?
-      if (comercioId) {
-        const alianza = await AlianzaService.validarCodigoAlianza(codigo, comercioId, "EXPRESS");
-        if (alianza) {
-          const subtotalNum = Number(subtotal);
-          const descuentoAlianza = alianza.tipoDescuento === "PORCENTAJE"
-            ? Math.round(subtotalNum * Number(alianza.valorDescuento) / 100)
-            : Math.min(Number(alianza.valorDescuento), subtotalNum);
-          return {
-            cupon: { codigo: String(codigo).trim().toUpperCase() },
-            descuento: descuentoAlianza,
-            subtotalConDescuento: subtotalNum - descuentoAlianza,
-            esAlianza: true,
-          };
-        }
+      const alianza = await intentarAlianza(comercioId, codigo, "EXPRESS", subtotal);
+      if (alianza) {
+        return {
+          cupon: { codigo: alianza.codigo },
+          descuento: alianza.descuento,
+          subtotalConDescuento: Number(subtotal) - alianza.descuento,
+          esAlianza: true,
+        };
       }
       throw new ErrorValidacion("Cupón inválido o expirado");
     }
     if (cupon.usosMaximos && cupon.usosActuales >= cupon.usosMaximos) {
       throw new ErrorValidacion("Este cupón ya alcanzó su límite de usos");
     }
-    if (cupon.minimoSubtotal && Number(subtotal) < Number(cupon.minimoSubtotal)) {
-      throw new ErrorValidacion(`Subtotal mínimo requerido: $${Number(cupon.minimoSubtotal).toLocaleString("es-CO")}`);
+    if (cupon.minimoAplicable && Number(subtotal) < Number(cupon.minimoAplicable)) {
+      throw new ErrorValidacion(`Subtotal mínimo requerido: $${Number(cupon.minimoAplicable).toLocaleString("es-CO")}`);
     }
-    // Verificar que el cliente no lo haya usado antes
-    if (clienteId) {
-      const yaUso = await prisma.cuponExpressUso.findFirst({
-        where: { cuponExpressId: cupon.id, clienteId },
-      });
-      if (yaUso) throw new ErrorValidacion("Ya usaste este cupón anteriormente");
+    if (await yaUsadoPorCliente(prisma, cupon.id, clienteId)) {
+      throw new ErrorValidacion("Ya usaste este cupón anteriormente");
     }
-    const descuento = cupon.tipo === "PORCENTAJE"
-      ? Math.round(Number(subtotal) * Number(cupon.valor) / 100)
-      : Math.min(Number(cupon.valor), Number(subtotal));
+    const descuento = calcularDescuento(cupon, subtotal);
     return { cupon, descuento, subtotalConDescuento: Number(subtotal) - descuento };
   },
 
   async listarCuponesExpress(comercioId) {
     const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
     if (!cfg) return [];
-    return prisma.cuponExpress.findMany({
-      where: { configExpressId: cfg.id },
+    const cupones = await prisma.cuponVertical.findMany({
+      where: { tipoEntidad: "CONFIG_EXPRESS", entidadId: cfg.id },
       orderBy: { createdAt: "desc" },
       include: { _count: { select: { usos: true } } },
     });
+    return cupones.map((c) => mapearCuponVertical(c, "minimoSubtotal", "configExpressId", { _count: c._count }));
   },
 
   async crearCuponExpress(comercioId, datos) {
@@ -699,29 +673,31 @@ const ExpressService = {
     if (!codigo?.trim()) throw new ErrorValidacion("El código es requerido");
     if (!valor || Number(valor) <= 0) throw new ErrorValidacion("El valor debe ser positivo");
     if (tipo === "PORCENTAJE" && Number(valor) > 100) throw new ErrorValidacion("El porcentaje no puede superar 100");
-    return prisma.cuponExpress.create({
+    const cupon = await prisma.cuponVertical.create({
       data: {
         codigo: codigo.trim().toUpperCase(),
+        tipoEntidad: "CONFIG_EXPRESS",
         tipo: tipo ?? "PORCENTAJE",
         valor: Number(valor),
-        minimoSubtotal: minimoSubtotal ? Number(minimoSubtotal) : null,
+        minimoAplicable: minimoSubtotal ? Number(minimoSubtotal) : null,
         usosMaximos: usosMaximos ? Number(usosMaximos) : null,
         activo: true,
         inicio: new Date(inicio),
         fin:    new Date(fin),
-        configExpressId: cfg.id,
+        entidadId: cfg.id,
       },
     });
+    return mapearCuponVertical(cupon, "minimoSubtotal", "configExpressId");
   },
 
   async eliminarCuponExpress(comercioId, cuponId) {
     const cfg = await prisma.configExpress.findUnique({ where: { comercioId } });
     if (!cfg) throw new ErrorNoEncontrado("Config no encontrada");
-    const cupon = await prisma.cuponExpress.findFirst({
-      where: { id: cuponId, configExpressId: cfg.id },
+    const cupon = await prisma.cuponVertical.findFirst({
+      where: { id: cuponId, tipoEntidad: "CONFIG_EXPRESS", entidadId: cfg.id },
     });
     if (!cupon) throw new ErrorNoEncontrado("Cupón no encontrado");
-    return prisma.cuponExpress.update({ where: { id: cuponId }, data: { activo: false } });
+    return prisma.cuponVertical.update({ where: { id: cuponId }, data: { activo: false } });
   },
 
   // ── ESTADÍSTICAS EXPRESS ──────────────────────────────────────

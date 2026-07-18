@@ -292,6 +292,11 @@ const ComercioController = {
       // Rango de fechas puntual (opcional, para consultas contables)
       const { desde, hasta } = req.query;
 
+      // Resena no tiene relación directa a Producto (entidadId no es FK real);
+      // se resuelven los ids de producto del comercio antes del Promise.all.
+      const productosDelComercio = await prisma.producto.findMany({ where: { comercioId }, select: { id: true } });
+      const productoIdsComercio = productosDelComercio.map((p) => p.id);
+
       const [
         sumaActual,
         sumaPasado,
@@ -343,8 +348,8 @@ const ComercioController = {
           GROUP BY mes
           ORDER BY mes ASC
         `,
-        prisma.reviewProducto.aggregate({
-          where: { producto: { comercioId } },
+        prisma.resena.aggregate({
+          where: { tipoEntidad: "PRODUCTO", entidadId: { in: productoIdsComercio } },
           _avg: { calificacion: true },
           _count: { _all: true },
         }),
@@ -354,14 +359,11 @@ const ComercioController = {
           orderBy: { fin: "asc" },
           take: 3,
         }),
-        prisma.reviewProducto.findMany({
-          where: { producto: { comercioId } },
+        prisma.resena.findMany({
+          where: { tipoEntidad: "PRODUCTO", entidadId: { in: productoIdsComercio } },
           orderBy: { createdAt: "desc" },
           take: 5,
-          include: {
-            comprador: { select: { nombre: true } },
-            producto: { select: { nombre: true } },
-          },
+          include: { autor: { select: { nombre: true } } },
         }),
         prisma.$queryRaw`
           SELECT "productoId"::int, COUNT(*)::int AS vistas
@@ -372,6 +374,18 @@ const ComercioController = {
           ORDER BY vistas DESC
         `,
       ]);
+
+      const reviewsRecientesProductoIds = reviewsRecientes.map((r) => r.entidadId);
+      const reviewsRecientesProductoInfo = reviewsRecientesProductoIds.length
+        ? await prisma.producto.findMany({ where: { id: { in: reviewsRecientesProductoIds } }, select: { id: true, nombre: true } })
+        : [];
+      const reviewsRecientesProductoPorId = new Map(reviewsRecientesProductoInfo.map((p) => [p.id, p]));
+      const reviewsRecientesMapeadas = reviewsRecientes.map((r) => ({
+        id: r.id, productoId: r.entidadId, compradorId: r.autorId,
+        calificacion: r.calificacion, comentario: r.comentario, createdAt: r.createdAt,
+        comprador: r.autor ? { nombre: r.autor.nombre } : undefined,
+        producto: reviewsRecientesProductoPorId.get(r.entidadId) ? { nombre: reviewsRecientesProductoPorId.get(r.entidadId).nombre } : undefined,
+      }));
 
       const topIds = topVendidos.map((t) => t.productoId);
       const topInfo = topIds.length
@@ -462,7 +476,7 @@ const ComercioController = {
         tendenciaMensual,
         productos: { topMasVendidos, sinVentas, stockCritico },
         vistas: { topMasVistos, sinVistas },
-        reputacion: { calificacionPromedio: calProm, totalReviews, reviewsRecientes },
+        reputacion: { calificacionPromedio: calProm, totalReviews, reviewsRecientes: reviewsRecientesMapeadas },
         ofertasProximas,
         insights,
       };
@@ -841,6 +855,35 @@ const ComercioController = {
           requiereRevision: Boolean(revision?.requiereCambioEstado || resultado.revisionResultado.cambioCriticoId),
           productosDesactivados: resultado.revisionResultado.productosDesactivados,
         });
+      } catch (e) {
+        next(e);
+      }
+    });
+  },
+
+  // POST /comercios/subir-camara-comercio - foto/captura del certificado de
+  // Cámara de Comercio. Más simple que subirDocumento: no es un documento de
+  // identidad, no requiere dedup por lado ni revisión crítica automática.
+  subirCamaraComercio(req, res, next) {
+    _uploadDoc(req, res, async (err) => {
+      if (err) return next(err);
+      if (!req.file) return res.status(400).json({ ok: false, error: "No se recibió imagen." });
+      try {
+        const validacion = validarDocumentoImagen(req.file);
+        if (!validacion.ok) {
+          fs.unlink(req.file.path, () => {});
+          throw new ErrorValidacion(validacion.mensaje);
+        }
+
+        const base = `${req.protocol}://${req.get("host")}`;
+        const url = `${base}/uploads/documentos/${req.file.filename}`;
+
+        const comercio = await prisma.comercio.update({
+          where: { usuarioId: req.usuario.id },
+          data: { camaraComercioUrl: url },
+        });
+
+        res.json({ ok: true, url, comercio });
       } catch (e) {
         next(e);
       }

@@ -72,6 +72,7 @@ function señalesFraude(comercio: AdminComercio): string[] {
   if (!documentoFrenteUrl(comercio)) señales.push('📄 Sin frente del documento')
   if (!comercio.fotoDocumentoReversoUrl) señales.push('📄 Sin reverso del documento')
   if (!comercio.usuario.tipoDocumento || !comercio.usuario.numeroDocumento) señales.push('🪪 Sin documento de identidad')
+  if (!comercio.rut?.trim()) señales.push('🧾 Sin RUT')
   if (!comercio.usuario.telefono)  señales.push('📱 Sin teléfono')
   if (comercio.usuario.email.match(/@(mailinator|yopmail|tempmail|guerrillamail)\./i)) señales.push('📧 Email temporal')
   if (comercio.usuario.telefono && !comercio.usuario.telefono.match(/^3\d{9}$/)) señales.push('📱 Teléfono no colombiano')
@@ -573,6 +574,22 @@ function CardComerciante({
         </div>
 
         <div className="grid grid-cols-2 gap-3 rounded-2xl bg-[#F8F5F0] p-4 text-sm">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[#1A1A1A]/40">RUT</p>
+            {comercio.rut?.trim() ? (
+              <p className="mt-1 font-semibold text-[#1A1A1A]">{comercio.rut}</p>
+            ) : (
+              <p className="mt-1 font-semibold text-[#C0392B]">Sin RUT</p>
+            )}
+            {comercio.camaraComercioNumero?.trim() && (
+              <p className="text-xs text-[#1A1A1A]/55">Matrícula {comercio.camaraComercioNumero}</p>
+            )}
+            {comercio.camaraComercioUrl && (
+              <a href={comercio.camaraComercioUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-[#2D6A4F] underline">
+                Ver certificado
+              </a>
+            )}
+          </div>
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wide text-[#1A1A1A]/40">Productos</p>
             <p className="mt-1 text-lg font-bold text-[#1A1A1A]">{comercio._count.productos}</p>

@@ -4,6 +4,10 @@ const sseManager = require("../utils/sse-manager");
 const { enviarPushAUsuario } = require("../utils/push");
 const AlianzaService = require("./alianza.service");
 const FacturacionService = require("./facturacion.service");
+const {
+  buscarCuponVertical, bloquearYRevalidar, yaUsadoPorCliente,
+  calcularDescuento, intentarAlianza, registrarUsoVertical, mapearCuponVertical,
+} = require("../utils/cupon-vertical");
 
 function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -33,71 +37,39 @@ const TRANSPORTE_INCLUDE = {
 };
 
 async function validarCuponTransporteInterno(db, codigo, configTransporteId, asientos, clienteId, totalOriginal, { bloquear = false, comercioId = null } = {}) {
-  const ahora = new Date();
-  const codigoNormalizado = String(codigo || "").trim().toUpperCase();
-  let cupon = await db.cuponTransporte.findFirst({
-    where: {
-      codigo: codigoNormalizado,
-      activo: true,
-      inicio: { lte: ahora },
-      fin:    { gte: ahora },
-      OR: [
-        { configTransporteId: null },
-        { configTransporteId },
-      ],
-    },
-  });
+  let cupon = await buscarCuponVertical(db, { codigo, tipoEntidad: "CONFIG_TRANSPORTE", entidadId: configTransporteId });
 
   if (!cupon) {
-    // Fallback: no es un CuponTransporte propio, ¿es un código de alianza
-    // comercial vigente para este comercio en el módulo TRANSPORTE?
-    if (comercioId) {
-      const alianza = await AlianzaService.validarCodigoAlianza(codigoNormalizado, comercioId, "TRANSPORTE");
-      if (alianza) {
-        const descuentoAlianza = alianza.tipoDescuento === "PORCENTAJE"
-          ? Math.round(totalOriginal * Number(alianza.valorDescuento) / 100 * 100) / 100
-          : Math.min(Number(alianza.valorDescuento), totalOriginal);
-        return {
-          cupon: { codigo: codigoNormalizado },
-          descuento: descuentoAlianza,
-          totalConDescuento: totalOriginal - descuentoAlianza,
-          esAlianza: true,
-        };
-      }
+    const alianza = await intentarAlianza(comercioId, codigo, "TRANSPORTE", totalOriginal);
+    if (alianza) {
+      return {
+        cupon: { codigo: alianza.codigo },
+        descuento: alianza.descuento,
+        totalConDescuento: Number(totalOriginal) - alianza.descuento,
+        esAlianza: true,
+      };
     }
     throw new ErrorValidacion("Cupon no valido o expirado");
   }
   if (bloquear) {
-    await db.$queryRaw`SELECT id FROM "CuponTransporte" WHERE id = ${cupon.id} FOR UPDATE`;
-    cupon = await db.cuponTransporte.findUnique({ where: { id: cupon.id } });
-    if (!cupon || !cupon.activo || cupon.inicio > ahora || cupon.fin < ahora) {
-      throw new ErrorValidacion("Cupon no valido o expirado");
-    }
+    cupon = await bloquearYRevalidar(db, "CuponVertical", cupon.id);
+    if (!cupon) throw new ErrorValidacion("Cupon no valido o expirado");
   }
 
-  if (cupon.minimoAsientos && asientos < cupon.minimoAsientos) {
-    throw new ErrorValidacion(`Este cupon requiere minimo ${cupon.minimoAsientos} asiento(s)`);
+  if (cupon.minimoAplicable && asientos < Number(cupon.minimoAplicable)) {
+    throw new ErrorValidacion(`Este cupon requiere minimo ${Number(cupon.minimoAplicable)} asiento(s)`);
   }
 
   if (cupon.usosMaximos && cupon.usosActuales >= cupon.usosMaximos) {
     throw new ErrorValidacion("El cupon ha alcanzado el limite de usos");
   }
 
-  if (clienteId) {
-    const usoExistente = await db.cuponTransporteUso.findFirst({
-      where: { cuponTransporteId: cupon.id, clienteId },
-    });
-    if (usoExistente) throw new ErrorValidacion("Ya usaste este cupon");
+  if (await yaUsadoPorCliente(db, cupon.id, clienteId)) {
+    throw new ErrorValidacion("Ya usaste este cupon");
   }
 
-  let descuento;
-  if (cupon.tipo === "PORCENTAJE") {
-    descuento = Math.round(totalOriginal * Number(cupon.valor) / 100 * 100) / 100;
-  } else {
-    descuento = Math.min(Number(cupon.valor), totalOriginal);
-  }
-
-  const totalConDescuento = totalOriginal - descuento;
+  const descuento = calcularDescuento(cupon, totalOriginal);
+  const totalConDescuento = Number(totalOriginal) - descuento;
   return { cupon, descuento, totalConDescuento };
 }
 
@@ -191,18 +163,11 @@ const TransporteService = {
         include: { ruta: { include: { configTransporte: { include: TRANSPORTE_INCLUDE } } } },
       });
 
-      // Un descuento de alianza no tiene fila CuponTransporte propia que actualizar.
+      // Un descuento de alianza no tiene fila CuponVertical propia que actualizar.
       if (cuponValidado && !cuponEsAlianza) {
-        await tx.cuponTransporteUso.create({
-          data: {
-            cuponTransporteId: cuponValidado.id,
-            clienteId,
-            reservaTransporteId: nuevaReserva.id,
-          },
-        });
-        await tx.cuponTransporte.update({
-          where: { id: cuponValidado.id },
-          data:  { usosActuales: { increment: 1 } },
+        await registrarUsoVertical(tx, {
+          cuponId: cuponValidado.id, clienteId,
+          tipoEntidad: "CONFIG_TRANSPORTE", entidadId: nuevaReserva.id,
         });
       }
 
@@ -473,37 +438,38 @@ const TransporteService = {
   // ── FAVORITOS ─────────────────────────────────────────────────
 
   async toggleFavorito(usuarioId, configTransporteId) {
-    const existe = await prisma.favoritoTransporte.findUnique({
-      where: { usuarioId_configTransporteId: { usuarioId, configTransporteId } },
+    const existe = await prisma.favorito.findUnique({
+      where: { usuarioId_tipoEntidad_entidadId: { usuarioId, tipoEntidad: "CONFIG_TRANSPORTE", entidadId: configTransporteId } },
     });
     if (existe) {
-      await prisma.favoritoTransporte.delete({ where: { id: existe.id } });
+      await prisma.favorito.delete({ where: { id: existe.id } });
       return { favorito: false };
     } else {
-      await prisma.favoritoTransporte.create({ data: { usuarioId, configTransporteId } });
+      await prisma.favorito.create({ data: { usuarioId, tipoEntidad: "CONFIG_TRANSPORTE", entidadId: configTransporteId } });
       return { favorito: true };
     }
   },
 
   async misFavoritosTransporte(usuarioId) {
-    const favs = await prisma.favoritoTransporte.findMany({
-      where: { usuarioId },
-      include: {
-        configTransporte: {
-          include: {
-            ...TRANSPORTE_INCLUDE,
-            rutas: { where: { activo: true }, orderBy: { horario: 'asc' } },
-          },
-        },
-      },
+    const favs = await prisma.favorito.findMany({
+      where: { usuarioId, tipoEntidad: "CONFIG_TRANSPORTE" },
       orderBy: { createdAt: 'desc' },
     });
-    return favs.map(f => f.configTransporte);
+    if (favs.length === 0) return [];
+    const configs = await prisma.configTransporte.findMany({
+      where: { id: { in: favs.map(f => f.entidadId) } },
+      include: {
+        ...TRANSPORTE_INCLUDE,
+        rutas: { where: { activo: true }, orderBy: { horario: 'asc' } },
+      },
+    });
+    const porId = new Map(configs.map(c => [c.id, c]));
+    return favs.map(f => porId.get(f.entidadId)).filter(Boolean);
   },
 
   async esFavoritoTransporte(usuarioId, configTransporteId) {
-    const existe = await prisma.favoritoTransporte.findUnique({
-      where: { usuarioId_configTransporteId: { usuarioId, configTransporteId } },
+    const existe = await prisma.favorito.findUnique({
+      where: { usuarioId_tipoEntidad_entidadId: { usuarioId, tipoEntidad: "CONFIG_TRANSPORTE", entidadId: configTransporteId } },
     });
     return { favorito: !!existe };
   },
@@ -521,40 +487,43 @@ const TransporteService = {
     const { codigo, tipo = "PORCENTAJE", valor, minimoAsientos, usosMaximos, inicio, fin } = datos;
     if (!codigo || !valor || !inicio || !fin) throw new ErrorValidacion("Faltan campos requeridos: codigo, valor, inicio, fin");
 
-    return prisma.cuponTransporte.create({
+    const cupon = await prisma.cuponVertical.create({
       data: {
-        codigo:         codigo.trim().toUpperCase(),
+        codigo:          codigo.trim().toUpperCase(),
+        tipoEntidad:     "CONFIG_TRANSPORTE",
         tipo,
-        valor:          Number(valor),
-        minimoAsientos: minimoAsientos ? Number(minimoAsientos) : null,
-        usosMaximos:    usosMaximos    ? Number(usosMaximos)    : null,
-        inicio:         new Date(inicio),
-        fin:            new Date(fin),
-        configTransporteId: transporte.id,
+        valor:           Number(valor),
+        minimoAplicable: minimoAsientos ? Number(minimoAsientos) : null,
+        usosMaximos:     usosMaximos    ? Number(usosMaximos)    : null,
+        inicio:          new Date(inicio),
+        fin:             new Date(fin),
+        entidadId:       transporte.id,
       },
     });
+    return mapearCuponVertical(cupon, "minimoAsientos", "configTransporteId");
   },
 
   async listarCuponesTransporte(comercioId) {
     const transporte = await prisma.configTransporte.findUnique({ where: { comercioId } });
     if (!transporte) throw new ErrorNoEncontrado("Servicio de transporte no encontrado");
 
-    return prisma.cuponTransporte.findMany({
-      where:   { configTransporteId: transporte.id },
+    const cupones = await prisma.cuponVertical.findMany({
+      where:   { tipoEntidad: "CONFIG_TRANSPORTE", entidadId: transporte.id },
       orderBy: { createdAt: "desc" },
     });
+    return cupones.map((c) => mapearCuponVertical(c, "minimoAsientos", "configTransporteId"));
   },
 
   async eliminarCuponTransporte(comercioId, cuponId) {
     const transporte = await prisma.configTransporte.findUnique({ where: { comercioId } });
     if (!transporte) throw new ErrorNoEncontrado("Servicio de transporte no encontrado");
 
-    const cupon = await prisma.cuponTransporte.findFirst({
-      where: { id: cuponId, configTransporteId: transporte.id },
+    const cupon = await prisma.cuponVertical.findFirst({
+      where: { id: cuponId, tipoEntidad: "CONFIG_TRANSPORTE", entidadId: transporte.id },
     });
     if (!cupon) throw new ErrorNoEncontrado("Cupón no encontrado");
 
-    return prisma.cuponTransporte.update({
+    return prisma.cuponVertical.update({
       where: { id: cuponId },
       data:  { activo: false },
     });

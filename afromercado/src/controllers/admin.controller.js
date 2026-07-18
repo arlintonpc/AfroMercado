@@ -13,6 +13,7 @@ const { hashearPassword } = require("../utils/auth");
 const ConfigRepository = require("../repositories/config.repository");
 const Reglas = require("../config/reglas");
 const PaymentConfigService = require("../services/payment-config.service");
+const { recalcularCalificacionComercio } = require("../utils/resena");
 const NotificacionService = require("../services/notificacion.service");
 const UsuarioService = require("../services/usuario.service");
 
@@ -299,46 +300,59 @@ const AdminController = {
       const tipo   = req.query.tipo || 'producto';
 
       if (tipo === 'tienda') {
-        const [total, items] = await Promise.all([
-          prisma.review.count(),
-          prisma.review.findMany({
+        const [total, rows] = await Promise.all([
+          prisma.resena.count({ where: { tipoEntidad: 'PEDIDO' } }),
+          prisma.resena.findMany({
+            where: { tipoEntidad: 'PEDIDO' },
             orderBy: { createdAt: 'desc' },
             skip: (pagina - 1) * limite,
             take: limite,
             include: {
-              comprador: { select: { id: true, nombre: true, email: true } },
-              comercio:  { select: { id: true, nombre: true } },
+              autor:    { select: { id: true, nombre: true, email: true } },
+              comercio: { select: { id: true, nombre: true } },
             },
           }),
         ]);
-        return res.json({ ok: true, data: items.map(r => ({ ...r, estrellas: r.calificacion, autor: r.comprador })), total, pagina, limite });
+        const items = rows.map(r => ({
+          id: r.id, comercioId: r.comercioId, compradorId: r.autorId, pedidoId: r.entidadId,
+          calificacion: r.calificacion, comentario: r.comentario, createdAt: r.createdAt,
+          comprador: r.autor, comercio: r.comercio, estrellas: r.calificacion, autor: r.autor,
+        }));
+        return res.json({ ok: true, data: items, total, pagina, limite });
       }
 
-      const [total, items] = await Promise.all([
-        prisma.reviewProducto.count(),
-        prisma.reviewProducto.findMany({
+      const [total, rows] = await Promise.all([
+        prisma.resena.count({ where: { tipoEntidad: 'PRODUCTO' } }),
+        prisma.resena.findMany({
+          where: { tipoEntidad: 'PRODUCTO' },
           orderBy: { createdAt: 'desc' },
           skip: (pagina - 1) * limite,
           take: limite,
-          include: {
-            comprador: { select: { id: true, nombre: true, email: true } },
-            producto:  { select: { id: true, nombre: true } },
-          },
+          include: { autor: { select: { id: true, nombre: true, email: true } } },
         }),
       ]);
-      res.json({ ok: true, data: items.map(r => ({ ...r, estrellas: r.calificacion, autor: r.comprador })), total, pagina, limite });
+      const productoIds = rows.map(r => r.entidadId);
+      const productos = productoIds.length
+        ? await prisma.producto.findMany({ where: { id: { in: productoIds } }, select: { id: true, nombre: true } })
+        : [];
+      const prodPorId = new Map(productos.map(p => [p.id, p]));
+      const items = rows.map(r => ({
+        id: r.id, productoId: r.entidadId, compradorId: r.autorId,
+        calificacion: r.calificacion, comentario: r.comentario, createdAt: r.createdAt,
+        comprador: r.autor, producto: prodPorId.get(r.entidadId) ?? null,
+        estrellas: r.calificacion, autor: r.autor,
+      }));
+      res.json({ ok: true, data: items, total, pagina, limite });
     } catch (e) { next(e); }
   },
 
   // DELETE /admin/reviews/:id?tipo=producto|tienda
   async eliminarReview(req, res, next) {
     try {
-      const id   = Number(req.params.id);
-      const tipo = req.query.tipo || 'producto';
-      if (tipo === 'tienda') {
-        await prisma.review.delete({ where: { id } });
-      } else {
-        await prisma.reviewProducto.delete({ where: { id } });
+      const id = Number(req.params.id);
+      const resena = await prisma.resena.delete({ where: { id } });
+      if (resena.comercioId && resena.tipoEntidad !== 'PRODUCTO') {
+        await recalcularCalificacionComercio(prisma, resena.comercioId);
       }
       res.json({ ok: true });
     } catch (e) { next(e); }

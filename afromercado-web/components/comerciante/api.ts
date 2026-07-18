@@ -42,6 +42,10 @@ export interface Comercio {
   fotoDocumentoReversoUrl?: string | null
   fotoDocumentoFrenteHash?: string | null
   fotoDocumentoReversoHash?: string | null
+  /** RUT/NIT — requisito mínimo para que el admin pueda aprobar el comercio. */
+  rut?: string | null
+  camaraComercioNumero?: string | null
+  camaraComercioUrl?: string | null
   whatsappVisible?: boolean
   vereda?: string | null
   videoUrl?: string | null
@@ -180,6 +184,8 @@ export interface DatosComercio {
   fotoDocumentoReversoUrl?: string
   fotoDocumentoFrenteHash?: string
   fotoDocumentoReversoHash?: string
+  rut?: string
+  camaraComercioNumero?: string
   /** Monto mínimo para envío gratis de la tienda (null/0 = desactivado). */
   envioGratisDesde?: number | null
   bancoCodigo?: string
@@ -674,6 +680,23 @@ export async function subirDocumentoComercio(file: File, lado: LadoDocumento): P
   })
   if (!res.ok) {
     let msg = 'No se pudo subir el documento.'
+    try { const j = await res.json(); if (j?.error) msg = j.error } catch { /* sin cuerpo */ }
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function subirCamaraComercio(file: File): Promise<{ url: string; comercio?: Comercio }> {
+  const token = obtenerToken()
+  const fd = new FormData()
+  fd.append('documento', file)
+  const res = await fetch(`${API_URL}/comercios/subir-camara-comercio`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: fd,
+  })
+  if (!res.ok) {
+    let msg = 'No se pudo subir el certificado.'
     try { const j = await res.json(); if (j?.error) msg = j.error } catch { /* sin cuerpo */ }
     throw new Error(msg)
   }

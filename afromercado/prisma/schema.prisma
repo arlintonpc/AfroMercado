@@ -191,8 +191,7 @@ model Usuario {
   pedidos                  Pedido[]
   direcciones          Direccion[]
   carrito              CarritoItem[]
-  reviews              Review[]
-  reviewsProducto      ReviewProducto[]
+  resenas              Resena[]
   visibilidadesAdmin   VisibilidadPagada[] @relation("VisibilidadAdmin")
   campanasAdmin        CampanaHero[]       @relation("CampanaAdmin")
   solicitudesPublicidadRevisadas SolicitudPublicidad[] @relation("SolicitudPublicidadRevisor")
@@ -202,8 +201,6 @@ model Usuario {
   vistasProducto       VistaProducto[]
   cuponUsos            CuponUso[]
   cuponAsignaciones    CuponAsignacion[]
-  favoritosHotel       FavoritoHotel[]
-  favoritosExpress     FavoritoExpress[]
   conversaciones            Conversacion[]      @relation("ConversacionComprador")
   mensajes                  Mensaje[]
   entregas                  Entrega[]           @relation("EntregaRepartidor")
@@ -217,18 +214,7 @@ model Usuario {
   reservasTour              ReservaTour[]       @relation("ReservasTourCliente")
   reservasTransporte        ReservaTransporte[] @relation("ReservasTransporteCliente")
   reservasCulturales        ReservaCultural[]   @relation("ReservasCulturalesCliente")
-  reviewsHotel              ReviewHotel[]       @relation("ReviewsHotelCliente")
-  reviewsTour               ReviewTour[]        @relation("ReviewsTourCliente")
-  reviewsTransporte         ReviewTransporte[]  @relation("ReviewsTransporteCliente")
-  reviewsExpress            ReviewExpress[]     @relation("ReviewsExpressCliente")
-  reviewsCultura            ReviewCultura[]     @relation("ReviewsCulturaCliente")
-  cuponesHotelUsos          CuponHotelUso[]
-  cuponesExpressUsos        CuponExpressUso[]
-  favoritosTour             FavoritoTour[]
-  favoritosTransporte       FavoritoTransporte[]
-  favoritosCultura          FavoritoCultura[]
-  cuponesTourUsos           CuponTourUso[]
-  cuponesTransporteUsos     CuponTransporteUso[]
+  cuponesVerticalUsos       CuponVerticalUso[]
   disputasComoComprador     Disputa[]           @relation("DisputasComprador")
   facturas                  FacturaElectronica[]
   pqrsd                     Pqrsd[]
@@ -239,7 +225,6 @@ model Usuario {
   ofertasEmpleoPublicadas   OfertaEmpleo[]           @relation("OfertasEmpleoPublicadas")
   hojaDeVida                HojaDeVida?
   postulacionesEmpleoEnviadas PostulacionEmpleo[]    @relation("PostulacionesEmpleoEnviadas")
-  favoritosOfertaEmpleo     FavoritoOfertaEmpleo[]
   denunciasEmpleoHechas     DenunciaOfertaEmpleo[]
   publicacionesCulturales            PublicacionCultural[]
   denunciasPublicacionCulturalHechas DenunciaPublicacionCultural[]
@@ -287,6 +272,9 @@ model Comercio {
   whatsappAprobadoPor Int?
   whatsappAprobadoAt  DateTime?
   vereda            String?
+  rut                   String?
+  camaraComercioNumero  String?
+  camaraComercioUrl     String?
   fotoDocumentoUrl  String?
   fotoDocumentoFrenteUrl  String?
   fotoDocumentoReversoUrl String?
@@ -300,7 +288,7 @@ model Comercio {
   usuario           Usuario             @relation(fields: [usuarioId], references: [id])
   productos         Producto[]
   subPedidos        SubPedido[]
-  reviews           Review[]
+  resenas           Resena[]
   visibilidades     VisibilidadPagada[]
   vistasProductos   VistaProducto[]
   conversaciones    Conversacion[]
@@ -399,11 +387,9 @@ model Producto {
   carrito          CarritoItem[]
   pedidoItems      PedidoItem[]
   historialPrecios PrecioHistorial[]
-  reviews          ReviewProducto[]
   visibilidades    VisibilidadPagada[]
   ofertas          Oferta[]
   vistas           VistaProducto[]
-  favoritos        Favorito[]
   solicitudesPublicidad SolicitudPublicidad[]
   itemsExpress          ItemPedidoExpress[]
   menuSeccion      MenuSeccion?       @relation("ProductoMenuSeccion", fields: [menuSeccionId], references: [id], onDelete: SetNull)
@@ -879,17 +865,41 @@ model CalificacionRepartidor {
   @@index([repartidorId])
 }
 
-model Review {
-  id           Int      @id @default(autoincrement())
-  comercioId   Int
-  compradorId  Int
-  pedidoId     Int      @unique
+// Anexo B, Fase 3 (unificación núcleo-vs-verticales): reemplaza a Review,
+// ReviewProducto, ReviewHotel, ReviewTour, ReviewTransporte, ReviewExpress
+// y ReviewCultura — mismo patrón polimórfico usado en Favorito (Fase 1).
+enum TipoEntidadResenable {
+  PEDIDO              // Review (Marketplace, nivel tienda/pedido completo)
+  PRODUCTO            // ReviewProducto
+  RESERVA_HOTEL
+  RESERVA_TOUR
+  RESERVA_TRANSPORTE
+  PEDIDO_EXPRESS
+  RESERVA_CULTURAL
+}
+
+model Resena {
+  id           Int                  @id @default(autoincrement())
+  tipoEntidad  TipoEntidadResenable
+  entidadId    Int
+  comercioId   Int?                 // desnormalizado a propósito: permite "todas las reseñas de este comercio" sin importar el vertical
+  autorId      Int
   calificacion Int
   comentario   String?
-  createdAt    DateTime @default(now())
+  fotoUrls     String[]             @default([])
+  videoUrl     String?
+  createdAt    DateTime             @default(now())
 
-  comercio  Comercio @relation(fields: [comercioId], references: [id])
-  comprador Usuario  @relation(fields: [compradorId], references: [id])
+  autor    Usuario  @relation(fields: [autorId], references: [id])
+  comercio Comercio? @relation(fields: [comercioId], references: [id])
+
+  // [tipoEntidad, entidadId] solo determina un único autor posible en 6 de los
+  // 7 tipos (una reserva/pedido pertenece a un cliente); PRODUCTO es la
+  // excepción real (muchos compradores distintos pueden reseñar el mismo
+  // producto) — por eso autorId entra en la restricción, no solo el par.
+  @@unique([tipoEntidad, entidadId, autorId])
+  @@index([comercioId])
+  @@index([tipoEntidad, entidadId])
 }
 
 model TokenRecuperacion {
@@ -918,21 +928,6 @@ model SesionReset {
   usuario Usuario @relation(fields: [usuarioId], references: [id])
 
   @@index([usuarioId])
-}
-
-model ReviewProducto {
-  id           Int      @id @default(autoincrement())
-  productoId   Int
-  compradorId  Int
-  calificacion Int
-  comentario   String?
-  createdAt    DateTime @default(now())
-
-  producto  Producto @relation(fields: [productoId], references: [id])
-  comprador Usuario  @relation(fields: [compradorId], references: [id])
-
-  @@unique([compradorId, productoId])
-  @@index([productoId])
 }
 
 model Config {
@@ -994,17 +989,31 @@ model Notificacion {
   @@index([usuarioId, leida, createdAt])
 }
 
+// Favorito unificado (Anexo B, Fase 1 de la migración núcleo-vs-verticales):
+// reemplaza los 7 modelos por vertical (Favorito+6 variantes) que existían
+// antes, todos con la misma forma exacta salvo el nombre del campo de FK.
+enum TipoEntidadFavorita {
+  PRODUCTO
+  CONFIG_HOTEL
+  CONFIG_EXPRESS
+  CONFIG_TOUR
+  CONFIG_TRANSPORTE
+  EVENTO_CULTURAL
+  OFERTA_EMPLEO
+}
+
 model Favorito {
-  id         Int      @id @default(autoincrement())
-  usuarioId  Int
-  productoId Int
-  createdAt  DateTime @default(now())
+  id          Int                 @id @default(autoincrement())
+  usuarioId   Int
+  tipoEntidad TipoEntidadFavorita
+  entidadId   Int
+  createdAt   DateTime            @default(now())
 
-  usuario  Usuario  @relation(fields: [usuarioId], references: [id])
-  producto Producto @relation(fields: [productoId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
-  @@unique([usuarioId, productoId])
+  @@unique([usuarioId, tipoEntidad, entidadId])
   @@index([usuarioId, createdAt])
+  @@index([tipoEntidad, entidadId])
 }
 
 model BusquedaHistorial {
@@ -1128,26 +1137,11 @@ model OfertaEmpleo {
   publicadoPor  Usuario             @relation("OfertasEmpleoPublicadas", fields: [publicadoPorId], references: [id])
   comercio      Comercio?           @relation(fields: [comercioId], references: [id])
   postulaciones PostulacionEmpleo[]
-  favoritos     FavoritoOfertaEmpleo[]
   denuncias     DenunciaOfertaEmpleo[]
 
   @@index([estado, estadoModeracion, municipio, createdAt])
   @@index([publicadoPorId])
   @@index([comercioId])
-}
-
-model FavoritoOfertaEmpleo {
-  id             Int      @id @default(autoincrement())
-  usuarioId      Int
-  ofertaEmpleoId Int
-  createdAt      DateTime @default(now())
-
-  usuario Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  oferta  OfertaEmpleo @relation(fields: [ofertaEmpleoId], references: [id], onDelete: Cascade)
-
-  @@unique([usuarioId, ofertaEmpleoId])
-  @@index([usuarioId])
-  @@index([ofertaEmpleoId])
 }
 
 // Denuncias de ofertas de empleo (falsas, explotación laboral, discriminatorias,
@@ -1691,9 +1685,6 @@ model ConfigExpress {
   pedidosExpress  PedidoExpress[]
   horarios        HorarioExpress[]
   secciones       MenuSeccion[]
-  cupones         CuponExpress[]
-  reviews         ReviewExpress[]
-  favoritos       FavoritoExpress[]
 
   @@index([activo, abierto])
 }
@@ -1782,8 +1773,6 @@ model PedidoExpress {
   repartidor       Usuario?            @relation("PedidosExpressRepartidor", fields: [repartidorId],   references: [id])
   configExpress    ConfigExpress       @relation(fields: [configExpressId],  references: [id])
   items            ItemPedidoExpress[]
-  cuponUso         CuponExpressUso?
-  review           ReviewExpress?
 
   @@index([comercioId, estado])
   @@index([clienteId,  estado])
@@ -1930,10 +1919,7 @@ model ConfigHotel {
   habitaciones  HabitacionTipo[]
   habitacionesFisicas HabitacionFisica[]
   reservas      ReservaHotel[]
-  reviews       ReviewHotel[]
-  cupones       CuponHotel[]
   temporadas    TemporadaHotel[]
-  favoritos     FavoritoHotel[]
 
   @@index([activo])
 }
@@ -2029,8 +2015,6 @@ model ReservaHotel {
   habitacionTipo HabitacionTipo @relation(fields: [habitacionTipoId], references: [id])
   habitacionFisica HabitacionFisica? @relation(fields: [habitacionFisicaId], references: [id])
   cliente        Usuario        @relation("ReservasHotelCliente",     fields: [clienteId], references: [id])
-  review         ReviewHotel?
-  cuponHotelUso  CuponHotelUso?
 
   @@index([configHotelId, estado])
   @@index([habitacionFisicaId])
@@ -2076,9 +2060,6 @@ model ConfigTour {
   comercio  Comercio       @relation(fields: [comercioId], references: [id])
   lugares   TourLugar[]
   reservas  ReservaTour[]
-  reviews   ReviewTour[]
-  cupones   CuponTour[]
-  favoritos FavoritoTour[]
 
   @@index([activo])
 }
@@ -2154,8 +2135,6 @@ model ReservaTour {
 
   configTour   ConfigTour    @relation(fields: [configTourId], references: [id])
   cliente      Usuario       @relation("ReservasTourCliente", fields: [clienteId], references: [id])
-  review       ReviewTour?
-  cuponTourUso CuponTourUso?
 
   @@index([configTourId, estado])
   @@index([clienteId])
@@ -2179,9 +2158,6 @@ model ConfigTransporte {
 
   comercio   Comercio            @relation(fields: [comercioId], references: [id])
   rutas      RutaTransporte[]
-  reviews    ReviewTransporte[]
-  favoritos  FavoritoTransporte[]
-  cupones    CuponTransporte[]
 
   @@index([activo])
 }
@@ -2232,8 +2208,6 @@ model ReservaTransporte {
 
   ruta          RutaTransporte     @relation(fields: [rutaTransporteId], references: [id])
   cliente       Usuario            @relation("ReservasTransporteCliente", fields: [clienteId], references: [id])
-  review        ReviewTransporte?
-  cuponTransporteUso CuponTransporteUso?
 
   @@index([rutaTransporteId, estado])
   @@index([clienteId])
@@ -2242,125 +2216,56 @@ model ReservaTransporte {
 
 // ─── REVIEWS ─────────────────────────────────────────────────
 
-model ReviewHotel {
-  id             Int      @id @default(autoincrement())
-  configHotelId  Int
-  clienteId      Int
-  reservaHotelId Int      @unique
-  calificacion   Int
-  comentario     String?
-  creadoAt       DateTime @default(now())
-
-  configHotel  ConfigHotel  @relation(fields: [configHotelId],  references: [id], onDelete: Cascade)
-  cliente      Usuario      @relation("ReviewsHotelCliente",    fields: [clienteId],      references: [id])
-  reservaHotel ReservaHotel @relation(fields: [reservaHotelId], references: [id], onDelete: Cascade)
-
-  @@index([configHotelId])
+// ─── CUPONES DE VERTICALES DE SERVICIO ─────────────────────────
+// Anexo B, Fase 4 (unificación núcleo-vs-verticales): reemplaza CuponHotel,
+// CuponExpress, CuponTour, CuponTransporte (y sus *Uso) — 8 tablas casi
+// idénticas — en un solo par polimórfico. El Cupon/CuponUso de Marketplace
+// se deja intacto a propósito: tiene encima un sistema de analítica y
+// detección de fraude (CuponRepository) exclusivo de ese módulo, sin nada
+// equivalente que unificar en los verticales.
+enum TipoEntidadCuponVertical {
+  CONFIG_HOTEL
+  CONFIG_EXPRESS
+  CONFIG_TOUR
+  CONFIG_TRANSPORTE
 }
 
-model ReviewTour {
-  id            Int      @id @default(autoincrement())
-  configTourId  Int
-  clienteId     Int
-  reservaTourId Int      @unique
-  calificacion  Int
-  comentario    String?
-  creadoAt      DateTime @default(now())
+model CuponVertical {
+  id              Int                      @id @default(autoincrement())
+  codigo          String                   @unique
+  tipoEntidad     TipoEntidadCuponVertical
+  entidadId       Int?                     // null = aplica a todos los comercios de ese vertical (antes: configXId null)
+  tipo            String                   @default("PORCENTAJE")
+  valor           Decimal                  @db.Decimal(10, 2)
+  minimoAplicable Decimal?                 @db.Decimal(12, 2) // reemplaza minimoNoches/minimoSubtotal/minimoPersonas/minimoAsientos
+  usosMaximos     Int?
+  usosActuales    Int                      @default(0)
+  activo          Boolean                  @default(true)
+  inicio          DateTime
+  fin             DateTime
+  createdAt       DateTime                 @default(now())
 
-  configTour  ConfigTour  @relation(fields: [configTourId],  references: [id], onDelete: Cascade)
-  cliente     Usuario     @relation("ReviewsTourCliente",    fields: [clienteId],     references: [id])
-  reservaTour ReservaTour @relation(fields: [reservaTourId], references: [id], onDelete: Cascade)
-
-  @@index([configTourId])
-}
-
-model ReviewTransporte {
-  id                  Int      @id @default(autoincrement())
-  configTransporteId  Int
-  clienteId           Int
-  reservaTransporteId Int      @unique
-  calificacion        Int
-  comentario          String?
-  creadoAt            DateTime @default(now())
-
-  configTransporte  ConfigTransporte  @relation(fields: [configTransporteId],  references: [id], onDelete: Cascade)
-  cliente           Usuario           @relation("ReviewsTransporteCliente",    fields: [clienteId], references: [id])
-  reservaTransporte ReservaTransporte @relation(fields: [reservaTransporteId], references: [id], onDelete: Cascade)
-
-  @@index([configTransporteId])
-}
-
-model ReviewExpress {
-  id              Int      @id @default(autoincrement())
-  configExpressId Int
-  clienteId       Int
-  pedidoExpressId Int      @unique
-  calificacion    Int
-  comentario      String?
-  fotoUrls        String[] @default([])
-  creadoAt        DateTime @default(now())
-
-  configExpress ConfigExpress @relation(fields: [configExpressId], references: [id], onDelete: Cascade)
-  cliente       Usuario       @relation("ReviewsExpressCliente",   fields: [clienteId], references: [id])
-  pedidoExpress PedidoExpress @relation(fields: [pedidoExpressId], references: [id], onDelete: Cascade)
-
-  @@index([configExpressId])
-}
-
-model ReviewCultura {
-  id                Int      @id @default(autoincrement())
-  eventoCulturalId  Int
-  clienteId         Int
-  reservaCulturalId Int      @unique
-  calificacion      Int
-  comentario        String?
-  fotoUrls          String[] @default([])
-  videoUrl          String?
-  creadoAt          DateTime @default(now())
-
-  evento         EventoCultural   @relation(fields: [eventoCulturalId],  references: [id], onDelete: Cascade)
-  cliente        Usuario          @relation("ReviewsCulturaCliente",     fields: [clienteId],         references: [id])
-  reservaCultural ReservaCultural @relation(fields: [reservaCulturalId], references: [id], onDelete: Cascade)
-
-  @@index([eventoCulturalId])
-}
-
-// ─── CUPONES HOTEL ────────────────────────────────────────────
-
-model CuponHotel {
-  id            Int       @id @default(autoincrement())
-  codigo        String    @unique
-  tipo          String    @default("PORCENTAJE")
-  valor         Decimal   @db.Decimal(10, 2)
-  minimoNoches  Int?
-  usosMaximos   Int?
-  usosActuales  Int       @default(0)
-  activo        Boolean   @default(true)
-  inicio        DateTime
-  fin           DateTime
-  configHotelId Int?
-  createdAt     DateTime  @default(now())
-
-  configHotel ConfigHotel?    @relation(fields: [configHotelId], references: [id], onDelete: SetNull)
-  usos        CuponHotelUso[]
+  usos CuponVerticalUso[]
 
   @@index([codigo, activo])
   @@index([activo, fin])
-  @@index([configHotelId])
+  @@index([tipoEntidad, entidadId])
 }
 
-model CuponHotelUso {
-  id             Int      @id @default(autoincrement())
-  cuponHotelId   Int
-  clienteId      Int
-  reservaHotelId Int      @unique
-  createdAt      DateTime @default(now())
+model CuponVerticalUso {
+  id          Int                      @id @default(autoincrement())
+  cuponId     Int
+  clienteId   Int
+  tipoEntidad TipoEntidadCuponVertical // qué tipo de reserva/pedido consumió el cupón
+  entidadId   Int                      // reservaHotelId/pedidoExpressId/reservaTourId/reservaTransporteId
 
-  cupon        CuponHotel   @relation(fields: [cuponHotelId], references: [id])
-  cliente      Usuario      @relation(fields: [clienteId], references: [id])
-  reservaHotel ReservaHotel @relation(fields: [reservaHotelId], references: [id])
+  createdAt DateTime @default(now())
 
-  @@index([cuponHotelId, clienteId])
+  cupon   CuponVertical @relation(fields: [cuponId], references: [id])
+  cliente Usuario       @relation(fields: [clienteId], references: [id])
+
+  @@unique([tipoEntidad, entidadId])
+  @@index([cuponId, clienteId])
 }
 
 model TemporadaHotel {
@@ -2380,174 +2285,6 @@ model TemporadaHotel {
   @@index([configHotelId, activo])
   @@index([habitacionTipoId, activo])
   @@index([inicio, fin])
-}
-
-// ─── CUPONES EXPRESS ──────────────────────────────────────────
-
-model CuponExpress {
-  id              Int       @id @default(autoincrement())
-  codigo          String    @unique
-  tipo            String    @default("PORCENTAJE")  // PORCENTAJE | VALOR_FIJO
-  valor           Decimal   @db.Decimal(10, 2)
-  minimoSubtotal  Decimal?  @db.Decimal(10, 2)
-  usosMaximos     Int?
-  usosActuales    Int       @default(0)
-  activo          Boolean   @default(true)
-  inicio          DateTime
-  fin             DateTime
-  configExpressId Int?
-  createdAt       DateTime  @default(now())
-
-  configExpress ConfigExpress?    @relation(fields: [configExpressId], references: [id], onDelete: SetNull)
-  usos          CuponExpressUso[]
-
-  @@index([codigo, activo])
-  @@index([activo, fin])
-  @@index([configExpressId])
-}
-
-model CuponExpressUso {
-  id              Int      @id @default(autoincrement())
-  cuponExpressId  Int
-  clienteId       Int
-  pedidoExpressId Int      @unique
-  createdAt       DateTime @default(now())
-
-  cupon         CuponExpress  @relation(fields: [cuponExpressId], references: [id])
-  cliente       Usuario       @relation(fields: [clienteId],      references: [id])
-  pedidoExpress PedidoExpress @relation(fields: [pedidoExpressId], references: [id])
-
-  @@index([cuponExpressId, clienteId])
-}
-
-model FavoritoHotel {
-  id            Int      @id @default(autoincrement())
-  usuarioId     Int
-  configHotelId Int
-  createdAt     DateTime @default(now())
-
-  usuario     Usuario     @relation(fields: [usuarioId],     references: [id], onDelete: Cascade)
-  configHotel ConfigHotel @relation(fields: [configHotelId], references: [id], onDelete: Cascade)
-
-  @@unique([usuarioId, configHotelId])
-  @@index([usuarioId])
-  @@index([configHotelId])
-}
-
-model FavoritoExpress {
-  id              Int      @id @default(autoincrement())
-  usuarioId       Int
-  configExpressId Int
-  createdAt       DateTime @default(now())
-
-  usuario       Usuario       @relation(fields: [usuarioId],       references: [id], onDelete: Cascade)
-  configExpress ConfigExpress @relation(fields: [configExpressId], references: [id], onDelete: Cascade)
-
-  @@unique([usuarioId, configExpressId])
-  @@index([usuarioId])
-  @@index([configExpressId])
-}
-
-// ─── CUPONES TOUR ─────────────────────────────────────────────
-
-model CuponTour {
-  id              Int       @id @default(autoincrement())
-  codigo          String    @unique
-  tipo            String    @default("PORCENTAJE")
-  valor           Decimal   @db.Decimal(10, 2)
-  minimoPersonas  Int?
-  usosMaximos     Int?
-  usosActuales    Int       @default(0)
-  activo          Boolean   @default(true)
-  inicio          DateTime
-  fin             DateTime
-  configTourId    Int?
-  createdAt       DateTime  @default(now())
-
-  configTour  ConfigTour?    @relation(fields: [configTourId], references: [id], onDelete: SetNull)
-  usos        CuponTourUso[]
-
-  @@index([codigo, activo])
-  @@index([activo, fin])
-  @@index([configTourId])
-}
-
-model CuponTourUso {
-  id            Int      @id @default(autoincrement())
-  cuponTourId   Int
-  clienteId     Int
-  reservaTourId Int      @unique
-  createdAt     DateTime @default(now())
-
-  cupon       CuponTour   @relation(fields: [cuponTourId],   references: [id])
-  cliente     Usuario     @relation(fields: [clienteId],     references: [id])
-  reservaTour ReservaTour @relation(fields: [reservaTourId], references: [id])
-
-  @@index([cuponTourId, clienteId])
-}
-
-// ─── CUPONES TRANSPORTE ───────────────────────────────────────
-
-model CuponTransporte {
-  id                 Int       @id @default(autoincrement())
-  codigo             String    @unique
-  tipo               String    @default("PORCENTAJE")
-  valor              Decimal   @db.Decimal(10, 2)
-  minimoAsientos     Int?
-  usosMaximos        Int?
-  usosActuales       Int       @default(0)
-  activo             Boolean   @default(true)
-  inicio             DateTime
-  fin                DateTime
-  configTransporteId Int?
-  createdAt          DateTime  @default(now())
-
-  configTransporte ConfigTransporte?    @relation(fields: [configTransporteId], references: [id], onDelete: SetNull)
-  usos             CuponTransporteUso[]
-
-  @@index([codigo, activo])
-  @@index([activo, fin])
-  @@index([configTransporteId])
-}
-
-model CuponTransporteUso {
-  id                  Int      @id @default(autoincrement())
-  cuponTransporteId   Int
-  clienteId           Int
-  reservaTransporteId Int      @unique
-  createdAt           DateTime @default(now())
-
-  cupon             CuponTransporte   @relation(fields: [cuponTransporteId], references: [id])
-  cliente           Usuario           @relation(fields: [clienteId], references: [id])
-  reservaTransporte ReservaTransporte @relation(fields: [reservaTransporteId], references: [id])
-
-  @@index([cuponTransporteId, clienteId])
-}
-
-model FavoritoTour {
-  id           Int      @id @default(autoincrement())
-  usuarioId    Int
-  configTourId Int
-  createdAt    DateTime @default(now())
-
-  usuario    Usuario    @relation(fields: [usuarioId],    references: [id])
-  configTour ConfigTour @relation(fields: [configTourId], references: [id])
-
-  @@unique([usuarioId, configTourId])
-  @@index([usuarioId])
-}
-
-model FavoritoTransporte {
-  id                 Int      @id @default(autoincrement())
-  usuarioId          Int
-  configTransporteId Int
-  createdAt          DateTime @default(now())
-
-  usuario          Usuario          @relation(fields: [usuarioId],          references: [id])
-  configTransporte ConfigTransporte @relation(fields: [configTransporteId], references: [id])
-
-  @@unique([usuarioId, configTransporteId])
-  @@index([usuarioId])
 }
 
 // ─── MÓDULO CULTURA ───────────────────────────────────────────
@@ -2599,25 +2336,10 @@ model EventoCultural {
   comercio Comercio?         @relation("EventosCulturalesComercio", fields: [comercioId], references: [id])
   entradas EntradaCultural[]
   reservas ReservaCultural[]
-  reviews  ReviewCultura[]
-  favoritos FavoritoCultura[]
 
   @@index([estado, fechaInicio])
   @@index([departamento, municipio])
   @@index([comercioId])
-}
-
-model FavoritoCultura {
-  id               Int      @id @default(autoincrement())
-  usuarioId        Int
-  eventoCulturalId Int
-  createdAt        DateTime @default(now())
-
-  usuario Usuario        @relation(fields: [usuarioId],        references: [id])
-  evento  EventoCultural @relation(fields: [eventoCulturalId], references: [id])
-
-  @@unique([usuarioId, eventoCulturalId])
-  @@index([usuarioId])
 }
 
 model EntradaCultural {
@@ -2660,7 +2382,6 @@ model ReservaCultural {
   evento  EventoCultural  @relation(fields: [eventoCulturalId], references: [id])
   entrada EntradaCultural @relation(fields: [entradaCulturalId], references: [id])
   cliente Usuario         @relation("ReservasCulturalesCliente", fields: [clienteId], references: [id])
-  review  ReviewCultura?
 
   @@index([eventoCulturalId, estado])
   @@index([clienteId])

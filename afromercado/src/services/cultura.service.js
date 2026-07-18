@@ -550,29 +550,34 @@ const CulturaService = {
   // ── FAVORITOS CULTURA ───────────────────────────────────────────
 
   async toggleFavoritoCultura(usuarioId, eventoCulturalId) {
-    const existe = await prisma.favoritoCultura.findUnique({
-      where: { usuarioId_eventoCulturalId: { usuarioId, eventoCulturalId } },
+    const existe = await prisma.favorito.findUnique({
+      where: { usuarioId_tipoEntidad_entidadId: { usuarioId, tipoEntidad: "EVENTO_CULTURAL", entidadId: eventoCulturalId } },
     });
     if (existe) {
-      await prisma.favoritoCultura.delete({ where: { id: existe.id } });
+      await prisma.favorito.delete({ where: { id: existe.id } });
       return { esFavorito: false };
     }
-    await prisma.favoritoCultura.create({ data: { usuarioId, eventoCulturalId } });
+    await prisma.favorito.create({ data: { usuarioId, tipoEntidad: "EVENTO_CULTURAL", entidadId: eventoCulturalId } });
     return { esFavorito: true };
   },
 
   async misFavoritosCultura(usuarioId) {
-    const favs = await prisma.favoritoCultura.findMany({
-      where: { usuarioId },
-      include: { evento: { include: EVENTO_INCLUDE } },
+    const favs = await prisma.favorito.findMany({
+      where: { usuarioId, tipoEntidad: "EVENTO_CULTURAL" },
       orderBy: { createdAt: "desc" },
     });
-    return favs.map(f => f.evento);
+    if (favs.length === 0) return [];
+    const eventos = await prisma.eventoCultural.findMany({
+      where: { id: { in: favs.map(f => f.entidadId) } },
+      include: EVENTO_INCLUDE,
+    });
+    const porId = new Map(eventos.map(e => [e.id, e]));
+    return favs.map(f => porId.get(f.entidadId)).filter(Boolean);
   },
 
   async esFavoritoCultura(usuarioId, eventoCulturalId) {
-    const existe = await prisma.favoritoCultura.findUnique({
-      where: { usuarioId_eventoCulturalId: { usuarioId, eventoCulturalId } },
+    const existe = await prisma.favorito.findUnique({
+      where: { usuarioId_tipoEntidad_entidadId: { usuarioId, tipoEntidad: "EVENTO_CULTURAL", entidadId: eventoCulturalId } },
     });
     return { esFavorito: !!existe };
   },

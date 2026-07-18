@@ -5,6 +5,10 @@ const { enviarPushAUsuario } = require("../utils/push");
 const { enviarMensajeWA } = require("../utils/whatsapp");
 const AlianzaService = require("./alianza.service");
 const FacturacionService = require("./facturacion.service");
+const {
+  buscarCuponVertical, yaUsadoPorCliente, calcularDescuento,
+  intentarAlianza, registrarUsoVertical, mapearCuponVertical,
+} = require("../utils/cupon-vertical");
 
 const TASA_COMISION_TOUR = 0.10;
 
@@ -271,14 +275,11 @@ const TourService = {
         include: { configTour: { include: TOUR_INCLUDE } },
       });
 
-      // Un descuento de alianza no tiene fila CuponTour propia que actualizar.
+      // Un descuento de alianza no tiene fila CuponVertical propia que actualizar.
       if (cuponAplicado && !cuponEsAlianza) {
-        await tx.cuponTourUso.create({
-          data: { cuponTourId: cuponAplicado.id, clienteId, reservaTourId: reserva.id },
-        });
-        await tx.cuponTour.update({
-          where: { id: cuponAplicado.id },
-          data: { usosActuales: { increment: 1 } },
+        await registrarUsoVertical(tx, {
+          cuponId: cuponAplicado.id, clienteId,
+          tipoEntidad: "CONFIG_TOUR", entidadId: reserva.id,
         });
       }
 
@@ -611,62 +612,44 @@ const TourService = {
   // ── CUPONES TOUR ─────────────────────────────────────────────
 
   async validarCuponTour(codigo, configTourId, participantes, clienteId, comercioId) {
-    const cupon = await prisma.cuponTour.findFirst({
-      where: {
-        codigo: codigo.trim().toUpperCase(),
-        activo: true,
-        fin:    { gte: new Date() },
-        inicio: { lte: new Date() },
-        OR: [{ configTourId: null }, { configTourId }],
-      },
-    });
+    const tour = await prisma.configTour.findUnique({ where: { id: configTourId } });
+    const subtotal = Number(tour.precioPersona) * participantes;
+
+    const cupon = await buscarCuponVertical(prisma, { codigo, tipoEntidad: "CONFIG_TOUR", entidadId: configTourId });
     if (!cupon) {
-      // Fallback: no es un CuponTour propio, ¿es un código de alianza
-      // comercial vigente para este comercio en el módulo TOUR?
-      if (comercioId) {
-        const alianza = await AlianzaService.validarCodigoAlianza(codigo, comercioId, "TOUR");
-        if (alianza) {
-          const tourAlianza = await prisma.configTour.findUnique({ where: { id: configTourId } });
-          const subtotalAlianza = Number(tourAlianza.precioPersona) * participantes;
-          const descuentoAlianza = alianza.tipoDescuento === "PORCENTAJE"
-            ? Math.round(subtotalAlianza * Number(alianza.valorDescuento) / 100)
-            : Math.min(Number(alianza.valorDescuento), subtotalAlianza);
-          return {
-            cupon: { codigo: String(codigo).trim().toUpperCase() },
-            descuento: descuentoAlianza,
-            subtotalConDescuento: subtotalAlianza - descuentoAlianza,
-            esAlianza: true,
-          };
-        }
+      const alianza = await intentarAlianza(comercioId, codigo, "TOUR", subtotal);
+      if (alianza) {
+        return {
+          cupon: { codigo: alianza.codigo },
+          descuento: alianza.descuento,
+          subtotalConDescuento: subtotal - alianza.descuento,
+          esAlianza: true,
+        };
       }
       throw new ErrorValidacion("Cupón inválido o expirado");
     }
     if (cupon.usosMaximos && cupon.usosActuales >= cupon.usosMaximos) {
       throw new ErrorValidacion("Este cupón ya alcanzó su límite de usos");
     }
-    if (cupon.minimoPersonas && participantes < cupon.minimoPersonas) {
-      throw new ErrorValidacion(`Mínimo ${cupon.minimoPersonas} personas para usar este cupón`);
+    if (cupon.minimoAplicable && participantes < Number(cupon.minimoAplicable)) {
+      throw new ErrorValidacion(`Mínimo ${Number(cupon.minimoAplicable)} personas para usar este cupón`);
     }
-    if (clienteId) {
-      const yaUso = await prisma.cuponTourUso.findFirst({ where: { cuponTourId: cupon.id, clienteId } });
-      if (yaUso) throw new ErrorValidacion("Ya usaste este cupón anteriormente");
+    if (await yaUsadoPorCliente(prisma, cupon.id, clienteId)) {
+      throw new ErrorValidacion("Ya usaste este cupón anteriormente");
     }
-    const tour = await prisma.configTour.findUnique({ where: { id: configTourId } });
-    const subtotal = Number(tour.precioPersona) * participantes;
-    const descuento = cupon.tipo === "PORCENTAJE"
-      ? Math.round(subtotal * Number(cupon.valor) / 100)
-      : Math.min(Number(cupon.valor), subtotal);
+    const descuento = calcularDescuento(cupon, subtotal);
     return { cupon, descuento, subtotalConDescuento: subtotal - descuento };
   },
 
   async listarCuponesTour(comercioId) {
     const tour = await prisma.configTour.findUnique({ where: { comercioId } });
     if (!tour) return [];
-    return prisma.cuponTour.findMany({
-      where: { configTourId: tour.id },
+    const cupones = await prisma.cuponVertical.findMany({
+      where: { tipoEntidad: "CONFIG_TOUR", entidadId: tour.id },
       orderBy: { createdAt: "desc" },
       include: { _count: { select: { usos: true } } },
     });
+    return cupones.map((c) => mapearCuponVertical(c, "minimoPersonas", "configTourId", { _count: c._count }));
   },
 
   async crearCuponTour(comercioId, datos) {
@@ -676,61 +659,62 @@ const TourService = {
     if (!codigo?.trim()) throw new ErrorValidacion("El código es requerido");
     if (!valor || Number(valor) <= 0) throw new ErrorValidacion("El valor debe ser positivo");
     if (tipo === "PORCENTAJE" && Number(valor) > 100) throw new ErrorValidacion("El porcentaje no puede superar 100");
-    return prisma.cuponTour.create({
+    const cupon = await prisma.cuponVertical.create({
       data: {
         codigo: codigo.trim().toUpperCase(),
+        tipoEntidad: "CONFIG_TOUR",
         tipo: tipo ?? "PORCENTAJE",
         valor: Number(valor),
-        minimoPersonas: minimoPersonas ? Number(minimoPersonas) : null,
+        minimoAplicable: minimoPersonas ? Number(minimoPersonas) : null,
         usosMaximos: usosMaximos ? Number(usosMaximos) : null,
         activo: true,
         inicio: new Date(inicio),
         fin:    new Date(fin),
-        configTourId: tour.id,
+        entidadId: tour.id,
       },
     });
+    return mapearCuponVertical(cupon, "minimoPersonas", "configTourId");
   },
 
   async eliminarCuponTour(comercioId, cuponId) {
     const tour = await prisma.configTour.findUnique({ where: { comercioId } });
     if (!tour) throw new ErrorNoEncontrado("Tour no encontrado");
-    const cupon = await prisma.cuponTour.findFirst({ where: { id: cuponId, configTourId: tour.id } });
+    const cupon = await prisma.cuponVertical.findFirst({ where: { id: cuponId, tipoEntidad: "CONFIG_TOUR", entidadId: tour.id } });
     if (!cupon) throw new ErrorNoEncontrado("Cupón no encontrado");
-    return prisma.cuponTour.update({ where: { id: cuponId }, data: { activo: false } });
+    return prisma.cuponVertical.update({ where: { id: cuponId }, data: { activo: false } });
   },
 
   // ── FAVORITOS TOUR ────────────────────────────────────────────
 
   async toggleFavoritoTour(usuarioId, configTourId) {
-    const existe = await prisma.favoritoTour.findUnique({
-      where: { usuarioId_configTourId: { usuarioId, configTourId } },
+    const existe = await prisma.favorito.findUnique({
+      where: { usuarioId_tipoEntidad_entidadId: { usuarioId, tipoEntidad: "CONFIG_TOUR", entidadId: configTourId } },
     });
     if (existe) {
-      await prisma.favoritoTour.delete({ where: { id: existe.id } });
+      await prisma.favorito.delete({ where: { id: existe.id } });
       return { esFavorito: false };
     }
-    await prisma.favoritoTour.create({ data: { usuarioId, configTourId } });
+    await prisma.favorito.create({ data: { usuarioId, tipoEntidad: "CONFIG_TOUR", entidadId: configTourId } });
     return { esFavorito: true };
   },
 
   async misFavoritosTour(usuarioId) {
-    const favs = await prisma.favoritoTour.findMany({
-      where: { usuarioId },
-      include: {
-        configTour: {
-          include: {
-            comercio: { select: { id: true, nombre: true, municipio: true, logoUrl: true } },
-          },
-        },
-      },
+    const favs = await prisma.favorito.findMany({
+      where: { usuarioId, tipoEntidad: "CONFIG_TOUR" },
       orderBy: { createdAt: "desc" },
     });
-    return favs.map(f => f.configTour);
+    if (favs.length === 0) return [];
+    const tours = await prisma.configTour.findMany({
+      where: { id: { in: favs.map(f => f.entidadId) } },
+      include: { comercio: { select: { id: true, nombre: true, municipio: true, logoUrl: true } } },
+    });
+    const porId = new Map(tours.map(t => [t.id, t]));
+    return favs.map(f => porId.get(f.entidadId)).filter(Boolean);
   },
 
   async esFavoritoTour(usuarioId, configTourId) {
-    const existe = await prisma.favoritoTour.findUnique({
-      where: { usuarioId_configTourId: { usuarioId, configTourId } },
+    const existe = await prisma.favorito.findUnique({
+      where: { usuarioId_tipoEntidad_entidadId: { usuarioId, tipoEntidad: "CONFIG_TOUR", entidadId: configTourId } },
     });
     return { esFavorito: !!existe };
   },

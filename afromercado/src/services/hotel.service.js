@@ -9,6 +9,10 @@ const emailHotel = require("../utils/templates/email-hotel");
 const { notificarReservaHotel, notificarClienteReserva } = require("../utils/notificaciones");
 const AlianzaService = require("./alianza.service");
 const FacturacionService = require("./facturacion.service");
+const {
+  buscarCuponVertical, bloquearYRevalidar, yaUsadoPorCliente,
+  calcularDescuento, intentarAlianza, registrarUsoVertical, mapearCuponVertical,
+} = require("../utils/cupon-vertical");
 
 function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -277,71 +281,39 @@ async function buscarHabitacionFisicaDisponible(db, reserva) {
 }
 
 async function validarCuponHotelInterno(db, codigo, configHotelId, noches, clienteId, totalOriginal, { bloquear = false, comercioId = null } = {}) {
-  const ahora = new Date();
-  const codigoNormalizado = String(codigo || "").trim().toUpperCase();
-  let cupon = await db.cuponHotel.findFirst({
-    where: {
-      codigo: codigoNormalizado,
-      activo: true,
-      inicio: { lte: ahora },
-      fin:    { gte: ahora },
-      OR: [
-        { configHotelId: null },
-        { configHotelId },
-      ],
-    },
-  });
+  let cupon = await buscarCuponVertical(db, { codigo, tipoEntidad: "CONFIG_HOTEL", entidadId: configHotelId });
 
   if (!cupon) {
-    // Fallback: no es un CuponHotel propio, ¿es un código de alianza
-    // comercial vigente para este comercio en el módulo HOTEL?
-    if (comercioId) {
-      const alianza = await AlianzaService.validarCodigoAlianza(codigoNormalizado, comercioId, "HOTEL");
-      if (alianza) {
-        const descuentoAlianza = alianza.tipoDescuento === "PORCENTAJE"
-          ? Math.round(totalOriginal * Number(alianza.valorDescuento) / 100 * 100) / 100
-          : Math.min(Number(alianza.valorDescuento), totalOriginal);
-        return {
-          cupon: { codigo: codigoNormalizado },
-          descuento: descuentoAlianza,
-          totalConDescuento: totalOriginal - descuentoAlianza,
-          esAlianza: true,
-        };
-      }
+    const alianza = await intentarAlianza(comercioId, codigo, "HOTEL", totalOriginal);
+    if (alianza) {
+      return {
+        cupon: { codigo: alianza.codigo },
+        descuento: alianza.descuento,
+        totalConDescuento: Number(totalOriginal) - alianza.descuento,
+        esAlianza: true,
+      };
     }
     throw new ErrorValidacion("Cupon no valido o expirado");
   }
   if (bloquear) {
-    await db.$queryRaw`SELECT id FROM "CuponHotel" WHERE id = ${cupon.id} FOR UPDATE`;
-    cupon = await db.cuponHotel.findUnique({ where: { id: cupon.id } });
-    if (!cupon || !cupon.activo || cupon.inicio > ahora || cupon.fin < ahora) {
-      throw new ErrorValidacion("Cupon no valido o expirado");
-    }
+    cupon = await bloquearYRevalidar(db, "CuponVertical", cupon.id);
+    if (!cupon) throw new ErrorValidacion("Cupon no valido o expirado");
   }
 
-  if (cupon.minimoNoches && noches < cupon.minimoNoches) {
-    throw new ErrorValidacion(`Este cupon requiere minimo ${cupon.minimoNoches} noche(s)`);
+  if (cupon.minimoAplicable && noches < Number(cupon.minimoAplicable)) {
+    throw new ErrorValidacion(`Este cupon requiere minimo ${Number(cupon.minimoAplicable)} noche(s)`);
   }
 
   if (cupon.usosMaximos && cupon.usosActuales >= cupon.usosMaximos) {
     throw new ErrorValidacion("El cupon ha alcanzado el limite de usos");
   }
 
-  if (clienteId) {
-    const usoExistente = await db.cuponHotelUso.findFirst({
-      where: { cuponHotelId: cupon.id, clienteId },
-    });
-    if (usoExistente) throw new ErrorValidacion("Ya usaste este cupon");
+  if (await yaUsadoPorCliente(db, cupon.id, clienteId)) {
+    throw new ErrorValidacion("Ya usaste este cupon");
   }
 
-  let descuento;
-  if (cupon.tipo === "PORCENTAJE") {
-    descuento = Math.round(totalOriginal * Number(cupon.valor) / 100 * 100) / 100;
-  } else {
-    descuento = Math.min(Number(cupon.valor), totalOriginal);
-  }
-
-  const totalConDescuento = totalOriginal - descuento;
+  const descuento = calcularDescuento(cupon, totalOriginal);
+  const totalConDescuento = Number(totalOriginal) - descuento;
   return { cupon, descuento, totalConDescuento };
 }
 
@@ -507,19 +479,12 @@ const HotelService = {
         },
       });
 
-      // Un descuento de alianza no tiene fila CuponHotel propia que actualizar
+      // Un descuento de alianza no tiene fila CuponVertical propia que actualizar
       // (su "un uso por comercio" ya lo garantiza AlianzaSocio).
       if (cuponValidado && !cuponEsAlianza) {
-        await tx.cuponHotelUso.create({
-          data: {
-            cuponHotelId:   cuponValidado.id,
-            clienteId,
-            reservaHotelId: reserva.id,
-          },
-        });
-        await tx.cuponHotel.update({
-          where: { id: cuponValidado.id },
-          data:  { usosActuales: { increment: 1 } },
+        await registrarUsoVertical(tx, {
+          cuponId: cuponValidado.id, clienteId,
+          tipoEntidad: "CONFIG_HOTEL", entidadId: reserva.id,
         });
       }
 
@@ -758,19 +723,12 @@ const HotelService = {
         reservasCreadas.push(reserva);
       }
 
-      // Un descuento de alianza no tiene fila CuponHotel propia que actualizar.
+      // Un descuento de alianza no tiene fila CuponVertical propia que actualizar.
       if (cuponValidado && !cuponEsAlianza) {
         // El uso del cupón se registra una sola vez, contra la primera reserva del grupo.
-        await tx.cuponHotelUso.create({
-          data: {
-            cuponHotelId:   cuponValidado.id,
-            clienteId,
-            reservaHotelId: reservasCreadas[0].id,
-          },
-        });
-        await tx.cuponHotel.update({
-          where: { id: cuponValidado.id },
-          data:  { usosActuales: { increment: 1 } },
+        await registrarUsoVertical(tx, {
+          cuponId: cuponValidado.id, clienteId,
+          tipoEntidad: "CONFIG_HOTEL", entidadId: reservasCreadas[0].id,
         });
       }
 
@@ -1637,40 +1595,43 @@ const HotelService = {
     const { codigo, tipo = "PORCENTAJE", valor, minimoNoches, usosMaximos, inicio, fin } = datos;
     if (!codigo || !valor || !inicio || !fin) throw new ErrorValidacion("Faltan campos requeridos: codigo, valor, inicio, fin");
 
-    return prisma.cuponHotel.create({
+    const cupon = await prisma.cuponVertical.create({
       data: {
-        codigo:       codigo.trim().toUpperCase(),
+        codigo:          codigo.trim().toUpperCase(),
+        tipoEntidad:     "CONFIG_HOTEL",
         tipo,
-        valor:        Number(valor),
-        minimoNoches: minimoNoches ? Number(minimoNoches) : null,
-        usosMaximos:  usosMaximos  ? Number(usosMaximos)  : null,
-        inicio:       new Date(inicio),
-        fin:          new Date(fin),
-        configHotelId: hotel.id,
+        valor:           Number(valor),
+        minimoAplicable: minimoNoches ? Number(minimoNoches) : null,
+        usosMaximos:     usosMaximos  ? Number(usosMaximos)  : null,
+        inicio:          new Date(inicio),
+        fin:             new Date(fin),
+        entidadId:       hotel.id,
       },
     });
+    return mapearCuponVertical(cupon, "minimoNoches", "configHotelId");
   },
 
   async listarCuponesHotel(comercioId) {
     const hotel = await prisma.configHotel.findUnique({ where: { comercioId } });
     if (!hotel) throw new ErrorNoEncontrado("Hotel no encontrado");
 
-    return prisma.cuponHotel.findMany({
-      where:   { configHotelId: hotel.id },
+    const cupones = await prisma.cuponVertical.findMany({
+      where:   { tipoEntidad: "CONFIG_HOTEL", entidadId: hotel.id },
       orderBy: { createdAt: "desc" },
     });
+    return cupones.map((c) => mapearCuponVertical(c, "minimoNoches", "configHotelId"));
   },
 
   async eliminarCuponHotel(comercioId, cuponId) {
     const hotel = await prisma.configHotel.findUnique({ where: { comercioId } });
     if (!hotel) throw new ErrorNoEncontrado("Hotel no encontrado");
 
-    const cupon = await prisma.cuponHotel.findFirst({
-      where: { id: cuponId, configHotelId: hotel.id },
+    const cupon = await prisma.cuponVertical.findFirst({
+      where: { id: cuponId, tipoEntidad: "CONFIG_HOTEL", entidadId: hotel.id },
     });
     if (!cupon) throw new ErrorNoEncontrado("Cupón no encontrado");
 
-    return prisma.cuponHotel.update({
+    return prisma.cuponVertical.update({
       where: { id: cuponId },
       data:  { activo: false },
     });
@@ -1721,30 +1682,35 @@ const HotelService = {
   // ── FAVORITOS ─────────────────────────────────────────────────
 
   async toggleFavorito(usuarioId, configHotelId) {
-    const existe = await prisma.favoritoHotel.findUnique({
-      where: { usuarioId_configHotelId: { usuarioId, configHotelId } },
+    const existe = await prisma.favorito.findUnique({
+      where: { usuarioId_tipoEntidad_entidadId: { usuarioId, tipoEntidad: "CONFIG_HOTEL", entidadId: configHotelId } },
     });
     if (existe) {
-      await prisma.favoritoHotel.delete({ where: { id: existe.id } });
+      await prisma.favorito.delete({ where: { id: existe.id } });
       return { favorito: false };
     } else {
-      await prisma.favoritoHotel.create({ data: { usuarioId, configHotelId } });
+      await prisma.favorito.create({ data: { usuarioId, tipoEntidad: "CONFIG_HOTEL", entidadId: configHotelId } });
       return { favorito: true };
     }
   },
 
   async misFavoritosHotel(usuarioId) {
-    const favs = await prisma.favoritoHotel.findMany({
-      where: { usuarioId },
-      include: { configHotel: { include: HOTEL_INCLUDE } },
+    const favs = await prisma.favorito.findMany({
+      where: { usuarioId, tipoEntidad: "CONFIG_HOTEL" },
       orderBy: { createdAt: "desc" },
     });
-    return favs.map(f => f.configHotel);
+    if (favs.length === 0) return [];
+    const hoteles = await prisma.configHotel.findMany({
+      where: { id: { in: favs.map(f => f.entidadId) } },
+      include: HOTEL_INCLUDE,
+    });
+    const porId = new Map(hoteles.map(h => [h.id, h]));
+    return favs.map(f => porId.get(f.entidadId)).filter(Boolean);
   },
 
   async esFavoritoHotel(usuarioId, configHotelId) {
-    const existe = await prisma.favoritoHotel.findUnique({
-      where: { usuarioId_configHotelId: { usuarioId, configHotelId } },
+    const existe = await prisma.favorito.findUnique({
+      where: { usuarioId_tipoEntidad_entidadId: { usuarioId, tipoEntidad: "CONFIG_HOTEL", entidadId: configHotelId } },
     });
     return { favorito: !!existe };
   },

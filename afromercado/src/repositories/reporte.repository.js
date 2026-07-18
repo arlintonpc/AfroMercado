@@ -158,6 +158,10 @@ const ReporteRepository = {
     if (desde) createdAt.gte = new Date(`${desde}T00:00:00`);
     if (hasta) createdAt.lte = new Date(`${hasta}T23:59:59.999`);
 
+    // Resena no tiene relación directa a Producto (entidadId no es FK real);
+    // se resuelven los ids de producto del comercio antes del Promise.all.
+    const productoIdsComercio = (await prisma.producto.findMany({ where: { comercioId }, select: { id: true } })).map((p) => p.id);
+
     const [vendidos, vistas, productos, reviews] = await Promise.all([
       prisma.pedidoItem.groupBy({
         by: ["productoId"],
@@ -188,9 +192,9 @@ const ReporteRepository = {
         },
         orderBy: { nombre: "asc" },
       }),
-      prisma.reviewProducto.groupBy({
-        by: ["productoId"],
-        where: { producto: { comercioId } },
+      prisma.resena.groupBy({
+        by: ["entidadId"],
+        where: { tipoEntidad: "PRODUCTO", entidadId: { in: productoIdsComercio } },
         _avg: { calificacion: true },
         _count: { _all: true },
       }),
@@ -198,7 +202,7 @@ const ReporteRepository = {
 
     const ventasMap = Object.fromEntries(vendidos.map((v) => [v.productoId, v]));
     const vistasMap = Object.fromEntries(vistas.map((v) => [v.productoId, v._count._all]));
-    const reviewsMap = Object.fromEntries(reviews.map((r) => [r.productoId, r]));
+    const reviewsMap = Object.fromEntries(reviews.map((r) => [r.entidadId, r]));
 
     return productos.map((p) => {
       const v = ventasMap[p.id];
@@ -230,38 +234,47 @@ const ReporteRepository = {
   /** Reporte de reseñas: distribución + evolución mensual + lista. */
   async resenasComercio({ comercioId, pagina = 1, estrellas }) {
     const porPagina = 20;
-    const whereBase = { producto: { comercioId } };
+    const productoIdsComercio = (await prisma.producto.findMany({ where: { comercioId }, select: { id: true } })).map((p) => p.id);
+    const whereBase = { tipoEntidad: "PRODUCTO", entidadId: { in: productoIdsComercio } };
     if (estrellas) whereBase.calificacion = Number(estrellas);
 
-    const [distribucion, evolucionRaw, resenas, total] = await Promise.all([
-      prisma.reviewProducto.groupBy({
+    const [distribucion, evolucionRaw, resenasRaw, total] = await Promise.all([
+      prisma.resena.groupBy({
         by: ["calificacion"],
-        where: { producto: { comercioId } },
+        where: { tipoEntidad: "PRODUCTO", entidadId: { in: productoIdsComercio } },
         _count: { _all: true },
       }),
       prisma.$queryRaw`
         SELECT
-          TO_CHAR(rp."createdAt" AT TIME ZONE 'America/Bogota', 'YYYY-MM') AS mes,
-          ROUND(AVG(rp.calificacion)::numeric, 2)::float                    AS promedio,
+          TO_CHAR(r."createdAt" AT TIME ZONE 'America/Bogota', 'YYYY-MM') AS mes,
+          ROUND(AVG(r.calificacion)::numeric, 2)::float                    AS promedio,
           COUNT(*)::int                                                      AS total
-        FROM "ReviewProducto" rp
-        JOIN "Producto" p ON p.id = rp."productoId"
-        WHERE p."comercioId" = ${comercioId}
+        FROM "Resena" r
+        JOIN "Producto" p ON p.id = r."entidadId"
+        WHERE r."tipoEntidad" = 'PRODUCTO' AND p."comercioId" = ${comercioId}
         GROUP BY mes ORDER BY mes ASC
         LIMIT 24
       `,
-      prisma.reviewProducto.findMany({
+      prisma.resena.findMany({
         where: whereBase,
         orderBy: { createdAt: "desc" },
         skip: (pagina - 1) * porPagina,
         take: porPagina,
-        include: {
-          producto: { select: { nombre: true } },
-          autor: { select: { nombre: true } },
-        },
+        include: { autor: { select: { nombre: true } } },
       }),
-      prisma.reviewProducto.count({ where: whereBase }),
+      prisma.resena.count({ where: whereBase }),
     ]);
+
+    const resenasProductoIds = resenasRaw.map((r) => r.entidadId);
+    const resenasProductoInfo = resenasProductoIds.length
+      ? await prisma.producto.findMany({ where: { id: { in: resenasProductoIds } }, select: { id: true, nombre: true } })
+      : [];
+    const resenasProductoPorId = new Map(resenasProductoInfo.map((p) => [p.id, p]));
+    const resenas = resenasRaw.map((r) => ({
+      id: r.id, productoId: r.entidadId, compradorId: r.autorId,
+      calificacion: r.calificacion, comentario: r.comentario, createdAt: r.createdAt,
+      autor: r.autor, producto: resenasProductoPorId.get(r.entidadId) ? { nombre: resenasProductoPorId.get(r.entidadId).nombre } : undefined,
+    }));
 
     const distMap = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     for (const d of distribucion) distMap[d.calificacion] = d._count._all;
@@ -392,6 +405,32 @@ const ReporteRepository = {
         AND p."createdAt" >= ${d} AND p."createdAt" <= ${h}
       GROUP BY c.municipio
       ORDER BY comision DESC
+    `;
+  },
+
+  /**
+   * Comercios con coordenadas reales (capturadas por GPS en el perfil del
+   * comerciante) + ventas agregadas, para el mapa de analítica territorial.
+   * No inventa geolocalización de municipio: solo plottea comercios que sí
+   * tienen latitud/longitud propias.
+   */
+  async mapaComerciosAdmin({ desde, hasta }) {
+    const d = desde ? new Date(`${desde}T00:00:00`) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const h = hasta ? new Date(`${hasta}T23:59:59.999`) : new Date();
+    return prisma.$queryRaw`
+      SELECT c.id, c.nombre, c.municipio, c.departamento, c.latitud, c.longitud,
+             c.calificacion, c."totalReviews",
+             COUNT(DISTINCT sp."pedidoId")::int    AS pedidos,
+             COALESCE(SUM(sp.subtotal), 0)::float  AS gmv,
+             COALESCE(SUM(sp.comision), 0)::float  AS comision
+      FROM "Comercio" c
+      LEFT JOIN "SubPedido" sp ON sp."comercioId" = c.id
+      LEFT JOIN "Pedido" p     ON p.id = sp."pedidoId"
+        AND p.estado IN ('CONFIRMADO','ENTREGADO')
+        AND p."createdAt" >= ${d} AND p."createdAt" <= ${h}
+      WHERE c.latitud IS NOT NULL AND c.longitud IS NOT NULL AND c.activo = true
+      GROUP BY c.id
+      ORDER BY gmv DESC
     `;
   },
 

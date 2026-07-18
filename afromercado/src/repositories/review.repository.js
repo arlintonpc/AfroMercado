@@ -1,24 +1,58 @@
 const prisma = require("../config/prisma");
+const { recalcularCalificacionComercio } = require("../utils/resena");
+
+const AUTOR_NOMBRE = { autor: { select: { nombre: true } } };
+
+function _mapProducto(r) {
+  return {
+    id: r.id,
+    productoId: r.entidadId,
+    compradorId: r.autorId,
+    calificacion: r.calificacion,
+    comentario: r.comentario,
+    createdAt: r.createdAt,
+    ...(r.autor ? { comprador: { nombre: r.autor.nombre } } : {}),
+  };
+}
+
+function _mapTienda(r) {
+  return {
+    id: r.id,
+    comercioId: r.comercioId,
+    compradorId: r.autorId,
+    pedidoId: r.entidadId,
+    calificacion: r.calificacion,
+    comentario: r.comentario,
+    createdAt: r.createdAt,
+    ...(r.autor ? { comprador: { nombre: r.autor.nombre } } : {}),
+  };
+}
 
 const ReviewRepository = {
   async crear({ productoId, compradorId, calificacion, comentario }) {
-    return prisma.reviewProducto.create({
-      data: { productoId, compradorId, calificacion, comentario },
-      include: { comprador: { select: { nombre: true } } },
+    const producto = await prisma.producto.findUnique({ where: { id: productoId }, select: { comercioId: true } });
+    const resena = await prisma.resena.create({
+      data: {
+        tipoEntidad: "PRODUCTO", entidadId: productoId, comercioId: producto?.comercioId ?? null,
+        autorId: compradorId, calificacion, comentario,
+      },
+      include: AUTOR_NOMBRE,
     });
+    return _mapProducto(resena);
   },
 
   async listarPorProducto(productoId) {
-    return prisma.reviewProducto.findMany({
-      where: { productoId },
+    const rows = await prisma.resena.findMany({
+      where: { tipoEntidad: "PRODUCTO", entidadId: productoId },
       orderBy: { createdAt: "desc" },
-      include: { comprador: { select: { nombre: true } } },
+      include: AUTOR_NOMBRE,
     });
+    return rows.map(_mapProducto);
   },
 
   async existeDelComprador(compradorId, productoId) {
-    return prisma.reviewProducto.findUnique({
-      where: { compradorId_productoId: { compradorId, productoId } },
+    return prisma.resena.findUnique({
+      where: { tipoEntidad_entidadId_autorId: { tipoEntidad: "PRODUCTO", entidadId: productoId, autorId: compradorId } },
     });
   },
 
@@ -38,8 +72,8 @@ const ReviewRepository = {
   },
 
   async promedioProducto(productoId) {
-    const res = await prisma.reviewProducto.aggregate({
-      where: { productoId },
+    const res = await prisma.resena.aggregate({
+      where: { tipoEntidad: "PRODUCTO", entidadId: productoId },
       _avg: { calificacion: true },
       _count: { id: true },
     });
@@ -51,44 +85,28 @@ const ReviewRepository = {
 
   async crearTienda({ comercioId, compradorId, pedidoId, calificacion, comentario }) {
     return prisma.$transaction(async (tx) => {
-      const review = await tx.review.create({
-        data: { comercioId, compradorId, pedidoId, calificacion, comentario },
-        include: { comprador: { select: { nombre: true } } },
+      const resena = await tx.resena.create({
+        data: { tipoEntidad: "PEDIDO", entidadId: pedidoId, comercioId, autorId: compradorId, calificacion, comentario },
+        include: AUTOR_NOMBRE,
       });
-
-      const comercio = await tx.comercio.findUnique({
-        where: { id: comercioId },
-        select: { calificacion: true, totalReviews: true },
-      });
-
-      const calActual = Number(comercio.calificacion ?? 0);
-      const totalActual = comercio.totalReviews ?? 0;
-      const nuevaCal = (calActual * totalActual + calificacion) / (totalActual + 1);
-
-      await tx.comercio.update({
-        where: { id: comercioId },
-        data: {
-          calificacion: Math.round(nuevaCal * 10) / 10,
-          totalReviews: totalActual + 1,
-        },
-      });
-
-      return review;
+      await recalcularCalificacionComercio(tx, comercioId);
+      return _mapTienda(resena);
     });
   },
 
   async listarPorComercio(comercioId) {
-    return prisma.review.findMany({
-      where: { comercioId },
+    const rows = await prisma.resena.findMany({
+      where: { tipoEntidad: "PEDIDO", comercioId },
       orderBy: { createdAt: "desc" },
-      include: { comprador: { select: { nombre: true } } },
+      include: AUTOR_NOMBRE,
       take: 50,
     });
+    return rows.map(_mapTienda);
   },
 
   async existeTiendaDelComprador(compradorId, pedidoId) {
-    return prisma.review.findUnique({
-      where: { pedidoId },
+    return prisma.resena.findUnique({
+      where: { tipoEntidad_entidadId_autorId: { tipoEntidad: "PEDIDO", entidadId: pedidoId, autorId: compradorId } },
     });
   },
 

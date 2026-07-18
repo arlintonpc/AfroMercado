@@ -211,6 +211,16 @@ const ReporteController = {
     } catch (e) { next(e); }
   },
 
+  // GET /reportes/admin/mapa?desde&hasta
+  async mapaAdmin(req, res, next) {
+    try {
+      const { desde, hasta } = req.query;
+      validarFechas(desde, hasta);
+      const data = await ReporteRepository.mapaComerciosAdmin({ desde, hasta });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
   // GET /reportes/admin/pagos?desde&hasta
   async pagosAdmin(req, res, next) {
     try {

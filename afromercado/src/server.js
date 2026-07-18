@@ -426,36 +426,7 @@ async function aplicarMigraciones() {
     )`,
     `CREATE INDEX IF NOT EXISTS "ReviewExpress_configExpressId_idx" ON "ReviewExpress"("configExpressId")`,
 
-    // ── CuponHotel / CuponHotelUso / TemporadaHotel ───────────────────
-    `CREATE TABLE IF NOT EXISTS "CuponHotel" (
-      "id"            SERIAL PRIMARY KEY,
-      "codigo"        TEXT NOT NULL UNIQUE,
-      "tipo"          TEXT NOT NULL DEFAULT 'PORCENTAJE',
-      "valor"         DECIMAL(10,2) NOT NULL,
-      "minimoNoches"  INTEGER,
-      "usosMaximos"   INTEGER,
-      "usosActuales"  INTEGER NOT NULL DEFAULT 0,
-      "activo"        BOOLEAN NOT NULL DEFAULT true,
-      "inicio"        TIMESTAMP(3) NOT NULL,
-      "fin"           TIMESTAMP(3) NOT NULL,
-      "configHotelId" INTEGER,
-      "createdAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "CuponHotel_configHotelId_fkey" FOREIGN KEY ("configHotelId") REFERENCES "ConfigHotel"("id") ON DELETE SET NULL ON UPDATE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS "CuponHotel_codigo_activo_idx"     ON "CuponHotel"("codigo", "activo")`,
-    `CREATE INDEX IF NOT EXISTS "CuponHotel_activo_fin_idx"        ON "CuponHotel"("activo", "fin")`,
-    `CREATE INDEX IF NOT EXISTS "CuponHotel_configHotelId_idx"     ON "CuponHotel"("configHotelId")`,
-    `CREATE TABLE IF NOT EXISTS "CuponHotelUso" (
-      "id"             SERIAL PRIMARY KEY,
-      "cuponHotelId"   INTEGER NOT NULL,
-      "clienteId"      INTEGER NOT NULL,
-      "reservaHotelId" INTEGER NOT NULL UNIQUE,
-      "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "CuponHotelUso_cuponHotelId_fkey"   FOREIGN KEY ("cuponHotelId")   REFERENCES "CuponHotel"("id")   ON DELETE RESTRICT ON UPDATE CASCADE,
-      CONSTRAINT "CuponHotelUso_clienteId_fkey"      FOREIGN KEY ("clienteId")      REFERENCES "Usuario"("id")      ON DELETE RESTRICT ON UPDATE CASCADE,
-      CONSTRAINT "CuponHotelUso_reservaHotelId_fkey" FOREIGN KEY ("reservaHotelId") REFERENCES "ReservaHotel"("id") ON DELETE RESTRICT ON UPDATE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS "CuponHotelUso_cuponHotelId_clienteId_idx" ON "CuponHotelUso"("cuponHotelId", "clienteId")`,
+    // ── TemporadaHotel ───────────────────
     `CREATE TABLE IF NOT EXISTS "TemporadaHotel" (
       "id"               SERIAL PRIMARY KEY,
       "configHotelId"    INTEGER NOT NULL,
@@ -473,37 +444,6 @@ async function aplicarMigraciones() {
     `CREATE INDEX IF NOT EXISTS "TemporadaHotel_habitacionTipoId_activo_idx" ON "TemporadaHotel"("habitacionTipoId", "activo")`,
     `CREATE INDEX IF NOT EXISTS "TemporadaHotel_inicio_fin_idx"              ON "TemporadaHotel"("inicio", "fin")`,
 
-    // ── CuponExpress / CuponExpressUso ─────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS "CuponExpress" (
-      "id"              SERIAL PRIMARY KEY,
-      "codigo"          TEXT NOT NULL UNIQUE,
-      "tipo"            TEXT NOT NULL DEFAULT 'PORCENTAJE',
-      "valor"           DECIMAL(10,2) NOT NULL,
-      "minimoSubtotal"  DECIMAL(10,2),
-      "usosMaximos"     INTEGER,
-      "usosActuales"    INTEGER NOT NULL DEFAULT 0,
-      "activo"          BOOLEAN NOT NULL DEFAULT true,
-      "inicio"          TIMESTAMP(3) NOT NULL,
-      "fin"             TIMESTAMP(3) NOT NULL,
-      "configExpressId" INTEGER,
-      "createdAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "CuponExpress_configExpressId_fkey" FOREIGN KEY ("configExpressId") REFERENCES "ConfigExpress"("id") ON DELETE SET NULL ON UPDATE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS "CuponExpress_codigo_activo_idx"     ON "CuponExpress"("codigo", "activo")`,
-    `CREATE INDEX IF NOT EXISTS "CuponExpress_activo_fin_idx"        ON "CuponExpress"("activo", "fin")`,
-    `CREATE INDEX IF NOT EXISTS "CuponExpress_configExpressId_idx"   ON "CuponExpress"("configExpressId")`,
-    `CREATE TABLE IF NOT EXISTS "CuponExpressUso" (
-      "id"              SERIAL PRIMARY KEY,
-      "cuponExpressId"  INTEGER NOT NULL,
-      "clienteId"       INTEGER NOT NULL,
-      "pedidoExpressId" INTEGER NOT NULL UNIQUE,
-      "createdAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "CuponExpressUso_cuponExpressId_fkey"  FOREIGN KEY ("cuponExpressId")  REFERENCES "CuponExpress"("id")  ON DELETE RESTRICT ON UPDATE CASCADE,
-      CONSTRAINT "CuponExpressUso_clienteId_fkey"       FOREIGN KEY ("clienteId")       REFERENCES "Usuario"("id")       ON DELETE RESTRICT ON UPDATE CASCADE,
-      CONSTRAINT "CuponExpressUso_pedidoExpressId_fkey" FOREIGN KEY ("pedidoExpressId") REFERENCES "PedidoExpress"("id") ON DELETE RESTRICT ON UPDATE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS "CuponExpressUso_cuponExpressId_clienteId_idx" ON "CuponExpressUso"("cuponExpressId", "clienteId")`,
-
     // ── FavoritoHotel ──────────────────────────────────────────────────
     `CREATE TABLE IF NOT EXISTS "FavoritoHotel" (
       "id"            SERIAL PRIMARY KEY,
@@ -516,37 +456,6 @@ async function aplicarMigraciones() {
     )`,
     `CREATE INDEX IF NOT EXISTS "FavoritoHotel_usuarioId_idx"     ON "FavoritoHotel"("usuarioId")`,
     `CREATE INDEX IF NOT EXISTS "FavoritoHotel_configHotelId_idx" ON "FavoritoHotel"("configHotelId")`,
-
-    // ── CuponTour / CuponTourUso ───────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS "CuponTour" (
-      "id"             SERIAL PRIMARY KEY,
-      "codigo"         TEXT NOT NULL UNIQUE,
-      "tipo"           TEXT NOT NULL DEFAULT 'PORCENTAJE',
-      "valor"          DECIMAL(10,2) NOT NULL,
-      "minimoPersonas" INTEGER,
-      "usosMaximos"    INTEGER,
-      "usosActuales"   INTEGER NOT NULL DEFAULT 0,
-      "activo"         BOOLEAN NOT NULL DEFAULT true,
-      "inicio"         TIMESTAMP(3) NOT NULL,
-      "fin"            TIMESTAMP(3) NOT NULL,
-      "configTourId"   INTEGER,
-      "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "CuponTour_configTourId_fkey" FOREIGN KEY ("configTourId") REFERENCES "ConfigTour"("id") ON DELETE SET NULL ON UPDATE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS "CuponTour_codigo_activo_idx"   ON "CuponTour"("codigo", "activo")`,
-    `CREATE INDEX IF NOT EXISTS "CuponTour_activo_fin_idx"      ON "CuponTour"("activo", "fin")`,
-    `CREATE INDEX IF NOT EXISTS "CuponTour_configTourId_idx"    ON "CuponTour"("configTourId")`,
-    `CREATE TABLE IF NOT EXISTS "CuponTourUso" (
-      "id"            SERIAL PRIMARY KEY,
-      "cuponTourId"   INTEGER NOT NULL,
-      "clienteId"     INTEGER NOT NULL,
-      "reservaTourId" INTEGER NOT NULL UNIQUE,
-      "createdAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "CuponTourUso_cuponTourId_fkey"   FOREIGN KEY ("cuponTourId")   REFERENCES "CuponTour"("id")   ON DELETE RESTRICT ON UPDATE CASCADE,
-      CONSTRAINT "CuponTourUso_clienteId_fkey"     FOREIGN KEY ("clienteId")     REFERENCES "Usuario"("id")     ON DELETE RESTRICT ON UPDATE CASCADE,
-      CONSTRAINT "CuponTourUso_reservaTourId_fkey" FOREIGN KEY ("reservaTourId") REFERENCES "ReservaTour"("id") ON DELETE RESTRICT ON UPDATE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS "CuponTourUso_cuponTourId_clienteId_idx" ON "CuponTourUso"("cuponTourId", "clienteId")`,
 
     // ── FavoritoTour ───────────────────────────────────────────────────
     `CREATE TABLE IF NOT EXISTS "FavoritoTour" (
@@ -1045,38 +954,9 @@ async function aplicarMigraciones() {
     `ALTER TABLE "PagoDispersion" ADD COLUMN IF NOT EXISTS "proximoReintentoAt" TIMESTAMP(3)`,
     `CREATE INDEX IF NOT EXISTS "PagoDispersion_estado_proximoReintentoAt_idx" ON "PagoDispersion"("estado", "proximoReintentoAt")`,
 
-    // ── CuponTransporte / CuponTransporteUso ──────────────────────
+    // ── ReservaTransporte: columnas de descuento/cupón ──────────────────
     `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "montoDescuento" DECIMAL(10,2)`,
     `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "codigoCupon" TEXT`,
-    `CREATE TABLE IF NOT EXISTS "CuponTransporte" (
-      "id"                 SERIAL PRIMARY KEY,
-      "codigo"             TEXT NOT NULL UNIQUE,
-      "tipo"               TEXT NOT NULL DEFAULT 'PORCENTAJE',
-      "valor"              DECIMAL(10,2) NOT NULL,
-      "minimoAsientos"     INTEGER,
-      "usosMaximos"        INTEGER,
-      "usosActuales"       INTEGER NOT NULL DEFAULT 0,
-      "activo"             BOOLEAN NOT NULL DEFAULT true,
-      "inicio"             TIMESTAMP(3) NOT NULL,
-      "fin"                TIMESTAMP(3) NOT NULL,
-      "configTransporteId" INTEGER,
-      "createdAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "CuponTransporte_configTransporteId_fkey" FOREIGN KEY ("configTransporteId") REFERENCES "ConfigTransporte"("id") ON DELETE SET NULL ON UPDATE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS "CuponTransporte_codigo_activo_idx"     ON "CuponTransporte"("codigo", "activo")`,
-    `CREATE INDEX IF NOT EXISTS "CuponTransporte_activo_fin_idx"        ON "CuponTransporte"("activo", "fin")`,
-    `CREATE INDEX IF NOT EXISTS "CuponTransporte_configTransporteId_idx" ON "CuponTransporte"("configTransporteId")`,
-    `CREATE TABLE IF NOT EXISTS "CuponTransporteUso" (
-      "id"                  SERIAL PRIMARY KEY,
-      "cuponTransporteId"   INTEGER NOT NULL,
-      "clienteId"           INTEGER NOT NULL,
-      "reservaTransporteId" INTEGER NOT NULL UNIQUE,
-      "createdAt"           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "CuponTransporteUso_cuponTransporteId_fkey"   FOREIGN KEY ("cuponTransporteId")   REFERENCES "CuponTransporte"("id")   ON DELETE RESTRICT ON UPDATE CASCADE,
-      CONSTRAINT "CuponTransporteUso_clienteId_fkey"           FOREIGN KEY ("clienteId")           REFERENCES "Usuario"("id")           ON DELETE RESTRICT ON UPDATE CASCADE,
-      CONSTRAINT "CuponTransporteUso_reservaTransporteId_fkey" FOREIGN KEY ("reservaTransporteId") REFERENCES "ReservaTransporte"("id") ON DELETE RESTRICT ON UPDATE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS "CuponTransporteUso_cuponTransporteId_clienteId_idx" ON "CuponTransporteUso"("cuponTransporteId", "clienteId")`,
 
     // ── ReviewCultura ─────────────────────────────────────────────────
     `CREATE TABLE IF NOT EXISTS "ReviewCultura" (
@@ -1328,6 +1208,268 @@ async function aplicarMigraciones() {
 
     // ── Vista compacta de sección de menú (ideal para bebidas) ──
     `ALTER TABLE "MenuSeccion" ADD COLUMN IF NOT EXISTS "vistaCompacta" BOOLEAN NOT NULL DEFAULT false`,
+
+    // ── Validación de comerciante: RUT y Cámara de Comercio ──
+    `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "rut" TEXT`,
+    `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "camaraComercioNumero" TEXT`,
+    `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "camaraComercioUrl" TEXT`,
+
+    // ── Anexo B, Fase 1: Favorito unificado (reemplaza 7 tablas por 1) ──
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoEntidadFavorita') THEN
+        CREATE TYPE "TipoEntidadFavorita" AS ENUM (
+          'PRODUCTO', 'CONFIG_HOTEL', 'CONFIG_EXPRESS', 'CONFIG_TOUR',
+          'CONFIG_TRANSPORTE', 'EVENTO_CULTURAL', 'OFERTA_EMPLEO'
+        );
+      END IF;
+    END $$`,
+    `ALTER TABLE "Favorito" ADD COLUMN IF NOT EXISTS "tipoEntidad" "TipoEntidadFavorita"`,
+    `ALTER TABLE "Favorito" ADD COLUMN IF NOT EXISTS "entidadId" INTEGER`,
+    `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Favorito' AND column_name = 'productoId') THEN
+        UPDATE "Favorito" SET "tipoEntidad" = 'PRODUCTO', "entidadId" = "productoId"
+          WHERE "tipoEntidad" IS NULL AND "productoId" IS NOT NULL;
+      END IF;
+    END $$`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "Favorito_usuarioId_tipoEntidad_entidadId_key"
+      ON "Favorito"("usuarioId", "tipoEntidad", "entidadId")`,
+    `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'FavoritoHotel') THEN
+        INSERT INTO "Favorito" ("usuarioId", "tipoEntidad", "entidadId", "createdAt")
+          SELECT "usuarioId", 'CONFIG_HOTEL', "configHotelId", "createdAt" FROM "FavoritoHotel"
+          ON CONFLICT ("usuarioId", "tipoEntidad", "entidadId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'FavoritoExpress') THEN
+        INSERT INTO "Favorito" ("usuarioId", "tipoEntidad", "entidadId", "createdAt")
+          SELECT "usuarioId", 'CONFIG_EXPRESS', "configExpressId", "createdAt" FROM "FavoritoExpress"
+          ON CONFLICT ("usuarioId", "tipoEntidad", "entidadId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'FavoritoTour') THEN
+        INSERT INTO "Favorito" ("usuarioId", "tipoEntidad", "entidadId", "createdAt")
+          SELECT "usuarioId", 'CONFIG_TOUR', "configTourId", "createdAt" FROM "FavoritoTour"
+          ON CONFLICT ("usuarioId", "tipoEntidad", "entidadId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'FavoritoTransporte') THEN
+        INSERT INTO "Favorito" ("usuarioId", "tipoEntidad", "entidadId", "createdAt")
+          SELECT "usuarioId", 'CONFIG_TRANSPORTE', "configTransporteId", "createdAt" FROM "FavoritoTransporte"
+          ON CONFLICT ("usuarioId", "tipoEntidad", "entidadId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'FavoritoCultura') THEN
+        INSERT INTO "Favorito" ("usuarioId", "tipoEntidad", "entidadId", "createdAt")
+          SELECT "usuarioId", 'EVENTO_CULTURAL', "eventoCulturalId", "createdAt" FROM "FavoritoCultura"
+          ON CONFLICT ("usuarioId", "tipoEntidad", "entidadId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'FavoritoOfertaEmpleo') THEN
+        INSERT INTO "Favorito" ("usuarioId", "tipoEntidad", "entidadId", "createdAt")
+          SELECT "usuarioId", 'OFERTA_EMPLEO', "ofertaEmpleoId", "createdAt" FROM "FavoritoOfertaEmpleo"
+          ON CONFLICT ("usuarioId", "tipoEntidad", "entidadId") DO NOTHING;
+      END IF;
+    END $$`,
+    `ALTER TABLE "Favorito" ALTER COLUMN "tipoEntidad" SET NOT NULL`,
+    `ALTER TABLE "Favorito" ALTER COLUMN "entidadId" SET NOT NULL`,
+    `ALTER TABLE "Favorito" DROP CONSTRAINT IF EXISTS "Favorito_productoId_fkey"`,
+    `DROP INDEX IF EXISTS "Favorito_usuarioId_productoId_key"`,
+    `ALTER TABLE "Favorito" DROP COLUMN IF EXISTS "productoId"`,
+    `DROP TABLE IF EXISTS "FavoritoHotel"`,
+    `DROP TABLE IF EXISTS "FavoritoExpress"`,
+    `DROP TABLE IF EXISTS "FavoritoTour"`,
+    `DROP TABLE IF EXISTS "FavoritoTransporte"`,
+    `DROP TABLE IF EXISTS "FavoritoCultura"`,
+    `DROP TABLE IF EXISTS "FavoritoOfertaEmpleo"`,
+
+    // ── Anexo B, Fase 3: Resena unificada (reemplaza 7 tablas por 1) ──
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoEntidadResenable') THEN
+        CREATE TYPE "TipoEntidadResenable" AS ENUM (
+          'PEDIDO', 'PRODUCTO', 'RESERVA_HOTEL', 'RESERVA_TOUR',
+          'RESERVA_TRANSPORTE', 'PEDIDO_EXPRESS', 'RESERVA_CULTURAL'
+        );
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "Resena" (
+      "id" SERIAL PRIMARY KEY,
+      "tipoEntidad" "TipoEntidadResenable" NOT NULL,
+      "entidadId" INTEGER NOT NULL,
+      "comercioId" INTEGER,
+      "autorId" INTEGER NOT NULL,
+      "calificacion" INTEGER NOT NULL,
+      "comentario" TEXT,
+      "fotoUrls" TEXT[] NOT NULL DEFAULT '{}',
+      "videoUrl" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "Resena_autorId_fkey" FOREIGN KEY ("autorId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "Resena_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE SET NULL ON UPDATE CASCADE,
+      CONSTRAINT "Resena_tipoEntidad_entidadId_autorId_key" UNIQUE ("tipoEntidad", "entidadId", "autorId")
+    )`,
+    `CREATE INDEX IF NOT EXISTS "Resena_comercioId_idx" ON "Resena"("comercioId")`,
+    `CREATE INDEX IF NOT EXISTS "Resena_tipoEntidad_entidadId_idx" ON "Resena"("tipoEntidad", "entidadId")`,
+    `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'Review') THEN
+        INSERT INTO "Resena" ("tipoEntidad", "entidadId", "comercioId", "autorId", "calificacion", "comentario", "createdAt")
+          SELECT 'PEDIDO', "pedidoId", "comercioId", "compradorId", "calificacion", "comentario", "createdAt" FROM "Review"
+          ON CONFLICT ("tipoEntidad", "entidadId", "autorId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'ReviewProducto') THEN
+        INSERT INTO "Resena" ("tipoEntidad", "entidadId", "comercioId", "autorId", "calificacion", "comentario", "createdAt")
+          SELECT 'PRODUCTO', rp."productoId", p."comercioId", rp."compradorId", rp."calificacion", rp."comentario", rp."createdAt"
+          FROM "ReviewProducto" rp LEFT JOIN "Producto" p ON p."id" = rp."productoId"
+          ON CONFLICT ("tipoEntidad", "entidadId", "autorId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'ReviewHotel') THEN
+        INSERT INTO "Resena" ("tipoEntidad", "entidadId", "comercioId", "autorId", "calificacion", "comentario", "createdAt")
+          SELECT 'RESERVA_HOTEL', rh."reservaHotelId", ch."comercioId", rh."clienteId", rh."calificacion", rh."comentario", rh."creadoAt"
+          FROM "ReviewHotel" rh LEFT JOIN "ConfigHotel" ch ON ch."id" = rh."configHotelId"
+          ON CONFLICT ("tipoEntidad", "entidadId", "autorId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'ReviewTour') THEN
+        INSERT INTO "Resena" ("tipoEntidad", "entidadId", "comercioId", "autorId", "calificacion", "comentario", "createdAt")
+          SELECT 'RESERVA_TOUR', rt."reservaTourId", ct."comercioId", rt."clienteId", rt."calificacion", rt."comentario", rt."creadoAt"
+          FROM "ReviewTour" rt LEFT JOIN "ConfigTour" ct ON ct."id" = rt."configTourId"
+          ON CONFLICT ("tipoEntidad", "entidadId", "autorId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'ReviewTransporte') THEN
+        INSERT INTO "Resena" ("tipoEntidad", "entidadId", "comercioId", "autorId", "calificacion", "comentario", "createdAt")
+          SELECT 'RESERVA_TRANSPORTE', rt."reservaTransporteId", ctr."comercioId", rt."clienteId", rt."calificacion", rt."comentario", rt."creadoAt"
+          FROM "ReviewTransporte" rt LEFT JOIN "ConfigTransporte" ctr ON ctr."id" = rt."configTransporteId"
+          ON CONFLICT ("tipoEntidad", "entidadId", "autorId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'ReviewExpress') THEN
+        INSERT INTO "Resena" ("tipoEntidad", "entidadId", "comercioId", "autorId", "calificacion", "comentario", "fotoUrls", "createdAt")
+          SELECT 'PEDIDO_EXPRESS', re."pedidoExpressId", ce."comercioId", re."clienteId", re."calificacion", re."comentario", re."fotoUrls", re."creadoAt"
+          FROM "ReviewExpress" re LEFT JOIN "ConfigExpress" ce ON ce."id" = re."configExpressId"
+          ON CONFLICT ("tipoEntidad", "entidadId", "autorId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'ReviewCultura') THEN
+        INSERT INTO "Resena" ("tipoEntidad", "entidadId", "comercioId", "autorId", "calificacion", "comentario", "fotoUrls", "videoUrl", "createdAt")
+          SELECT 'RESERVA_CULTURAL', rc."reservaCulturalId", ev."comercioId", rc."clienteId", rc."calificacion", rc."comentario", rc."fotoUrls", rc."videoUrl", rc."creadoAt"
+          FROM "ReviewCultura" rc LEFT JOIN "EventoCultural" ev ON ev."id" = rc."eventoCulturalId"
+          ON CONFLICT ("tipoEntidad", "entidadId", "autorId") DO NOTHING;
+      END IF;
+    END $$`,
+    `UPDATE "Comercio" c SET
+      "calificacion" = sub.avg_cal,
+      "totalReviews" = sub.cnt
+      FROM (
+        SELECT "comercioId", ROUND(AVG("calificacion")::numeric, 2) AS avg_cal, COUNT(*)::int AS cnt
+        FROM "Resena"
+        WHERE "comercioId" IS NOT NULL AND "tipoEntidad" != 'PRODUCTO'
+        GROUP BY "comercioId"
+      ) sub
+      WHERE c."id" = sub."comercioId"`,
+    `DROP TABLE IF EXISTS "Review"`,
+    `DROP TABLE IF EXISTS "ReviewProducto"`,
+    `DROP TABLE IF EXISTS "ReviewHotel"`,
+    `DROP TABLE IF EXISTS "ReviewTour"`,
+    `DROP TABLE IF EXISTS "ReviewTransporte"`,
+    `DROP TABLE IF EXISTS "ReviewExpress"`,
+    `DROP TABLE IF EXISTS "ReviewCultura"`,
+
+    // ── Anexo B, Fase 4: CuponVertical unificado (Hotel/Express/Tour/Transporte, 8→2) ──
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoEntidadCuponVertical') THEN
+        CREATE TYPE "TipoEntidadCuponVertical" AS ENUM (
+          'CONFIG_HOTEL', 'CONFIG_EXPRESS', 'CONFIG_TOUR', 'CONFIG_TRANSPORTE'
+        );
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "CuponVertical" (
+      "id"              SERIAL PRIMARY KEY,
+      "codigo"          TEXT NOT NULL UNIQUE,
+      "tipoEntidad"     "TipoEntidadCuponVertical" NOT NULL,
+      "entidadId"       INTEGER,
+      "tipo"            TEXT NOT NULL DEFAULT 'PORCENTAJE',
+      "valor"           DECIMAL(10,2) NOT NULL,
+      "minimoAplicable" DECIMAL(12,2),
+      "usosMaximos"     INTEGER,
+      "usosActuales"    INTEGER NOT NULL DEFAULT 0,
+      "activo"          BOOLEAN NOT NULL DEFAULT true,
+      "inicio"          TIMESTAMP(3) NOT NULL,
+      "fin"             TIMESTAMP(3) NOT NULL,
+      "createdAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE INDEX IF NOT EXISTS "CuponVertical_codigo_activo_idx" ON "CuponVertical"("codigo", "activo")`,
+    `CREATE INDEX IF NOT EXISTS "CuponVertical_activo_fin_idx" ON "CuponVertical"("activo", "fin")`,
+    `CREATE INDEX IF NOT EXISTS "CuponVertical_tipoEntidad_entidadId_idx" ON "CuponVertical"("tipoEntidad", "entidadId")`,
+    `CREATE TABLE IF NOT EXISTS "CuponVerticalUso" (
+      "id"          SERIAL PRIMARY KEY,
+      "cuponId"     INTEGER NOT NULL,
+      "clienteId"   INTEGER NOT NULL,
+      "tipoEntidad" "TipoEntidadCuponVertical" NOT NULL,
+      "entidadId"   INTEGER NOT NULL,
+      "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "CuponVerticalUso_cuponId_fkey" FOREIGN KEY ("cuponId") REFERENCES "CuponVertical"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "CuponVerticalUso_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT "CuponVerticalUso_tipoEntidad_entidadId_key" UNIQUE ("tipoEntidad", "entidadId")
+    )`,
+    `CREATE INDEX IF NOT EXISTS "CuponVerticalUso_cuponId_clienteId_idx" ON "CuponVerticalUso"("cuponId", "clienteId")`,
+    `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'CuponHotel') THEN
+        INSERT INTO "CuponVertical" ("codigo","tipoEntidad","entidadId","tipo","valor","minimoAplicable","usosMaximos","usosActuales","activo","inicio","fin","createdAt")
+          SELECT codigo, 'CONFIG_HOTEL', "configHotelId", tipo, valor, "minimoNoches"::decimal, "usosMaximos", "usosActuales", activo, inicio, fin, "createdAt"
+          FROM "CuponHotel"
+          ON CONFLICT (codigo) DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'CuponExpress') THEN
+        INSERT INTO "CuponVertical" ("codigo","tipoEntidad","entidadId","tipo","valor","minimoAplicable","usosMaximos","usosActuales","activo","inicio","fin","createdAt")
+          SELECT codigo, 'CONFIG_EXPRESS', "configExpressId", tipo, valor, "minimoSubtotal", "usosMaximos", "usosActuales", activo, inicio, fin, "createdAt"
+          FROM "CuponExpress"
+          ON CONFLICT (codigo) DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'CuponTour') THEN
+        INSERT INTO "CuponVertical" ("codigo","tipoEntidad","entidadId","tipo","valor","minimoAplicable","usosMaximos","usosActuales","activo","inicio","fin","createdAt")
+          SELECT codigo, 'CONFIG_TOUR', "configTourId", tipo, valor, "minimoPersonas"::decimal, "usosMaximos", "usosActuales", activo, inicio, fin, "createdAt"
+          FROM "CuponTour"
+          ON CONFLICT (codigo) DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'CuponTransporte') THEN
+        INSERT INTO "CuponVertical" ("codigo","tipoEntidad","entidadId","tipo","valor","minimoAplicable","usosMaximos","usosActuales","activo","inicio","fin","createdAt")
+          SELECT codigo, 'CONFIG_TRANSPORTE', "configTransporteId", tipo, valor, "minimoAsientos"::decimal, "usosMaximos", "usosActuales", activo, inicio, fin, "createdAt"
+          FROM "CuponTransporte"
+          ON CONFLICT (codigo) DO NOTHING;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'CuponHotelUso') THEN
+        INSERT INTO "CuponVerticalUso" ("cuponId","clienteId","tipoEntidad","entidadId","createdAt")
+          SELECT cv.id, u."clienteId", 'CONFIG_HOTEL', u."reservaHotelId", u."createdAt"
+          FROM "CuponHotelUso" u
+          JOIN "CuponHotel" c ON c.id = u."cuponHotelId"
+          JOIN "CuponVertical" cv ON cv.codigo = c.codigo AND cv."tipoEntidad" = 'CONFIG_HOTEL'
+          ON CONFLICT ("tipoEntidad", "entidadId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'CuponExpressUso') THEN
+        INSERT INTO "CuponVerticalUso" ("cuponId","clienteId","tipoEntidad","entidadId","createdAt")
+          SELECT cv.id, u."clienteId", 'CONFIG_EXPRESS', u."pedidoExpressId", u."createdAt"
+          FROM "CuponExpressUso" u
+          JOIN "CuponExpress" c ON c.id = u."cuponExpressId"
+          JOIN "CuponVertical" cv ON cv.codigo = c.codigo AND cv."tipoEntidad" = 'CONFIG_EXPRESS'
+          ON CONFLICT ("tipoEntidad", "entidadId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'CuponTourUso') THEN
+        INSERT INTO "CuponVerticalUso" ("cuponId","clienteId","tipoEntidad","entidadId","createdAt")
+          SELECT cv.id, u."clienteId", 'CONFIG_TOUR', u."reservaTourId", u."createdAt"
+          FROM "CuponTourUso" u
+          JOIN "CuponTour" c ON c.id = u."cuponTourId"
+          JOIN "CuponVertical" cv ON cv.codigo = c.codigo AND cv."tipoEntidad" = 'CONFIG_TOUR'
+          ON CONFLICT ("tipoEntidad", "entidadId") DO NOTHING;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'CuponTransporteUso') THEN
+        INSERT INTO "CuponVerticalUso" ("cuponId","clienteId","tipoEntidad","entidadId","createdAt")
+          SELECT cv.id, u."clienteId", 'CONFIG_TRANSPORTE', u."reservaTransporteId", u."createdAt"
+          FROM "CuponTransporteUso" u
+          JOIN "CuponTransporte" c ON c.id = u."cuponTransporteId"
+          JOIN "CuponVertical" cv ON cv.codigo = c.codigo AND cv."tipoEntidad" = 'CONFIG_TRANSPORTE'
+          ON CONFLICT ("tipoEntidad", "entidadId") DO NOTHING;
+      END IF;
+    END $$`,
+    `DROP TABLE IF EXISTS "CuponHotelUso"`,
+    `DROP TABLE IF EXISTS "CuponHotel"`,
+    `DROP TABLE IF EXISTS "CuponExpressUso"`,
+    `DROP TABLE IF EXISTS "CuponExpress"`,
+    `DROP TABLE IF EXISTS "CuponTourUso"`,
+    `DROP TABLE IF EXISTS "CuponTour"`,
+    `DROP TABLE IF EXISTS "CuponTransporteUso"`,
+    `DROP TABLE IF EXISTS "CuponTransporte"`,
   ];
   for (const sql of migraciones) {
     try {

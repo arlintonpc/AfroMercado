@@ -43,6 +43,8 @@ router.get("/admin/categorias",   ...soloAdmin, ReporteController.categoriasAdmi
 router.get("/admin/productos",    ...soloAdmin, ReporteController.productosAdmin);
 // GET /reportes/admin/territorios
 router.get("/admin/territorios",  ...soloAdmin, ReporteController.territoriosAdmin);
+// GET /reportes/admin/mapa — comercios con coordenadas reales para el mapa territorial
+router.get("/admin/mapa",         ...soloAdmin, ReporteController.mapaAdmin);
 // GET /reportes/admin/pagos
 router.get("/admin/pagos",        ...soloAdmin, ReporteController.pagosAdmin);
 // GET /reportes/admin/logistica

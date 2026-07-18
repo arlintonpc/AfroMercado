@@ -125,6 +125,14 @@ router.post(
   ComercioController.subirDocumento,
 );
 
+// POST /comercios/subir-camara-comercio - foto/captura del certificado de Cámara de Comercio
+router.post(
+  "/subir-camara-comercio",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  ComercioController.subirCamaraComercio,
+);
+
 // POST /comercios/declaracion-territorial - solicitar declaracion de organizacion territorial (Ley 1581)
 router.post(
   "/declaracion-territorial",

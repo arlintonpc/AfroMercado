@@ -1,12 +1,16 @@
 'use client'
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { apiFetch } from '@/lib/api/client'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import FiltroFechas from '@/components/reportes/FiltroFechas'
 import BotonExportar from '@/components/reportes/BotonExportar'
+import type { ComercioMapaAdmin } from '@/components/reportes/MapaAnaliticaTerritorial'
+
+const MapaAnaliticaTerritorial = dynamic(() => import('@/components/reportes/MapaAnaliticaTerritorial'), { ssr: false })
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 interface KPIItem { valor: number; delta: number | null }
@@ -137,6 +141,7 @@ function Contenido() {
   const [categorias, setCategorias] = useState<CategoriaRow[]>([])
   const [productos, setProductos] = useState<ProductoTopRow[]>([])
   const [territorios, setTerritorios] = useState<TerritorioRow[]>([])
+  const [mapaComercios, setMapaComercios] = useState<ComercioMapaAdmin[]>([])
   const [pagos, setPagos] = useState<PagosData | null>(null)
   const [logistica, setLogistica] = useState<LogisticaData | null>(null)
   const [clientes, setClientes] = useState<ClientesData | null>(null)
@@ -148,7 +153,7 @@ function Contenido() {
     setCargando(true)
     try {
       const qs = `?desde=${desde}&hasta=${hasta}`
-      const [d, s, m, c, r, cr, co, cat, prod, terr, pag, log, cli, al] = await Promise.all([
+      const [d, s, m, c, r, cr, co, cat, prod, terr, pag, log, cli, al, mapa] = await Promise.all([
         apiFetch<{ ok: boolean; data: Dashboard }>(`/reportes/admin/dashboard${qs}`),
         apiFetch<{ ok: boolean; data: SeriePunto[] }>(`/reportes/admin/serie${qs}`),
         apiFetch<{ ok: boolean; data: MunicipioRow[] }>(`/reportes/admin/municipios${qs}`),
@@ -163,6 +168,7 @@ function Contenido() {
         apiFetch<{ ok: boolean; data: LogisticaData }>(`/reportes/admin/logistica${qs}`),
         apiFetch<{ ok: boolean; data: ClientesData }>(`/reportes/admin/clientes${qs}`),
         apiFetch<{ ok: boolean; data: AlertasData }>(`/reportes/admin/alertas${qs}`),
+        apiFetch<{ ok: boolean; data: ComercioMapaAdmin[] }>(`/reportes/admin/mapa${qs}`),
       ])
       setDashboard(d?.data ?? null)
       setSerie(s?.data ?? [])
@@ -178,6 +184,7 @@ function Contenido() {
       setLogistica(log?.data ?? null)
       setClientes(cli?.data ?? null)
       setAlertas(al?.data ?? null)
+      setMapaComercios(mapa?.data ?? [])
     } catch { /**/ } finally { setCargando(false) }
   }, [desde, hasta])
 
@@ -353,7 +360,20 @@ function Contenido() {
 
       {/* ── Tab: Territorio ──────────────────────────────────────────────── */}
       {tab === 'territorio' && (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="flex flex-col gap-4">
+          <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-[#1A1A1A]/5 bg-[#F8F5F0]/60">
+              <p className="text-sm font-semibold text-[#1A1A1A]/60">Mapa territorial</p>
+              <p className="text-xs text-[#1A1A1A]/35 mt-0.5">
+                Comercios con ubicación GPS real ({mapaComercios.length}) — el tamaño del punto es proporcional al GMV del periodo.
+              </p>
+            </div>
+            <div className="p-4">
+              <MapaAnaliticaTerritorial comercios={mapaComercios} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
           <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-[#1A1A1A]/5 bg-[#F8F5F0]/60">
               <p className="text-sm font-semibold text-[#1A1A1A]/60">Origen comercial: municipio del comercio</p>
@@ -412,6 +432,7 @@ function Contenido() {
                 </tbody>
               </table>
             </div>
+          </div>
           </div>
         </div>
       )}

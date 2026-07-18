@@ -61,6 +61,7 @@ router.use("/busqueda",      require("./busqueda.routes"));
 router.use("/alianzas",      require("./alianza.routes"));
 router.use("/datos-abiertos", require("./datosabiertos.routes"));
 router.use("/directorio-compras-publicas", require("./directorio.routes"));
+router.use("/directorio", require("./directorio-general.routes"));
 router.use("/", require("./disputa.routes"));
 router.use("/", require("./config-fiscal.routes"));
 router.use("/", require("./facturacion.routes"));

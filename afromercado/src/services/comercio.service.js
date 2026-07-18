@@ -21,10 +21,16 @@ const CAMPOS_EDITABLES = [
   "whatsapp",
   "logoUrl",
   "vereda",
+  "rut",
+  "camaraComercioNumero",
   "fotoDocumentoUrl",
   "fotoDocumentoFrenteUrl",
   "fotoDocumentoReversoUrl",
 ];
+
+// RUT/NIT colombiano: dígitos, opcionalmente con guion + dígito de verificación
+// (ej. 900123456-7). Validación de formato, no de existencia real ante la DIAN.
+const REGEX_RUT = /^\d{8,15}(-\d)?$/;
 
 const TIPOS_DOCUMENTO_VALIDOS = ["CC", "TI", "CE", "PEP", "PASAPORTE", "NIT"];
 
@@ -215,6 +221,14 @@ const ComercioService = {
     const cambios = {};
     for (const campo of CAMPOS_EDITABLES) {
       if (datos[campo] !== undefined) cambios[campo] = datos[campo];
+    }
+
+    if (cambios.rut !== undefined && cambios.rut !== null && cambios.rut !== "") {
+      const rutLimpio = String(cambios.rut).trim();
+      if (!REGEX_RUT.test(rutLimpio)) {
+        throw new ErrorValidacion("El RUT no tiene un formato válido. Usa solo números, con guion y dígito de verificación si aplica (ej. 900123456-7).");
+      }
+      cambios.rut = rutLimpio;
     }
 
     // Envío gratis del vendedor: monto mínimo (0 / vacío / null = desactivado).
