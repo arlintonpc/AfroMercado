@@ -42,6 +42,9 @@ function TarjetaModeracion({ oferta, onResuelta }: { oferta: OfertaEmpleo; onRes
 
   return (
     <div className="rounded-2xl border border-[#D4A017]/25 bg-[#D4A017]/8 p-5">
+      <span className="inline-flex items-center rounded-full bg-white text-[10px] font-bold px-2 py-0.5 mb-1.5 text-[#1B4332]">
+        {oferta.tipoPublicacion === 'OFRECE_SERVICIO' ? '🛠️ Servicio' : '💼 Empleo'}
+      </span>
       <p className="font-semibold text-[#1A1A1A]">{oferta.titulo}</p>
       <p className="text-xs text-[#1A1A1A]/50 mt-0.5">
         Por {oferta.publicadoPor?.nombre} · {oferta.municipio}

@@ -1,6 +1,7 @@
 import { apiFetch, API_URL, obtenerToken } from './client'
 
 export type TipoContratoEmpleo = 'TIEMPO_COMPLETO' | 'MEDIO_TIEMPO' | 'POR_DIAS' | 'TEMPORAL' | 'OTRO'
+export type TipoPublicacionEmpleo = 'OFERTA_EMPLEO' | 'OFRECE_SERVICIO'
 export type EstadoOfertaEmpleo = 'BORRADOR' | 'PUBLICADA' | 'PAUSADA' | 'CERRADA'
 export type EstadoPostulacionEmpleo = 'ENVIADA' | 'VISTA' | 'PRESELECCIONADO' | 'RECHAZADA' | 'CONTRATADO' | 'RETIRADA'
 export type TipoPreguntaEmpleo = 'TEXTO' | 'SI_NO' | 'OPCION_MULTIPLE'
@@ -23,6 +24,18 @@ export const CATEGORIAS_EMPLEO: string[] = [
   'Otro',
 ]
 
+export const CATEGORIAS_SERVICIO: string[] = [
+  'Reparaciones',
+  'Clases y tutorías',
+  'Belleza y bienestar',
+  'Construcción y oficios',
+  'Tecnología',
+  'Cuidado y limpieza',
+  'Transporte',
+  'Eventos',
+  'Otro',
+]
+
 export interface PreguntaOferta {
   id: string
   texto: string
@@ -40,6 +53,7 @@ export interface OfertaEmpleo {
   id: number
   publicadoPorId: number
   comercioId: number | null
+  tipoPublicacion: TipoPublicacionEmpleo
   titulo: string
   descripcion: string
   categoria: string | null
@@ -131,12 +145,13 @@ interface RespuestaApi<T> {
   data: T
 }
 
-export async function listarOfertasEmpleo(filtros: { municipio?: string; departamento?: string; categoria?: string; tipoContrato?: TipoContratoEmpleo; search?: string; salarioMin?: number; salarioMax?: number; page?: number } = {}): Promise<{ items: OfertaEmpleo[]; total: number; pagina: number }> {
+export async function listarOfertasEmpleo(filtros: { municipio?: string; departamento?: string; categoria?: string; tipoContrato?: TipoContratoEmpleo; tipoPublicacion?: TipoPublicacionEmpleo; search?: string; salarioMin?: number; salarioMax?: number; page?: number } = {}): Promise<{ items: OfertaEmpleo[]; total: number; pagina: number }> {
   const params = new URLSearchParams()
   if (filtros.municipio) params.set('municipio', filtros.municipio)
   if (filtros.departamento) params.set('departamento', filtros.departamento)
   if (filtros.categoria) params.set('categoria', filtros.categoria)
   if (filtros.tipoContrato) params.set('tipoContrato', filtros.tipoContrato)
+  if (filtros.tipoPublicacion) params.set('tipoPublicacion', filtros.tipoPublicacion)
   if (filtros.search) params.set('search', filtros.search)
   if (filtros.salarioMin != null) params.set('salarioMin', String(filtros.salarioMin))
   if (filtros.salarioMax != null) params.set('salarioMax', String(filtros.salarioMax))

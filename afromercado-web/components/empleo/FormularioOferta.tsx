@@ -4,8 +4,10 @@ import { useState } from 'react'
 import {
   subirImagenOferta,
   CATEGORIAS_EMPLEO,
+  CATEGORIAS_SERVICIO,
   type TipoContratoEmpleo,
   type TipoPreguntaEmpleo,
+  type TipoPublicacionEmpleo,
   type PreguntaOferta,
 } from '@/lib/api/empleo'
 import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
@@ -20,6 +22,7 @@ const TIPOS: { valor: TipoContratoEmpleo; etiqueta: string }[] = [
 
 /** Forma de los datos que produce el formulario, compatible con Partial<OfertaEmpleo> (crear y editar). */
 export interface DatosFormularioOferta {
+  tipoPublicacion: TipoPublicacionEmpleo
   titulo: string
   descripcion: string
   categoria?: string
@@ -56,6 +59,8 @@ export default function FormularioOferta({
   textoBoton = 'Publicar oferta',
   textoEnviando = 'Publicando…',
 }: FormularioOfertaProps) {
+  const [tipoPublicacion, setTipoPublicacion] = useState<TipoPublicacionEmpleo>(valoresIniciales?.tipoPublicacion ?? 'OFERTA_EMPLEO')
+  const esServicio = tipoPublicacion === 'OFRECE_SERVICIO'
   const [titulo, setTitulo] = useState(valoresIniciales?.titulo ?? '')
   const [descripcion, setDescripcion] = useState(valoresIniciales?.descripcion ?? '')
   const [categoria, setCategoria] = useState(valoresIniciales?.categoria ?? '')
@@ -117,21 +122,22 @@ export default function FormularioOferta({
     setError(null)
     try {
       await onGuardar({
+        tipoPublicacion,
         titulo,
         descripcion,
         categoria: categoria || undefined,
         departamento,
         municipio,
-        tipoContrato,
+        tipoContrato: esServicio ? 'OTRO' : tipoContrato,
         salarioMin: salarioMin ? Number(salarioMin) : undefined,
         salarioMax: salarioMax ? Number(salarioMax) : undefined,
         salarioNegociable,
         requisitos: requisitos || undefined,
-        vacantes: Number(vacantes) || 1,
+        vacantes: esServicio ? 1 : Number(vacantes) || 1,
         contactoWhatsapp: contactoWhatsapp || undefined,
-        fechaCierre: fechaCierre || undefined,
+        fechaCierre: esServicio ? undefined : (fechaCierre || undefined),
         imagenUrl,
-        preguntas: preguntas
+        preguntas: esServicio ? [] : preguntas
           .filter((p) => p.texto.trim())
           .map((p) => ({ ...p, opciones: p.opciones?.map((o) => o.trim()).filter(Boolean) })),
       })
@@ -144,6 +150,27 @@ export default function FormularioOferta({
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 flex flex-col gap-4">
+      <div>
+        <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1.5">¿Qué quieres publicar?</label>
+        <div className="flex flex-wrap gap-1.5">
+          <button type="button" onClick={() => setTipoPublicacion('OFERTA_EMPLEO')}
+            className={`px-3.5 py-1.5 rounded-full text-sm font-semibold border-2 transition-colors ${
+              !esServicio ? 'bg-[#1B4332] text-white border-[#1B4332]' : 'bg-white text-[#1A1A1A]/60 border-[#1A1A1A]/12 hover:border-[#1B4332]'
+            }`}>
+            💼 Busco empleado
+          </button>
+          <button type="button" onClick={() => setTipoPublicacion('OFRECE_SERVICIO')}
+            className={`px-3.5 py-1.5 rounded-full text-sm font-semibold border-2 transition-colors ${
+              esServicio ? 'bg-[#1B4332] text-white border-[#1B4332]' : 'bg-white text-[#1A1A1A]/60 border-[#1A1A1A]/12 hover:border-[#1B4332]'
+            }`}>
+            🛠️ Ofrezco un servicio
+          </button>
+        </div>
+        {esServicio && (
+          <p className="text-xs text-[#1A1A1A]/45 mt-1.5">Quien lo necesite te contacta directo por WhatsApp — sin postulaciones ni hoja de vida.</p>
+        )}
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Imagen / banner (opcional)</label>
         {imagenUrl ? (
@@ -184,7 +211,7 @@ export default function FormularioOferta({
         <select value={categoria} onChange={(e) => setCategoria(e.target.value)}
           className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none">
           <option value="">Sin categoría</option>
-          {CATEGORIAS_EMPLEO.map((c) => <option key={c} value={c}>{c}</option>)}
+          {(esServicio ? CATEGORIAS_SERVICIO : CATEGORIAS_EMPLEO).map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
@@ -235,29 +262,31 @@ export default function FormularioOferta({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Tipo de contrato</label>
-          <select value={tipoContrato} onChange={(e) => setTipoContrato(e.target.value as TipoContratoEmpleo)}
-            className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none">
-            {TIPOS.map((t) => <option key={t.valor} value={t.valor}>{t.etiqueta}</option>)}
-          </select>
+      {!esServicio && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Tipo de contrato</label>
+            <select value={tipoContrato} onChange={(e) => setTipoContrato(e.target.value as TipoContratoEmpleo)}
+              className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none">
+              {TIPOS.map((t) => <option key={t.valor} value={t.valor}>{t.etiqueta}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Fecha límite para postularse (opcional)</label>
+            <input type="date" value={fechaCierre} min={fechaMinima} onChange={(e) => setFechaCierre(e.target.value)}
+              className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none" />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Fecha límite para postularse (opcional)</label>
-          <input type="date" value={fechaCierre} min={fechaMinima} onChange={(e) => setFechaCierre(e.target.value)}
-            className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none" />
-        </div>
-      </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Salario mínimo (opcional)</label>
+          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">{esServicio ? 'Tarifa mínima (opcional)' : 'Salario mínimo (opcional)'}</label>
           <input type="number" value={salarioMin} onChange={(e) => setSalarioMin(e.target.value)} placeholder="Ej: 30000" disabled={salarioNegociable}
             className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none disabled:opacity-50" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Salario máximo (opcional)</label>
+          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">{esServicio ? 'Tarifa máxima (opcional)' : 'Salario máximo (opcional)'}</label>
           <input type="number" value={salarioMax} onChange={(e) => setSalarioMax(e.target.value)} placeholder="Ej: 50000" disabled={salarioNegociable}
             className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none disabled:opacity-50" />
         </div>
@@ -265,28 +294,31 @@ export default function FormularioOferta({
 
       <label className="flex items-center gap-2 text-sm text-[#1A1A1A]/70">
         <input type="checkbox" checked={salarioNegociable} onChange={(e) => setSalarioNegociable(e.target.checked)} />
-        Salario negociable
+        {esServicio ? 'Tarifa negociable' : 'Salario negociable'}
       </label>
 
       <div>
-        <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Requisitos (opcional)</label>
+        <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">{esServicio ? '¿Qué incluye tu servicio? (opcional)' : 'Requisitos (opcional)'}</label>
         <textarea value={requisitos} onChange={(e) => setRequisitos(e.target.value)} rows={2}
           className="w-full resize-none rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className={esServicio ? 'grid gap-4' : 'grid gap-4 sm:grid-cols-2'}>
+        {!esServicio && (
+          <div>
+            <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Vacantes</label>
+            <input type="number" min={1} value={vacantes} onChange={(e) => setVacantes(e.target.value)}
+              className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none" />
+          </div>
+        )}
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Vacantes</label>
-          <input type="number" min={1} value={vacantes} onChange={(e) => setVacantes(e.target.value)}
-            className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">WhatsApp de contacto (opcional)</label>
+          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">WhatsApp de contacto {esServicio ? '' : '(opcional)'}</label>
           <input value={contactoWhatsapp} onChange={(e) => setContactoWhatsapp(e.target.value)} placeholder="3001234567"
             className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none" />
         </div>
       </div>
 
+      {!esServicio && (
       <div>
         <div className="flex items-center justify-between mb-2">
           <div>
@@ -330,6 +362,7 @@ export default function FormularioOferta({
           </div>
         ))}
       </div>
+      )}
 
       {error && <p className="text-xs text-[#C0392B]">{error}</p>}
 

@@ -222,9 +222,14 @@ function TarjetaOferta({ oferta, onCambiado }: { oferta: OfertaEmpleo; onCambiad
     <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
+          <span className="inline-flex items-center rounded-full bg-[#F8F5F0] text-[10px] font-bold px-2 py-0.5 mb-1 text-[#1B4332]">
+            {oferta.tipoPublicacion === 'OFRECE_SERVICIO' ? '🛠️ Servicio' : '💼 Empleo'}
+          </span>
           <p className="font-semibold text-[#1A1A1A]">{oferta.titulo}</p>
           <p className="text-xs text-[#1A1A1A]/50 mt-0.5">
-            {oferta.municipio} · {vencida ? 'Vencida' : ESTADO_OFERTA_LABEL[oferta.estado]} · {oferta.vacantes} vacante(s) · {oferta._count?.postulaciones ?? 0} postulación(es)
+            {oferta.tipoPublicacion === 'OFRECE_SERVICIO'
+              ? `${oferta.municipio} · ${vencida ? 'Vencida' : ESTADO_OFERTA_LABEL[oferta.estado]}`
+              : `${oferta.municipio} · ${vencida ? 'Vencida' : ESTADO_OFERTA_LABEL[oferta.estado]} · ${oferta.vacantes} vacante(s) · ${oferta._count?.postulaciones ?? 0} postulación(es)`}
           </p>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${moderacion.color}`}>{moderacion.label}</span>

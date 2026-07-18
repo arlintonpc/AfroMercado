@@ -13,8 +13,10 @@ import {
   misPostulacionesEmpleo,
   misFavoritosEmpleo,
   CATEGORIAS_EMPLEO,
+  CATEGORIAS_SERVICIO,
   type OfertaEmpleo,
   type TipoContratoEmpleo,
+  type TipoPublicacionEmpleo,
   type PostulacionEmpleo,
 } from '@/lib/api/empleo'
 import { DEPARTAMENTOS } from '@/lib/data/colombia'
@@ -38,6 +40,7 @@ export default function PaginaEmpleo() {
   const [municipio, setMunicipio] = useState('')
   const [departamento, setDepartamento] = useState('')
   const [tipoContrato, setTipoContrato] = useState<TipoContratoEmpleo | ''>('')
+  const [tipoPublicacion, setTipoPublicacion] = useState<TipoPublicacionEmpleo>('OFERTA_EMPLEO')
   const [pagina, setPagina] = useState(1)
   const [total, setTotal] = useState(0)
   const [misPostulaciones, setMisPostulaciones] = useState<Map<number, PostulacionEmpleo>>(new Map())
@@ -67,6 +70,7 @@ export default function PaginaEmpleo() {
         departamento: departamento || undefined,
         categoria: categoria || undefined,
         tipoContrato: tipoContrato || undefined,
+        tipoPublicacion,
         search: busquedaDebounced || undefined,
         salarioMin: salarioMin ? Number(salarioMin) : undefined,
         salarioMax: salarioMax ? Number(salarioMax) : undefined,
@@ -82,7 +86,7 @@ export default function PaginaEmpleo() {
     } finally {
       setCargando(false)
     }
-  }, [municipio, departamento, categoria, tipoContrato, busquedaDebounced, salarioMin, salarioMax])
+  }, [municipio, departamento, categoria, tipoContrato, tipoPublicacion, busquedaDebounced, salarioMin, salarioMax])
 
   useEffect(() => {
     cargar()
@@ -97,6 +101,7 @@ export default function PaginaEmpleo() {
         departamento: departamento || undefined,
         categoria: categoria || undefined,
         tipoContrato: tipoContrato || undefined,
+        tipoPublicacion,
         search: busquedaDebounced || undefined,
         salarioMin: salarioMin ? Number(salarioMin) : undefined,
         salarioMax: salarioMax ? Number(salarioMax) : undefined,
@@ -130,11 +135,38 @@ export default function PaginaEmpleo() {
             <h1 className="text-3xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
               Empleo
             </h1>
-            <p className="mt-1 text-sm text-[#1A1A1A]/55">Bolsa de trabajo comunitaria — ofertas locales del Chocó y todo el país.</p>
+            <p className="mt-1 text-sm text-[#1A1A1A]/55">
+              {tipoPublicacion === 'OFRECE_SERVICIO'
+                ? 'Trabajadores independientes que ofrecen su servicio — contacto directo por WhatsApp.'
+                : 'Bolsa de trabajo comunitaria — ofertas locales del Chocó y todo el país.'}
+            </p>
           </div>
           <Link href="/empleo/publicar" className="rounded-xl bg-[#2D6A4F] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#245a42] transition-colors whitespace-nowrap">
-            Publicar oferta
+            Publicar
           </Link>
+        </div>
+
+        <div className="inline-flex bg-white border border-[#1A1A1A]/10 rounded-full p-1 gap-1 mb-4">
+          <button
+            type="button"
+            onClick={() => { setTipoPublicacion('OFERTA_EMPLEO'); setCategoria(''); setTipoContrato('') }}
+            aria-pressed={tipoPublicacion === 'OFERTA_EMPLEO'}
+            className={`px-3.5 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+              tipoPublicacion === 'OFERTA_EMPLEO' ? 'bg-[#1B4332] text-white' : 'text-[#1A1A1A]/60 hover:text-[#1A1A1A]'
+            }`}
+          >
+            💼 Empleos
+          </button>
+          <button
+            type="button"
+            onClick={() => { setTipoPublicacion('OFRECE_SERVICIO'); setCategoria(''); setTipoContrato('') }}
+            aria-pressed={tipoPublicacion === 'OFRECE_SERVICIO'}
+            className={`px-3.5 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+              tipoPublicacion === 'OFRECE_SERVICIO' ? 'bg-[#1B4332] text-white' : 'text-[#1A1A1A]/60 hover:text-[#1A1A1A]'
+            }`}
+          >
+            🛠️ Servicios
+          </button>
         </div>
 
         <div className="mb-3">
@@ -161,23 +193,25 @@ export default function PaginaEmpleo() {
             placeholder="Filtrar por municipio…"
             className="rounded-xl border border-[#1A1A1A]/12 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30"
           />
-          <select
-            value={tipoContrato}
-            onChange={(e) => setTipoContrato(e.target.value as TipoContratoEmpleo | '')}
-            className="rounded-xl border border-[#1A1A1A]/12 bg-white px-3 py-2 text-sm focus:outline-none"
-          >
-            <option value="">Todos los tipos de contrato</option>
-            {Object.entries(TIPO_LABEL).map(([valor, etiqueta]) => (
-              <option key={valor} value={valor}>{etiqueta}</option>
-            ))}
-          </select>
+          {tipoPublicacion === 'OFERTA_EMPLEO' && (
+            <select
+              value={tipoContrato}
+              onChange={(e) => setTipoContrato(e.target.value as TipoContratoEmpleo | '')}
+              className="rounded-xl border border-[#1A1A1A]/12 bg-white px-3 py-2 text-sm focus:outline-none"
+            >
+              <option value="">Todos los tipos de contrato</option>
+              {Object.entries(TIPO_LABEL).map(([valor, etiqueta]) => (
+                <option key={valor} value={valor}>{etiqueta}</option>
+              ))}
+            </select>
+          )}
           <select
             value={categoria}
             onChange={(e) => setCategoria(e.target.value)}
             className="rounded-xl border border-[#1A1A1A]/12 bg-white px-3 py-2 text-sm focus:outline-none"
           >
             <option value="">Todas las categorías</option>
-            {CATEGORIAS_EMPLEO.map((c) => <option key={c} value={c}>{c}</option>)}
+            {(tipoPublicacion === 'OFRECE_SERVICIO' ? CATEGORIAS_SERVICIO : CATEGORIAS_EMPLEO).map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
           <input
             type="number"

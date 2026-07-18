@@ -45,11 +45,11 @@ export default function PaginaPublicarEmpleo() {
       <Header />
       <main className="flex-1 w-full max-w-2xl mx-auto px-4 md:px-6 py-8 pb-12">
         <h1 className="text-3xl text-[#1A1A1A] mb-1" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
-          Publicar oferta de empleo
+          Publicar empleo o servicio
         </h1>
-        <p className="text-sm text-[#1A1A1A]/55 mb-6">Tu oferta pasará por una breve revisión antes de quedar visible.</p>
+        <p className="text-sm text-[#1A1A1A]/55 mb-6">Tu publicación pasará por una breve revisión antes de quedar visible.</p>
 
-        <FormularioOferta onGuardar={guardar} textoBoton="Publicar oferta" textoEnviando="Publicando…" />
+        <FormularioOferta onGuardar={guardar} textoBoton="Publicar" textoEnviando="Publicando…" />
       </main>
       <Footer />
     </div>

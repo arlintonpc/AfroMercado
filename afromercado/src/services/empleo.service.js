@@ -101,6 +101,7 @@ const EmpleoService = {
     return EmpleoRepository.crearOferta({
       publicadoPorId: usuarioId,
       comercioId: comercio ? comercio.id : null,
+      tipoPublicacion: datos.tipoPublicacion === "OFRECE_SERVICIO" ? "OFRECE_SERVICIO" : "OFERTA_EMPLEO",
       titulo: datos.titulo.trim(),
       descripcion: datos.descripcion.trim(),
       categoria: datos.categoria?.trim() || null,
@@ -344,6 +345,9 @@ const EmpleoService = {
     }
     if (oferta.publicadoPorId === usuarioId) {
       throw new ErrorValidacion("No puedes postularte a tu propia oferta");
+    }
+    if (oferta.tipoPublicacion === "OFRECE_SERVICIO") {
+      throw new ErrorValidacion("Esta publicación es un servicio ofrecido — contacta directo por WhatsApp, no requiere postulación");
     }
 
     const hoja = await EmpleoRepository.buscarHojaDeVida(usuarioId);

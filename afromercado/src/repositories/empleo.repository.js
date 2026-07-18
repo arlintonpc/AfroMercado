@@ -20,7 +20,7 @@ const EmpleoRepository = {
     return prisma.ofertaEmpleo.update({ where: { id }, data });
   },
 
-  async listarPublicas({ municipio, departamento, categoria, tipoContrato, search, salarioMin, salarioMax, page = 1, take = 20 }) {
+  async listarPublicas({ municipio, departamento, categoria, tipoContrato, tipoPublicacion, search, salarioMin, salarioMax, page = 1, take = 20 }) {
     const min = salarioMin != null && salarioMin !== "" ? Number(salarioMin) : null;
     const max = salarioMax != null && salarioMax !== "" ? Number(salarioMax) : null;
     // Rango solapado: la oferta califica si [oferta.salarioMin, oferta.salarioMax]
@@ -41,6 +41,7 @@ const EmpleoRepository = {
       ...(departamento ? { departamento: { equals: departamento, mode: "insensitive" } } : {}),
       ...(categoria ? { categoria: { contains: categoria, mode: "insensitive" } } : {}),
       ...(tipoContrato ? { tipoContrato } : {}),
+      ...(tipoPublicacion ? { tipoPublicacion } : {}),
       ...(search ? { titulo: { contains: search, mode: "insensitive" } } : {}),
       ...(filtroSalario.length ? { AND: filtroSalario } : {}),
     };

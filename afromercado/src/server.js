@@ -1451,6 +1451,14 @@ async function aplicarMigraciones() {
 
     // ── Vertical Agro: reutiliza GrupoCategoria (patrón "Tienda Local") ──
     `ALTER TYPE "GrupoCategoria" ADD VALUE IF NOT EXISTS 'AGRO'`,
+
+    // ── Piloto Servicios Profesionales: reutiliza OfertaEmpleo invertido ──
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoPublicacionEmpleo') THEN
+        CREATE TYPE "TipoPublicacionEmpleo" AS ENUM ('OFERTA_EMPLEO', 'OFRECE_SERVICIO');
+      END IF;
+    END $$`,
+    `ALTER TABLE "OfertaEmpleo" ADD COLUMN IF NOT EXISTS "tipoPublicacion" "TipoPublicacionEmpleo" NOT NULL DEFAULT 'OFERTA_EMPLEO'`,
   ];
   for (const sql of migraciones) {
     try {

@@ -190,7 +190,8 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
                 </div>
               </div>
               <p className="text-sm text-[#1A1A1A]/55 mt-1">
-                📍 {oferta.municipio}{oferta.departamento ? `, ${oferta.departamento}` : ''} · {TIPO_LABEL[oferta.tipoContrato]}
+                📍 {oferta.municipio}{oferta.departamento ? `, ${oferta.departamento}` : ''}
+                {oferta.tipoPublicacion !== 'OFRECE_SERVICIO' && ` · ${TIPO_LABEL[oferta.tipoContrato]}`}
                 {(oferta.comercio?.nombre ?? oferta.publicadoPor?.nombre) && ` · ${oferta.comercio?.nombre ?? oferta.publicadoPor?.nombre}`}
               </p>
               <p className="text-base font-semibold text-[#2D6A4F] mt-2">
@@ -210,10 +211,12 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
                 </div>
               )}
 
+              {oferta.tipoPublicacion !== 'OFRECE_SERVICIO' && (
               <p className="text-xs text-[#1A1A1A]/40 mt-4">
                 {oferta.vacantes} vacante{oferta.vacantes !== 1 ? 's' : ''}
                 {oferta.fechaCierre && ` · Postulaciones hasta el ${fmtFecha(oferta.fechaCierre)}`}
               </p>
+              )}
 
               {autenticado && !esPropia && (
                 <p className="mt-3 text-xs">
@@ -251,10 +254,15 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
             <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-[#D4A017]/25 bg-[#D4A017]/8 px-4 py-3">
               <span className="text-base leading-none" aria-hidden="true">⚠️</span>
               <p className="text-xs leading-relaxed text-[#6B4E0D]">
-                <span className="font-semibold">Nunca pagues por inscribirte, tomar un curso o &quot;asegurar&quot; tu cupo.</span> Ninguna oferta real te pedirá dinero para postularte. Si te lo piden, es una estafa — denúnciala.
+                {oferta.tipoPublicacion === 'OFRECE_SERVICIO' ? (
+                  <><span className="font-semibold">Nunca pagues por adelantado antes de conocer el trabajo o verificar referencias.</span> Acuerda el pago al recibir el servicio. Si te piden dinero por adelantado, es una estafa — denúnciala.</>
+                ) : (
+                  <><span className="font-semibold">Nunca pagues por inscribirte, tomar un curso o &quot;asegurar&quot; tu cupo.</span> Ninguna oferta real te pedirá dinero para postularte. Si te lo piden, es una estafa — denúnciala.</>
+                )}
               </p>
             </div>
 
+            {oferta.tipoPublicacion !== 'OFRECE_SERVICIO' && (
             <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 mt-4">
               {!autenticado ? (
                 <Link href={`/ingresar?redirect=/empleo/${id}`} className="block text-center rounded-xl bg-[#2D6A4F] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#245a42] transition-colors">
@@ -338,6 +346,7 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
                 </>
               )}
             </div>
+            )}
 
             {otrasOfertas.length > 0 && (
               <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 mt-4">

@@ -1110,6 +1110,15 @@ enum TipoContratoEmpleo {
   OTRO
 }
 
+// Piloto Servicios Profesionales (Capítulo 3, sección 3.4.4): reutiliza
+// OfertaEmpleo en el sentido inverso — un trabajador independiente ofrece
+// su servicio en vez de que una empresa busque empleado. Sin postulación
+// ni hoja de vida: el contacto es directo por WhatsApp.
+enum TipoPublicacionEmpleo {
+  OFERTA_EMPLEO
+  OFRECE_SERVICIO
+}
+
 enum EstadoPostulacionEmpleo {
   ENVIADA
   VISTA
@@ -1123,6 +1132,7 @@ model OfertaEmpleo {
   id                Int                @id @default(autoincrement())
   publicadoPorId    Int
   comercioId        Int?
+  tipoPublicacion   TipoPublicacionEmpleo @default(OFERTA_EMPLEO)
   titulo            String
   descripcion       String
   categoria         String?

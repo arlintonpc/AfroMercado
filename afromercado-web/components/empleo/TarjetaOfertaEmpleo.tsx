@@ -26,10 +26,11 @@ export const ESTADO_POSTULACION_LABEL: Record<EstadoPostulacionEmpleo, string> =
 }
 
 export function salarioTexto(o: OfertaEmpleo): string {
-  if (o.salarioNegociable) return 'Salario negociable'
+  const esServicio = o.tipoPublicacion === 'OFRECE_SERVICIO'
+  if (o.salarioNegociable) return esServicio ? 'Tarifa negociable' : 'Salario negociable'
   if (o.salarioMin && o.salarioMax) return `${formatearPrecio(Number(o.salarioMin))} - ${formatearPrecio(Number(o.salarioMax))}`
   if (o.salarioMin) return `Desde ${formatearPrecio(Number(o.salarioMin))}`
-  return 'Salario a convenir'
+  return esServicio ? 'Tarifa a convenir' : 'Salario a convenir'
 }
 
 export function haceTiempo(iso: string): string {
@@ -98,6 +99,27 @@ export function AccionRapida({
 }) {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  if (oferta.tipoPublicacion === 'OFRECE_SERVICIO') {
+    if (usuarioId && String(oferta.publicadoPorId) === usuarioId) {
+      return <span className="text-xs font-semibold text-[#1A1A1A]/40">Tu servicio</span>
+    }
+    if (!oferta.contactoWhatsapp) {
+      return <Link href={`/empleo/${oferta.id}`} className="text-xs font-semibold text-[#2D6A4F] hover:underline">Ver detalle →</Link>
+    }
+    return (
+      <a
+        href={`https://wa.me/57${oferta.contactoWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, vi tu servicio "${oferta.titulo}" en Teravia y quiero más información.`)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors"
+        style={{ background: '#25D366' }}
+      >
+        Contactar
+      </a>
+    )
+  }
 
   async function postularme() {
     setEnviando(true)
@@ -213,9 +235,15 @@ export default function TarjetaOfertaEmpleo({
               <span className="inline-flex items-center gap-1 rounded-full bg-[#2D6A4F]/8 text-[#2D6A4F] text-xs font-semibold px-2.5 py-1">
                 📍 {oferta.municipio}
               </span>
-              <span className="inline-flex items-center rounded-full bg-[#1A1A1A]/6 text-[#1A1A1A]/60 text-xs font-semibold px-2.5 py-1">
-                {TIPO_LABEL[oferta.tipoContrato]}
-              </span>
+              {oferta.tipoPublicacion === 'OFRECE_SERVICIO' ? (
+                <span className="inline-flex items-center rounded-full bg-[#52B788]/12 text-[#1B4332] text-xs font-semibold px-2.5 py-1">
+                  🛠️ Servicio
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-[#1A1A1A]/6 text-[#1A1A1A]/60 text-xs font-semibold px-2.5 py-1">
+                  {TIPO_LABEL[oferta.tipoContrato]}
+                </span>
+              )}
               {oferta.categoria && (
                 <span className="inline-flex items-center rounded-full bg-[#D4A017]/10 text-[#9C6F0F] text-xs font-semibold px-2.5 py-1">
                   {oferta.categoria}
