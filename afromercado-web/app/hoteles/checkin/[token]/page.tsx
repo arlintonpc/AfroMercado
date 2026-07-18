@@ -77,7 +77,7 @@ export default function CheckinOnlinePage() {
         <h1 className="font-bold text-xl text-gray-900 mb-2">Check-in completado</h1>
         <p className="text-sm text-gray-500 mb-4">Todo listo para tu llegada a <strong>{hotel?.nombre}</strong></p>
         <div className="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-1 mb-6">
-          <p><span className="text-gray-400">Habitación:</span> <span className="font-medium">{hab?.nombre}</span></p>
+          <p><span className="text-gray-400">Alojamiento:</span> <span className="font-medium">{hab?.nombre}</span></p>
           <p><span className="text-gray-400">Entrada:</span> <span className="font-medium">{entrada}</span></p>
           <p><span className="text-gray-400">Check-in:</span> <span className="font-medium">{reserva?.configHotel?.checkInHora}</span></p>
           <p><span className="text-gray-400">Código:</span> <span className="font-mono font-semibold text-[#1B4332]">{reserva?.codigo}</span></p>

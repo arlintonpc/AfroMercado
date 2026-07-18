@@ -3,6 +3,30 @@ import { apiFetch } from './client'
 export type EstadoReservaHotel = 'PENDIENTE' | 'CONFIRMADA' | 'CHECKIN' | 'CHECKOUT' | 'CANCELADA' | 'RECHAZADA'
 export type EstadoHabitacionFisica = 'LIBRE' | 'OCUPADA' | 'LIMPIEZA' | 'MANTENIMIENTO' | 'BLOQUEADA'
 export type ModalidadReservaHotel = 'NOCHE' | 'HORAS'
+export type TipoAlojamiento = 'HABITACION' | 'CABANA' | 'APARTAMENTO' | 'CASA_COMPLETA' | 'FINCA' | 'GLAMPING' | 'POSADA' | 'HOSTAL' | 'ALBERGUE' | 'RESORT'
+
+export const TIPOS_ALOJAMIENTO: { value: TipoAlojamiento; label: string; labelPlural: string; icono: string }[] = [
+  { value: 'HABITACION',   label: 'Habitación',    labelPlural: 'habitaciones',    icono: '🛏️' },
+  { value: 'CABANA',       label: 'Cabaña',        labelPlural: 'cabañas',         icono: '🌲' },
+  { value: 'APARTAMENTO',  label: 'Apartamento',   labelPlural: 'apartamentos',    icono: '🏢' },
+  { value: 'CASA_COMPLETA',label: 'Casa completa', labelPlural: 'casas completas', icono: '🏠' },
+  { value: 'FINCA',        label: 'Finca',         labelPlural: 'fincas',          icono: '🌾' },
+  { value: 'GLAMPING',     label: 'Glamping',      labelPlural: 'glampings',       icono: '⛺' },
+  { value: 'POSADA',       label: 'Posada',        labelPlural: 'posadas',         icono: '🏡' },
+  { value: 'HOSTAL',       label: 'Hostal',        labelPlural: 'hostales',        icono: '🎒' },
+  { value: 'ALBERGUE',     label: 'Albergue',      labelPlural: 'albergues',       icono: '🏘️' },
+  { value: 'RESORT',       label: 'Resort',        labelPlural: 'resorts',         icono: '🏖️' },
+]
+
+export const LABEL_TIPO_ALOJAMIENTO: Record<TipoAlojamiento, string> =
+  Object.fromEntries(TIPOS_ALOJAMIENTO.map(t => [t.value, t.label])) as Record<TipoAlojamiento, string>
+
+export const LABEL_PLURAL_TIPO_ALOJAMIENTO: Record<TipoAlojamiento, string> =
+  Object.fromEntries(TIPOS_ALOJAMIENTO.map(t => [t.value, t.labelPlural])) as Record<TipoAlojamiento, string>
+
+// Tipos donde lo normal es una sola unidad completa (no N unidades idénticas) —
+// se usa para sugerir cantidad=1 y ocultar "reservas por horas" en el formulario.
+export const TIPOS_ALOJAMIENTO_UNIDAD_UNICA: TipoAlojamiento[] = ['CABANA', 'CASA_COMPLETA', 'FINCA', 'GLAMPING']
 
 export interface TemporadaHotel {
   id: number
@@ -35,6 +59,7 @@ export interface HabitacionFisica {
 export interface HabitacionTipo {
   id: number
   configHotelId: number
+  tipoAlojamiento: TipoAlojamiento
   nombre: string
   descripcion?: string | null
   capacidad: number

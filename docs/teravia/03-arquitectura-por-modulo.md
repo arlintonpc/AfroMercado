@@ -20,7 +20,7 @@ El Capítulo 0 (Proyecto Maestro) ya advertía que la lista de 15 componentes de
 | 5 | Productores agropecuarios | ⚠️ **No existe como módulo** | Es solo una categoría de producto dentro del Marketplace (1) — el productor no tiene identidad, flujo ni beneficios propios |
 | 6 | Artesanos | ⚠️ **No existe como módulo** | Igual que (5): solo categoría de producto, sin identidad propia |
 | 7 | Eventos | ✅ Construido completo, con matiz | Es agenda cultural/patrimonial con boletería (módulo "Cultura"), no un módulo genérico de eventos corporativos |
-| 8 | Directorio empresarial | 🟡 Construido parcial | Existe, pero es una vitrina B2G para compra pública ("nunca dinero, factura ni checkout" — así lo etiqueta el propio código), no un directorio empresarial general |
+| 8 | Directorio empresarial | ✅ Construido completo | Dos módulos separados: el directorio general público (`/directorio`, cualquier ciudadano busca cualquier comercio verificado, con paginación y ficha de detalle) y el directorio B2G de compras públicas (`/directorio-compras-publicas`, solo comercios con `disponibleComprasPublicas=true`, sin transacción) — ver nota de corrección al final de la sección 3.3 |
 | 9 | Servicios profesionales | ❌ **No existe en absoluto** | Cero rastro en el código |
 | 10 | Empleo | ✅ Construido completo | Postulación con hoja de vida, moderación, denuncias |
 | 11 | Bienes raíces | ❌ **No existe en absoluto** | Cero rastro en el código |
@@ -29,7 +29,7 @@ El Capítulo 0 (Proyecto Maestro) ya advertía que la lista de 15 componentes de
 | 14 | Inteligencia Artificial | ❌ **No existe en absoluto** | Cero rastro en el código |
 | 15 | Analítica territorial | 🟡 Construido parcial | Existe un panel de reportes admin (ventas por municipio/departamento, cohortes, riesgo), pero no es una plataforma de analítica geoespacial ni predictiva — es un dashboard de BI interno |
 
-**Lectura sin adornos:** de 15 componentes declarados, **6 están construidos de extremo a extremo**, **4 están construidos parcialmente con una brecha real entre lo que dicen ser y lo que hacen**, y **4 no existen en absoluto** más allá de la intención. Esto no es un fracaso — es exactamente lo esperable para una plataforma construida por un equipo reducido en el tiempo que lleva TERAVIA. Pero un documento que presente los 15 como equivalentes pierde credibilidad en la primera revisión técnica seria. Las secciones siguientes tratan cada grupo con el nivel de detalle que le corresponde.
+**Lectura sin adornos:** de 15 componentes declarados, **7 están construidos de extremo a extremo**, **3 están construidos parcialmente con una brecha real entre lo que dicen ser y lo que hacen**, y **4 no existen en absoluto** más allá de la intención. Esto no es un fracaso — es exactamente lo esperable para una plataforma construida por un equipo reducido en el tiempo que lleva TERAVIA. Pero un documento que presente los 15 como equivalentes pierde credibilidad en la primera revisión técnica seria. Las secciones siguientes tratan cada grupo con el nivel de detalle que le corresponde.
 
 ---
 
@@ -51,6 +51,10 @@ Empleo está completo (postulación, hoja de vida, moderación), pero es tambié
 
 El componente "Eventos" de la lista de 15 en realidad es un módulo de **agenda cultural y patrimonial con boletería** — más cercano a preservación e identidad territorial que a "eventos" en el sentido corporativo (ferias, conferencias). Esto no es un defecto: es coherente con el propósito de TERAVIA. Pero el Capítulo 0 debería renombrar este componente en la lista pública de 15 a algo más preciso ("Cultura y patrimonio territorial") para no generar expectativa de un módulo de eventos genérico que no existe.
 
+### 3.2.5 Directorio empresarial general — completado después de esta auditoría
+
+A diferencia de los cuatro módulos anteriores, este no estaba completo cuando se auditó el código por primera vez (2026-07-16) — ver la nota de corrección en la sección 3.3 para el detalle. Hoy `/directorio` permite a cualquier ciudadano, sin login, buscar cualquier comercio verificado por departamento, municipio, categoría o nombre, con paginación real y ficha de detalle. Es un módulo distinto y separado del directorio B2G de compras públicas (sección 3.3, antes de la corrección).
+
 ---
 
 ## 3.3 Módulos parciales: la brecha entre la etiqueta y el código
@@ -61,19 +65,18 @@ El hallazgo del Capítulo 2 (sección 2.2) explica exactamente por qué el módu
 
 ### 3.3.2 Pagos digitales — el riesgo más operativo del ecosistema hoy
 
-Este es, de los cuatro módulos parciales, el que más urge resolver. El código de integración con Wompi (incluyendo dispersión hacia comercios) está completo, pero sin credenciales reales configuradas en producción, la plataforma opera hoy con pagos manuales verificados por comprobante. Esto tiene dos implicaciones serias:
+Este es, de los tres módulos parciales, el que más urge resolver. El código de integración con Wompi (incluyendo dispersión hacia comercios) está completo, pero sin credenciales reales configuradas en producción, la plataforma opera hoy con pagos manuales verificados por comprobante. Esto tiene dos implicaciones serias:
 
 1. **Operativa:** cada pago manual es fricción y riesgo de fraude/error humano que una pasarela activa eliminaría.
 2. **De cumplimiento (conecta directo con el Capítulo 2, sección 2.4):** cuanto más crece el volumen de transacciones en efectivo/manual, más se acerca el operador a los umbrales de la Ley 1581 y a la exposición del tipo de sanción que la SIC ya aplicó a Rappi en 2026 — sin siquiera tener el beneficio operativo de una pasarela activa que automatice la trazabilidad.
 
 **Recomendación de secuencia:** activar Wompi en producción debería tratarse como prioridad de infraestructura, no como una mejora incremental más en la lista de features — es lo que separa a TERAVIA de operar como un directorio con coordinación manual de pagos, de operar como una plataforma transaccional real.
 
-### 3.3.3 Directorio empresarial (B2G) y Analítica territorial — dos productos válidos, mal etiquetados
+### 3.3.3 Analítica territorial — producto válido, mal etiquetado
 
-Ambos existen y funcionan, pero no son lo que su nombre en la lista de 15 sugiere:
+La "Analítica territorial" es hoy un panel de reportes de venta por municipio para uso interno/administrativo — no una plataforma de inteligencia territorial vendible a terceros. La investigación de mercado (sección 3.4.5) muestra que sí existe una categoría comercial real de "analítica territorial como servicio" en Colombia (geomarketing), pero orientada a decisiones de expansión de retail privado, no necesariamente a gobiernos — un dato que cambia a quién se le vendería este producto si se decide construirlo de verdad.
 
-- El "Directorio empresarial" es, en código, una vitrina de descubrimiento para compra pública local (B2G) — sin transacción. Es un producto legítimo y potencialmente valioso (conecta con el segmento institucional identificado en el Capítulo 1 como "sin respaldo cuantitativo"), pero no es un directorio empresarial general para que cualquier ciudadano encuentre cualquier negocio.
-- La "Analítica territorial" es hoy un panel de reportes de venta por municipio para uso interno/administrativo — no una plataforma de inteligencia territorial vendible a terceros. La investigación de mercado (sección 3.4.5) muestra que sí existe una categoría comercial real de "analítica territorial como servicio" en Colombia (geomarketing), pero orientada a decisiones de expansión de retail privado, no necesariamente a gobiernos — un dato que cambia a quién se le vendería este producto si se decide construirlo de verdad.
+> **Nota de corrección (2026-07-18):** esta sección originalmente agrupaba aquí también al "Directorio empresarial (B2G)", describiéndolo como vitrina de compra pública sin equivalente general para el ciudadano. Eso era correcto el 2026-07-16, pero dejó de serlo: se construyó un directorio empresarial general independiente (`/directorio`, sin autenticación, con paginación y ficha de detalle) que sí cubre ese hueco. El directorio B2G (`/directorio-compras-publicas`) sigue existiendo tal cual se describía, solo que ahora es un módulo adicional junto al general, no el único. Ver sección 3.1 (fila 8) y sección 3.2.5.
 
 ---
 
@@ -119,8 +122,8 @@ Esta era la sección con más riesgo de quedar vacía de contenido real, y la in
 
 ## 3.5 Síntesis: qué hacer con esta información
 
-1. **No se necesitan 15 frentes de desarrollo simultáneos.** El ecosistema ya tiene 6 módulos completos que comparten una base técnica común (Prisma + Next.js + patrón de checkout/reseñas) — consolidar esa base y llevar los 4 módulos parciales a completos genera más valor inmediato que abrir cualquiera de los 4 módulos inexistentes.
-2. **Orden de prioridad sugerido para los módulos parciales, por urgencia real:** (1) Pagos digitales — activar Wompi, es riesgo operativo y de cumplimiento acumulándose cada día; (2) integrar Transporte fluvial con la logística de Express/Marketplace; (3) decidir si el Directorio B2G y la Analítica se desarrollan como productos completos o se dejan como están, con expectativa correctamente calibrada en la comunicación pública del proyecto.
+1. **No se necesitan 15 frentes de desarrollo simultáneos.** El ecosistema ya tiene 7 módulos completos que comparten una base técnica común (Prisma + Next.js + patrón de checkout/reseñas) — consolidar esa base y llevar los 3 módulos parciales a completos genera más valor inmediato que abrir cualquiera de los 4 módulos inexistentes.
+2. **Orden de prioridad sugerido para los módulos parciales, por urgencia real:** (1) Pagos digitales — activar Wompi, es riesgo operativo y de cumplimiento acumulándose cada día; (2) integrar Transporte fluvial con la logística de Express/Marketplace; (3) decidir si la Analítica territorial se desarrolla como producto completo/vendible o se deja como panel interno, con expectativa correctamente calibrada en la comunicación pública del proyecto.
 3. **De los 4 módulos inexistentes, no todos merecen inversión en el mismo horizonte de tiempo:**
    - **Agro** tiene el caso más claro y de corto plazo: diferenciarse del Estado siendo la capa transaccional que "El Campo a un Clic" admite no cubrir.
    - **Artesanos** debería explorarse como alianza con Artesanías de Colombia antes que como producto propio — competir de frente no tiene sentido económico.

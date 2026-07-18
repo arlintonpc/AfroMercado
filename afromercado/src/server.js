@@ -1335,6 +1335,17 @@ async function aplicarMigraciones() {
     END $$`,
     `ALTER TABLE "PedidoExpress" DROP CONSTRAINT IF EXISTS "PedidoExpress_repartidorId_fkey"`,
     `ALTER TABLE "PedidoExpress" DROP COLUMN IF EXISTS "repartidorId"`,
+
+    // ── Módulo Hotel: categorías de alojamiento (cabaña, apartamento, casa completa, finca, glamping, posada) ──
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoAlojamiento') THEN
+        CREATE TYPE "TipoAlojamiento" AS ENUM ('HABITACION', 'CABANA', 'APARTAMENTO', 'CASA_COMPLETA', 'FINCA', 'GLAMPING', 'POSADA');
+      END IF;
+    END $$`,
+    `ALTER TABLE "HabitacionTipo" ADD COLUMN IF NOT EXISTS "tipoAlojamiento" "TipoAlojamiento" NOT NULL DEFAULT 'HABITACION'`,
+    `ALTER TYPE "TipoAlojamiento" ADD VALUE IF NOT EXISTS 'HOSTAL'`,
+    `ALTER TYPE "TipoAlojamiento" ADD VALUE IF NOT EXISTS 'ALBERGUE'`,
+    `ALTER TYPE "TipoAlojamiento" ADD VALUE IF NOT EXISTS 'RESORT'`,
   ];
   for (const sql of migraciones) {
     try {

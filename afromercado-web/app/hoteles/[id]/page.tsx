@@ -4,7 +4,14 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { obtenerHotel, verificarDisponibilidad, crearReserva, crearReservaMultiple, misReservasHotel, listarHoteles, iniciarPagoReserva, validarCuponHotel, esFavoritoHotel, toggleFavoritoHotel, type ConfigHotel, type HabitacionTipo, type ReservaHotel, type ReservaMultipleResultado, type ValidacionCupon, type TemporadaHotel, type ModalidadReservaHotel } from '@/lib/api/hotel'
+import { obtenerHotel, verificarDisponibilidad, crearReserva, crearReservaMultiple, misReservasHotel, listarHoteles, iniciarPagoReserva, validarCuponHotel, esFavoritoHotel, toggleFavoritoHotel, TIPOS_ALOJAMIENTO, LABEL_TIPO_ALOJAMIENTO, LABEL_PLURAL_TIPO_ALOJAMIENTO, type ConfigHotel, type HabitacionTipo, type ReservaHotel, type ReservaMultipleResultado, type ValidacionCupon, type TemporadaHotel, type ModalidadReservaHotel } from '@/lib/api/hotel'
+
+function labelTipo(hab: Pick<HabitacionTipo, 'tipoAlojamiento'>): string {
+  return LABEL_TIPO_ALOJAMIENTO[hab.tipoAlojamiento ?? 'HABITACION']
+}
+function labelTipoPlural(hab: Pick<HabitacionTipo, 'tipoAlojamiento'>): string {
+  return LABEL_PLURAL_TIPO_ALOJAMIENTO[hab.tipoAlojamiento ?? 'HABITACION']
+}
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import CalendarioReserva from '@/components/hoteles/CalendarioReserva'
@@ -301,6 +308,9 @@ function TarjetaHabitacion({ hab, cantidad, onCantidad, onReservar, onVerFotos }
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-bold text-gray-900 text-xl leading-tight">{hab.nombre}</h3>
+                <span className="inline-flex items-center gap-1 bg-[#1B4332]/8 text-[#1B4332] text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0">
+                  {TIPOS_ALOJAMIENTO.find(t => t.value === (hab.tipoAlojamiento ?? 'HABITACION'))?.icono} {labelTipo(hab)}
+                </span>
                 {hab.videoUrl && (
                   <span className="inline-flex items-center gap-1 bg-black text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0">
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -315,7 +325,7 @@ function TarjetaHabitacion({ hab, cantidad, onCantidad, onReservar, onVerFotos }
                 </span>
                 <span className="flex items-center gap-1.5">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                  {hab.cantidad} {hab.cantidad === 1 ? 'habitación' : 'habitaciones'} disponibles
+                  {hab.cantidad} {hab.cantidad === 1 ? labelTipo(hab) : labelTipoPlural(hab)} disponible{hab.cantidad === 1 ? '' : 's'}
                 </span>
               </div>
             </div>
@@ -366,7 +376,7 @@ function TarjetaHabitacion({ hab, cantidad, onCantidad, onReservar, onVerFotos }
           <div className="mt-auto pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <p className="text-xs text-gray-400 hidden sm:block">Sin cobros ocultos · Cancelación flexible</p>
-              <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-1 py-1" title="Cantidad de habitaciones de este tipo">
+              <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-1 py-1" title={`Cantidad de ${labelTipoPlural(hab)} de este tipo`}>
                 <button
                   type="button"
                   onClick={() => onCantidad(Math.max(0, cantidad - 1))}
@@ -427,7 +437,7 @@ function WidgetReserva({ hotel, habitaciones, habIdx, fechaEntrada, fechaSalida,
 
       {habitaciones.length > 1 && (
         <div className="mb-4">
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Habitación</label>
+          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Alojamiento</label>
           <select value={habIdx} onChange={e => onHabIdx(Number(e.target.value))}
             className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#1B4332] bg-white">
             {habitaciones.map((h, i) => (
@@ -679,7 +689,7 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
               <p className="font-semibold text-gray-900">{resumenEstadia}</p>
               {disponibilidad !== null && (
                 <p className={`text-xs mt-0.5 font-medium ${disponibilidad.disponibles > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                  {disponibilidad.disponibles > 0 ? `✓ ${disponibilidad.disponibles} habitación(es) disponible(s)` : '✗ Sin disponibilidad'}
+                  {disponibilidad.disponibles > 0 ? `✓ ${disponibilidad.disponibles} ${disponibilidad.disponibles === 1 ? labelTipo(habitacion) : labelTipoPlural(habitacion)} disponible(s)` : '✗ Sin disponibilidad'}
                 </p>
               )}
             </div>
@@ -1204,7 +1214,7 @@ export default function HotelDetallePage() {
               <span className="text-2xl">🛏️</span>
               <div className="text-left">
                 <p className="font-bold text-gray-900 text-sm">
-                  {hotel.habitaciones.length === 1 ? '1 tipo de habitación disponible' : `${hotel.habitaciones.length} tipos de habitación disponibles`}
+                  {hotel.habitaciones.length === 1 ? '1 tipo de alojamiento disponible' : `${hotel.habitaciones.length} tipos de alojamiento disponibles`}
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Desde {formatearPrecio(Math.min(...hotel.habitaciones.map(h => Number(h.precioPorNoche))))} / noche
@@ -1314,13 +1324,13 @@ export default function HotelDetallePage() {
             {/* HABITACIONES */}
             <div data-rooms className="py-6 border-b border-gray-100">
               <h2 className="text-xl font-bold text-gray-900 mb-1">
-                Habitaciones disponibles
+                Alojamientos disponibles
               </h2>
-              <p className="text-sm text-gray-400 mb-5">{hotel.habitaciones.length} tipo{hotel.habitaciones.length !== 1 ? 's' : ''} de habitación</p>
+              <p className="text-sm text-gray-400 mb-5">{hotel.habitaciones.length} tipo{hotel.habitaciones.length !== 1 ? 's' : ''} de alojamiento</p>
               {hotel.habitaciones.length === 0 ? (
                 <div className="bg-gray-50 rounded-2xl p-10 text-center text-gray-400">
                   <p className="text-5xl mb-3">🛏️</p>
-                  <p>Sin habitaciones publicadas</p>
+                  <p>Sin alojamientos publicados</p>
                 </div>
               ) : (
                 <div className="space-y-5">
@@ -1340,7 +1350,7 @@ export default function HotelDetallePage() {
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-[#1B4332] bg-[#F0FDF4] px-5 py-4">
                   <div>
                     <p className="font-bold text-gray-900 text-sm">
-                      {totalHabitacionesSeleccionadas} habitaciones seleccionadas
+                      {totalHabitacionesSeleccionadas} unidades seleccionadas
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">
                       {hotel.habitaciones
@@ -1352,7 +1362,7 @@ export default function HotelDetallePage() {
                   <button
                     onClick={() => { if (!autenticado) { router.push('/ingresar'); return }; setReservaMultipleAbierta(true) }}
                     className="flex-shrink-0 bg-[#1B4332] hover:bg-[#15362A] active:scale-[0.98] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-sm whitespace-nowrap">
-                    Reservar {totalHabitacionesSeleccionadas} habitaciones
+                    Reservar {totalHabitacionesSeleccionadas} unidades
                   </button>
                 </div>
               )}

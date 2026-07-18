@@ -978,7 +978,7 @@ const HotelService = {
     if (!cfg) throw new ErrorNoEncontrado("Configura el hotel primero");
     const {
       nombre, descripcion, capacidad, precioPorNoche, cantidad, fotos, serviciosExtra,
-      precioPorHora, permitePorHoras, duracionMinHoras, duracionMaxHoras,
+      precioPorHora, permitePorHoras, duracionMinHoras, duracionMaxHoras, tipoAlojamiento,
     } = datos;
     if (!nombre || !precioPorNoche) throw new ErrorValidacion("Nombre y precio son obligatorios");
     if (permitePorHoras && (!precioPorHora || Number(precioPorHora) <= 0)) {
@@ -987,6 +987,7 @@ const HotelService = {
     return prisma.habitacionTipo.create({
       data: {
         configHotelId: cfg.id,
+        tipoAlojamiento: tipoAlojamiento || "HABITACION",
         nombre,
         descripcion: descripcion || null,
         capacidad:   Number(capacidad) || 2,
@@ -1009,7 +1010,7 @@ const HotelService = {
     if (!hab) throw new ErrorNoEncontrado("Habitación no encontrada");
     const {
       nombre, descripcion, capacidad, precioPorNoche, cantidad, fotos, serviciosExtra, activo,
-      precioPorHora, permitePorHoras, duracionMinHoras, duracionMaxHoras,
+      precioPorHora, permitePorHoras, duracionMinHoras, duracionMaxHoras, tipoAlojamiento,
     } = datos;
     const permitePorHorasFinal = permitePorHoras !== undefined ? !!permitePorHoras : hab.permitePorHoras;
     const precioPorHoraFinal = precioPorHora !== undefined ? Number(precioPorHora) : Number(hab.precioPorHora || 0);
@@ -1017,6 +1018,7 @@ const HotelService = {
       throw new ErrorValidacion("Define un precio por hora valido para activar reservas por horas");
     }
     const data = {
+      tipoAlojamiento,
       nombre,
       descripcion,
       capacidad: capacidad !== undefined ? Number(capacidad) : undefined,

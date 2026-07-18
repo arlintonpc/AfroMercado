@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { listarHoteles, type ConfigHotel } from '@/lib/api/hotel'
+import { listarHoteles, type ConfigHotel, type TipoAlojamiento, TIPOS_ALOJAMIENTO } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { optimizarImagenPequena } from '@/lib/cloudinary'
 
@@ -53,6 +53,11 @@ function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat
   const desde = hotel.habitaciones.length > 0
     ? Math.min(...hotel.habitaciones.map(h => Number(h.precioPorNoche)))
     : null
+  const tiposDistintos = new Set(hotel.habitaciones.map(h => h.tipoAlojamiento ?? 'HABITACION'))
+  const tipoUnico = tiposDistintos.size === 1 ? [...tiposDistintos][0] as TipoAlojamiento : null
+  const badgeTipo = tipoUnico && tipoUnico !== 'HABITACION'
+    ? TIPOS_ALOJAMIENTO.find(t => t.value === tipoUnico)
+    : tiposDistintos.size > 1 ? { icono: '✨', label: 'Varios tipos' } : null
   const dist = userLat && userLon && hotel.comercio.latitud && hotel.comercio.longitud
     ? distanciaKm(userLat, userLon, hotel.comercio.latitud, hotel.comercio.longitud)
     : null
@@ -77,12 +82,15 @@ function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
-        {/* Badge urgencia */}
-        {hotel.habitaciones.length === 1 && (
-          <div className="absolute top-3 left-3">
-            <span className="bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded-full">🔥 Última habitación</span>
-          </div>
-        )}
+        {/* Badge de tipo + urgencia */}
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
+          {badgeTipo && (
+            <span className="bg-white/90 backdrop-blur-sm text-[#1B4332] text-[10px] font-bold px-2.5 py-1 rounded-full">{badgeTipo.icono} {badgeTipo.label}</span>
+          )}
+          {hotel.habitaciones.length === 1 && (
+            <span className="bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded-full">🔥 Última unidad</span>
+          )}
+        </div>
 
         {/* Precio */}
         <div className="absolute top-3 right-3">
@@ -133,7 +141,7 @@ function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat
             <span className="text-[11px] text-gray-400">Sin reseñas aún</span>
           )}
           {hotel.habitaciones.length > 0 && (
-            <p className="text-[11px] text-gray-400 mt-0.5">{hotel.habitaciones.length} tipo{hotel.habitaciones.length !== 1 ? 's' : ''} de habitación</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">{hotel.habitaciones.length} tipo{hotel.habitaciones.length !== 1 ? 's' : ''} de alojamiento</p>
           )}
         </div>
         {hotel.servicios.length > 0 && (
@@ -150,8 +158,8 @@ function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat
 
 function PanelFiltros({ onClose, filtros, onChange }: {
   onClose: () => void
-  filtros: { precioMax: number; capacidad: number; servicios: string[] }
-  onChange: (f: { precioMax: number; capacidad: number; servicios: string[] }) => void
+  filtros: { precioMax: number; capacidad: number; servicios: string[]; tipos: TipoAlojamiento[] }
+  onChange: (f: { precioMax: number; capacidad: number; servicios: string[]; tipos: TipoAlojamiento[] }) => void
 }) {
   const [local, setLocal] = useState(filtros)
 
@@ -191,6 +199,21 @@ function PanelFiltros({ onClose, filtros, onChange }: {
               </div>
             </div>
             <div>
+              <label className="text-sm font-semibold text-[#111] block mb-3">Tipo de alojamiento</label>
+              <div className="flex flex-wrap gap-2">
+                {TIPOS_ALOJAMIENTO.map(t => {
+                  const sel = local.tipos.includes(t.value)
+                  return (
+                    <button key={t.value} onClick={() => setLocal(p => ({
+                      ...p, tipos: sel ? p.tipos.filter(x => x !== t.value) : [...p.tipos, t.value]
+                    }))} className={`px-4 py-2 rounded-full text-xs font-semibold border-2 transition-colors ${
+                      sel ? 'bg-[#1B4332] text-white border-[#1B4332]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#1B4332]'
+                    }`}>{t.icono} {t.label}</button>
+                  )
+                })}
+              </div>
+            </div>
+            <div>
               <label className="text-sm font-semibold text-[#111] block mb-3">Servicios</label>
               <div className="flex flex-wrap gap-2">
                 {SERVICIOS_FILTRO.map(s => {
@@ -207,7 +230,7 @@ function PanelFiltros({ onClose, filtros, onChange }: {
             </div>
           </div>
           <div className="flex gap-3 mt-8">
-            <button onClick={() => { setLocal({ precioMax: 0, capacidad: 1, servicios: [] }); onChange({ precioMax: 0, capacidad: 1, servicios: [] }); onClose() }}
+            <button onClick={() => { const vacio = { precioMax: 0, capacidad: 1, servicios: [], tipos: [] as TipoAlojamiento[] }; setLocal(vacio); onChange(vacio); onClose() }}
               className="flex-1 border-2 border-gray-200 text-gray-600 font-semibold py-3 rounded-2xl text-sm hover:border-gray-300 transition-colors">
               Limpiar
             </button>
@@ -233,7 +256,7 @@ export default function HotelesPage() {
   const [gpsCargando, setGpsCargando] = useState(false)
   const [gpsCiudad, setGpsCiudad] = useState('')
   const [mostrarFiltros, setMostrarFiltros] = useState(false)
-  const [filtros, setFiltros] = useState({ precioMax: 0, capacidad: 1, servicios: [] as string[] })
+  const [filtros, setFiltros] = useState({ precioMax: 0, capacidad: 1, servicios: [] as string[], tipos: [] as TipoAlojamiento[] })
 
   useEffect(() => {
     const t = setTimeout(() => setTardando(true), 6000)
@@ -259,8 +282,8 @@ export default function HotelesPage() {
     )
   }
 
-  const filtrosActivos = filtros.precioMax > 0 || filtros.capacidad > 1 || filtros.servicios.length > 0
-  const nFiltros = [filtros.precioMax > 0, filtros.capacidad > 1, filtros.servicios.length > 0].filter(Boolean).length
+  const filtrosActivos = filtros.precioMax > 0 || filtros.capacidad > 1 || filtros.servicios.length > 0 || filtros.tipos.length > 0
+  const nFiltros = [filtros.precioMax > 0, filtros.capacidad > 1, filtros.servicios.length > 0, filtros.tipos.length > 0].filter(Boolean).length
 
   const filtrados = hoteles.filter(h => {
     if (busqueda) {
@@ -276,6 +299,7 @@ export default function HotelesPage() {
       if (maxCap < filtros.capacidad) return false
     }
     if (filtros.servicios.length > 0 && !filtros.servicios.every(s => h.servicios.includes(s))) return false
+    if (filtros.tipos.length > 0 && !h.habitaciones.some(hab => filtros.tipos.includes(hab.tipoAlojamiento ?? 'HABITACION'))) return false
     return true
   })
 
@@ -445,7 +469,7 @@ export default function HotelesPage() {
                   </button>
                 )}
                 {filtrosActivos && (
-                  <button onClick={() => setFiltros({ precioMax: 0, capacidad: 1, servicios: [] })}
+                  <button onClick={() => setFiltros({ precioMax: 0, capacidad: 1, servicios: [], tipos: [] })}
                     className="px-5 py-2 bg-[#1B4332] text-white rounded-full text-sm font-medium hover:bg-[#2D6A4F] transition-colors">
                     Quitar filtros
                   </button>

@@ -14,7 +14,8 @@ import {
   obtenerEstadisticasHotel,
   type ConfigHotel, type HabitacionTipo, type HabitacionFisica, type ReservaHotel,
   type EstadoReservaHotel, type EstadoHabitacionFisica, type BloqueoFecha, type CuponHotel,
-  type TemporadaHotel, type EstadisticasHotel,
+  type TemporadaHotel, type EstadisticasHotel, type TipoAlojamiento,
+  TIPOS_ALOJAMIENTO, TIPOS_ALOJAMIENTO_UNIDAD_UNICA,
 } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { obtenerToken } from '@/lib/api/client'
@@ -72,10 +73,19 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
   onCancelar: () => void
 }) {
   const [form, setForm] = useState<Partial<HabitacionTipo>>({
-    nombre: '', descripcion: '', capacidad: 2, precioPorNoche: 80000, cantidad: 1,
+    tipoAlojamiento: 'HABITACION', nombre: '', descripcion: '', capacidad: 2, precioPorNoche: 80000, cantidad: 1,
     precioPorHora: null, permitePorHoras: false, duracionMinHoras: 2, duracionMaxHoras: null,
     fotos: [], serviciosExtra: [], ...inicial,
   })
+  const esUnidadUnica = TIPOS_ALOJAMIENTO_UNIDAD_UNICA.includes(form.tipoAlojamiento ?? 'HABITACION')
+
+  function cambiarTipo(tipo: TipoAlojamiento) {
+    setForm(p => ({
+      ...p,
+      tipoAlojamiento: tipo,
+      ...(TIPOS_ALOJAMIENTO_UNIDAD_UNICA.includes(tipo) ? { cantidad: 1, permitePorHoras: false } : {}),
+    }))
+  }
   const [subiendoFotos, setSubiendoFotos] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
@@ -170,6 +180,19 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
           </div>
           <div className="space-y-3">
             <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de alojamiento</label>
+              <div className="flex flex-wrap gap-1.5">
+                {TIPOS_ALOJAMIENTO.map(t => (
+                  <button key={t.value} type="button" onClick={() => cambiarTipo(t.value)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-colors ${
+                      form.tipoAlojamiento === t.value ? 'bg-[#1B4332] text-white border-[#1B4332]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#1B4332]'
+                    }`}>
+                    {t.icono} {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Nombre *</label>
               <input value={form.nombre ?? ''} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))}
                 placeholder="Ej: Habitación Doble, Suite Junior"
@@ -181,7 +204,7 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
                 rows={2} placeholder="Describe la habitación…"
                 className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F] resize-none" />
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className={esUnidadUnica ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-3 gap-2'}>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Capacidad</label>
                 <input type="number" min={1} value={form.capacidad ?? 2} onChange={e => setForm(p => ({ ...p, capacidad: Number(e.target.value) }))}
@@ -192,46 +215,53 @@ function FormHabitacion({ inicial, onGuardar, onCancelar }: {
                 <input type="number" min={0} value={form.precioPorNoche ?? ''} onChange={e => setForm(p => ({ ...p, precioPorNoche: Number(e.target.value) }))}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
-                <input type="number" min={1} value={form.cantidad ?? 1} onChange={e => setForm(p => ({ ...p, cantidad: Number(e.target.value) }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
-              </div>
-            </div>
-
-            <div className={`rounded-2xl border p-3 transition-colors ${
-              form.permitePorHoras ? 'border-[#2D6A4F]/25 bg-[#F4FBF7]' : 'border-gray-100 bg-gray-50'
-            }`}>
-              <div className="flex items-start justify-between gap-3">
+              {!esUnidadUnica && (
                 <div>
-                  <p className="text-sm font-bold text-[#1A1A1A]">Reservas por horas</p>
-                  <p className="text-xs text-gray-500">Ideal para hoteles por turnos, day pass o descansos cortos.</p>
-                </div>
-                <Switch
-                  activo={!!form.permitePorHoras}
-                  onChange={v => setForm(p => ({ ...p, permitePorHoras: v }))}
-                />
-              </div>
-              {form.permitePorHoras && (
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Precio/hora *</label>
-                    <input type="number" min={0} value={form.precioPorHora ?? ''} onChange={e => setForm(p => ({ ...p, precioPorHora: Number(e.target.value) }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Min. horas</label>
-                    <input type="number" min={1} value={form.duracionMinHoras ?? 2} onChange={e => setForm(p => ({ ...p, duracionMinHoras: Number(e.target.value) }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Max. horas</label>
-                    <input type="number" min={1} value={form.duracionMaxHoras ?? ''} placeholder="Libre" onChange={e => setForm(p => ({ ...p, duracionMaxHoras: e.target.value ? Number(e.target.value) : null }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
-                  </div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
+                  <input type="number" min={1} value={form.cantidad ?? 1} onChange={e => setForm(p => ({ ...p, cantidad: Number(e.target.value) }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
                 </div>
               )}
             </div>
+
+            {!esUnidadUnica && (
+              <div className={`rounded-2xl border p-3 transition-colors ${
+                form.permitePorHoras ? 'border-[#2D6A4F]/25 bg-[#F4FBF7]' : 'border-gray-100 bg-gray-50'
+              }`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-[#1A1A1A]">Reservas por horas</p>
+                    <p className="text-xs text-gray-500">Ideal para hoteles por turnos, day pass o descansos cortos.</p>
+                  </div>
+                  <Switch
+                    activo={!!form.permitePorHoras}
+                    onChange={v => setForm(p => ({ ...p, permitePorHoras: v }))}
+                  />
+                </div>
+                {form.permitePorHoras && (
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Precio/hora *</label>
+                      <input type="number" min={0} value={form.precioPorHora ?? ''} onChange={e => setForm(p => ({ ...p, precioPorHora: Number(e.target.value) }))}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Min. horas</label>
+                      <input type="number" min={1} value={form.duracionMinHoras ?? 2} onChange={e => setForm(p => ({ ...p, duracionMinHoras: Number(e.target.value) }))}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Max. horas</label>
+                      <input type="number" min={1} value={form.duracionMaxHoras ?? ''} placeholder="Libre" onChange={e => setForm(p => ({ ...p, duracionMaxHoras: e.target.value ? Number(e.target.value) : null }))}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2D6A4F]" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {esUnidadUnica && (
+              <p className="text-xs text-gray-400 -mt-1">Se publica como una sola unidad completa (cantidad 1). Si necesitas varias unidades idénticas, usa Habitación o Apartamento.</p>
+            )}
 
             {/* Fotos */}
             <div>
@@ -1862,9 +1892,12 @@ export default function ComercianteHotelesPage() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="font-bold text-[#1A1A1A]">{hab.nombre}</h3>
+                      <span className="text-[10px] font-bold text-[#1B4332] bg-[#1B4332]/8 px-2 py-0.5 rounded-full">
+                        {TIPOS_ALOJAMIENTO.find(t => t.value === hab.tipoAlojamiento)?.icono ?? '🛏️'} {TIPOS_ALOJAMIENTO.find(t => t.value === hab.tipoAlojamiento)?.label ?? 'Habitación'}
+                      </span>
                       {!hab.activo && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactiva</span>}
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">👤 {hab.capacidad} personas · {hab.cantidad} habitación{hab.cantidad !== 1 ? 'es' : ''}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">👤 {hab.capacidad} personas · {hab.cantidad} {hab.cantidad !== 1 ? 'unidades' : 'unidad'}</p>
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className="font-bold text-[#2D6A4F]">{formatearPrecio(Number(hab.precioPorNoche))}</p>

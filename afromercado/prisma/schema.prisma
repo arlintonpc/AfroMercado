@@ -1943,9 +1943,23 @@ model ConfigHotel {
   @@index([activo])
 }
 
+enum TipoAlojamiento {
+  HABITACION
+  CABANA
+  APARTAMENTO
+  CASA_COMPLETA
+  FINCA
+  GLAMPING
+  POSADA
+  HOSTAL
+  ALBERGUE
+  RESORT
+}
+
 model HabitacionTipo {
   id              Int         @id @default(autoincrement())
   configHotelId   Int
+  tipoAlojamiento TipoAlojamiento @default(HABITACION)
   nombre          String
   descripcion     String?
   capacidad       Int         @default(2)
