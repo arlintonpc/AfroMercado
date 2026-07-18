@@ -187,7 +187,27 @@ async function iniciarWhatsApp() {
       }
     });
 
-    socketWA.ev.on("messages.upsert", () => {});
+    socketWA.ev.on("messages.upsert", async ({ messages, type }) => {
+      if (miId !== socketActualId) return;
+      if (type !== "notify") return;
+
+      for (const msg of messages) {
+        try {
+          const jid = msg.key?.remoteJid;
+          if (!jid || msg.key?.fromMe) continue;
+          if (jid.endsWith("@g.us") || jid === "status@broadcast") continue;
+
+          const texto = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
+          if (!texto) continue;
+
+          const { generarRespuestaAsistente } = require("../services/asistente-whatsapp.service");
+          const respuesta = await generarRespuestaAsistente(jid, texto);
+          if (respuesta) await enviarMensajeWA(jid, respuesta);
+        } catch (e) {
+          waLog("[WA] Error procesando mensaje entrante:", e.message);
+        }
+      }
+    });
     socketWA.ev.on("messages.update", () => {});
     socketWA.ev.on("contacts.upsert", () => {});
     socketWA.ev.on("chats.upsert", () => {});
@@ -200,7 +220,7 @@ async function iniciarWhatsApp() {
 }
 
 function obtenerEstadoWA() {
-  return { estado: estadoWA, qrDataUrl };
+  return { estado: estadoWA, qrDataUrl, iaActiva: !!process.env.ANTHROPIC_API_KEY };
 }
 
 async function enviarMensajeWA(telefono, texto) {

@@ -72,23 +72,32 @@ export default function WhatsAppPanel() {
           </p>
         </div>
 
-        {/* Badge de estado */}
-        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full ${
-          estado.estado === 'CONECTADO'
-            ? 'bg-[#52B788]/15 text-[#2D6A4F]'
-            : estado.estado === 'ESCANEANDO_QR'
-            ? 'bg-[#D4A017]/15 text-[#9B7300]'
-            : 'bg-[#1A1A1A]/8 text-[#1A1A1A]/50'
-        }`}>
-          <span className={`w-2 h-2 rounded-full ${
-            estado.estado === 'CONECTADO' ? 'bg-[#2D6A4F]' :
-            estado.estado === 'ESCANEANDO_QR' ? 'bg-[#D4A017] animate-pulse' :
-            'bg-[#1A1A1A]/30'
-          }`} />
-          {estado.estado === 'CONECTADO' ? 'Conectado' :
-           estado.estado === 'ESCANEANDO_QR' ? 'Esperando escaneo' :
-           'Desconectado'}
-        </span>
+        <div className="flex flex-col items-end gap-1.5">
+          {/* Badge de estado */}
+          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full ${
+            estado.estado === 'CONECTADO'
+              ? 'bg-[#52B788]/15 text-[#2D6A4F]'
+              : estado.estado === 'ESCANEANDO_QR'
+              ? 'bg-[#D4A017]/15 text-[#9B7300]'
+              : 'bg-[#1A1A1A]/8 text-[#1A1A1A]/50'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${
+              estado.estado === 'CONECTADO' ? 'bg-[#2D6A4F]' :
+              estado.estado === 'ESCANEANDO_QR' ? 'bg-[#D4A017] animate-pulse' :
+              'bg-[#1A1A1A]/30'
+            }`} />
+            {estado.estado === 'CONECTADO' ? 'Conectado' :
+             estado.estado === 'ESCANEANDO_QR' ? 'Esperando escaneo' :
+             'Desconectado'}
+          </span>
+
+          {/* Badge del asistente de IA */}
+          <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
+            estado.iaActiva ? 'bg-[#2D6A4F]/10 text-[#2D6A4F]' : 'bg-[#1A1A1A]/6 text-[#1A1A1A]/40'
+          }`}>
+            🤖 {estado.iaActiva ? 'Asistente IA activo' : 'Asistente IA no configurado'}
+          </span>
+        </div>
       </div>
 
       {error && (

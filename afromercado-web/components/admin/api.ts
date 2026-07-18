@@ -191,6 +191,7 @@ export async function enviarEmailTest(): Promise<string> {
 export interface EstadoWhatsApp {
   estado: 'DESCONECTADO' | 'ESCANEANDO_QR' | 'CONECTADO'
   qrDataUrl?: string
+  iaActiva?: boolean
 }
 
 /**
