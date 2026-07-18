@@ -68,5 +68,6 @@ router.use("/", require("./facturacion.routes"));
 router.use("/", require("./pqrsd.routes"));
 router.use("/", require("./fidelizacion.routes"));
 router.use("/", require("./empleo.routes"));
+router.use("/", require("./inmueble.routes"));
 
 module.exports = router;

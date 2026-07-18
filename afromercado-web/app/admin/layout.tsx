@@ -19,6 +19,7 @@ const NAV_LINKS = [
   { href: '/admin/facturas',             label: 'Facturas'       },
   { href: '/admin/pqrsd',                label: 'PQRSD',         contador: 'pqrsd' as const },
   { href: '/admin/empleo',               label: 'Empleo',        contador: 'denunciasEmpleo' as const },
+  { href: '/admin/inmuebles',            label: '🏘️ Bienes Raíces' },
   { href: '/admin/cultura',              label: '🎭 Cultura',    contador: 'denunciasCultura' as const },
   { href: '/admin/entregas',             label: 'Entregas'       },
   { href: '/admin/envios',              label: 'Envíos'         },

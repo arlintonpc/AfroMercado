@@ -225,6 +225,8 @@ model Usuario {
   hojaDeVida                HojaDeVida?
   postulacionesEmpleoEnviadas PostulacionEmpleo[]    @relation("PostulacionesEmpleoEnviadas")
   denunciasEmpleoHechas     DenunciaOfertaEmpleo[]
+  inmueblesPublicados       Inmueble[]               @relation("InmueblesPublicados")
+  denunciasInmuebleHechas   DenunciaInmueble[]        @relation("DenunciasInmuebleHechas")
   publicacionesCulturales            PublicacionCultural[]
   denunciasPublicacionCulturalHechas DenunciaPublicacionCultural[]
   likesPublicacionesCultura          LikePublicacionCultural[]
@@ -308,6 +310,7 @@ model Comercio {
   configFiscal          ConfigFiscalComercio?
   facturas              FacturaElectronica[]
   ofertasEmpleo         OfertaEmpleo[]
+  inmuebles             Inmueble[]
 }
 
 // IVA configurable por comercio (Fase 1.1) — apagado por defecto, solo el ADMIN
@@ -1189,6 +1192,120 @@ model DenunciaOfertaEmpleo {
   denunciante Usuario      @relation(fields: [denuncianteId], references: [id])
 
   @@unique([ofertaEmpleoId, denuncianteId])
+  @@index([estado, createdAt])
+}
+
+// ============================================================
+//  Módulo Bienes Raíces / Inmuebles (vitrina, sin transacción)
+//  Vitrina de predios formalizados — NO hay compra/venta ni checkout dentro
+//  de la plataforma; el contacto siempre es por WhatsApp. Un marketplace
+//  abierto de tierra no encaja en el territorio piloto (informalidad de
+//  tenencia 52-60%, riesgo de tierra en disputa — ver Capítulo 3 del
+//  Proyecto Maestro), así que a diferencia de Empleo la moderación NUNCA
+//  se salta: un admin siempre debe verificar el documento de soporte
+//  (evidencia de título, privado, solo lo ve un admin) antes de aprobar.
+//  Cualquier Usuario puede publicar (mismo espíritu comunitario que Empleo).
+// ============================================================
+enum TipoInmueble {
+  LOTE
+  CASA
+  APARTAMENTO
+  FINCA
+  LOCAL_COMERCIAL
+  BODEGA
+  OTRO
+}
+
+enum TipoOperacionInmueble {
+  VENTA
+  ARRIENDO
+}
+
+enum EstadoInmueble {
+  BORRADOR
+  PUBLICADO
+  PAUSADO
+  CERRADO
+}
+
+model Inmueble {
+  id                      Int      @id @default(autoincrement())
+  publicadorId            Int
+  comercioId              Int?
+  titulo                  String
+  descripcion             String?
+  tipoInmueble            TipoInmueble
+  tipoOperacion           TipoOperacionInmueble
+  precio                  Decimal  @db.Decimal(14, 2)
+  areaM2                  Float?
+  habitaciones            Int?
+  banos                   Int?
+  departamento            String
+  municipio               String
+  vereda                  String?
+  direccionReferencia     String?
+  latitud                 Float?
+  longitud                Float?
+  fotoUrls                String[] @default([])
+  folioMatricula          String?
+  documentoSoporteUrl     String?
+  contactoWhatsapp        String?
+  estado                  EstadoInmueble @default(BORRADOR)
+  estadoModeracion        String   @default("PENDIENTE") // PENDIENTE | APROBADA | RECHAZADA
+  revisadoPor             Int?
+  revisadoAt              DateTime?
+  motivoRechazoModeracion String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  deletedAt               DateTime?
+
+  publicador Usuario            @relation("InmueblesPublicados", fields: [publicadorId], references: [id])
+  comercio   Comercio?          @relation(fields: [comercioId], references: [id])
+  denuncias  DenunciaInmueble[]
+
+  @@index([departamento, municipio])
+  @@index([tipoInmueble, tipoOperacion])
+  @@index([estado, estadoModeracion])
+  @@index([publicadorId])
+}
+
+// Denuncias de publicaciones de inmuebles (publicación falsa, tierra en
+// disputa, estafa, documento falso, etc.). El admin puede desestimar,
+// bloquear solo la publicación denunciada, o bloquear la cuenta completa
+// del publicador — en ese último caso TODAS sus demás publicaciones activas
+// se cierran también (mismo patrón que DenunciaOfertaEmpleo).
+enum MotivoDenunciaInmueble {
+  PUBLICACION_FALSA
+  TIERRA_EN_DISPUTA
+  ESTAFA_DINERO
+  DOCUMENTO_FALSO
+  CONTENIDO_INAPROPIADO
+  OTRO
+}
+
+enum EstadoDenunciaInmueble {
+  PENDIENTE
+  DESESTIMADA
+  PUBLICACION_BLOQUEADA
+  CUENTA_BLOQUEADA
+}
+
+model DenunciaInmueble {
+  id            Int      @id @default(autoincrement())
+  inmuebleId    Int
+  denuncianteId Int
+  motivo        MotivoDenunciaInmueble
+  descripcion   String?
+  estado        EstadoDenunciaInmueble @default(PENDIENTE)
+  revisadoPor   Int?
+  revisadoAt    DateTime?
+  notaRevision  String?
+  createdAt     DateTime @default(now())
+
+  inmueble    Inmueble @relation(fields: [inmuebleId], references: [id], onDelete: Cascade)
+  denunciante Usuario  @relation("DenunciasInmuebleHechas", fields: [denuncianteId], references: [id])
+
+  @@unique([inmuebleId, denuncianteId])
   @@index([estado, createdAt])
 }
 
