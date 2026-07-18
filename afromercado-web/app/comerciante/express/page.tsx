@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   obtenerConfigExpress, actualizarConfigExpress, toggleAbiertoExpress,
   pedidosComercioExpress, aceptarPedidoExpress, rechazarPedidoExpress, avanzarEstadoExpress,
+  activarRepartidorPlataforma,
   festivosColombia, obtenerMenuComercioExpress,
   listarSeccionesExpress, crearSeccionExpress, actualizarSeccionExpress,
   eliminarSeccionExpress, asignarSeccionProducto,
@@ -501,6 +502,14 @@ export default function ExpressComerciante() {
     } catch (e: any) { setError(e.message) }
   }
 
+  // Válvula de escape (Fase 5, Anexo B): pasar un pedido puntual a repartidor
+  // de la plataforma aunque el restaurante esté en modo "mi propio domiciliario".
+  async function activarPlataforma(id: number) {
+    try {
+      await activarRepartidorPlataforma(id)
+    } catch (e: any) { setError(e.message) }
+  }
+
   const activos   = pedidos.filter(p => !['ENTREGADO','CANCELADO','RECHAZADO'].includes(p.estado))
   const historial = pedidos.filter(p =>  ['ENTREGADO','CANCELADO','RECHAZADO'].includes(p.estado))
   const pedidosEfectivoEntregados = pedidos.filter(p => p.estado === 'ENTREGADO' && p.metodoPago === 'EFECTIVO')
@@ -621,7 +630,7 @@ export default function ExpressComerciante() {
               <p>No hay pedidos activos</p>
             </div>
           )}
-          {activos.map(p => <TarjetaPedido key={p.id} pedido={p} onAceptar={aceptar} onRechazar={rechazar} onAvanzar={avanzar} />)}
+          {activos.map(p => <TarjetaPedido key={p.id} pedido={p} onAceptar={aceptar} onRechazar={rechazar} onAvanzar={avanzar} onActivarPlataforma={activarPlataforma} />)}
         </div>
       )}
 
@@ -633,7 +642,7 @@ export default function ExpressComerciante() {
               <p>Sin historial todavía</p>
             </div>
           )}
-          {historial.map(p => <TarjetaPedido key={p.id} pedido={p} onAceptar={aceptar} onRechazar={rechazar} onAvanzar={avanzar} />)}
+          {historial.map(p => <TarjetaPedido key={p.id} pedido={p} onAceptar={aceptar} onRechazar={rechazar} onAvanzar={avanzar} onActivarPlataforma={activarPlataforma} />)}
         </div>
       )}
 
@@ -1398,6 +1407,37 @@ export default function ExpressComerciante() {
               onChange={e => setEditConfig(prev => ({ ...prev, costoEnvioBase: Number(e.target.value) }))}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
             />
+            {Number(editConfig.costoEnvioBase ?? 3000) === 0 && (
+              <p className="text-[11px] text-green-700 mt-1">Se mostrará "Envío gratis" a tus clientes.</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-2">¿Quién hace tus domicilios?</label>
+            <div className="flex flex-wrap gap-2">
+              {([
+                { valor: 'PROPIO' as const, label: '🏍️ Mi propio domiciliario' },
+                { valor: 'PLATAFORMA' as const, label: '🚴 Repartidor de Teravia' },
+              ]).map(({ valor, label }) => {
+                const sel = (editConfig.tipoEntregaDomicilio ?? 'PROPIO') === valor
+                return (
+                  <button
+                    key={valor}
+                    onClick={() => setEditConfig(prev => ({ ...prev, tipoEntregaDomicilio: valor }))}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                      sel ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-[11px] text-gray-500 mt-1">
+              {(editConfig.tipoEntregaDomicilio ?? 'PROPIO') === 'PROPIO'
+                ? 'Tú gestionas la entrega con tu propia gente, igual que hoy.'
+                : 'Tus domicilios entran al pool de repartidores de Teravia — se les paga automáticamente por cada entrega.'}
+            </p>
           </div>
 
           <div>
@@ -1618,12 +1658,13 @@ export default function ExpressComerciante() {
 }
 
 function TarjetaPedido({
-  pedido, onAceptar, onRechazar, onAvanzar,
+  pedido, onAceptar, onRechazar, onAvanzar, onActivarPlataforma,
 }: {
   pedido: PedidoExpress
   onAceptar: (id: number) => void
   onRechazar: (id: number) => void
   onAvanzar: (id: number) => void
+  onActivarPlataforma: (id: number) => void
 }) {
   const expiresIn = pedido.estado === 'PENDIENTE'
     ? Math.max(0, Math.round((new Date(pedido.expiresAt).getTime() - Date.now()) / 1000))
@@ -1746,6 +1787,17 @@ function TarjetaPedido({
           </button>
         )}
       </div>
+
+      {/* Válvula de escape (Fase 5): tu domiciliario no puede cubrir este
+          pedido puntual — pásalo al pool de repartidores de Teravia. */}
+      {pedido.modalidad === 'DOMICILIO' && ['EN_PREPARACION', 'LISTO'].includes(pedido.estado) && (
+        <button
+          onClick={() => onActivarPlataforma(pedido.id)}
+          className="w-full text-xs text-gray-500 hover:text-[#2D6A4F] underline underline-offset-2 transition-colors"
+        >
+          🚴 Mi domiciliario no puede — enviar por repartidor de Teravia
+        </button>
+      )}
     </div>
   )
 }

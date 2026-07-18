@@ -320,12 +320,12 @@ const NotificacionService = {
     }
   },
 
-  async pedidoEntregado({ pedidoId, comprador }) {
+  async pedidoEntregado({ pedidoId, comprador, url = "/mis-pedidos" }) {
     await crearNotificacionDB(comprador.id, {
       tipo: "PEDIDO_ENTREGADO",
       titulo: "¡Pedido entregado! ✅",
       mensaje: `Tu pedido #${pedidoId} fue entregado. ¿Quedaste satisfecho? Deja tu reseña.`,
-      url: `/mis-pedidos`,
+      url,
       datos: { pedidoId },
     });
 
@@ -376,12 +376,12 @@ const NotificacionService = {
   },
 
   // N-C-09 comprador + N-V-07 comerciante
-  async entregaRecogida({ pedidoId, comprador, comerciante }) {
+  async entregaRecogida({ pedidoId, comprador, comerciante, url = "/mis-pedidos" }) {
     await crearNotificacionDB(comprador.id, {
       tipo: "ENTREGA_RECOGIDA",
       titulo: "El repartidor ya recogió tu pedido",
       mensaje: `El repartidor recogió los productos del pedido #${pedidoId} y viene en camino.`,
-      url: `/mis-pedidos`,
+      url,
       datos: { pedidoId },
     });
     if (comerciante?.usuarioId) {
@@ -396,18 +396,18 @@ const NotificacionService = {
   },
 
   // N-C-10 comprador CRÍTICO (WA + Push)
-  async entregaEnCamino({ pedidoId, comprador, repartidorNombre, direccion }) {
+  async entregaEnCamino({ pedidoId, comprador, repartidorNombre, direccion, url = "/mis-pedidos" }) {
     await crearNotificacionDB(comprador.id, {
       tipo: "ENTREGA_EN_CAMINO",
       titulo: "🚴 ¡Tu pedido va en camino!",
       mensaje: `${repartidorNombre} está en camino con tu pedido #${pedidoId}. Prepárate para recibirlo.`,
-      url: `/mis-pedidos`,
+      url,
       datos: { pedidoId },
     });
     await enviarPushAUsuario(prisma, comprador.id, {
       titulo: "🚴 ¡Tu pedido va en camino!",
       cuerpo: `${repartidorNombre} está en camino. Prepárate para recibirlo.`,
-      url: `/mis-pedidos`,
+      url,
     });
     if (comprador.telefono) {
       await dispararNotificacion(() =>
@@ -418,12 +418,12 @@ const NotificacionService = {
   },
 
   // N-C-12 comprador + N-A-06 admin
-  async entregaFallida({ pedidoId, comprador }) {
+  async entregaFallida({ pedidoId, comprador, url = "/mis-pedidos" }) {
     await crearNotificacionDB(comprador.id, {
       tipo: "ENTREGA_FALLIDA",
       titulo: "Problema con tu entrega",
       mensaje: `Tuvimos un inconveniente entregando el pedido #${pedidoId}. Nuestro equipo te contactará pronto.`,
-      url: `/mis-pedidos`,
+      url,
       datos: { pedidoId },
     });
     if (comprador.telefono) {

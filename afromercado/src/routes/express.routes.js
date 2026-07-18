@@ -35,6 +35,7 @@ router.get(   "/mis-pedidos",               ...soloComercio, ExpressController.p
 router.post(  "/mis-pedidos/:id/aceptar",   ...soloComercio, ExpressController.aceptarPedido);
 router.post(  "/mis-pedidos/:id/rechazar",  ...soloComercio, ExpressController.rechazarPedido);
 router.post(  "/mis-pedidos/:id/avanzar",   ...soloComercio, ExpressController.avanzarEstado);
+router.post(  "/mis-pedidos/:id/repartidor-plataforma", ...soloComercio, ExpressController.activarRepartidorPlataforma);
 
 // Cupones Express (validar es público con auth opcional)
 router.post(   "/cupones/validar",      ExpressController.validarCupon);

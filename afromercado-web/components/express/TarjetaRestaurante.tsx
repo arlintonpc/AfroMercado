@@ -126,7 +126,9 @@ export default function TarjetaRestaurante({
           )}
           <div className="flex gap-2 mt-0.5">
             {cfg.modalidades.includes('DOMICILIO') && (
-              <span className="text-[11px] text-gray-500">🛵 {formatearPrecio(Number(cfg.costoEnvioBase))}</span>
+              <span className="text-[11px] text-gray-500">
+                🛵 {Number(cfg.costoEnvioBase) === 0 ? 'Envío gratis' : formatearPrecio(Number(cfg.costoEnvioBase))}
+              </span>
             )}
             {cfg.modalidades.includes('RECOGER') && (
               <span className="text-[11px] text-gray-500">🏃 Recoger</span>

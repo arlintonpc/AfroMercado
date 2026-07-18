@@ -29,7 +29,8 @@ interface EntregaAdmin {
   repartidorId: number | null
   repartidor: RepartidorSimple | null
   createdAt: string
-  subPedido: {
+  /** Origen Marketplace — mutuamente excluyente con pedidoExpress (Fase 5, Anexo B). */
+  subPedido?: {
     id: number
     comercio: { nombre: string }
     pedido: {
@@ -40,6 +41,40 @@ interface EntregaAdmin {
     }
     items: Array<{ cantidad: number; producto: { nombre: string } }>
   }
+  /** Origen Express en modo PLATAFORMA — mutuamente excluyente con subPedido. */
+  pedidoExpress?: {
+    id: number
+    codigo: string
+    direccionTexto: string | null
+    cliente: { nombre: string; telefono: string | null }
+    configExpress: { comercio: { nombre: string } }
+    items: Array<{ cantidad: number; producto: { nombre: string } }>
+  }
+}
+
+/** Normaliza el origen (SubPedido/Marketplace o PedidoExpress) a un shape único para la UI. */
+function origenDeAdmin(e: EntregaAdmin) {
+  if (e.subPedido) {
+    return {
+      codigo: e.subPedido.pedido.codigo ?? `PED-${e.subPedido.pedido.id}`,
+      comercioNombre: e.subPedido.comercio.nombre,
+      direccion: e.subPedido.pedido.direccionTexto,
+      clienteNombre: e.subPedido.pedido.comprador.nombre,
+      clienteTelefono: e.subPedido.pedido.comprador.telefono,
+      items: e.subPedido.items,
+    }
+  }
+  if (e.pedidoExpress) {
+    return {
+      codigo: e.pedidoExpress.codigo,
+      comercioNombre: e.pedidoExpress.configExpress.comercio.nombre,
+      direccion: e.pedidoExpress.direccionTexto ?? '',
+      clienteNombre: e.pedidoExpress.cliente.nombre,
+      clienteTelefono: e.pedidoExpress.cliente.telefono,
+      items: e.pedidoExpress.items,
+    }
+  }
+  return null
 }
 
 // ─── Utilidades ──────────────────────────────────────────────────────────────
@@ -321,19 +356,20 @@ function TarjetaEntrega({
   entrega: EntregaAdmin
   onAsignar: (id: number) => void
 }) {
-  const { subPedido } = entrega
-  const codigoPedido = subPedido.pedido.codigo ?? `PED-${subPedido.pedido.id}`
+  const origen = origenDeAdmin(entrega)
   const terminal = estaTerminal(entrega.estado)
+
+  if (!origen) return null
 
   return (
     <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-5 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs text-[#1A1A1A]/40 font-medium">
-            {codigoPedido} · {fechaCorta(entrega.createdAt)}
+            {origen.codigo} · {fechaCorta(entrega.createdAt)}
           </p>
           <p className="mt-0.5 text-base font-semibold text-[#1A1A1A] truncate">
-            {subPedido.comercio.nombre}
+            {origen.comercioNombre}
           </p>
         </div>
         <span
@@ -348,21 +384,21 @@ function TarjetaEntrega({
       {/* Dirección */}
       <p className="text-sm text-[#1A1A1A]/70 flex gap-1.5 items-start">
         <span className="text-[#2D6A4F] mt-0.5">📍</span>
-        <span>{subPedido.pedido.direccionTexto}</span>
+        <span>{origen.direccion}</span>
       </p>
 
       {/* Comprador */}
       <p className="text-sm text-[#1A1A1A]/60">
-        <span className="font-medium text-[#1A1A1A]">{subPedido.pedido.comprador.nombre}</span>
-        {subPedido.pedido.comprador.telefono && (
-          <span className="ml-1 text-[#2D6A4F]">· {subPedido.pedido.comprador.telefono}</span>
+        <span className="font-medium text-[#1A1A1A]">{origen.clienteNombre}</span>
+        {origen.clienteTelefono && (
+          <span className="ml-1 text-[#2D6A4F]">· {origen.clienteTelefono}</span>
         )}
       </p>
 
       {/* Productos */}
       <div className="rounded-xl bg-[#F8F5F0] px-3 py-2">
         <ul className="flex flex-col gap-0.5">
-          {subPedido.items.map((item, i) => (
+          {origen.items.map((item, i) => (
             <li key={i} className="flex justify-between text-xs text-[#1A1A1A]/70">
               <span>{item.producto.nombre}</span>
               <span className="font-medium">×{item.cantidad}</span>

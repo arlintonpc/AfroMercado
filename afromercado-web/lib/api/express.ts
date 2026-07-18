@@ -15,6 +15,8 @@ export type EstadoPedidoExpress =
   | 'EN_CAMINO' | 'ENTREGADO' | 'CANCELADO' | 'RECHAZADO'
 export type MetodoPagoExpress = 'EFECTIVO' | 'NEQUI' | 'WOMPI'
 
+export type TipoEntregaDomicilio = 'PROPIO' | 'PLATAFORMA'
+
 export interface ConfigExpress {
   id: number
   comercioId: number
@@ -24,6 +26,7 @@ export interface ConfigExpress {
   municipiosEntrega: string[]
   modalidades: ModalidadExpress[]
   costoEnvioBase: number
+  tipoEntregaDomicilio: TipoEntregaDomicilio
   limiteCreditoEfectivo: number
   deudaEfectivoActual: number
   videoUrl?: string | null
@@ -222,6 +225,12 @@ export async function rechazarPedidoExpress(id: number, motivo?: string): Promis
 export async function avanzarEstadoExpress(id: number): Promise<PedidoExpress> {
   const r = await apiFetch<{ ok: boolean; data: PedidoExpress }>(`/express/mis-pedidos/${id}/avanzar`, { method: 'POST', body: {} })
   return r.data
+}
+
+// Válvula de escape (Fase 5, Anexo B): pasar un pedido puntual a repartidor
+// de la plataforma aunque el restaurante esté en modo PROPIO.
+export async function activarRepartidorPlataforma(id: number): Promise<void> {
+  await apiFetch(`/express/mis-pedidos/${id}/repartidor-plataforma`, { method: 'POST', body: {} })
 }
 
 // ── ADMIN ────────────────────────────────────────────────────

@@ -137,15 +137,16 @@ const ExpressService = {
   },
 
   async actualizarConfig(comercioId, datos) {
-    const { activo, tiempoPrepMinutos, municipiosEntrega, modalidades, costoEnvioBase, horarios } = datos;
+    const { activo, tiempoPrepMinutos, municipiosEntrega, modalidades, costoEnvioBase, tipoEntregaDomicilio, horarios } = datos;
     const cfg = await prisma.configExpress.upsert({
       where:  { comercioId },
-      update: { activo, tiempoPrepMinutos, municipiosEntrega, modalidades, costoEnvioBase, updatedAt: new Date() },
+      update: { activo, tiempoPrepMinutos, municipiosEntrega, modalidades, costoEnvioBase, tipoEntregaDomicilio, updatedAt: new Date() },
       create: { comercioId, activo: activo ?? false,
                 tiempoPrepMinutos: tiempoPrepMinutos ?? 20,
                 municipiosEntrega: municipiosEntrega ?? [],
                 modalidades: modalidades ?? ["RECOGER"],
-                costoEnvioBase: costoEnvioBase ?? 3000 },
+                costoEnvioBase: costoEnvioBase ?? 3000,
+                tipoEntregaDomicilio: tipoEntregaDomicilio ?? "PROPIO" },
     });
 
     // Upsert horarios por día si vienen en el payload
@@ -377,6 +378,16 @@ const ExpressService = {
     const paso = FLUJO[pedido.estado];
     if (!paso) throw new ErrorValidacion(`No se puede avanzar desde el estado ${pedido.estado}`);
 
+    // Fase 5 (Anexo B): si este pedido ya tiene una Entrega (modo PLATAFORMA
+    // o activada puntualmente), LISTO→EN_CAMINO deja de ser del comerciante —
+    // la controla el repartidor asignado vía /repartidor/entregas/:id/estado.
+    if (pedido.estado === "LISTO") {
+      const entregaExistente = await prisma.entrega.findUnique({ where: { pedidoExpressId: pedidoId } });
+      if (entregaExistente) {
+        throw new ErrorValidacion("Este pedido tiene un repartidor de la plataforma asignado; el estado lo actualiza él, no el comercio");
+      }
+    }
+
     const actualizado = await prisma.pedidoExpress.update({
       where: { id: pedidoId },
       data:  { estado: paso.siguiente, [paso.campo]: new Date() },
@@ -384,6 +395,20 @@ const ExpressService = {
     });
 
     notifExpress(pedido.clienteId, paso.titulo, paso.cuerpo(pedido.codigo), "/express/mis-pedidos");
+
+    // Fase 5: al quedar LISTO, si el restaurante usa repartidor de la
+    // plataforma (modo PLATAFORMA) y el pedido es a domicilio, se crea la
+    // Entrega y entra al pool compartido — mismo disparador que Marketplace
+    // (SubPedido → LISTO en comercio.controller.js).
+    if (paso.siguiente === "LISTO" && pedido.modalidad === "DOMICILIO") {
+      const cfg = await prisma.configExpress.findUnique({
+        where: { id: pedido.configExpressId },
+        select: { tipoEntregaDomicilio: true },
+      });
+      if (cfg?.tipoEntregaDomicilio === "PLATAFORMA") {
+        await this._crearEntregaExpress(pedido);
+      }
+    }
 
     // Si se entrega en efectivo → acumular deuda de comisión
     if (paso.siguiente === "ENTREGADO" && pedido.metodoPago === "EFECTIVO") {
@@ -394,6 +419,34 @@ const ExpressService = {
     }
 
     return actualizado;
+  },
+
+  async _crearEntregaExpress(pedido) {
+    const existente = await prisma.entrega.findUnique({ where: { pedidoExpressId: pedido.id } });
+    if (existente) return existente;
+    return prisma.entrega.create({
+      data: {
+        pedidoExpressId: pedido.id,
+        direccion: pedido.direccionTexto || pedido.municipioEntrega || "Sin dirección registrada",
+        estado: "ASIGNADA",
+      },
+    });
+  },
+
+  // Válvula de escape (Fase 5): un restaurante en modo PROPIO puede, para un
+  // pedido puntual que su domiciliario no puede cubrir, pasarlo al pool de
+  // repartidores de la plataforma sin cambiar su configuración general.
+  async activarRepartidorPlataforma(pedidoId, comercioId) {
+    const pedido = await this._getPedidoComercio(pedidoId, comercioId);
+    if (pedido.modalidad !== "DOMICILIO") {
+      throw new ErrorValidacion("Solo los pedidos a domicilio necesitan repartidor");
+    }
+    if (["PENDIENTE", "ENTREGADO", "CANCELADO", "RECHAZADO"].includes(pedido.estado)) {
+      throw new ErrorValidacion("Este pedido no puede pasar a repartidor de la plataforma en su estado actual");
+    }
+    const existente = await prisma.entrega.findUnique({ where: { pedidoExpressId: pedidoId } });
+    if (existente) throw new ErrorValidacion("Este pedido ya tiene un repartidor de la plataforma asignado");
+    return this._crearEntregaExpress(pedido);
   },
 
   // ── LISTADOS ─────────────────────────────────────────────────

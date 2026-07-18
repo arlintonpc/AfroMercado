@@ -1307,6 +1307,34 @@ async function aplicarMigraciones() {
     `DROP TABLE IF EXISTS "CuponTour"`,
     `DROP TABLE IF EXISTS "CuponTransporteUso"`,
     `DROP TABLE IF EXISTS "CuponTransporte"`,
+
+    // ── Anexo B, Fase 5: Entrega sirve también a Express (modo propio/plataforma) ──
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoEntregaDomicilio') THEN
+        CREATE TYPE "TipoEntregaDomicilio" AS ENUM ('PROPIO', 'PLATAFORMA');
+      END IF;
+    END $$`,
+    `ALTER TABLE "ConfigExpress" ADD COLUMN IF NOT EXISTS "tipoEntregaDomicilio" "TipoEntregaDomicilio" NOT NULL DEFAULT 'PROPIO'`,
+    `ALTER TABLE "Entrega" ALTER COLUMN "subPedidoId" DROP NOT NULL`,
+    `ALTER TABLE "Entrega" ADD COLUMN IF NOT EXISTS "pedidoExpressId" INTEGER`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Entrega_pedidoExpressId_key') THEN
+        ALTER TABLE "Entrega" ADD CONSTRAINT "Entrega_pedidoExpressId_key" UNIQUE ("pedidoExpressId");
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Entrega_pedidoExpressId_fkey') THEN
+        ALTER TABLE "Entrega" ADD CONSTRAINT "Entrega_pedidoExpressId_fkey" FOREIGN KEY ("pedidoExpressId") REFERENCES "PedidoExpress"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Entrega_origen_unico_check') THEN
+        ALTER TABLE "Entrega" ADD CONSTRAINT "Entrega_origen_unico_check"
+          CHECK (("subPedidoId" IS NOT NULL AND "pedidoExpressId" IS NULL) OR ("subPedidoId" IS NULL AND "pedidoExpressId" IS NOT NULL));
+      END IF;
+    END $$`,
+    `ALTER TABLE "PedidoExpress" DROP CONSTRAINT IF EXISTS "PedidoExpress_repartidorId_fkey"`,
+    `ALTER TABLE "PedidoExpress" DROP COLUMN IF EXISTS "repartidorId"`,
   ];
   for (const sql of migraciones) {
     try {

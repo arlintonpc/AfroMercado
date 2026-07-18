@@ -64,12 +64,37 @@ async function decorarEntregas(entregas, { conFoto = false } = {}) {
   }));
 }
 
+// Anexo B, Fase 5: una Entrega ahora viene de SubPedido (Marketplace) o de
+// PedidoExpress (Express en modo PLATAFORMA) — mutuamente excluyentes. Estos
+// helpers normalizan el acceso para no repetir `?? ` en cada función.
+function compradorIdDe(entrega) {
+  return entrega.subPedido?.pedido?.compradorId ?? entrega.pedidoExpress?.clienteId ?? null;
+}
+function pedidoIdDe(entrega) {
+  return entrega.subPedido?.pedido?.id ?? entrega.pedidoExpress?.id ?? null;
+}
+function compradorDe(entrega) {
+  return entrega.subPedido?.pedido?.comprador ?? entrega.pedidoExpress?.cliente ?? null;
+}
+function comercioDe(entrega) {
+  const c = entrega.subPedido?.comercio ?? entrega.pedidoExpress?.configExpress?.comercio ?? null;
+  if (!c) return null;
+  return { id: c.id, nombre: c.nombre, municipio: c.municipio, usuarioId: c.usuario?.id ?? null };
+}
+function direccionDe(entrega) {
+  return entrega.subPedido?.pedido?.direccionTexto ?? entrega.pedidoExpress?.direccionTexto ?? null;
+}
+function urlPedidoDe(entrega) {
+  return entrega.pedidoExpressId ? "/express/mis-pedidos" : "/mis-pedidos";
+}
+
 const INCLUDE_ENTREGA = {
   subPedido: {
     include: {
       pedido: {
         select: {
           id: true,
+          compradorId: true,
           direccionTexto: true,
           costoEnvio: true,
           _count: { select: { subPedidos: true } },
@@ -82,6 +107,13 @@ const INCLUDE_ENTREGA = {
           producto: { select: { nombre: true } },
         },
       },
+    },
+  },
+  pedidoExpress: {
+    include: {
+      cliente: { select: { id: true, nombre: true, telefono: true, email: true } },
+      configExpress: { select: { comercio: { select: { id: true, nombre: true, municipio: true, usuario: { select: { id: true } } } } } },
+      items: { include: { producto: { select: { nombre: true } } } },
     },
   },
   repartidor: { select: { id: true, nombre: true, telefono: true } },
@@ -107,13 +139,8 @@ async function asignarRepartidorAtomica(tx, {
       id: true,
       estado: true,
       repartidorId: true,
-      subPedido: {
-        select: {
-          pedido: {
-            select: { compradorId: true },
-          },
-        },
-      },
+      subPedido: { select: { pedido: { select: { compradorId: true } } } },
+      pedidoExpress: { select: { clienteId: true } },
     },
   });
 
@@ -128,7 +155,8 @@ async function asignarRepartidorAtomica(tx, {
     throw new ErrorProhibido("Solo se pueden tomar entregas en estado ASIGNADA");
   }
 
-  if (compradorIdBloqueado !== null && entrega.subPedido?.pedido?.compradorId === compradorIdBloqueado) {
+  const compradorId = entrega.subPedido?.pedido?.compradorId ?? entrega.pedidoExpress?.clienteId ?? null;
+  if (compradorIdBloqueado !== null && compradorId === compradorIdBloqueado) {
     throw new ErrorProhibido(mensajeBloqueada);
   }
 
@@ -196,21 +224,42 @@ const RepartidorController = {
       }
 
       // Candado: el repartidor no ve (ni puede tomar) entregas de su propio pedido.
-      const subPedidoFiltro = {
-        pedido: { compradorId: { not: req.usuario.id } },
-        ...(municipioBase
-          ? { comercio: { municipio: { equals: municipioBase, mode: "insensitive" } } }
-          : {}),
-      };
-
+      // OR entre los dos orígenes posibles — un filtro `subPedido: {...}` simple
+      // no matchea nunca una Entrega de origen Express (subPedido es null ahí).
       const entregas = await prisma.entrega.findMany({
         where: {
           repartidorId: null,
           estado: "ASIGNADA",
-          subPedido: subPedidoFiltro,
+          OR: [
+            {
+              subPedido: {
+                pedido: { compradorId: { not: req.usuario.id } },
+                ...(municipioBase
+                  ? { comercio: { municipio: { equals: municipioBase, mode: "insensitive" } } }
+                  : {}),
+              },
+            },
+            {
+              pedidoExpress: {
+                clienteId: { not: req.usuario.id },
+                ...(municipioBase
+                  ? { configExpress: { comercio: { municipio: { equals: municipioBase, mode: "insensitive" } } } }
+                  : {}),
+              },
+            },
+          ],
         },
         include: INCLUDE_ENTREGA,
-        orderBy: { createdAt: "desc" },
+        // Urgencia real (Fase 5): un domicilio Express es comida que se enfría
+        // mientras espera — se muestra antes que un paquete de Marketplace,
+        // y dentro de cada origen, lo que lleva más tiempo esperando primero.
+        orderBy: { createdAt: "asc" },
+      });
+      entregas.sort((a, b) => {
+        const urgenteA = a.pedidoExpressId ? 0 : 1;
+        const urgenteB = b.pedidoExpressId ? 0 : 1;
+        if (urgenteA !== urgenteB) return urgenteA - urgenteB;
+        return new Date(a.createdAt) - new Date(b.createdAt);
       });
       const data = await decorarEntregas(entregas);
       res.json({ ok: true, data, municipioBase });
@@ -282,19 +331,28 @@ const RepartidorController = {
         }
 
         if (estado === "ENTREGADA") {
-          await tx.subPedido.update({
-            where: { id: entrega.subPedidoId },
-            data: { estado: "ENTREGADO" },
-          });
-
-          const todos = await tx.subPedido.findMany({
-            where: { pedidoId: entrega.subPedido.pedido.id },
-            select: { estado: true },
-          });
-          if (todos.every((subPedido) => subPedido.estado === "ENTREGADO")) {
-            await tx.pedido.update({
-              where: { id: entrega.subPedido.pedido.id },
+          if (entrega.subPedidoId) {
+            await tx.subPedido.update({
+              where: { id: entrega.subPedidoId },
               data: { estado: "ENTREGADO" },
+            });
+
+            const todos = await tx.subPedido.findMany({
+              where: { pedidoId: entrega.subPedido.pedido.id },
+              select: { estado: true },
+            });
+            if (todos.every((subPedido) => subPedido.estado === "ENTREGADO")) {
+              await tx.pedido.update({
+                where: { id: entrega.subPedido.pedido.id },
+                data: { estado: "ENTREGADO" },
+              });
+            }
+          } else if (entrega.pedidoExpressId) {
+            // Un PedidoExpress es siempre de un solo comercio — no hay
+            // "esperar a los demás subpedidos" como en Marketplace.
+            await tx.pedidoExpress.update({
+              where: { id: entrega.pedidoExpressId },
+              data: { estado: "ENTREGADO", entregadoAt: new Date() },
             });
           }
         }
@@ -319,26 +377,26 @@ const RepartidorController = {
       const repartidorNombre = req.usuario.nombre;
       setImmediate(async () => {
         try {
-          const sp = actualizada.subPedido;
-          if (!sp) return;
-          const pedidoId = sp.pedido?.id;
-          const comprador = sp.pedido?.comprador;
-          const comerciante = sp.comercio ? { ...sp.comercio, usuarioId: sp.comercio.usuario?.id } : null;
+          const pedidoId = pedidoIdDe(actualizada);
+          const comprador = compradorDe(actualizada);
+          const comerciante = comercioDe(actualizada);
+          const url = urlPedidoDe(actualizada);
           if (!pedidoId || !comprador?.id) return;
 
           if (estado === "RECOGIDA") {
-            await NotificacionService.entregaRecogida({ pedidoId, comprador, comerciante });
+            await NotificacionService.entregaRecogida({ pedidoId, comprador, comerciante, url });
           } else if (estado === "EN_CAMINO") {
             await NotificacionService.entregaEnCamino({
               pedidoId, comprador,
               repartidorNombre,
-              direccion: sp.pedido?.direccionTexto,
+              direccion: direccionDe(actualizada),
+              url,
             });
           } else if (estado === "ENTREGADA") {
-            await NotificacionService.pedidoEntregado({ pedidoId, comprador });
+            await NotificacionService.pedidoEntregado({ pedidoId, comprador, url });
             await NotificacionService.entregaCompletadaComerciante({ pedidoId, comerciante });
           } else if (estado === "FALLIDA") {
-            await NotificacionService.entregaFallida({ pedidoId, comprador });
+            await NotificacionService.entregaFallida({ pedidoId, comprador, url });
           }
         } catch (e) {
           console.error("[NOTIF] actualizarEstado:", e.message);
@@ -366,7 +424,10 @@ const RepartidorController = {
 
       const entrega = await prisma.entrega.findUnique({
         where: { id },
-        include: { subPedido: { include: { pedido: { select: { compradorId: true } } } } },
+        include: {
+          subPedido: { include: { pedido: { select: { compradorId: true } } } },
+          pedidoExpress: { select: { clienteId: true } },
+        },
       });
       if (!entrega) throw new ErrorNoEncontrado("Entrega no encontrada");
       if (entrega.repartidorId !== req.usuario.id) {
@@ -382,7 +443,7 @@ const RepartidorController = {
         data: { ultimaLatitud: latitud, ultimaLongitud: longitud, ultimaUbicacionAt: ahora },
       });
 
-      const compradorId = entrega.subPedido?.pedido?.compradorId;
+      const compradorId = compradorIdDe(entrega);
       if (compradorId) {
         sseManager.enviar(compradorId, "ubicacion-repartidor", {
           entregaId: id,
@@ -411,11 +472,14 @@ const RepartidorController = {
 
       const entrega = await prisma.entrega.findUnique({
         where: { id },
-        include: { subPedido: { include: { pedido: { select: { compradorId: true } } } } },
+        include: {
+          subPedido: { include: { pedido: { select: { compradorId: true } } } },
+          pedidoExpress: { select: { clienteId: true } },
+        },
       });
       if (!entrega) throw new ErrorNoEncontrado("Entrega no encontrada");
       if (!entrega.repartidorId) throw new ErrorValidacion("Esta entrega no tiene repartidor asignado");
-      if (entrega.subPedido?.pedido?.compradorId !== req.usuario.id) {
+      if (compradorIdDe(entrega) !== req.usuario.id) {
         throw new ErrorProhibido("No puedes calificar esta entrega");
       }
       if (entrega.estado !== "ENTREGADA") {
@@ -477,7 +541,10 @@ const RepartidorController = {
 
       const entrega = await prisma.entrega.findUnique({
         where: { id },
-        include: { subPedido: { select: { pedido: { select: { compradorId: true } } } } },
+        include: {
+          subPedido: { select: { pedido: { select: { compradorId: true } } } },
+          pedidoExpress: { select: { clienteId: true } },
+        },
       });
       if (!entrega) throw new ErrorNoEncontrado("Entrega no encontrada");
 
@@ -487,7 +554,7 @@ const RepartidorController = {
       });
       if (!repartidor || repartidor.rol !== "REPARTIDOR" || !repartidor.activo)
         throw new ErrorValidacion("El usuario no es un repartidor válido");
-      if (entrega.subPedido?.pedido?.compradorId === repartidor.id)
+      if (compradorIdDe(entrega) === repartidor.id)
         throw new ErrorValidacion("No puedes asignar a un repartidor su propio pedido");
 
       const actualizada = await prisma.$transaction((tx) =>
@@ -508,14 +575,14 @@ const RepartidorController = {
             select: { id: true, nombre: true, telefono: true },
           });
           if (!repartidorCompleto) return;
-          const sp = actualizada.subPedido;
+          const comercio = comercioDe(actualizada);
           await NotificacionService.entregaAsignada({
             entregaId: id,
-            pedidoId: sp?.pedido?.id,
+            pedidoId: pedidoIdDe(actualizada),
             repartidor: repartidorCompleto,
-            comercioNombre: sp?.comercio?.nombre,
-            comercioMunicipio: sp?.comercio?.municipio,
-            direccion: sp?.pedido?.direccionTexto,
+            comercioNombre: comercio?.nombre,
+            comercioMunicipio: comercio?.municipio,
+            direccion: direccionDe(actualizada),
           });
         } catch (e) {
           console.error("[NOTIF] asignarAdmin:", e.message);

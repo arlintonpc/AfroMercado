@@ -14,12 +14,20 @@ function calcularPagoEntrega(entrega, modo, valor) {
   }
 
   if (modo === "porcentaje_envio") {
-    const pedido = entrega.subPedido?.pedido;
-    const costoEnvio = Number(pedido?.costoEnvio ?? 0);
-    const cantidadSubPedidos = Math.max(
-      1,
-      Number(pedido?._count?.subPedidos ?? pedido?.subPedidos?.length ?? 1),
-    );
+    let costoEnvio = 0;
+    let cantidadSubPedidos = 1;
+    if (entrega.subPedido) {
+      const pedido = entrega.subPedido.pedido;
+      costoEnvio = Number(pedido?.costoEnvio ?? 0);
+      cantidadSubPedidos = Math.max(
+        1,
+        Number(pedido?._count?.subPedidos ?? pedido?.subPedidos?.length ?? 1),
+      );
+    } else if (entrega.pedidoExpress) {
+      // Un PedidoExpress es siempre de un solo comercio — no hay costo de
+      // envío que repartir entre varios subpedidos como en Marketplace.
+      costoEnvio = Number(entrega.pedidoExpress.costoEnvio ?? 0);
+    }
     return Math.round((costoEnvio * (valor / 100)) / cantidadSubPedidos);
   }
   return Math.round(valor);

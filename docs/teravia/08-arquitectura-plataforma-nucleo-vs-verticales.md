@@ -53,9 +53,9 @@ CuponTransporte + CuponTransporteUso
 
 Aquí la duplicación es real pero con más matices que Reseñas/Favoritos: `Cupon` (Marketplace) tiene `usosMaximosPorUsuario`, `soloNuevos`, `distribucion` (`TipoDistribucionCupon`) y `programaNombre` — funcionalidad que ningún cupón de servicio (`CuponHotel`, `CuponExpress`, etc.) tiene. Y los cupones de servicio usan `minimoNoches` (Hotel) o `minimoSubtotal` (Express) — el mismo concepto ("monto/cantidad mínima para aplicar") expresado con nombres distintos en cada tabla.
 
-### 1.4 Logística — 2 sistemas que resuelven el mismo problema sin saberlo
+### 1.4 Logística — diagnóstico inicial corregido tras auditoría (ver sección 3.5)
 
-Ya documentado en el Anexo A: `Entrega` + `SolicitudRepartidor` + `CalificacionRepartidor` (usado por Marketplace/Express) y `RutaTransporte` + `ReservaTransporte` (Transporte fluvial) son dos implementaciones independientes de "mover algo de un punto A a un punto B", sin una sola línea de código en común.
+El diagnóstico original (Anexo A) asumía que `Entrega`+`SolicitudRepartidor`+`CalificacionRepartidor` y `RutaTransporte`+`ReservaTransporte` eran dos implementaciones independientes del mismo problema. La auditoría de la sección 3.5 encontró que **no es así**: no comparten ni una línea de código porque no resuelven el mismo problema — uno es logística gig-economy con repartidor, tracking en vivo y pago por viaje; el otro es venta de cupos en un servicio que el propio comercio opera, sin repartidor ni tracking. El hallazgo real fue distinto: `PedidoExpress.repartidorId` existe pero está completamente muerto (usado por Marketplace, nunca conectado en Express) — ver sección 3.5 para el detalle y la recomendación.
 
 ### 1.5 Comisión — no es duplicación de modelo, es una inconsistencia peor: dos mecanismos activos a la vez
 
@@ -87,7 +87,7 @@ No todo está duplicado. `Producto` es un único modelo compartido entre Marketp
 | Favoritos | 🔴 7 modelos duplicados | Unificar en `Favorito` polimórfico |
 | Cupones | 🔴 11 modelos duplicados, con más lógica real que migrar | Unificar en `CuponUnificado` — la migración de mayor riesgo de las tres |
 | Comisión | 🟡 Núcleo ya existe (`ComisionComercio`), Express lo ignora | Corregir Express para leer de `ComisionComercio` — no crear nada nuevo |
-| Logística/Cumplimiento | 🔴 2 sistemas paralelos | Diseño nuevo — el trabajo más grande, ya estaba en el backlog como "Transporte↔Entrega" |
+| Logística/Cumplimiento | 🟢 Auditado (sección 3.5) — no son 2 sistemas paralelos del mismo problema | Transporte no se toca (es reserva de capacidad, no reparto); conectar Express al `Entrega` de Marketplace, ya construido y funcionando |
 
 ---
 
@@ -202,9 +202,31 @@ model CuponUnificado {
 
 No se propone un modelo nuevo. `ComisionComercio` ya es el diseño correcto. El cambio es en `express.service.js`: reemplazar `TASA_COMISION` hardcodeado por una consulta a `ComisionComercio` (la misma que probablemente ya usa `pedido.service.js` para Marketplace — verificar y replicar exactamente esa función, no inventar una nueva).
 
-### 3.5 Logística/Cumplimiento — fuera de alcance de este documento
+### 3.5 Logística/Cumplimiento — auditoría ejecutada, la premisa original no se sostuvo
 
-Ya se identificó en el Anexo A y en la lista de pendientes. Diseñar el modelo unificado de "logística de última milla" (que sirva tanto para un domiciliario en moto como para una embarcación fluvial) es un trabajo de diseño propio, más grande que Reseñas/Favoritos/Cupones juntos — merece su propia sesión de arquitectura, no una sección de este documento.
+Se ejecutó la sesión de auditoría propia que esta sección pedía (2026-07-18), con mapeo exhaustivo de campo/función de los dos sistemas antes de proponer nada. **Resultado: la premisa de "unificar Entrega y Transporte en un modelo de última milla" no se sostiene contra la evidencia.**
+
+**`Entrega`/`SolicitudRepartidor`/`CalificacionRepartidor` (Marketplace)** es un sistema de logística gig-economy real y maduro: pool abierto de entregas (`repartidorId:null` → cualquier repartidor con rol `REPARTIDOR` la reclama por candado optimista, o un admin la asigna), máquina de estados (`ASIGNADA→RECOGIDA→EN_CAMINO→ENTREGADA`), tracking en vivo persistido (`ultimaLatitud/ultimaLongitud/ultimaUbicacionAt`, retransmitido por SSE), pago calculado por reglas de negocio (`pago-repartidor.service.js`), calificación propia del repartidor como persona (`CalificacionRepartidor`, deliberadamente no fusionada con `Resena` en la Fase 3 — calificar al repartidor no es calificar el pedido).
+
+**`RutaTransporte`/`ReservaTransporte` (Transporte fluvial)** no tiene ningún concepto equivalente: sin repartidor/operador separado del comerciante (el mismo `Comercio` dueño de la ruta ejecuta las transiciones de estado directamente), sin tracking en vivo, sin pago-a-tercero (el comerciante cobra directo), sin calificación individual a un "piloto". Estructuralmente se parece mucho más al modelo de inventario de habitaciones de Hotel (`RutaTransporte.capacidad` + agregación dinámica de asientos reservados, igual que disponibilidad de `HabitacionTipo`) que a un problema de logística de reparto. **No hay duplicación real que consolidar** — forzar una unificación aquí inventaría estructura sin respaldo en la lógica de negocio real, el mismo error que ya se evitó en Cupones (sección 3.3) al no fusionar `Cupon` de Marketplace con los verticales.
+
+**El hallazgo real y aprovechable, no el que se buscaba:** `PedidoExpress.repartidorId` existe en el schema pero está **completamente muerto** — confirmado por grep exhaustivo en `express.service.js`/`express.controller.js`/`express.routes.js`: cero lecturas, cero escrituras. Hoy, cuando un pedido Express avanza a `EN_CAMINO`/`ENTREGADO`, es el propio comerciante quien fuerza el cambio de estado manualmente — no hay repartidor real asignado, ni tracking en vivo, ni pago a domiciliario, pese a que el campo sugiere que esto se planeó y nunca se conectó. A diferencia de Transporte, Express **sí** es un problema de última milla con la misma forma exacta que Marketplace (comida de un restaurante a una casa) — es el candidato natural y de bajo riesgo para reusar el sistema `Entrega`/`repartidor.controller.js` ya construido, en vez de una unificación Entrega↔Transporte que la evidencia no respalda.
+
+Transporte fluvial queda fuera de cualquier unificación de logística — es un modelo de reserva de capacidad, no de reparto, y se documenta aquí explícitamente para que no se reintente esta unificación sin evidencia nueva que la respalde.
+
+### 3.5.1 Fase 5 — conectar Express a Entrega ✅ Ejecutada — 2026-07-18
+
+Dos decisiones de producto reales se resolvieron antes de escribir código, con evidencia:
+
+- **¿Pool de repartidores compartido o separado entre Marketplace y Express?** Compartido. Con cero repartidores activos y varios comercios que ya operan Express y Marketplace a la vez en pueblos chicos del Chocó (Tadó, Quibdó), separar el pool fragmentaría algo que hoy ni siquiera existe, sin ningún beneficio operativo real.
+- **¿Los domicilios de comida (urgentes) compiten en igualdad con los de Marketplace (no urgentes)?** No — se agregó prioridad real: `disponibles` ordena primero por origen (Express antes que Marketplace) y luego por tiempo de espera, en vez de "más reciente primero" sin criterio.
+- **Hallazgo adicional que amplió el alcance:** muchos restaurantes ya tienen su propio domiciliario y no deberían entrar al pool de la plataforma en absoluto. Se agregó `ConfigExpress.tipoEntregaDomicilio` (`PROPIO` por defecto — no rompe a nadie — o `PLATAFORMA`), más una válvula de escape para que un restaurante en modo `PROPIO` pase un pedido puntual al pool si su domiciliario no puede cubrirlo.
+
+**Resultado real:** `Entrega` gana `pedidoExpressId` (nullable, único) junto a `subPedidoId` (ahora también nullable) — mutuamente excluyentes, reforzado con un `CHECK` a nivel de base de datos, no el patrón polimórfico `tipoEntidad`/`entidadId` de Reseñas/Favoritos/Cupones a propósito (aquí sí hacían falta relaciones reales de Prisma para los filtros de `repartidor.controller.js`, y no había 7 tablas duplicadas que consolidar). `PedidoExpress.repartidorId` — el campo muerto que originó esta fase — se eliminó, reemplazado por `Entrega.repartidorId` como única fuente de verdad. Al llegar a `LISTO` en modo `PLATAFORMA`, se crea la `Entrega` automáticamente (mismo disparador que Marketplace en `SubPedido→LISTO`); desde ahí, `LISTO→EN_CAMINO` deja de ser potestad del comercio y pasa al repartidor asignado.
+
+`repartidor.controller.js` se generalizó con helpers (`compradorIdDe`, `pedidoIdDe`, `comercioDe`, `direccionDe`) que normalizan el acceso sin importar el origen, en vez de duplicar cada función. `pago-repartidor.service.js` y las notificaciones (`entregaRecogida`/`entregaEnCamino`/`pedidoEntregado`/`entregaFallida`, con `url` ahora configurable) se extendieron de la misma forma. Badge "Envío gratis" corregido en la tarjeta de restaurante cuando `costoEnvioBase = 0` (antes mostraba "🛵 $0").
+
+Verificado extremo a extremo: `tsc --noEmit` y `node --check` limpios en todos los archivos tocados, dos reinicios consecutivos del backend sin error, y un script de prueba real que activó modo `PLATAFORMA`, creó un pedido, confirmó la `Entrega` automática al llegar a `LISTO`, confirmó que el comercio queda bloqueado de avanzar el estado él mismo, confirmó que la query del pool de repartidores encuentra la entrega, confirmó el cálculo de pago al repartidor, y probó la válvula de escape sobre un pedido en modo `PROPIO` — limpiando los datos de prueba al final.
 
 ---
 

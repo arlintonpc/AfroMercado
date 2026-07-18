@@ -146,6 +146,16 @@ const ExpressController = {
     } catch (err) { next(err); }
   },
 
+  // Válvula de escape (Fase 5, Anexo B): pasar un pedido puntual a repartidor
+  // de la plataforma aunque el restaurante esté en modo PROPIO.
+  async activarRepartidorPlataforma(req, res, next) {
+    try {
+      const comercioId = await getComercioId(req.usuario.id);
+      const data = await ExpressService.activarRepartidorPlataforma(Number(req.params.id), comercioId);
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
   // ── ADMIN ────────────────────────────────────────────────────
 
   async deudasAdmin(req, res, next) {

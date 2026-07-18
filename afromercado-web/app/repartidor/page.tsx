@@ -12,6 +12,7 @@ import {
   actualizarUbicacionEntrega,
   subirFotoEntrega,
   estadisticasRepartidor,
+  origenDe,
   type EntregaDetalle,
   type EstadisticasRepartidor,
 } from '@/lib/api/repartidor'
@@ -96,8 +97,7 @@ function TarjetaEntrega({
   subiendoFotoId?: number | null
   cargandoAccion: number | null
 }) {
-  const { subPedido } = entrega
-  const { pedido, comercio, items } = subPedido
+  const origen = origenDe(entrega)
   const activa = estaActiva(entrega.estado)
   const siguiente = SIGUIENTE_ESTADO[entrega.estado]
   const ocupado = cargandoAccion === entrega.id
@@ -121,16 +121,18 @@ function TarjetaEntrega({
     return () => navigator.geolocation.clearWatch(watchId)
   }, [entrega.estado, entrega.id])
 
+  if (!origen) return null
+
   return (
     <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-5 flex flex-col gap-4">
       {/* Cabecera */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs text-[#1A1A1A]/40 font-medium">
-            Pedido #{pedido.id} · {fechaCorta(entrega.createdAt)}
+            Pedido #{origen.pedidoId} · {fechaCorta(entrega.createdAt)}
           </p>
           <p className="mt-0.5 text-base font-semibold text-[#1A1A1A] truncate">
-            {comercio.nombre}
+            {origen.comercioNombre}
           </p>
         </div>
         <BadgeEstado estado={entrega.estado} />
@@ -151,7 +153,7 @@ function TarjetaEntrega({
             fill="currentColor"
           />
         </svg>
-        <span>{pedido.direccionTexto}</span>
+        <span>{origen.direccion}</span>
       </div>
 
       {/* Comprador */}
@@ -166,10 +168,10 @@ function TarjetaEntrega({
           />
         </svg>
         <span>
-          {pedido.comprador.nombre}
-          {pedido.comprador.telefono && (
+          {origen.clienteNombre}
+          {origen.clienteTelefono && (
             <span className="ml-1 text-[#2D6A4F] font-medium">
-              · {pedido.comprador.telefono}
+              · {origen.clienteTelefono}
             </span>
           )}
         </span>
@@ -181,7 +183,7 @@ function TarjetaEntrega({
           Productos
         </p>
         <ul className="flex flex-col gap-1">
-          {items.map((item, i) => (
+          {origen.items.map((item, i) => (
             <li key={i} className="flex justify-between text-sm text-[#1A1A1A]">
               <span>{item.producto.nombre}</span>
               <span className="font-medium text-[#1A1A1A]/60">×{item.cantidad}</span>
@@ -714,14 +716,14 @@ export default function PanelRepartidorPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <p className="text-xs text-[#1A1A1A]/40 font-medium">
-                              Pedido #{e.subPedido.pedido.id} · {fechaCorta(e.createdAt)}
+                              Pedido #{origenDe(e)?.pedidoId} · {fechaCorta(e.createdAt)}
                             </p>
                           </div>
                           <p className="text-sm font-semibold text-[#1A1A1A] truncate">
-                            {e.subPedido.comercio.nombre}
+                            {origenDe(e)?.comercioNombre}
                           </p>
                           <p className="text-xs text-[#1A1A1A]/55 truncate mt-0.5">
-                            {e.subPedido.pedido.direccionTexto}
+                            {origenDe(e)?.direccion}
                           </p>
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-1">

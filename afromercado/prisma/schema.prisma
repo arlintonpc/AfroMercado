@@ -209,7 +209,6 @@ model Usuario {
   liquidacionesCreadas      Liquidacion[]       @relation("LiquidacionAdmin")
   liquidacionesPagadas      Liquidacion[]       @relation("LiquidacionPagador")
   pedidosExpressCliente     PedidoExpress[]     @relation("PedidosExpressCliente")
-  pedidosExpressRepartidor  PedidoExpress[]     @relation("PedidosExpressRepartidor")
   reservasHotel             ReservaHotel[]      @relation("ReservasHotelCliente")
   reservasTour              ReservaTour[]       @relation("ReservasTourCliente")
   reservasTransporte        ReservaTransporte[] @relation("ReservasTransporteCliente")
@@ -825,10 +824,19 @@ model PagoDispersion {
   @@index([estado, proximoReintentoAt])
 }
 
+// Anexo B, Fase 5: Entrega ahora sirve tanto a Marketplace (subPedidoId) como
+// a Express en modo PLATAFORMA (pedidoExpressId) — mutuamente excluyentes,
+// exactamente uno de los dos debe estar presente (constraint CHECK a nivel
+// de BD, ver migración). No es el patrón polimórfico tipoEntidad/entidadId
+// usado en Resena/Favorito/CuponVertical a propósito: aquí sí hace falta la
+// relación real de Prisma para los joins de filtro (municipio, comprador)
+// que ya usaba repartidor.controller.js — no hay 7 tablas duplicadas que
+// consolidar, es una tabla que gana un segundo origen válido.
 model Entrega {
-  id           Int           @id @default(autoincrement())
-  subPedidoId  Int           @unique
-  repartidorId Int?
+  id              Int           @id @default(autoincrement())
+  subPedidoId     Int?          @unique
+  pedidoExpressId Int?          @unique
+  repartidorId    Int?
   estado       EstadoEntrega @default(ASIGNADA)
   direccion    String
   notas        String?
@@ -841,7 +849,8 @@ model Entrega {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  subPedido  SubPedido @relation(fields: [subPedidoId], references: [id])
+  subPedido     SubPedido?     @relation(fields: [subPedidoId], references: [id])
+  pedidoExpress PedidoExpress? @relation(fields: [pedidoExpressId], references: [id])
   repartidor Usuario?  @relation("EntregaRepartidor", fields: [repartidorId], references: [id])
   calificacion CalificacionRepartidor?
 
@@ -1665,6 +1674,16 @@ enum MetodoPagoExpress {
   WOMPI
 }
 
+// Anexo B, Fase 5: quién ejecuta el domicilio de este restaurante.
+// PROPIO (default) — el comerciante ya tiene su propio domiciliario y
+// gestiona la entrega igual que hoy, sin repartidor de la plataforma.
+// PLATAFORMA — se crea una Entrega real que entra al pool compartido de
+// repartidores que ya usa Marketplace.
+enum TipoEntregaDomicilio {
+  PROPIO
+  PLATAFORMA
+}
+
 model ConfigExpress {
   id         Int      @id @default(autoincrement())
   comercioId Int      @unique
@@ -1674,6 +1693,7 @@ model ConfigExpress {
   municipiosEntrega String[]
   modalidades       ModalidadExpress[]
   costoEnvioBase    Decimal  @default(3000) @db.Decimal(10, 2)
+  tipoEntregaDomicilio TipoEntregaDomicilio @default(PROPIO)
   limiteCreditoEfectivo Decimal @default(30000) @db.Decimal(10, 2)
   deudaEfectivoActual   Decimal @default(0)   @db.Decimal(10, 2)
   videoUrl       String?
@@ -1735,7 +1755,6 @@ model PedidoExpress {
   codigo           String              @unique
   comercioId       Int
   clienteId        Int
-  repartidorId     Int?
   configExpressId  Int
 
   modalidad        ModalidadExpress
@@ -1770,9 +1789,9 @@ model PedidoExpress {
   expiresAt        DateTime
 
   cliente          Usuario             @relation("PedidosExpressCliente",    fields: [clienteId],      references: [id])
-  repartidor       Usuario?            @relation("PedidosExpressRepartidor", fields: [repartidorId],   references: [id])
   configExpress    ConfigExpress       @relation(fields: [configExpressId],  references: [id])
   items            ItemPedidoExpress[]
+  entrega          Entrega?
 
   @@index([comercioId, estado])
   @@index([clienteId,  estado])

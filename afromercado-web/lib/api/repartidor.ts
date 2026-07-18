@@ -16,7 +16,8 @@ export interface EntregaDetalle {
   ultimaLatitud?: number | null
   ultimaLongitud?: number | null
   ultimaUbicacionAt?: string | null
-  subPedido: {
+  /** Origen Marketplace — mutuamente excluyente con pedidoExpress (Fase 5, Anexo B). */
+  subPedido?: {
     id: number
     comercio: { nombre: string }
     pedido: {
@@ -26,6 +27,39 @@ export interface EntregaDetalle {
     }
     items: Array<{ cantidad: number; producto: { nombre: string } }>
   }
+  /** Origen Express en modo PLATAFORMA — mutuamente excluyente con subPedido. */
+  pedidoExpress?: {
+    id: number
+    direccionTexto: string | null
+    cliente: { nombre: string; telefono: string | null }
+    configExpress: { comercio: { nombre: string } }
+    items: Array<{ cantidad: number; producto: { nombre: string } }>
+  }
+}
+
+/** Normaliza el origen (SubPedido/Marketplace o PedidoExpress) a un shape único para la UI. */
+export function origenDe(e: EntregaDetalle) {
+  if (e.subPedido) {
+    return {
+      pedidoId: e.subPedido.pedido.id,
+      comercioNombre: e.subPedido.comercio.nombre,
+      direccion: e.subPedido.pedido.direccionTexto,
+      clienteNombre: e.subPedido.pedido.comprador.nombre,
+      clienteTelefono: e.subPedido.pedido.comprador.telefono,
+      items: e.subPedido.items,
+    }
+  }
+  if (e.pedidoExpress) {
+    return {
+      pedidoId: e.pedidoExpress.id,
+      comercioNombre: e.pedidoExpress.configExpress.comercio.nombre,
+      direccion: e.pedidoExpress.direccionTexto ?? '',
+      clienteNombre: e.pedidoExpress.cliente.nombre,
+      clienteTelefono: e.pedidoExpress.cliente.telefono,
+      items: e.pedidoExpress.items,
+    }
+  }
+  return null
 }
 
 export async function misEntregas(): Promise<EntregaDetalle[]> {
