@@ -1,19 +1,11 @@
-/**
- * Departamentos y municipios de Colombia — catálogo DANE completo.
- *
- * Generado a partir del dataset público de códigos DANE (datos.gov.co,
- * vía github.com/RafaelRamosR/dane-codigos-municipios), cruzado por código
- * de departamento para preservar los nombres ya usados en la app. Cubre los
- * 33 departamentos (incluyendo Bogotá D.C.) y sus ~1123 municipios.
- *
- * No se validó a mano cada tilde de los ~1100 municipios fuera del Chocó —
- * si encuentras un nombre mal escrito, es del dataset fuente, no inventado.
- * (Sí se corrigió un error real del dataset: "San Pablo de Borbur" aparecía
- * duplicado en Bolívar además de Boyacá — el municipio 13670 de Bolívar se
- * llama "San Pablo".)
- */
+// ============================================================
+//  Departamentos y municipios de Colombia — catálogo DANE completo.
+//  Mismo contenido que afromercado-web/lib/data/colombia.ts — generado del
+//  mismo dataset (datos.gov.co, vía RafaelRamosR/dane-codigos-municipios).
+//  Usado por utils/ubicacion.js para validar Comercio y Direccion.
+// ============================================================
 
-export const DEPARTAMENTOS: string[] = [
+const DEPARTAMENTOS = [
   'Amazonas',
   'Antioquia',
   'Arauca',
@@ -47,9 +39,9 @@ export const DEPARTAMENTOS: string[] = [
   'Valle del Cauca',
   'Vaupés',
   'Vichada',
-]
+];
 
-export const MUNICIPIOS_POR_DEPARTAMENTO: Record<string, string[]> = {
+const MUNICIPIOS_POR_DEPARTAMENTO = {
   'Amazonas': [
     'El Encanto',
     'La Chorrera',
@@ -1239,9 +1231,6 @@ export const MUNICIPIOS_POR_DEPARTAMENTO: Record<string, string[]> = {
     'Puerto Carreño',
     'Santa Rosalía',
   ],
-}
+};
 
-/** Municipios de un departamento (vacío si el departamento no existe en el catálogo). */
-export function municipiosDe(departamento: string): string[] {
-  return MUNICIPIOS_POR_DEPARTAMENTO[departamento] ?? []
-}
+module.exports = { DEPARTAMENTOS, MUNICIPIOS_POR_DEPARTAMENTO };

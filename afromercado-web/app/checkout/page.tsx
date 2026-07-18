@@ -36,7 +36,6 @@ export default function PaginaCheckout() {
   // Campos del formulario
   const [departamento, setDepartamento] = useState('')
   const [municipio, setMunicipio] = useState('')
-  const [municipioOtro, setMunicipioOtro] = useState(false)
   const [barrio, setBarrio] = useState('')
   const [linea1, setLinea1] = useState('')
   const [referencia, setReferencia] = useState('')
@@ -202,7 +201,6 @@ export default function PaginaCheckout() {
     setSelectedId(null)
     setDepartamento('')
     setMunicipio('')
-    setMunicipioOtro(false)
     setBarrio('')
     setLinea1('')
     setReferencia('')
@@ -457,11 +455,6 @@ export default function PaginaCheckout() {
               {/* Formulario de dirección */}
               {(() => {
                 const muniOpciones = municipiosDe(departamento)
-                const usarTextoMunicipio =
-                  !!departamento &&
-                  (muniOpciones.length === 0 ||
-                    municipioOtro ||
-                    (municipio !== '' && !muniOpciones.includes(municipio)))
                 const selBase =
                   'w-full bg-transparent min-h-[44px] py-2 text-base border-b outline-none transition-colors duration-150 font-[var(--font-inter)]'
                 return (
@@ -476,7 +469,7 @@ export default function PaginaCheckout() {
                           id="departamento"
                           name="departamento"
                           value={departamento}
-                          onChange={(e) => { setDepartamento(e.target.value); setMunicipio(''); setMunicipioOtro(false) }}
+                          onChange={(e) => { setDepartamento(e.target.value); setMunicipio('') }}
                           className={[
                             selBase,
                             departamento ? 'text-[#1A1A1A]' : 'text-[#1A1A1A]/40',
@@ -495,56 +488,24 @@ export default function PaginaCheckout() {
                       <label htmlFor="municipio" className="font-semibold text-sm text-[#1A1A1A] leading-tight">
                         Municipio / Ciudad
                       </label>
-                      {usarTextoMunicipio ? (
-                        <>
-                          <div className="relative flex items-center min-h-[44px]">
-                            <input
-                              id="municipio"
-                              name="municipio"
-                              placeholder="Escribe tu municipio"
-                              value={municipio}
-                              onChange={(e) => setMunicipio(e.target.value)}
-                              className={[
-                                selBase,
-                                'text-[#1A1A1A] placeholder:text-[#1A1A1A]/40',
-                                errores.municipio ? 'border-[#C0392B]' : 'border-[#1A1A1A]/30 focus:border-[#D4A017]',
-                              ].join(' ')}
-                            />
-                          </div>
-                          {muniOpciones.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => { setMunicipioOtro(false); setMunicipio('') }}
-                              className="self-start text-xs text-[#2D6A4F] hover:underline mt-0.5"
-                            >
-                              Elegir de la lista
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        <div className="relative flex items-center min-h-[44px]">
-                          <select
-                            id="municipio"
-                            name="municipio"
-                            value={municipio}
-                            disabled={!departamento}
-                            onChange={(e) => {
-                              if (e.target.value === '__OTRO__') { setMunicipioOtro(true); setMunicipio('') }
-                              else setMunicipio(e.target.value)
-                            }}
-                            className={[
-                              selBase,
-                              municipio ? 'text-[#1A1A1A]' : 'text-[#1A1A1A]/40',
-                              errores.municipio ? 'border-[#C0392B]' : 'border-[#1A1A1A]/30 focus:border-[#D4A017]',
-                              !departamento ? 'opacity-50 cursor-not-allowed' : '',
-                            ].join(' ')}
-                          >
-                            <option value="">{departamento ? 'Elige tu municipio…' : 'Primero elige departamento'}</option>
-                            {muniOpciones.map((m) => <option key={m} value={m}>{m}</option>)}
-                            {departamento && <option value="__OTRO__">Otro (escribir)…</option>}
-                          </select>
-                        </div>
-                      )}
+                      <div className="relative flex items-center min-h-[44px]">
+                        <select
+                          id="municipio"
+                          name="municipio"
+                          value={municipio}
+                          disabled={!departamento}
+                          onChange={(e) => setMunicipio(e.target.value)}
+                          className={[
+                            selBase,
+                            municipio ? 'text-[#1A1A1A]' : 'text-[#1A1A1A]/40',
+                            errores.municipio ? 'border-[#C0392B]' : 'border-[#1A1A1A]/30 focus:border-[#D4A017]',
+                            !departamento ? 'opacity-50 cursor-not-allowed' : '',
+                          ].join(' ')}
+                        >
+                          <option value="">{departamento ? 'Elige tu municipio…' : 'Primero elige departamento'}</option>
+                          {muniOpciones.map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </div>
                       {errores.municipio && <p className="text-sm text-[#C0392B] mt-0.5">{errores.municipio}</p>}
                     </div>
                   </div>

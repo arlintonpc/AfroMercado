@@ -12,7 +12,7 @@ import {
   marcarDireccionPrincipal,
 } from '@/lib/api/direcciones'
 import type { Direccion, CrearDireccionInput } from '@/lib/api/direcciones'
-import { DEPARTAMENTOS } from '@/lib/data/colombia'
+import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
 const VACIO: CrearDireccionInput = {
@@ -135,27 +135,31 @@ function FormDireccion({ inicial = VACIO, onGuardar, onCancelar, guardando, erro
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <label className={labelCls}>Municipio <span className="text-red-500">*</span></label>
-          <input
-            type="text"
-            value={form.municipio}
-            onChange={set('municipio')}
-            placeholder="Ej: Quibdó"
-            required
-            className={inputCls}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
           <label className={labelCls}>Departamento <span className="text-red-500">*</span></label>
           <select
             value={form.departamento}
-            onChange={set('departamento')}
+            onChange={e => setForm(prev => ({ ...prev, departamento: e.target.value, municipio: '' }))}
             required
             className={inputCls}
           >
             <option value="">Seleccionar...</option>
             {DEPARTAMENTOS.map(d => (
               <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className={labelCls}>Municipio <span className="text-red-500">*</span></label>
+          <select
+            value={form.municipio}
+            onChange={set('municipio')}
+            disabled={!form.departamento}
+            required
+            className={inputCls}
+          >
+            <option value="">{form.departamento ? 'Seleccionar...' : 'Primero elige departamento'}</option>
+            {municipiosDe(form.departamento).map(m => (
+              <option key={m} value={m}>{m}</option>
             ))}
           </select>
         </div>

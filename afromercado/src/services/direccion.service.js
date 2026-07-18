@@ -1,5 +1,6 @@
 const DireccionRepository = require("../repositories/direccion.repository");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
+const { validarUbicacion } = require("../utils/ubicacion");
 
 const MAX_DIRECCIONES = 10;
 
@@ -20,6 +21,8 @@ function validarDatos(datos) {
   }
 
   if (e.length) throw new ErrorValidacion(e.join(" "));
+
+  validarUbicacion(datos.departamento.trim(), datos.municipio.trim());
 }
 
 const DireccionService = {

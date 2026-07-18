@@ -9,6 +9,7 @@ const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils
 const prisma = require("../config/prisma");
 const { eliminarDeCloudinary } = require("../utils/cloudinary");
 const { eliminarArchivoLocalDesdeUrl } = require("../utils/video-media");
+const { validarUbicacion } = require("../utils/ubicacion");
 
 const CAMPOS_EDITABLES = [
   "nombre",
@@ -96,10 +97,12 @@ const ComercioService = {
     }
 
     const { nombre, municipio } = datos;
+    const departamento = datos.departamento?.trim();
 
-    if (!nombre || !municipio) {
-      throw new ErrorValidacion("El nombre y el municipio son obligatorios");
+    if (!nombre || !municipio || !departamento) {
+      throw new ErrorValidacion("El nombre, el departamento y el municipio son obligatorios");
     }
+    validarUbicacion(departamento, municipio);
     if (!datos.tipoDocumento || !datos.numeroDocumento?.trim()) {
       throw new ErrorValidacion("El tipo y número de documento son obligatorios para el registro");
     }
@@ -123,7 +126,7 @@ const ComercioService = {
       }),
       prisma.comercio.create({
         data: { usuarioId, nombre, municipio,
-          departamento: datos.departamento?.trim() ?? null,
+          departamento,
           descripcion: datos.descripcion ?? null,
           historia: datos.historia ?? null,
           whatsapp: datos.whatsapp ?? null,
@@ -221,6 +224,13 @@ const ComercioService = {
     const cambios = {};
     for (const campo of CAMPOS_EDITABLES) {
       if (datos[campo] !== undefined) cambios[campo] = datos[campo];
+    }
+
+    if (cambios.departamento !== undefined || cambios.municipio !== undefined) {
+      validarUbicacion(
+        cambios.departamento ?? comercio.departamento,
+        cambios.municipio ?? comercio.municipio
+      );
     }
 
     if (cambios.rut !== undefined && cambios.rut !== null && cambios.rut !== "") {
