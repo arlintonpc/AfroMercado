@@ -78,7 +78,7 @@ const ProductoController = {
       const resultado = await ProductoService.listar({
         q: q || undefined,
         categoriaId: categoriaId ? Number(categoriaId) : undefined,
-        grupo: grupo === "ANCESTRAL" || grupo === "LOCAL" ? grupo : undefined,
+        grupo: grupo === "ANCESTRAL" || grupo === "LOCAL" || grupo === "AGRO" ? grupo : undefined,
         municipio: municipio || undefined,
         departamento: departamento || undefined,
         comercioId: comercioId ? Number(comercioId) : undefined,

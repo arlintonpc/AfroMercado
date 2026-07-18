@@ -13,7 +13,13 @@ interface Categoria {
   slug: string
   icono: string | null
   activa: boolean
-  grupo: 'ANCESTRAL' | 'LOCAL'
+  grupo: 'ANCESTRAL' | 'LOCAL' | 'AGRO'
+}
+
+const LABEL_GRUPO: Record<Categoria['grupo'], string> = {
+  ANCESTRAL: '🌿 Ancestral',
+  LOCAL: '🛍️ Tienda Local',
+  AGRO: '🌾 Agro',
 }
 
 // ─── Página ───────────────────────────────────────────────────────────────────
@@ -27,7 +33,7 @@ export default function AdminCategoriasPage() {
   // Formulario crear
   const [nombre, setNombre]             = useState('')
   const [icono, setIcono]               = useState('')
-  const [grupo, setGrupo]               = useState<'ANCESTRAL' | 'LOCAL'>('ANCESTRAL')
+  const [grupo, setGrupo]               = useState<Categoria['grupo']>('ANCESTRAL')
   const [creando, setCreando]           = useState(false)
 
   // Edición inline
@@ -83,12 +89,12 @@ export default function AdminCategoriasPage() {
     }
   }
 
-  async function cambiarGrupo(c: Categoria) {
-    const nuevoGrupo = c.grupo === 'ANCESTRAL' ? 'LOCAL' : 'ANCESTRAL'
+  async function cambiarGrupo(c: Categoria, nuevoGrupo: Categoria['grupo']) {
+    if (nuevoGrupo === c.grupo) return
     setProcesando(c.id)
     try {
       await apiFetch(`/admin/categorias/${c.id}/grupo`, { method: 'PATCH', body: { grupo: nuevoGrupo } })
-      setAviso({ tipo: 'exito', texto: `Categoría movida a ${nuevoGrupo === 'ANCESTRAL' ? 'Productos Ancestrales' : 'Tienda Local'}.` })
+      setAviso({ tipo: 'exito', texto: `Categoría movida a ${LABEL_GRUPO[nuevoGrupo]}.` })
       void cargar()
     } catch (err) {
       setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'Error al actualizar.' })
@@ -169,11 +175,12 @@ export default function AdminCategoriasPage() {
           />
           <select
             value={grupo}
-            onChange={(e) => setGrupo(e.target.value as 'ANCESTRAL' | 'LOCAL')}
+            onChange={(e) => setGrupo(e.target.value as Categoria['grupo'])}
             className="rounded-lg border border-[#1A1A1A]/15 bg-white px-3 py-2 text-sm"
           >
             <option value="ANCESTRAL">🌿 Ancestral</option>
             <option value="LOCAL">🛍️ Tienda Local</option>
+            <option value="AGRO">🌾 Agro</option>
           </select>
           <Button type="submit" variant="primary" size="sm" loading={creando} disabled={!nombre.trim()}>
             Crear
@@ -262,9 +269,11 @@ export default function AdminCategoriasPage() {
                         'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold',
                         c.grupo === 'LOCAL'
                           ? 'border-[#D4A017]/40 bg-[#D4A017]/10 text-[#8A6410]'
+                          : c.grupo === 'AGRO'
+                          ? 'border-[#52B788]/40 bg-[#52B788]/10 text-[#1B4332]'
                           : 'border-[#2D6A4F]/30 bg-[#2D6A4F]/10 text-[#1B4332]',
                       ].join(' ')}>
-                        {c.grupo === 'LOCAL' ? '🛍️ Tienda Local' : '🌿 Ancestral'}
+                        {LABEL_GRUPO[c.grupo]}
                       </span>
                     </td>
 
@@ -300,15 +309,16 @@ export default function AdminCategoriasPage() {
                             >
                               Editar
                             </Button>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => cambiarGrupo(c)}
-                              loading={procesandoId === c.id}
+                            <select
+                              value={c.grupo}
+                              onChange={(e) => cambiarGrupo(c, e.target.value as Categoria['grupo'])}
                               disabled={procesandoId !== null}
+                              className="rounded-lg border border-[#1A1A1A]/15 bg-white px-2 py-1.5 text-xs disabled:opacity-50"
                             >
-                              {c.grupo === 'LOCAL' ? 'Mover a Ancestral' : 'Mover a Tienda Local'}
-                            </Button>
+                              <option value="ANCESTRAL">{LABEL_GRUPO.ANCESTRAL}</option>
+                              <option value="LOCAL">{LABEL_GRUPO.LOCAL}</option>
+                              <option value="AGRO">{LABEL_GRUPO.AGRO}</option>
+                            </select>
                             <Button
                               variant={c.activa ? 'danger' : 'secondary'}
                               size="sm"

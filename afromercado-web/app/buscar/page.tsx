@@ -25,7 +25,7 @@ const FILTROS_VACIOS = {
   precioMax: '',
   alcance: '' as '' | 'LOCAL' | 'NACIONAL' | 'AMBOS',
   enOferta: false,
-  grupo: 'ANCESTRAL' as 'ANCESTRAL' | 'LOCAL',
+  grupo: 'ANCESTRAL' as 'ANCESTRAL' | 'LOCAL' | 'AGRO',
 }
 
 function contarFiltrosActivos(f: typeof FILTROS_VACIOS): number {
@@ -168,8 +168,8 @@ function Resultados() {
   const cargarProductos = useCallback(async (texto: string, paginaNum: number, append: boolean) => {
     const f = filtrosRef.current
     const hayTermino = !!texto.trim()
-    const grupoEsLocal = f.grupo === 'LOCAL'
-    const hayFiltros = contarFiltrosActivos(f) > 0 || grupoEsLocal
+    const grupoNoDefault = f.grupo !== 'ANCESTRAL'
+    const hayFiltros = contarFiltrosActivos(f) > 0 || grupoNoDefault
     if (!hayTermino && !hayFiltros) { setProductos([]); setTotal(0); setPaginas(0); return }
     if (append) setCargandoMas(true); else setCargandoProductos(true)
     setErrorProductos(null)
@@ -219,7 +219,7 @@ function Resultados() {
 
   function limpiarFiltros() { setFiltros(FILTROS_VACIOS) }
 
-  function cambiarGrupo(g: 'ANCESTRAL' | 'LOCAL') {
+  function cambiarGrupo(g: 'ANCESTRAL' | 'LOCAL' | 'AGRO') {
     setFiltros(prev => {
       if (prev.grupo === g) return prev
       const catSeleccionada = categorias.find(c => c.id === prev.categoriaId)
@@ -252,7 +252,8 @@ function Resultados() {
 
   const filtrosActivos = contarFiltrosActivos(filtros)
   const grupoEsLocal = filtros.grupo === 'LOCAL'
-  const sinTerminoNiFiltros = !q && filtrosActivos === 0 && !grupoEsLocal && !cargandoProductos
+  const grupoNoDefault = filtros.grupo !== 'ANCESTRAL'
+  const sinTerminoNiFiltros = !q && filtrosActivos === 0 && !grupoNoDefault && !cargandoProductos
   const categoriasDelGrupo = categorias.filter(c => !c.grupo || c.grupo === filtros.grupo)
 
   const inputCls = 'h-10 px-3 rounded-xl border border-[#1A1A1A]/15 bg-white focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] text-sm w-full'
@@ -356,7 +357,7 @@ function Resultados() {
           ))}
         </div>
 
-        {/* Toggle Productos ancestrales / Tienda local — secundario, solo dentro del tab Productos */}
+        {/* Toggle Productos ancestrales / Tienda local / Agro — secundario, solo dentro del tab Productos */}
         {tab === 'productos' && (
           <div className="inline-flex self-start bg-white border border-[#1A1A1A]/10 rounded-full p-1 gap-1">
             <button
@@ -378,6 +379,16 @@ function Resultados() {
               }`}
             >
               🏬 Tienda local
+            </button>
+            <button
+              type="button"
+              onClick={() => cambiarGrupo('AGRO')}
+              aria-pressed={filtros.grupo === 'AGRO'}
+              className={`px-3.5 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                filtros.grupo === 'AGRO' ? 'bg-[#52B788] text-white' : 'text-[#1A1A1A]/60 hover:text-[#1A1A1A]'
+              }`}
+            >
+              🌾 Agro
             </button>
           </div>
         )}
@@ -419,11 +430,15 @@ function Resultados() {
                 {errorProductos && !cargandoProductos && <EmptyState titulo="No pudimos buscar" descripcion={errorProductos} onReintentar={() => cargarProductos(q, pagina, false)} />}
                 {cargandoProductos && <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}</div>}
                 {sinTerminoNiFiltros && <EmptyState titulo="¿Qué estás buscando?" descripcion="Escribe el nombre de un producto, un sabor o un productor, o usa los filtros." />}
-                {!cargandoProductos && !errorProductos && productos.length === 0 && (q || filtrosActivos > 0 || grupoEsLocal) && (
-                  <EmptyState titulo={q ? `Sin resultados para «${q}»` : 'Sin resultados'} descripcion={grupoEsLocal ? 'Aún no hay productos en Tienda Local que coincidan.' : 'Prueba con otra palabra o ajusta los filtros.'} />
+                {!cargandoProductos && !errorProductos && productos.length === 0 && (q || filtrosActivos > 0 || grupoNoDefault) && (
+                  <EmptyState titulo={q ? `Sin resultados para «${q}»` : 'Sin resultados'} descripcion={
+                    grupoEsLocal ? 'Aún no hay productos en Tienda Local que coincidan.'
+                    : filtros.grupo === 'AGRO' ? 'Aún no hay productos de Agro que coincidan.'
+                    : 'Prueba con otra palabra o ajusta los filtros.'
+                  } />
                 )}
                 {!cargandoProductos && !errorProductos && productos.length > 0 && (
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">{productos.map(p => <TarjetaProducto key={p.id} producto={p} mostrarBadgeVerificado={grupoEsLocal} />)}</div>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">{productos.map(p => <TarjetaProducto key={p.id} producto={p} mostrarBadgeVerificado={grupoNoDefault} />)}</div>
                 )}
                 {cargandoMas && <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={`mas-${i}`} />)}</div>}
                 {!cargandoProductos && !errorProductos && productos.length > 0 && pagina < paginas && (

@@ -1448,6 +1448,9 @@ async function aplicarMigraciones() {
           FOREIGN KEY ("denuncianteId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
       END IF;
     END $$`,
+
+    // ── Vertical Agro: reutiliza GrupoCategoria (patrón "Tienda Local") ──
+    `ALTER TYPE "GrupoCategoria" ADD VALUE IF NOT EXISTS 'AGRO'`,
   ];
   for (const sql of migraciones) {
     try {

@@ -910,8 +910,8 @@ const AdminController = {
     try {
       const { nombre, icono, grupo } = req.body;
       if (!nombre?.trim()) throw new ErrorValidacion("El nombre es obligatorio");
-      if (grupo !== undefined && !["ANCESTRAL", "LOCAL"].includes(grupo)) {
-        throw new ErrorValidacion("grupo debe ser ANCESTRAL o LOCAL");
+      if (grupo !== undefined && !["ANCESTRAL", "LOCAL", "AGRO"].includes(grupo)) {
+        throw new ErrorValidacion("grupo debe ser ANCESTRAL, LOCAL o AGRO");
       }
       const slug = nombre
         .trim()
@@ -955,12 +955,12 @@ const AdminController = {
     } catch (e) { next(e); }
   },
 
-  // PATCH /admin/categorias/:id/grupo  body: { grupo: "ANCESTRAL"|"LOCAL" }
+  // PATCH /admin/categorias/:id/grupo  body: { grupo: "ANCESTRAL"|"LOCAL"|"AGRO" }
   async cambiarGrupoCategoria(req, res, next) {
     try {
       const { grupo } = req.body;
-      if (!["ANCESTRAL", "LOCAL"].includes(grupo)) {
-        throw new ErrorValidacion("grupo debe ser ANCESTRAL o LOCAL");
+      if (!["ANCESTRAL", "LOCAL", "AGRO"].includes(grupo)) {
+        throw new ErrorValidacion("grupo debe ser ANCESTRAL, LOCAL o AGRO");
       }
       const c = await prisma.categoria.findUnique({ where: { id: Number(req.params.id) } });
       if (!c) throw new ErrorNoEncontrado("Categoría no encontrada");
