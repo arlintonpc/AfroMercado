@@ -324,11 +324,20 @@ const TourService = {
   },
 
   async misReservas(clienteId) {
-    return prisma.reservaTour.findMany({
+    const reservas = await prisma.reservaTour.findMany({
       where: { clienteId },
-      include: { configTour: { include: TOUR_INCLUDE }, review: { select: { id: true } } },
+      include: { configTour: { include: TOUR_INCLUDE } },
       orderBy: { creadoAt: "desc" },
     });
+    // Resena (Fase 3, Anexo B) no tiene relación directa a ReservaTour
+    // (entidadId no es FK real) — se resuelve con una sola consulta por lote.
+    if (reservas.length === 0) return reservas;
+    const resenas = await prisma.resena.findMany({
+      where: { tipoEntidad: "RESERVA_TOUR", entidadId: { in: reservas.map(r => r.id) }, autorId: clienteId },
+      select: { id: true, entidadId: true },
+    });
+    const resenaPorReserva = new Map(resenas.map(r => [r.entidadId, r]));
+    return reservas.map(r => ({ ...r, review: resenaPorReserva.get(r.id) ?? null }));
   },
 
   async cancelarReserva(clienteId, reservaId) {

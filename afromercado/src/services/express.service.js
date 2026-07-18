@@ -558,21 +558,30 @@ const ExpressService = {
       include: {
         items: { include: { producto: { select: { nombre: true, fotoUrl: true } } } },
         cliente: { select: { nombre: true, email: true, telefono: true } },
+        entrega: { select: { id: true } }, // Fase 5: si existe, el repartidor de la plataforma ya controla el estado
       },
     });
   },
 
   async listarPedidosCliente(clienteId) {
-    return prisma.pedidoExpress.findMany({
+    const pedidos = await prisma.pedidoExpress.findMany({
       where: { clienteId },
       orderBy: { creadoAt: "desc" },
       take: 20,
       include: {
         items:    { include: { producto: { select: { nombre: true, fotoUrl: true } } } },
         configExpress: { include: { comercio: { select: { nombre: true, logoUrl: true } } } },
-        review: { select: { id: true } },
       },
     });
+    // Resena (Fase 3) no tiene relación directa a PedidoExpress (entidadId
+    // no es FK real) — se resuelve con una sola consulta por lote.
+    if (pedidos.length === 0) return pedidos;
+    const resenas = await prisma.resena.findMany({
+      where: { tipoEntidad: "PEDIDO_EXPRESS", entidadId: { in: pedidos.map(p => p.id) }, autorId: clienteId },
+      select: { id: true, entidadId: true },
+    });
+    const resenaPorPedido = new Map(resenas.map(r => [r.entidadId, r]));
+    return pedidos.map(p => ({ ...p, review: resenaPorPedido.get(p.id) ?? null }));
   },
 
   async obtenerPedido(id) {

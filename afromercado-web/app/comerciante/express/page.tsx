@@ -507,6 +507,7 @@ export default function ExpressComerciante() {
   async function activarPlataforma(id: number) {
     try {
       await activarRepartidorPlataforma(id)
+      setPedidos(prev => prev.map(p => p.id === id ? { ...p, entrega: { id: -1 } } : p))
     } catch (e: any) { setError(e.message) }
   }
 
@@ -1778,7 +1779,7 @@ function TarjetaPedido({
             </button>
           </>
         )}
-        {ACCION_AVANZAR[pedido.estado] && (
+        {ACCION_AVANZAR[pedido.estado] && !(pedido.estado === 'LISTO' && pedido.entrega) && (
           <button
             onClick={() => onAvanzar(pedido.id)}
             className="flex-1 bg-green-600 text-white py-2 rounded-xl text-sm font-semibold hover:bg-green-700 transition-colors"
@@ -1788,9 +1789,17 @@ function TarjetaPedido({
         )}
       </div>
 
+      {/* Fase 5: un repartidor de Teravia ya tiene este pedido — el comercio
+          deja de controlar el estado desde aquí. */}
+      {pedido.estado === 'LISTO' && pedido.entrega && (
+        <p className="text-xs text-[#2D6A4F] font-medium text-center">
+          🚴 Repartidor de Teravia asignado — él actualiza el resto del estado
+        </p>
+      )}
+
       {/* Válvula de escape (Fase 5): tu domiciliario no puede cubrir este
           pedido puntual — pásalo al pool de repartidores de Teravia. */}
-      {pedido.modalidad === 'DOMICILIO' && ['EN_PREPARACION', 'LISTO'].includes(pedido.estado) && (
+      {pedido.modalidad === 'DOMICILIO' && ['EN_PREPARACION', 'LISTO'].includes(pedido.estado) && !pedido.entrega && (
         <button
           onClick={() => onActivarPlataforma(pedido.id)}
           className="w-full text-xs text-gray-500 hover:text-[#2D6A4F] underline underline-offset-2 transition-colors"

@@ -70,6 +70,8 @@ export interface PedidoExpress {
   expiresAt: string
   montoDescuento: number | null
   codigoCupon: string | null
+  /** Si existe, un repartidor de la plataforma ya controla el estado — el comercio no puede avanzarlo (Fase 5, Anexo B). */
+  entrega?: { id: number } | null
   items: ItemPedidoExpress[]
   cliente?: { nombre: string; email: string; telefono: string | null }
   configExpress?: { comercio: { nombre: string; logoUrl: string | null; municipio: string } }
