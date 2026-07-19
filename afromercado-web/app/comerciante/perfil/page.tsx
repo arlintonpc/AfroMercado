@@ -601,6 +601,13 @@ export default function PerfilComerciantePage() {
           )}
         </div>
 
+        {comercio?.estadoRegistro === 'APROBADO' && (!rut.trim() || !cuentaRealVerificada) && (
+          <div className="rounded-xl border border-[#1A1A1A]/10 bg-[#F8F5F0] px-4 py-3 text-xs text-[#1A1A1A]/70 leading-relaxed">
+            Mientras no tengas RUT y cuenta bancaria verificada, tus productos igual aparecen en el catálogo,
+            pero los compradores te contactan directo por WhatsApp — el pago no se procesa por la plataforma.
+          </div>
+        )}
+
         <CampoSelect
           label="Banco o billetera"
           name="bancoCodigo"

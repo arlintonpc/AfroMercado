@@ -23,6 +23,7 @@ enum UnidadVenta {
   PAQUETE
   DOCENA
   MANOJO
+  ANIMAL
 }
 
 enum AlcanceVenta {

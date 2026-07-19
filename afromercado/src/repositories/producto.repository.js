@@ -1,6 +1,6 @@
 // Capa de acceso a datos — Productos
 const prisma = require("../config/prisma");
-const { filtroComercioPublicable } = require("../utils/comercio-publicacion");
+const { filtroComercioVisible } = require("../utils/comercio-publicacion");
 
 function includeProductoPublico(ahora = new Date()) {
   return {
@@ -22,6 +22,15 @@ function includeProductoPublico(ahora = new Date()) {
         verificadoEtnico: true,
         totalVentas: true,
         totalReviews: true,
+        // Solo para calcular comprableEnPlataforma en producto.service.js —
+        // se elimina del objeto antes de responder al cliente, nunca se expone.
+        activo: true,
+        estadoRegistro: true,
+        rut: true,
+        fotoDocumentoUrl: true,
+        fotoDocumentoFrenteUrl: true,
+        fotoDocumentoReversoUrl: true,
+        cuentaDispersion: { select: { estado: true } },
       },
     },
     categoria: true,
@@ -51,7 +60,7 @@ const ProductoRepository = {
         id: Number(id),
         activo: true,
         deletedAt: null,
-        comercio: filtroComercioPublicable(),
+        comercio: filtroComercioVisible(),
       },
       include: includeProductoPublico(),
     });
@@ -74,7 +83,7 @@ const ProductoRepository = {
     const where = {
       activo: true,
       deletedAt: null,
-      comercio: filtroComercioPublicable(),
+      comercio: filtroComercioVisible(),
       // Solo productos con stock disponible (stock > stockReservado)
       stock: { gt: 0 },
     };

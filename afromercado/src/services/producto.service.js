@@ -4,10 +4,24 @@ const ComercioRepository = require("../repositories/comercio.repository");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorNoAutorizado } = require("../utils/errores");
 const { eliminarDeCloudinary } = require("../utils/cloudinary");
 const { eliminarArchivoLocalDesdeUrl } = require("../utils/video-media");
-const { assertPuedePublicar } = require("../utils/comercio-publicacion");
+const { assertPuedePublicar, comercioComprableEnPlataforma } = require("../utils/comercio-publicacion");
 
-const UNIDADES_VALIDAS = ["KG", "UNIDAD", "LITRO", "PAQUETE", "DOCENA", "MANOJO"];
+const UNIDADES_VALIDAS = ["KG", "UNIDAD", "LITRO", "PAQUETE", "DOCENA", "MANOJO", "ANIMAL"];
 const ALCANCES_VALIDOS = ["LOCAL", "NACIONAL", "AMBOS"];
+
+/** Calcula comprableEnPlataforma y elimina los campos internos usados solo para calcularlo. */
+function mapearComercioPublico(producto) {
+  if (!producto?.comercio) return producto;
+  producto.comercio.comprableEnPlataforma = comercioComprableEnPlataforma(producto.comercio);
+  delete producto.comercio.rut;
+  delete producto.comercio.cuentaDispersion;
+  delete producto.comercio.activo;
+  delete producto.comercio.estadoRegistro;
+  delete producto.comercio.fotoDocumentoUrl;
+  delete producto.comercio.fotoDocumentoFrenteUrl;
+  delete producto.comercio.fotoDocumentoReversoUrl;
+  return producto;
+}
 
 async function limpiarVideoAnterior(producto) {
   if (!producto) return;
@@ -69,13 +83,15 @@ const ProductoService = {
   },
 
   async listar(filtros) {
-    return ProductoRepository.listar(filtros);
+    const resultado = await ProductoRepository.listar(filtros);
+    resultado.items = resultado.items.map(mapearComercioPublico);
+    return resultado;
   },
 
   async obtenerPorId(id) {
     const producto = await ProductoRepository.buscarPublicoPorId(id);
     if (!producto) throw new ErrorNoEncontrado("Producto no encontrado");
-    return producto;
+    return mapearComercioPublico(producto);
   },
 
   async misProductos(usuarioId) {

@@ -31,6 +31,8 @@ export interface Producto {
     totalReviews: number
     historia?: string
     whatsappVisible?: boolean
+    /** false = sin RUT/cuenta verificada: se vende por contacto directo, no por carrito. */
+    comprableEnPlataforma?: boolean
     videoUrl?: string | null
     videoPosterUrl?: string | null
     videoDuracionSegundos?: number | null

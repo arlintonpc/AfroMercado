@@ -375,6 +375,11 @@ function ModalAccion({
                 Falta frente o reverso del documento. No se puede aprobar.
               </p>
             )}
+            {!comercio.rut?.trim() && (
+              <p className="mt-2 text-[#9B7300]">
+                Sin RUT — si apruebas, sus productos se venderán con contacto directo por WhatsApp, no compra en la plataforma.
+              </p>
+            )}
             <label className="mt-3 flex items-start gap-2 text-xs font-medium text-[#1A1A1A]/70">
               <input
                 type="checkbox"

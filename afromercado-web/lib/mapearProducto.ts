@@ -28,6 +28,7 @@ interface ComercioCrudo {
   historia?: string
   whatsapp?: string | null
   whatsappVisible?: boolean
+  comprableEnPlataforma?: boolean
   videoUrl?: string | null
   videoPosterUrl?: string | null
   videoDuracionSegundos?: number | string | null
@@ -137,6 +138,7 @@ export function mapearProducto(crudo: ProductoCrudo): Producto {
       totalReviews: aNumero(comercio.totalReviews),
       historia: comercio.historia,
       whatsappVisible: crudo.comercio?.whatsappVisible ?? false,
+      comprableEnPlataforma: crudo.comercio?.comprableEnPlataforma ?? true,
       videoUrl: comercio.videoUrl ?? undefined,
       videoPosterUrl: comercio.videoPosterUrl ?? undefined,
       videoDuracionSegundos: comercio.videoDuracionSegundos != null ? aNumero(comercio.videoDuracionSegundos) : null,

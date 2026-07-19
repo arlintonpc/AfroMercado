@@ -12,6 +12,7 @@ const CarritoRepository = require("../repositories/carrito.repository");
 const ProductoRepository = require("../repositories/producto.repository");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const { ofertaTieneCupo, ofertaVigente, precioVigente } = require("../utils/ofertas");
+const { comercioComprableEnPlataforma } = require("../utils/comercio-publicacion");
 
 function validarCupoOferta(producto, cantidad) {
   const oferta = ofertaVigente(producto, new Date(), 1);
@@ -99,6 +100,9 @@ const CarritoService = {
     const producto = await ProductoRepository.buscarPublicoPorId(pid);
     if (!producto || !producto.activo || producto.deletedAt) {
       throw new ErrorNoEncontrado("Producto no encontrado o inactivo");
+    }
+    if (!comercioComprableEnPlataforma(producto.comercio)) {
+      throw new ErrorValidacion("Este producto no está disponible para compra en la plataforma. Contacta al vendedor por WhatsApp.");
     }
 
     const stockDisponible = producto.stock - producto.stockReservado;

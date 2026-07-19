@@ -13,7 +13,7 @@ export { MUNICIPIOS_POR_DEPARTAMENTO, municipiosDe }
 export const DEPARTAMENTOS_COLOMBIA: string[] = [...DEPARTAMENTOS].sort()
 
 /** Unidad de venta válida en el backend. */
-export type Unidad = 'KG' | 'UNIDAD' | 'LITRO' | 'PAQUETE' | 'DOCENA' | 'MANOJO'
+export type Unidad = 'KG' | 'UNIDAD' | 'LITRO' | 'PAQUETE' | 'DOCENA' | 'MANOJO' | 'ANIMAL'
 
 export interface OpcionUnidad {
   valor: Unidad
@@ -28,6 +28,7 @@ export const UNIDADES: OpcionUnidad[] = [
   { valor: 'PAQUETE', etiqueta: 'Paquete' },
   { valor: 'DOCENA', etiqueta: 'Docena' },
   { valor: 'MANOJO', etiqueta: 'Manojo' },
+  { valor: 'ANIMAL', etiqueta: 'Animal' },
 ]
 
 /** Etiqueta amigable para una unidad cualquiera (con respaldo). */

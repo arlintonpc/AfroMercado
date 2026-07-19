@@ -1459,6 +1459,9 @@ async function aplicarMigraciones() {
       END IF;
     END $$`,
     `ALTER TABLE "OfertaEmpleo" ADD COLUMN IF NOT EXISTS "tipoPublicacion" "TipoPublicacionEmpleo" NOT NULL DEFAULT 'OFERTA_EMPLEO'`,
+
+    // ── Venta con contacto directo: unidad "Animal" para cría/venta de animales ──
+    `ALTER TYPE "UnidadVenta" ADD VALUE IF NOT EXISTS 'ANIMAL'`,
   ];
   for (const sql of migraciones) {
     try {

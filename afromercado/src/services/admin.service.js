@@ -20,12 +20,6 @@ function tieneDocumentoIdentidadCompleto(comercio) {
   );
 }
 
-// Requisito mínimo de formalización (validado con el territorio piloto:
-// la gran mayoría de comercios en Chocó ya tiene RUT y Cámara de Comercio).
-function tieneRutCompleto(comercio) {
-  return Boolean(comercio.rut && comercio.rut.trim());
-}
-
 const AdminService = {
   /**
    * Lista los pagos a la espera de verificación (estado VERIFICANDO).
@@ -286,9 +280,10 @@ const AdminService = {
       if (!tieneDocumentoIdentidadCompleto(comercio)) {
         throw new ErrorValidacion("No se puede aprobar el comercio sin frente y reverso del documento de identidad.");
       }
-      if (!tieneRutCompleto(comercio)) {
-        throw new ErrorValidacion("No se puede aprobar el comercio sin RUT registrado.");
-      }
+      // Sin RUT igual se puede aprobar: sus productos se venden con contacto
+      // directo por WhatsApp en vez de compra en la plataforma (ver
+      // utils/comercio-publicacion.js). El RUT sigue siendo una señal visible
+      // al admin, solo dejó de ser bloqueante.
     }
 
     const ESTADO_MAP = {

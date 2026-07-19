@@ -20,7 +20,7 @@ const {
   normalizarRecorteVideo,
   urlLocalVideo,
 } = require("../utils/video-media");
-const { filtroComercioPublicable } = require("../utils/comercio-publicacion");
+const { filtroComercioVisible } = require("../utils/comercio-publicacion");
 
 // Carpeta pública donde se guardan las fotos de productos.
 const DIR_PRODUCTOS = path.join(__dirname, "..", "..", "uploads", "productos");
@@ -199,7 +199,7 @@ const ProductoController = {
         // Traer los productos vistos para obtener sus categorías
         const productosVistos = productoIdsVistos.length
           ? await prisma.producto.findMany({
-              where: { id: { in: productoIdsVistos }, activo: true, comercio: filtroComercioPublicable() },
+              where: { id: { in: productoIdsVistos }, activo: true, comercio: filtroComercioVisible() },
               select: { categoriaId: true },
             })
           : [];
@@ -212,7 +212,7 @@ const ProductoController = {
           productos = await prisma.producto.findMany({
             where: {
               activo: true,
-              comercio: filtroComercioPublicable(),
+              comercio: filtroComercioVisible(),
               id: { notIn: excluir },
               ...(categoriaIds.length > 0 ? { categoriaId: { in: categoriaIds } } : {}),
             },
@@ -255,7 +255,7 @@ const ProductoController = {
 
         if (idsPopulares.length > 0) {
           const relleno = await prisma.producto.findMany({
-            where: { id: { in: idsPopulares }, activo: true, comercio: filtroComercioPublicable() },
+            where: { id: { in: idsPopulares }, activo: true, comercio: filtroComercioVisible() },
             take: limite - productos.length,
             include: {
               comercio: {
@@ -479,7 +479,7 @@ const ProductoController = {
       const ids = vistas.map((v) => v.productoId);
       const encontrados = ids.length
         ? await prisma.producto.findMany({
-            where: { id: { in: ids }, activo: true, comercio: filtroComercioPublicable() },
+            where: { id: { in: ids }, activo: true, comercio: filtroComercioVisible() },
             include: {
               comercio: {
                 select: {
