@@ -1,13 +1,16 @@
 // Lógica de negocio — Productos
 const ProductoRepository = require("../repositories/producto.repository");
 const ComercioRepository = require("../repositories/comercio.repository");
-const { ErrorValidacion, ErrorNoEncontrado, ErrorNoAutorizado } = require("../utils/errores");
+const { ErrorValidacion, ErrorNoEncontrado, ErrorNoAutorizado, ErrorProhibido } = require("../utils/errores");
 const { eliminarDeCloudinary } = require("../utils/cloudinary");
 const { eliminarArchivoLocalDesdeUrl } = require("../utils/video-media");
 const { assertPuedePublicar, comercioComprableEnPlataforma } = require("../utils/comercio-publicacion");
+const AdminService = require("./admin.service");
 
 const UNIDADES_VALIDAS = ["KG", "UNIDAD", "LITRO", "PAQUETE", "DOCENA", "MANOJO", "ANIMAL"];
 const ALCANCES_VALIDOS = ["LOCAL", "NACIONAL", "AMBOS"];
+const MOTIVOS_DENUNCIA = ["PRODUCTO_FALSO", "ESTAFA_DINERO", "CONTENIDO_INAPROPIADO", "VENDEDOR_SOSPECHOSO", "OTRO"];
+const ACCIONES_RESOLVER_DENUNCIA = ["DESESTIMAR", "BLOQUEAR_PRODUCTO", "BLOQUEAR_CUENTA"];
 
 /** Calcula comprableEnPlataforma y elimina los campos internos usados solo para calcularlo. */
 function mapearComercioPublico(producto) {
@@ -255,6 +258,70 @@ const ProductoService = {
       videoBytes: null,
       videoFormato: null,
       videoMimeType: null,
+    });
+  },
+
+  // ── Denuncias ─────────────────────────────────────────────────
+  // Canal de protección para "venta con contacto directo": el sistema
+  // Disputa exige un Pedido ya completado en la plataforma y no aplica
+  // a un contacto solo por WhatsApp.
+  async denunciar(usuarioId, productoId, { motivo, descripcion }) {
+    if (!MOTIVOS_DENUNCIA.includes(motivo)) {
+      throw new ErrorValidacion(`Motivo inválido. Opciones: ${MOTIVOS_DENUNCIA.join(", ")}`);
+    }
+    const producto = await ProductoRepository.buscarConDueno(productoId);
+    if (!producto) throw new ErrorNoEncontrado("Producto no encontrado");
+    if (producto.comercio?.usuarioId === usuarioId) {
+      throw new ErrorProhibido("No puedes denunciar tu propio producto");
+    }
+    const existente = await ProductoRepository.buscarDenuncia(productoId, usuarioId);
+    if (existente) throw new ErrorValidacion("Ya denunciaste este producto");
+
+    return ProductoRepository.crearDenuncia({
+      productoId,
+      denuncianteId: usuarioId,
+      motivo,
+      descripcion: descripcion?.trim() || null,
+    });
+  },
+
+  async listarDenunciasPendientes() {
+    return ProductoRepository.listarDenunciasPendientes();
+  },
+
+  async resolverDenuncia(adminId, denunciaId, { accion, motivo }) {
+    if (!ACCIONES_RESOLVER_DENUNCIA.includes(accion)) {
+      throw new ErrorValidacion(`Acción inválida. Opciones: ${ACCIONES_RESOLVER_DENUNCIA.join(", ")}`);
+    }
+    const denuncia = await ProductoRepository.buscarDenunciaPorId(denunciaId);
+    if (!denuncia) throw new ErrorNoEncontrado("Denuncia no encontrada");
+    if (denuncia.estado !== "PENDIENTE") {
+      throw new ErrorValidacion("Esta denuncia ya fue resuelta");
+    }
+
+    if (accion === "BLOQUEAR_PRODUCTO") {
+      await ProductoRepository.actualizar(denuncia.productoId, { activo: false });
+      return ProductoRepository.actualizarDenuncia(denunciaId, {
+        estado: "PRODUCTO_BLOQUEADO",
+        revisadoPor: adminId,
+        revisadoAt: new Date(),
+        notaRevision: motivo?.trim() || null,
+      });
+    }
+
+    if (accion === "BLOQUEAR_CUENTA") {
+      const comercioId = denuncia.producto.comercio.id;
+      await AdminService.verificarComerciante(adminId, comercioId, { accion: "SUSPENDER", motivo: motivo?.trim() || "Denuncias de productos" });
+      await ProductoRepository.resolverDenunciasPendientesDelComercio(comercioId, "CUENTA_BLOQUEADA", adminId, motivo?.trim() || null);
+      return ProductoRepository.buscarDenunciaPorId(denunciaId);
+    }
+
+    // DESESTIMAR
+    return ProductoRepository.actualizarDenuncia(denunciaId, {
+      estado: "DESESTIMADA",
+      revisadoPor: adminId,
+      revisadoAt: new Date(),
+      notaRevision: motivo?.trim() || null,
     });
   },
 };

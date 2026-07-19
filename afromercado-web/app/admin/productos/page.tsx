@@ -3,6 +3,14 @@
 import { useEffect, useState, useCallback } from 'react'
 import { apiFetch } from '@/lib/api/client'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
+import {
+  adminDenunciasProductos,
+  adminResolverDenunciaProducto,
+  type DenunciaProducto,
+  type MotivoDenunciaProducto,
+  type AccionResolverDenunciaProducto,
+} from '@/lib/api/productos'
 
 interface ProductoAdmin {
   id: number
@@ -15,7 +23,73 @@ interface ProductoAdmin {
   comercio: { id: number; nombre: string; municipio: string }
 }
 
+const MOTIVO_DENUNCIA_LABEL: Record<MotivoDenunciaProducto, string> = {
+  PRODUCTO_FALSO: 'El producto no existe o no corresponde',
+  ESTAFA_DINERO: 'Estafa / pide dinero por adelantado',
+  CONTENIDO_INAPROPIADO: 'Contenido inapropiado',
+  VENDEDOR_SOSPECHOSO: 'Identidad o comercio sospechoso',
+  OTRO: 'Otro motivo',
+}
+
+function fmtFecha(iso: string): string {
+  return new Date(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function TarjetaDenuncia({ denuncia, onResuelta }: { denuncia: DenunciaProducto; onResuelta: (id: number) => void }) {
+  const [mostrarConfirmBloqueoCuenta, setMostrarConfirmBloqueoCuenta] = useState(false)
+  const [procesando, setProcesando] = useState(false)
+
+  async function resolver(accion: AccionResolverDenunciaProducto) {
+    setProcesando(true)
+    try {
+      await adminResolverDenunciaProducto(denuncia.id, { accion })
+      onResuelta(denuncia.id)
+    } finally {
+      setProcesando(false)
+      setMostrarConfirmBloqueoCuenta(false)
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-red-200 bg-red-50/40 p-5">
+      <p className="font-semibold text-[#1A1A1A]">{denuncia.producto?.nombre ?? `Producto #${denuncia.productoId}`}</p>
+      <p className="text-xs text-[#1A1A1A]/50 mt-0.5">
+        Comercio: {denuncia.producto?.comercio?.nombre ?? 'Desconocido'} · Denunciado por {denuncia.denunciante?.nombre ?? 'Desconocido'}
+      </p>
+      <p className="text-xs font-bold text-red-700 mt-2">Motivo: {MOTIVO_DENUNCIA_LABEL[denuncia.motivo]}</p>
+      {denuncia.descripcion && <p className="text-sm text-[#1A1A1A]/70 mt-1 whitespace-pre-wrap">{denuncia.descripcion}</p>}
+      <p className="text-xs text-[#1A1A1A]/40 mt-2">Denunciada el {fmtFecha(denuncia.createdAt)}</p>
+
+      <div className="flex flex-wrap gap-2 mt-3">
+        <button onClick={() => resolver('DESESTIMAR')} disabled={procesando} className="rounded-lg bg-[#2D6A4F] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#235540] disabled:opacity-50">
+          Desestimar
+        </button>
+        <button onClick={() => resolver('BLOQUEAR_PRODUCTO')} disabled={procesando} className="rounded-lg border border-[#D4A017]/40 bg-[#D4A017]/10 px-3 py-1.5 text-xs font-bold text-[#8a6710] hover:bg-[#D4A017]/20 disabled:opacity-50">
+          Bloquear producto
+        </button>
+        <button onClick={() => setMostrarConfirmBloqueoCuenta(true)} disabled={procesando} className="rounded-lg border border-red-300 bg-red-100 px-3 py-1.5 text-xs font-bold text-red-800 hover:bg-red-200 disabled:opacity-50">
+          Bloquear cuenta completa
+        </button>
+      </div>
+
+      {mostrarConfirmBloqueoCuenta && (
+        <ModalConfirmacion
+          titulo="Bloquear cuenta completa"
+          mensaje="Esta acción suspende el comercio completo — todos sus productos desaparecerán del catálogo de inmediato. Es una acción severa e irreversible desde esta pantalla."
+          onCancelar={() => setMostrarConfirmBloqueoCuenta(false)}
+          onConfirmar={() => resolver('BLOQUEAR_CUENTA')}
+          confirmando={procesando}
+          textoConfirmar="Confirmar bloqueo de cuenta"
+          destructivo
+        />
+      )}
+    </div>
+  )
+}
+
 export default function AdminProductosPage() {
+  const [tab, setTab] = useState<'PRODUCTOS' | 'DENUNCIAS'>('PRODUCTOS')
+
   const [productos, setProductos] = useState<ProductoAdmin[]>([])
   const [total, setTotal]         = useState(0)
   const [pagina, setPagina]       = useState(1)
@@ -24,6 +98,17 @@ export default function AdminProductosPage() {
   const [filtroActivo, setFiltroActivo] = useState<'todos' | 'activos' | 'inactivos'>('todos')
   const [procesandoId, setProcesandoId] = useState<number | null>(null)
   const LIMITE = 30
+
+  const [denuncias, setDenuncias] = useState<DenunciaProducto[]>([])
+  const [cargandoDenuncias, setCargandoDenuncias] = useState(true)
+
+  useEffect(() => {
+    adminDenunciasProductos().then(setDenuncias).finally(() => setCargandoDenuncias(false))
+  }, [])
+
+  function handleResueltaDenuncia(id: number) {
+    setDenuncias((prev) => prev.filter((d) => d.id !== id))
+  }
 
   const cargar = useCallback(async (p = pagina, q = busqueda, fa = filtroActivo) => {
     setCargando(true)
@@ -87,6 +172,44 @@ export default function AdminProductosPage() {
         <p className="text-sm text-gray-500 mt-1">{total} productos en total</p>
       </div>
 
+      <div className="mb-5 flex gap-2 border-b border-[#1A1A1A]/8">
+        <button
+          onClick={() => setTab('PRODUCTOS')}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+            tab === 'PRODUCTOS' ? 'border-[#2D6A4F] text-[#2D6A4F]' : 'border-transparent text-[#1A1A1A]/50 hover:text-[#1A1A1A]'
+          }`}
+        >
+          Productos
+        </button>
+        <button
+          onClick={() => setTab('DENUNCIAS')}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+            tab === 'DENUNCIAS' ? 'border-[#2D6A4F] text-[#2D6A4F]' : 'border-transparent text-[#1A1A1A]/50 hover:text-[#1A1A1A]'
+          }`}
+        >
+          Denuncias{denuncias.length > 0 ? ` (${denuncias.length})` : ''}
+        </button>
+      </div>
+
+      {tab === 'DENUNCIAS' ? (
+        <div>
+          <p className="text-sm text-[#1A1A1A]/55 mb-4">Reportes de compradores sobre productos publicados.</p>
+          {cargandoDenuncias ? (
+            <div className="flex flex-col gap-4">
+              {[1, 2].map((i) => <div key={i} className="h-32 animate-pulse rounded-2xl bg-[#1A1A1A]/6" />)}
+            </div>
+          ) : denuncias.length === 0 ? (
+            <div className="rounded-3xl border border-[#1A1A1A]/8 bg-white px-5 py-10 text-center text-sm text-[#1A1A1A]/55">
+              No hay denuncias pendientes de revisión.
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {denuncias.map((d) => <TarjetaDenuncia key={d.id} denuncia={d} onResuelta={handleResueltaDenuncia} />)}
+            </div>
+          )}
+        </div>
+      ) : (
+      <>
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
         <input
@@ -199,6 +322,8 @@ export default function AdminProductosPage() {
             </div>
           )}
         </>
+      )}
+      </>
       )}
     </div>
   )

@@ -231,6 +231,7 @@ model Usuario {
   publicacionesCulturales            PublicacionCultural[]
   denunciasPublicacionCulturalHechas DenunciaPublicacionCultural[]
   likesPublicacionesCultura          LikePublicacionCultural[]
+  denunciasProductoHechas   DenunciaProducto[]       @relation("DenunciasProductoHechas")
 }
 
 model Comercio {
@@ -399,11 +400,46 @@ model Producto {
   menuSeccion      MenuSeccion?       @relation("ProductoMenuSeccion", fields: [menuSeccionId], references: [id], onDelete: SetNull)
   gruposComplemento GrupoComplemento[]
   gruposComplementoAsignados ProductoGrupoComplemento[]
+  denuncias        DenunciaProducto[]
 
   @@index([comercioId, activo])
   @@index([categoriaId, activo])
   @@index([alcance, activo])
   @@index([menuSeccionId])
+}
+
+enum MotivoDenunciaProducto {
+  PRODUCTO_FALSO
+  ESTAFA_DINERO
+  CONTENIDO_INAPROPIADO
+  VENDEDOR_SOSPECHOSO
+  OTRO
+}
+
+enum EstadoDenunciaProducto {
+  PENDIENTE
+  DESESTIMADA
+  PRODUCTO_BLOQUEADO
+  CUENTA_BLOQUEADA
+}
+
+model DenunciaProducto {
+  id            Int      @id @default(autoincrement())
+  productoId    Int
+  denuncianteId Int
+  motivo        MotivoDenunciaProducto
+  descripcion   String?
+  estado        EstadoDenunciaProducto @default(PENDIENTE)
+  revisadoPor   Int?
+  revisadoAt    DateTime?
+  notaRevision  String?
+  createdAt     DateTime @default(now())
+
+  producto    Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  denunciante Usuario  @relation("DenunciasProductoHechas", fields: [denuncianteId], references: [id])
+
+  @@unique([productoId, denuncianteId])
+  @@index([estado, createdAt])
 }
 
 model PrecioHistorial {

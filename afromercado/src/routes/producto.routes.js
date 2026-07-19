@@ -19,6 +19,8 @@ router.get("/", ProductoController.listar);
 // Rutas protegidas estáticas — deben ir ANTES de /:id para evitar conflicto
 router.post("/", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.crear);
 router.get("/mis/productos", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.misProductos);
+router.get("/admin/denuncias", autenticar, autorizar("ADMIN"), ProductoController.listarDenunciasPendientes);
+router.patch("/admin/denuncias/:id/resolver", autenticar, autorizar("ADMIN"), ProductoController.resolverDenuncia);
 
 // Rutas dinámicas con :id
 router.get("/:id", ProductoController.obtener);
@@ -26,6 +28,7 @@ router.post("/:id/vista", autenticarOpcional, ProductoController.registrarVista)
 router.post("/:id/clic-patrocinado", autenticarOpcional, VisibilidadController.registrarClic);
 router.post("/:id/carrito-patrocinado", autenticarOpcional, VisibilidadController.registrarCarrito);
 router.get("/:id/reviews", ReviewController.listar);
+router.post("/:id/denunciar", autenticar, ProductoController.denunciar);
 router.patch("/:id", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.actualizar);
 router.delete("/:id", autenticar, autorizar("COMERCIANTE", "ADMIN"), ProductoController.desactivar);
 

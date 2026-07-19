@@ -26,6 +26,7 @@ import { apiFetch } from '@/lib/api/client'
 import { obtenerMenuComercioExpress, type MenuComercioExpress } from '@/lib/api/express'
 import { SeccionResenas } from '@/components/reviews/SeccionResenas'
 import TarjetaProducto from '@/components/catalogo/TarjetaProducto'
+import ModalDenunciarProducto from '@/components/catalogo/ModalDenunciarProducto'
 import { mapearProductos } from '@/lib/mapearProducto'
 import type { Producto } from '@/types/producto'
 import { Toast, useToast } from '@/components/ui/Toast'
@@ -124,6 +125,8 @@ export default function PaginaProducto({
   const [cantidad, setCantidad] = useState(1)
   const [agregando, setAgregando] = useState(false)
   const [agregado, setAgregado] = useState(false)
+  const [mostrarModalDenuncia, setMostrarModalDenuncia] = useState(false)
+  const [denunciaEnviada, setDenunciaEnviada] = useState(false)
   const [historiaExpandida, setHistoriaExpandida] = useState(false)
 
   // Carga del producto desde la API.
@@ -597,9 +600,34 @@ export default function PaginaProducto({
 
               {/* 9. Estimador de envío */}
               <EstimadorEnvio pesoKg={producto.pesoKg} />
+
+              {/* 10. Reportar producto */}
+              {autenticado && (
+                <p className="text-xs">
+                  {denunciaEnviada ? (
+                    <span className="text-[#1A1A1A]/35">Ya reportaste este producto</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setMostrarModalDenuncia(true)}
+                      className="text-[#1A1A1A]/35 hover:text-[#C0392B] transition-colors underline-offset-2 hover:underline"
+                    >
+                      🚩 Reportar este producto
+                    </button>
+                  )}
+                </p>
+              )}
             </div>
           </div>
         </div>
+
+        {mostrarModalDenuncia && (
+          <ModalDenunciarProducto
+            productoId={Number(producto.id)}
+            onCerrar={() => setMostrarModalDenuncia(false)}
+            onExito={() => setDenunciaEnviada(true)}
+          />
+        )}
 
         {/* ——— SECCIÓN "EL PRODUCTOR" ——— */}
         <section className="max-w-6xl mx-auto w-full px-4 md:px-6 py-6">

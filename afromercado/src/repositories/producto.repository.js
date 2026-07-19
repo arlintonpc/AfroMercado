@@ -221,6 +221,54 @@ const ProductoRepository = {
   async desactivar(id) {
     return prisma.producto.update({ where: { id: Number(id) }, data: { activo: false } });
   },
+
+  // Selección mínima para el chequeo de autodenuncia — nunca se expone al cliente.
+  async buscarConDueno(id) {
+    return prisma.producto.findUnique({
+      where: { id: Number(id) },
+      select: { id: true, comercio: { select: { id: true, usuarioId: true } } },
+    });
+  },
+
+  // ── Denuncias ─────────────────────────────────────────────────
+  async crearDenuncia(data) {
+    return prisma.denunciaProducto.create({ data });
+  },
+
+  async buscarDenuncia(productoId, denuncianteId) {
+    return prisma.denunciaProducto.findUnique({
+      where: { productoId_denuncianteId: { productoId, denuncianteId } },
+    });
+  },
+
+  async buscarDenunciaPorId(id) {
+    return prisma.denunciaProducto.findUnique({
+      where: { id },
+      include: { producto: { include: { comercio: { select: { id: true, nombre: true } } } } },
+    });
+  },
+
+  async listarDenunciasPendientes() {
+    return prisma.denunciaProducto.findMany({
+      where: { estado: "PENDIENTE" },
+      orderBy: { createdAt: "asc" },
+      include: {
+        producto: { include: { comercio: { select: { id: true, nombre: true, usuarioId: true } } } },
+        denunciante: { select: { id: true, nombre: true, email: true } },
+      },
+    });
+  },
+
+  async actualizarDenuncia(id, data) {
+    return prisma.denunciaProducto.update({ where: { id }, data });
+  },
+
+  async resolverDenunciasPendientesDelComercio(comercioId, nuevoEstado, adminId, motivo) {
+    return prisma.denunciaProducto.updateMany({
+      where: { estado: "PENDIENTE", producto: { comercioId } },
+      data: { estado: nuevoEstado, revisadoPor: adminId, revisadoAt: new Date(), notaRevision: motivo },
+    });
+  },
 };
 
 module.exports = ProductoRepository;

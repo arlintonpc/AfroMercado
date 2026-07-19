@@ -511,6 +511,33 @@ const ProductoController = {
       next(err);
     }
   },
+
+  async denunciar(req, res, next) {
+    try {
+      const data = await ProductoService.denunciar(req.usuario.id, Number(req.params.id), req.body);
+      res.status(201).json({ ok: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async listarDenunciasPendientes(req, res, next) {
+    try {
+      const data = await ProductoService.listarDenunciasPendientes();
+      res.json({ ok: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async resolverDenuncia(req, res, next) {
+    try {
+      const data = await ProductoService.resolverDenuncia(req.usuario.id, Number(req.params.id), req.body);
+      res.json({ ok: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
 };
 
 module.exports = ProductoController;
