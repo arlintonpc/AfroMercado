@@ -143,6 +143,14 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
           </span>
         )}
 
+        {/* Badge contacto directo — el vendedor aún no tiene RUT/cuenta
+            verificada, se compra coordinando con él directamente. */}
+        {!producto.esExpress && producto.comercio.comprableEnPlataforma === false && !agotado && (
+          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-[#25D366] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+            🤝 Contacto directo
+          </span>
+        )}
+
         {tieneVideo && (
           <span className={`absolute ${producto.esExpress && !agotado ? 'bottom-3 right-3' : 'bottom-3 right-3'} inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur`}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

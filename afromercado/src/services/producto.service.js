@@ -6,6 +6,9 @@ const { eliminarDeCloudinary } = require("../utils/cloudinary");
 const { eliminarArchivoLocalDesdeUrl } = require("../utils/video-media");
 const { assertPuedePublicar, comercioComprableEnPlataforma } = require("../utils/comercio-publicacion");
 const AdminService = require("./admin.service");
+const NotificacionService = require("./notificacion.service");
+const { enviarMensajeWA } = require("../utils/whatsapp");
+const prisma = require("../config/prisma");
 
 const UNIDADES_VALIDAS = ["KG", "UNIDAD", "LITRO", "PAQUETE", "DOCENA", "MANOJO", "ANIMAL"];
 const ALCANCES_VALIDOS = ["LOCAL", "NACIONAL", "AMBOS"];
@@ -277,12 +280,34 @@ const ProductoService = {
     const existente = await ProductoRepository.buscarDenuncia(productoId, usuarioId);
     if (existente) throw new ErrorValidacion("Ya denunciaste este producto");
 
-    return ProductoRepository.crearDenuncia({
+    const denuncia = await ProductoRepository.crearDenuncia({
       productoId,
       denuncianteId: usuarioId,
       motivo,
       descripcion: descripcion?.trim() || null,
     });
+
+    // Aviso urgente por WhatsApp al admin — no depende del asistente de IA
+    // (ANTHROPIC_API_KEY), solo de que WhatsApp esté conectado (enviarMensajeWA
+    // ya es un no-op silencioso si no lo está).
+    if (motivo === "ESTAFA_DINERO") {
+      setImmediate(async () => {
+        try {
+          const admins = await prisma.usuario.findMany({
+            where: { rol: "ADMIN", telefono: { not: null } },
+            select: { telefono: true },
+          });
+          const texto = `🚨 Denuncia de estafa en Teravia\n\nProducto: "${producto.nombre}"\nID producto: ${productoId}\n\nRevísala en /admin/productos (pestaña Denuncias).`;
+          for (const admin of admins) {
+            await enviarMensajeWA(admin.telefono, texto);
+          }
+        } catch (e) {
+          console.error("[NOTIF] aviso admin denuncia estafa:", e.message);
+        }
+      });
+    }
+
+    return denuncia;
   },
 
   async listarDenunciasPendientes() {
@@ -301,12 +326,26 @@ const ProductoService = {
 
     if (accion === "BLOQUEAR_PRODUCTO") {
       await ProductoRepository.actualizar(denuncia.productoId, { activo: false });
-      return ProductoRepository.actualizarDenuncia(denunciaId, {
+      const resultado = await ProductoRepository.actualizarDenuncia(denunciaId, {
         estado: "PRODUCTO_BLOQUEADO",
         revisadoPor: adminId,
         revisadoAt: new Date(),
         notaRevision: motivo?.trim() || null,
       });
+
+      const usuarioIdComercio = denuncia.producto.comercio.usuarioId;
+      if (usuarioIdComercio) {
+        setImmediate(() => {
+          NotificacionService.crearYEnviar({
+            usuarioId: usuarioIdComercio,
+            tipo: "PRODUCTO_BLOQUEADO",
+            titulo: "Un producto tuyo fue bloqueado",
+            mensaje: `"${denuncia.producto.nombre}" fue retirado del catálogo tras una denuncia. ${motivo?.trim() || "Revisa que cumpla las normas de la comunidad."}`,
+          }).catch((e) => console.error("[NOTIF] resolverDenuncia producto:", e.message));
+        });
+      }
+
+      return resultado;
     }
 
     if (accion === "BLOQUEAR_CUENTA") {

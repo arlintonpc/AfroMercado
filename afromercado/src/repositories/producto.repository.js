@@ -226,7 +226,7 @@ const ProductoRepository = {
   async buscarConDueno(id) {
     return prisma.producto.findUnique({
       where: { id: Number(id) },
-      select: { id: true, comercio: { select: { id: true, usuarioId: true } } },
+      select: { id: true, nombre: true, comercio: { select: { id: true, usuarioId: true } } },
     });
   },
 
@@ -244,7 +244,7 @@ const ProductoRepository = {
   async buscarDenunciaPorId(id) {
     return prisma.denunciaProducto.findUnique({
       where: { id },
-      include: { producto: { include: { comercio: { select: { id: true, nombre: true } } } } },
+      include: { producto: { include: { comercio: { select: { id: true, nombre: true, usuarioId: true } } } } },
     });
   },
 

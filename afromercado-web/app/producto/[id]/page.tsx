@@ -581,6 +581,19 @@ export default function PaginaProducto({
                 </button>
               )}
 
+              {/* 7.5 Aviso de seguridad — solo para contacto directo, ya que
+                  la compra en plataforma tiene el respaldo de Teravia. */}
+              {producto.comercio.comprableEnPlataforma === false && (
+                <div className="flex items-start gap-2.5 rounded-2xl border border-[#D4A017]/25 bg-[#D4A017]/8 px-4 py-3">
+                  <span className="text-base leading-none" aria-hidden="true">⚠️</span>
+                  <p className="text-xs leading-relaxed text-[#6B4E0D]">
+                    <span className="font-semibold">Comprador:</span> nunca pagues por adelantado sin conocer el producto. Acuerda el pago al recibir. Si te piden dinero antes, es una estafa — denúnciala.
+                    <br />
+                    <span className="font-semibold">Vendedor:</span> acuerda un lugar seguro y de confianza para la entrega, y nunca compartas datos financieros ni claves por WhatsApp.
+                  </p>
+                </div>
+              )}
+
               {/* 8. Nota de alistamiento o Express */}
               {producto.esExpress ? (
                 <p className={`text-sm flex items-center gap-1.5 font-medium ${expressAbierto ? 'text-[#D4A017]' : 'text-[#999]'}`}>
@@ -652,6 +665,15 @@ export default function PaginaProducto({
                   <BadgeProductorCertificado size="md" variante="etnico" />
                 )}
               </div>
+            )}
+
+            {/* Contacto directo — el vendedor aún no tiene RUT/cuenta
+                verificada; se avisa sin sonar alarmante, es la norma para
+                productores informales que recién empiezan en la plataforma. */}
+            {producto.comercio.comprableEnPlataforma === false && (
+              <span className="self-start inline-flex items-center gap-1.5 rounded-full bg-[#25D366]/10 text-[#128C7E] text-xs font-semibold px-3 py-1.5">
+                🤝 Vende por contacto directo — coordina el pago al recibir
+              </span>
             )}
 
             {/* Nombre y municipio */}
