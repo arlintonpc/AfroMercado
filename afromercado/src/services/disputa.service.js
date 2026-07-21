@@ -19,7 +19,7 @@ const MODULOS_VALIDOS = ["PEDIDO", "EXPRESS", "HOTEL", "TOUR", "TRANSPORTE"];
 const ESTADOS_RESOLVIBLES = ["ABIERTA", "RESPONDIDA_COMERCIO"];
 const VENTANA_REPORTE_HORAS_DEFAULT = 72;
 const VENTANA_RESPUESTA_HORAS_DEFAULT = 48;
-const TASA_COMISION_DEFAULT = 0.10; // fallback si un módulo no guarda su propia comisión (ver Transporte)
+const TASA_COMISION_DEFAULT = 0.10; // fallback si una reserva antigua no tiene comisión guardada (columna agregada después)
 
 async function horasDesdeConfig(clave, porDefecto) {
   const valor = await ConfigRepository.obtener(clave);
@@ -120,25 +120,13 @@ async function resolverReferencia(moduloOrigen, referenciaId) {
     if (reserva.estado !== "COMPLETADA") {
       throw new ErrorValidacion("Solo puedes reportar un problema sobre un viaje ya completado");
     }
-    // ReservaTransporte no guarda su propia comisión/tasa (a diferencia de los
-    // demás módulos) — se resuelve contra la comisión vigente del comercio en
-    // ComisionComercio, con fallback a la tasa por defecto de la plataforma.
     const bruto = Number(reserva.total);
-    const comercioId = reserva.ruta.configTransporte.comercioId;
-    const comisionVigente = await prisma.comisionComercio.findFirst({
-      where: {
-        comercioId,
-        desde: { lte: reserva.creadoAt },
-        OR: [{ hasta: null }, { hasta: { gte: reserva.creadoAt } }],
-      },
-      orderBy: { desde: "desc" },
-    });
-    const tasa = comisionVigente ? Number(comisionVigente.tasa) : TASA_COMISION_DEFAULT;
+    const comision = Number(reserva.comision ?? bruto * TASA_COMISION_DEFAULT);
     return {
-      comercioId,
+      comercioId: reserva.ruta.configTransporte.comercioId,
       compradorIdEsperado: reserva.clienteId,
       montoOriginal: bruto,
-      montoNetoOriginal: bruto - bruto * tasa,
+      montoNetoOriginal: bruto - comision,
       fechaEventoTerminal: reserva.updatedAt,
     };
   }

@@ -68,103 +68,93 @@ function Lightbox({ fotos, inicial, onClose }: { fotos: string[]; inicial: numbe
   )
 }
 
-/* ── Hero carrusel ──────────────────────────────────────── */
+/* ── Hero Grid Premium ──────────────────────────────────────── */
 function HeroCarrusel({ fotos, nombre, comercio, municipio, confirmacionAuto, esFavorito, autenticado, onFavorito, onShare, onOpenLightbox }: {
   fotos: string[]; nombre: string; comercio: string; municipio: string
   confirmacionAuto: boolean; esFavorito: boolean; autenticado: boolean
   onFavorito: () => void; onShare: () => void; onOpenLightbox: (idx: number) => void
 }) {
-  const [idx, setIdx] = useState(0)
   const total = fotos.length
 
-  useEffect(() => {
-    if (total <= 1) return
-    const t = setInterval(() => setIdx(i => (i + 1) % total), 4500)
-    return () => clearInterval(t)
-  }, [total])
-
-  const prev = () => setIdx(i => (i - 1 + total) % total)
-  const next = () => setIdx(i => (i + 1) % total)
-
-  const fondo = fotos[idx] ?? null
-
   return (
-    <div className="relative h-[42vh] min-h-[280px] max-h-[440px] overflow-hidden bg-[#1B4332]">
-      {/* Slides */}
-      {fotos.length === 0 ? (
-        <div className="absolute inset-0 bg-gradient-to-br from-[#1B4332] via-[#2D6A4F] to-[#52B788]" />
-      ) : fotos.map((f, i) => (
-        <img key={i} src={f} alt="" className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
-          style={{ opacity: i === idx ? 1 : 0 }} />
-      ))}
-
-      {/* Gradiente */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/5 to-black/75" />
-
-      {/* Nav superior */}
-      <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-4 z-10">
-        <Link href="/tours"
-          className="bg-black/30 backdrop-blur-md border border-white/15 text-white rounded-xl px-3 py-2 text-sm font-semibold flex items-center gap-1.5 hover:bg-black/50 transition-colors">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          Tours
+    <div className="max-w-6xl mx-auto px-5 pt-6 pb-2 relative">
+      <div className="mb-4">
+        <Link href="/tours" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1B4332] hover:underline">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          Volver a Tours
         </Link>
-        <div className="flex items-center gap-2">
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-6 gap-4">
+        <div>
+          {confirmacionAuto && (
+            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide mb-2 border border-emerald-200">
+              ✓ CONFIRMACIÓN INMEDIATA
+            </span>
+          )}
+          <h1 className="text-3xl sm:text-4xl font-black text-gray-900 leading-tight">{nombre}</h1>
+          <p className="text-gray-500 text-sm mt-1 flex items-center gap-2">
+             <span className="font-semibold text-gray-700">{comercio}</span>
+             <span>·</span>
+             <span className="underline decoration-dotted">{municipio}</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={onShare} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors text-sm font-semibold text-gray-700 underline">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Compartir
+          </button>
           {autenticado && (
-            <button onClick={onFavorito}
-              className="bg-black/30 backdrop-blur-md border border-white/15 text-white w-9 h-9 rounded-xl flex items-center justify-center hover:bg-black/50 transition-colors">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill={esFavorito ? '#E53E3E' : 'none'} stroke={esFavorito ? '#E53E3E' : 'white'} strokeWidth="2" strokeLinecap="round">
+            <button onClick={onFavorito} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors text-sm font-semibold text-gray-700 underline">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill={esFavorito ? '#E53E3E' : 'none'} stroke={esFavorito ? '#E53E3E' : 'currentColor'} strokeWidth="2" strokeLinecap="round">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
               </svg>
+              Guardar
             </button>
           )}
-          <button onClick={onShare}
-            className="bg-black/30 backdrop-blur-md border border-white/15 text-white w-9 h-9 rounded-xl flex items-center justify-center hover:bg-black/50 transition-colors">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          </button>
         </div>
       </div>
 
-      {/* Flechas de navegación (solo si hay más de 1 foto) */}
-      {total > 1 && (
-        <>
-          <button onClick={prev}
-            className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-black/30 backdrop-blur-sm border border-white/15 text-white flex items-center justify-center hover:bg-black/55 transition-colors">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
-          </button>
-          <button onClick={next}
-            className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-black/30 backdrop-blur-sm border border-white/15 text-white flex items-center justify-center hover:bg-black/55 transition-colors">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
-          </button>
-        </>
-      )}
-
-      {/* Info inferior */}
-      <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 z-10">
-        {total > 1 && (
-          <div className="flex gap-1.5 mb-3">
-            {fotos.map((_, i) => (
-              <button key={i} onClick={() => setIdx(i)}
-                className={`h-1 rounded-full transition-all duration-300 ${i === idx ? 'bg-white w-6' : 'bg-white/40 w-1.5'}`} />
-            ))}
-          </div>
-        )}
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            {confirmacionAuto && (
-              <span className="inline-flex items-center gap-1 bg-emerald-500 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full tracking-wide mb-2">
-                ✓ CONFIRMACIÓN INMEDIATA
-              </span>
-            )}
-            <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight drop-shadow-lg">{nombre}</h1>
-            <p className="text-white/70 text-xs mt-1">{comercio} · {municipio}</p>
-          </div>
-          {total > 0 && (
-            <button onClick={() => onOpenLightbox(idx)}
-              className="flex-shrink-0 bg-black/30 backdrop-blur-sm border border-white/20 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-lg hover:bg-black/50 transition-colors whitespace-nowrap">
-              🖼 {total} {total === 1 ? 'foto' : 'fotos'}
-            </button>
+      <div className="relative group">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 h-[300px] md:h-[460px] rounded-[2rem] overflow-hidden bg-gray-100">
+          {fotos.length === 0 ? (
+            <div className="col-span-full flex items-center justify-center bg-gray-100"><span className="text-6xl opacity-20">🏞️</span></div>
+          ) : (
+            <>
+              <div className={`relative cursor-pointer overflow-hidden ${fotos.length >= 2 ? 'md:col-span-2 md:row-span-2' : 'col-span-full'}`} onClick={() => onOpenLightbox(0)}>
+                <img src={fotos[0]} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+              </div>
+              {fotos.length >= 2 && (
+                <div className="hidden md:block col-span-1 row-span-1 relative cursor-pointer overflow-hidden" onClick={() => onOpenLightbox(1)}>
+                  <img src={fotos[1]} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                </div>
+              )}
+              {fotos.length >= 3 && (
+                <div className="hidden md:block col-span-1 row-span-1 relative cursor-pointer overflow-hidden" onClick={() => onOpenLightbox(2)}>
+                  <img src={fotos[2]} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                </div>
+              )}
+              {fotos.length >= 4 && (
+                <div className="hidden md:block col-span-1 row-span-1 relative cursor-pointer overflow-hidden" onClick={() => onOpenLightbox(3)}>
+                  <img src={fotos[3]} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                </div>
+              )}
+              {fotos.length >= 5 && (
+                <div className="hidden md:block col-span-1 row-span-1 relative cursor-pointer overflow-hidden" onClick={() => onOpenLightbox(4)}>
+                  <img src={fotos[4]} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                </div>
+              )}
+            </>
           )}
         </div>
+
+        {total > 0 && (
+          <button onClick={() => onOpenLightbox(0)}
+            className="absolute bottom-6 right-6 bg-white border border-gray-900 text-gray-900 font-bold text-sm px-4 py-2 rounded-xl shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            Mostrar todas las fotos
+          </button>
+        )}
       </div>
     </div>
   )
@@ -358,10 +348,14 @@ function WidgetReservaTour({ tour, onReservar, autenticado, router }: {
   const [fecha, setFecha]      = useState(new Date(Date.now() + 86400000).toISOString().split('T')[0])
   const [participantes, setP]  = useState(1)
   const [disponibilidad, setD] = useState<{ disponibles: number; maxParticipantes: number } | null>(null)
+  const [errorDisp, setErrorDisp] = useState<string | null>(null)
 
   useEffect(() => {
     if (!fecha) return
-    verificarDisponibilidadTour(tour.id, fecha).then(setD).catch(() => setD(null))
+    setErrorDisp(null)
+    verificarDisponibilidadTour(tour.id, fecha)
+      .then(setD)
+      .catch(() => { setD(null); setErrorDisp('No pudimos verificar la disponibilidad para esta fecha.') })
   }, [fecha, tour.id])
 
   const total = Number(tour.precioPersona) * participantes
@@ -386,6 +380,9 @@ function WidgetReservaTour({ tour, onReservar, autenticado, router }: {
             ? `✓ ${disponibilidad.disponibles} cupos disponibles`
             : '✗ Sin cupos para esta fecha'}
         </div>
+      )}
+      {errorDisp && (
+        <div className="rounded-xl px-3 py-2 text-xs font-semibold mb-3 bg-red-50 text-red-600">{errorDisp}</div>
       )}
 
       <div className="mb-5">
@@ -441,6 +438,7 @@ function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClo
   const [nombre, setNombre]         = useState(usuario?.nombre ?? '')
   const [telefono, setTelefono]     = useState(usuario?.telefono?.replace(/\D/g, '').replace(/^57/, '') ?? '')
   const [disponibilidad, setD]      = useState<{ disponibles: number; maxParticipantes: number } | null>(null)
+  const [errorDisp, setErrorDisp]   = useState<string | null>(null)
   const [cargando, setCargando]     = useState(false)
   const [error, setError]           = useState('')
   const [codigoCupon, setCodigoCupon]       = useState('')
@@ -465,7 +463,10 @@ function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClo
 
   useEffect(() => {
     if (!fecha) return
-    verificarDisponibilidadTour(tour.id, fecha).then(setD).catch(() => setD(null))
+    setErrorDisp(null)
+    verificarDisponibilidadTour(tour.id, fecha)
+      .then(setD)
+      .catch(() => { setD(null); setErrorDisp('No pudimos verificar la disponibilidad para esta fecha.') })
   }, [fecha, tour.id])
 
   async function handleReservar() {
@@ -501,6 +502,9 @@ function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClo
               </p>
               <p className="font-black text-2xl text-gray-900">{formatearPrecio(total)}</p>
             </div>
+          )}
+          {errorDisp && (
+            <p className="text-xs text-red-600 -mt-2">{errorDisp}</p>
           )}
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Participantes (máx. {tour.maxParticipantes})</label>

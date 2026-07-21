@@ -254,6 +254,14 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             🎭
           </Link>
           <Link
+            href="/vitrina"
+            title="Vitrina de video"
+            aria-label="Vitrina de video"
+            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
+          >
+            🎬
+          </Link>
+          <Link
             href="/empleo"
             title="Empleo"
             aria-label="Empleo"
@@ -310,6 +318,12 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1"
           >
             🎭 Cultura
+          </Link>
+          <Link
+            href="/vitrina"
+            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1"
+          >
+            🎬 Vitrina
           </Link>
           <Link
             href="/empleo"

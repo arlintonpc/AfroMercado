@@ -55,7 +55,9 @@ async function cancelarReservasHotelExpiradas() {
           mensaje: `Tu reserva ${r.codigo} fue cancelada por falta de respuesta.`,
           url: "/hoteles/mis-reservas",
         });
-      } catch {}
+      } catch (err) {
+        console.error("[CRON] Hotel cancelarReservasExpiradas notificación:", err.message);
+      }
 
       canceladas++;
     }

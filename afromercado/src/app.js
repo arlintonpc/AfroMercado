@@ -21,6 +21,16 @@ const origenesPermitidos = (process.env.CORS_ORIGIN || "")
   .map((o) => o.trim())
   .filter(Boolean);
 
+// Guardia de arranque: en producción, CORS_ORIGIN es obligatoria. Sin esta
+// guardia, `origin` cae a `true` más abajo y, combinado con `credentials: true`,
+// refleja dinámicamente cualquier origen (vector CSRF/robo de sesión). Mismo
+// patrón de guardia que ya usa `obtenerClaveCifrado()` en cuentas-dispersion.js.
+if (process.env.NODE_ENV === "production" && origenesPermitidos.length === 0) {
+  throw new Error(
+    "CORS_ORIGIN es obligatoria en producción — configúrala en las variables de entorno de Render con la URL exacta del frontend en Vercel."
+  );
+}
+
 // Seguridad y middlewares base
 app.use(helmet());                          // cabeceras de seguridad
 app.use(
@@ -132,6 +142,20 @@ app.use(
 // Rate limiting — se omite completamente en desarrollo para no interferir con hot-reload
 const esProd = process.env.NODE_ENV === "production";
 const saltarEnDev = () => !esProd;
+
+// Aviso de arranque: el rate limiting solo se activa cuando NODE_ENV es
+// exactamente "production". Un typo o valor no estándar (ej. "staging") en
+// Render deja login/checkout sin límite de intentos sin ningún aviso — este
+// warning existe para que no pase inadvertido.
+if (
+  process.env.NODE_ENV &&
+  process.env.NODE_ENV !== "production" &&
+  process.env.NODE_ENV !== "development"
+) {
+  console.warn(
+    `[RATE-LIMIT] NODE_ENV="${process.env.NODE_ENV}" no coincide con "production" ni "development" — el rate limiting se está saltando (solo se activa cuando NODE_ENV === "production"). Revisa la variable de entorno.`
+  );
+}
 
 // Opciones base del rate limiter — validate.xForwardedForHeader:false evita el
 // ERR_ERL_UNEXPECTED_X_FORWARDED_FOR que lanza Render al pasar múltiples IPs en el header.

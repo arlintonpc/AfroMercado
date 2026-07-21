@@ -172,7 +172,7 @@ export default function FormularioOferta({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Imagen / banner (opcional)</label>
+        <label htmlFor="imagen-oferta" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Imagen / banner (opcional)</label>
         {imagenUrl ? (
           <div className="relative rounded-xl overflow-hidden border border-[#1A1A1A]/12">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -186,29 +186,29 @@ export default function FormularioOferta({
             </button>
           </div>
         ) : (
-          <label className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[#1A1A1A]/20 bg-[#F8F5F0] px-3 py-6 text-sm text-[#1A1A1A]/50 cursor-pointer hover:bg-[#1A1A1A]/[0.03]">
+          <label htmlFor="imagen-oferta" className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[#1A1A1A]/20 bg-[#F8F5F0] px-3 py-6 text-sm text-[#1A1A1A]/50 cursor-pointer hover:bg-[#1A1A1A]/[0.03]">
             {subiendoImagen ? 'Subiendo imagen…' : 'Haz clic para subir una imagen'}
-            <input type="file" accept="image/*" className="hidden" disabled={subiendoImagen} onChange={handleArchivoImagen} />
+            <input id="imagen-oferta" type="file" accept="image/*" className="hidden" disabled={subiendoImagen} onChange={handleArchivoImagen} />
           </label>
         )}
         {errorImagen && <p className="text-xs text-[#C0392B] mt-1">{errorImagen}</p>}
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Título</label>
-        <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ej: Ayudante de pesca"
+        <label htmlFor="titulo-oferta" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Título</label>
+        <input id="titulo-oferta" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ej: Ayudante de pesca"
           className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Descripción</label>
-        <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={4} placeholder="Describe la labor con detalle"
+        <label htmlFor="descripcion-oferta" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Descripción</label>
+        <textarea id="descripcion-oferta" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={4} placeholder="Describe la labor con detalle"
           className="w-full resize-none rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Categoría (opcional)</label>
-        <select value={categoria} onChange={(e) => setCategoria(e.target.value)}
+        <label htmlFor="categoria-oferta" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Categoría (opcional)</label>
+        <select id="categoria-oferta" value={categoria} onChange={(e) => setCategoria(e.target.value)}
           className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none">
           <option value="">Sin categoría</option>
           {(esServicio ? CATEGORIAS_SERVICIO : CATEGORIAS_EMPLEO).map((c) => <option key={c} value={c}>{c}</option>)}
@@ -217,8 +217,9 @@ export default function FormularioOferta({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Departamento</label>
+          <label htmlFor="departamento-oferta" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Departamento</label>
           <select
+            id="departamento-oferta"
             value={departamento}
             onChange={(e) => { setDepartamento(e.target.value); setMunicipio(''); setMunicipioOtro(false) }}
             className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none"
@@ -228,10 +229,11 @@ export default function FormularioOferta({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Municipio</label>
+          <label htmlFor="municipio-oferta" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Municipio</label>
           {usarTextoMunicipio ? (
             <div className="flex flex-col gap-1">
               <input
+                id="municipio-oferta"
                 value={municipio}
                 onChange={(e) => setMunicipio(e.target.value)}
                 placeholder="Escribe el municipio"
@@ -246,6 +248,7 @@ export default function FormularioOferta({
             </div>
           ) : (
             <select
+              id="municipio-oferta"
               value={municipio}
               disabled={!departamento}
               onChange={(e) => {
@@ -265,15 +268,15 @@ export default function FormularioOferta({
       {!esServicio && (
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Tipo de contrato</label>
-            <select value={tipoContrato} onChange={(e) => setTipoContrato(e.target.value as TipoContratoEmpleo)}
+            <label htmlFor="tipo-contrato-oferta" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Tipo de contrato</label>
+            <select id="tipo-contrato-oferta" value={tipoContrato} onChange={(e) => setTipoContrato(e.target.value as TipoContratoEmpleo)}
               className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none">
               {TIPOS.map((t) => <option key={t.valor} value={t.valor}>{t.etiqueta}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Fecha límite para postularse (opcional)</label>
-            <input type="date" value={fechaCierre} min={fechaMinima} onChange={(e) => setFechaCierre(e.target.value)}
+            <label htmlFor="fecha-cierre-oferta" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Fecha límite para postularse (opcional)</label>
+            <input id="fecha-cierre-oferta" type="date" value={fechaCierre} min={fechaMinima} onChange={(e) => setFechaCierre(e.target.value)}
               className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none" />
           </div>
         </div>
@@ -281,39 +284,39 @@ export default function FormularioOferta({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">{esServicio ? 'Tarifa mínima (opcional)' : 'Salario mínimo (opcional)'}</label>
-          <input type="number" value={salarioMin} onChange={(e) => setSalarioMin(e.target.value)} placeholder="Ej: 30000" disabled={salarioNegociable}
+          <label htmlFor="salario-min-oferta" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">{esServicio ? 'Tarifa mínima (opcional)' : 'Salario mínimo (opcional)'}</label>
+          <input id="salario-min-oferta" type="number" value={salarioMin} onChange={(e) => setSalarioMin(e.target.value)} placeholder="Ej: 30000" disabled={salarioNegociable}
             className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none disabled:opacity-50" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">{esServicio ? 'Tarifa máxima (opcional)' : 'Salario máximo (opcional)'}</label>
-          <input type="number" value={salarioMax} onChange={(e) => setSalarioMax(e.target.value)} placeholder="Ej: 50000" disabled={salarioNegociable}
+          <label htmlFor="salario-max-oferta" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">{esServicio ? 'Tarifa máxima (opcional)' : 'Salario máximo (opcional)'}</label>
+          <input id="salario-max-oferta" type="number" value={salarioMax} onChange={(e) => setSalarioMax(e.target.value)} placeholder="Ej: 50000" disabled={salarioNegociable}
             className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none disabled:opacity-50" />
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-[#1A1A1A]/70">
-        <input type="checkbox" checked={salarioNegociable} onChange={(e) => setSalarioNegociable(e.target.checked)} />
+      <label htmlFor="salario-negociable-oferta" className="flex items-center gap-2 text-sm text-[#1A1A1A]/70">
+        <input id="salario-negociable-oferta" type="checkbox" checked={salarioNegociable} onChange={(e) => setSalarioNegociable(e.target.checked)} />
         {esServicio ? 'Tarifa negociable' : 'Salario negociable'}
       </label>
 
       <div>
-        <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">{esServicio ? '¿Qué incluye tu servicio? (opcional)' : 'Requisitos (opcional)'}</label>
-        <textarea value={requisitos} onChange={(e) => setRequisitos(e.target.value)} rows={2}
+        <label htmlFor="requisitos-oferta" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">{esServicio ? '¿Qué incluye tu servicio? (opcional)' : 'Requisitos (opcional)'}</label>
+        <textarea id="requisitos-oferta" value={requisitos} onChange={(e) => setRequisitos(e.target.value)} rows={2}
           className="w-full resize-none rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
       </div>
 
       <div className={esServicio ? 'grid gap-4' : 'grid gap-4 sm:grid-cols-2'}>
         {!esServicio && (
           <div>
-            <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Vacantes</label>
-            <input type="number" min={1} value={vacantes} onChange={(e) => setVacantes(e.target.value)}
+            <label htmlFor="vacantes-oferta" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Vacantes</label>
+            <input id="vacantes-oferta" type="number" min={1} value={vacantes} onChange={(e) => setVacantes(e.target.value)}
               className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none" />
           </div>
         )}
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">WhatsApp de contacto {esServicio ? '' : '(opcional)'}</label>
-          <input value={contactoWhatsapp} onChange={(e) => setContactoWhatsapp(e.target.value)} placeholder="3001234567"
+          <label htmlFor="whatsapp-oferta" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">WhatsApp de contacto {esServicio ? '' : '(opcional)'}</label>
+          <input id="whatsapp-oferta" value={contactoWhatsapp} onChange={(e) => setContactoWhatsapp(e.target.value)} placeholder="3001234567"
             className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none" />
         </div>
       </div>

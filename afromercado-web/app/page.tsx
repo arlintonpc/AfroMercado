@@ -9,6 +9,7 @@ import HeroBanner from '@/components/catalogo/HeroBanner'
 import BannerCarrusel from '@/components/publicidad/BannerCarrusel'
 import FiltrosHorizontales from '@/components/catalogo/FiltrosHorizontales'
 import TarjetaProducto from '@/components/catalogo/TarjetaProducto'
+import BannerDisplay from '@/components/publicidad/BannerDisplay'
 import { SkeletonCard, EmptyState } from '@/components/ui'
 import { listarProductos, listarCategorias } from '@/lib/api/productos'
 import { API_URL, apiFetch } from '@/lib/api/client'
@@ -108,49 +109,57 @@ async function obtenerVisibilidadesInicio(departamento?: string | null): Promise
 function SeccionHoteles({ hoteles }: { hoteles: ConfigHotel[] }) {
   if (hoteles.length === 0) return null
   return (
-    <section className="bg-white py-10">
+    <section className="bg-white py-12">
       <div className="max-w-7xl mx-auto px-4 md:px-6">
-        <div className="flex items-end justify-between mb-6">
+        <div className="flex items-end justify-between mb-8">
           <div>
-            <p className="text-[#2D6A4F] text-xs font-semibold tracking-widest uppercase mb-1">Turismo</p>
-            <h2 className="text-2xl md:text-3xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif)' }}>
+            <p className="text-[#2D6A4F] text-xs font-bold tracking-widest uppercase mb-2">Turismo</p>
+            <h2 className="text-3xl md:text-4xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif)' }}>
               Hoteles & Hospedaje
             </h2>
           </div>
-          <Link href="/hoteles" className="text-sm font-semibold text-[#2D6A4F] hover:underline whitespace-nowrap">
+          <Link href="/hoteles" className="text-sm font-bold text-[#2D6A4F] hover:underline whitespace-nowrap bg-[#2D6A4F]/10 px-4 py-2 rounded-full transition-colors hover:bg-[#2D6A4F]/20">
             Ver todos →
           </Link>
         </div>
         <div className="relative">
-          <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+          <div className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
             {hoteles.slice(0, 6).map(h => {
-              const desde = h.habitaciones.length > 0
-                ? Math.min(...h.habitaciones.map(hab => Number(hab.precioPorNoche)))
-                : null
+              const desde = h.habitaciones.length > 0 ? Math.min(...h.habitaciones.map(hab => Number(hab.precioPorNoche))) : null
               const foto = h.habitaciones[0]?.fotos[0]
               return (
-                <Link key={h.id} href={`/hoteles/${h.id}`}
-                  className="flex-shrink-0 w-40 sm:w-48 md:w-52 bg-[#F8F5F0] rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
-                  <div className="h-32 bg-gradient-to-br from-[#2D6A4F] to-[#40916C] flex items-center justify-center overflow-hidden">
-                    {foto
-                      ? <img src={optimizarImagenPequena(foto)} alt={h.comercio.nombre} className="w-full h-full object-cover" />
-                      : <span className="text-4xl">🏨</span>
-                    }
-                  </div>
-                  <div className="p-3">
-                    <p className="font-semibold text-[#1A1A1A] text-sm truncate">{h.comercio.nombre}</p>
-                    <p className="text-xs text-gray-500 truncate">📍 {h.comercio.municipio}</p>
-                    {desde !== null && (
-                      <p className="text-xs text-[#2D6A4F] font-bold mt-1">
-                        Desde {formatearPrecio(desde)}<span className="font-normal text-gray-400">/noche</span>
-                      </p>
+                <Link key={h.id} href={`/hoteles/${h.id}`} className="snap-start flex-shrink-0 w-64 sm:w-72 group block rounded-3xl overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 bg-white border border-gray-100 shadow-sm relative h-80">
+                  {/* Foto full */}
+                  <div className="absolute inset-0 bg-[#2D6A4F]">
+                    {foto ? (
+                      <img src={optimizarImagenPequena(foto)} alt={h.comercio.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                    ) : (
+                      <span className="text-6xl absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">🏨</span>
                     )}
+                  </div>
+                  {/* Overlay gradiente */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                  
+                  {/* Precio flotante */}
+                  {desde !== null && (
+                    <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-2xl px-3 py-1.5 shadow-lg">
+                      <p className="text-[10px] text-gray-500 font-medium leading-none mb-0.5">desde</p>
+                      <p className="text-[#1A1A1A] font-black text-sm leading-none">{formatearPrecio(desde)}</p>
+                    </div>
+                  )}
+
+                  {/* Info abajo */}
+                  <div className="absolute bottom-0 left-0 right-0 p-5">
+                    <p className="text-white/80 text-xs font-semibold mb-1 uppercase tracking-wide flex items-center gap-1">
+                      📍 {h.comercio.municipio}
+                    </p>
+                    <h3 className="text-white font-bold text-lg leading-tight line-clamp-2">{h.comercio.nombre}</h3>
                   </div>
                 </Link>
               )
             })}
           </div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent md:hidden" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-white to-transparent md:hidden" />
         </div>
       </div>
     </section>
@@ -161,39 +170,52 @@ function SeccionHoteles({ hoteles }: { hoteles: ConfigHotel[] }) {
 function SeccionTours({ tours }: { tours: ConfigTour[] }) {
   if (tours.length === 0) return null
   return (
-    <section className="bg-[#F8F5F0] py-10">
+    <section className="bg-[#F8F5F0] py-12">
       <div className="max-w-7xl mx-auto px-4 md:px-6">
-        <div className="flex items-end justify-between mb-6">
+        <div className="flex items-end justify-between mb-8">
           <div>
-            <p className="text-[#2D6A4F] text-xs font-semibold tracking-widest uppercase mb-1">Experiencias</p>
-            <h2 className="text-2xl md:text-3xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif)' }}>
+            <p className="text-[#2D6A4F] text-xs font-bold tracking-widest uppercase mb-2">Experiencias</p>
+            <h2 className="text-3xl md:text-4xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif)' }}>
               Tours & Aventura
             </h2>
           </div>
-          <Link href="/tours" className="text-sm font-semibold text-[#2D6A4F] hover:underline whitespace-nowrap">Ver todos →</Link>
+          <Link href="/tours" className="text-sm font-bold text-[#2D6A4F] hover:underline whitespace-nowrap bg-[#2D6A4F]/10 px-4 py-2 rounded-full transition-colors hover:bg-[#2D6A4F]/20">Ver todos →</Link>
         </div>
         <div className="relative">
-          <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+          <div className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
             {tours.slice(0, 6).map(t => (
-              <Link key={t.id} href={`/tours/${t.id}`}
-                className="flex-shrink-0 w-40 sm:w-48 md:w-52 bg-white rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
-                <div className="h-32 bg-gradient-to-br from-[#40916C] to-[#74C69D] flex items-center justify-center overflow-hidden">
-                  {t.fotos[0]
-                    ? <img src={optimizarImagenPequena(t.fotos[0])} alt={t.nombre} className="w-full h-full object-cover" />
-                    : <span className="text-4xl">🗺️</span>}
-                </div>
-                <div className="p-3">
-                  <p className="font-semibold text-[#1A1A1A] text-sm truncate">{t.nombre}</p>
-                  <p className="text-xs text-gray-500 truncate">📍 {t.comercio.municipio}</p>
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs text-[#2D6A4F] font-bold">{formatearPrecio(Number(t.precioPersona))}<span className="font-normal text-gray-400">/pers.</span></p>
-                    <p className="text-xs text-gray-400">⏱️ {t.duracionHoras}h</p>
+              <Link key={t.id} href={`/tours/${t.id}`} className="snap-start flex-shrink-0 w-64 sm:w-72 group block rounded-3xl overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 bg-white border border-gray-100 shadow-sm relative h-80">
+                  {/* Foto full */}
+                  <div className="absolute inset-0 bg-[#40916C]">
+                    {t.fotos[0] ? (
+                      <img src={optimizarImagenPequena(t.fotos[0])} alt={t.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                    ) : (
+                      <span className="text-6xl absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">🗺️</span>
+                    )}
                   </div>
-                </div>
+                  {/* Overlay gradiente */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                  
+                  {/* Precio flotante */}
+                  <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-2xl px-3 py-1.5 shadow-lg">
+                    <p className="text-[10px] text-gray-500 font-medium leading-none mb-0.5">desde</p>
+                    <p className="text-[#1B4332] font-black text-sm leading-none">{formatearPrecio(Number(t.precioPersona))}</p>
+                  </div>
+
+                  {/* Info abajo */}
+                  <div className="absolute bottom-0 left-0 right-0 p-5">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-white/80 text-xs font-semibold uppercase tracking-wide flex items-center gap-1">
+                        📍 {t.comercio.municipio}
+                      </p>
+                      <p className="text-white/90 text-xs font-bold bg-white/20 px-2 py-0.5 rounded-full backdrop-blur-md">⏱️ {t.duracionHoras}h</p>
+                    </div>
+                    <h3 className="text-white font-bold text-lg leading-tight line-clamp-2">{t.nombre}</h3>
+                  </div>
               </Link>
             ))}
           </div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#F8F5F0] to-transparent md:hidden" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-[#F8F5F0] to-transparent md:hidden" />
         </div>
       </div>
     </section>
@@ -206,42 +228,61 @@ const TIPO_ICONO: Record<string, string> = { LANCHA: '🛥️', BOTE: '⛵', CHA
 function SeccionTransporte({ transportes }: { transportes: ConfigTransporte[] }) {
   if (transportes.length === 0) return null
   return (
-    <section className="bg-white py-10">
+    <section className="bg-white py-12">
       <div className="max-w-7xl mx-auto px-4 md:px-6">
-        <div className="flex items-end justify-between mb-6">
+        <div className="flex items-end justify-between mb-8">
           <div>
-            <p className="text-[#023E8A] text-xs font-semibold tracking-widest uppercase mb-1">Fluvial</p>
-            <h2 className="text-2xl md:text-3xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif)' }}>
+            <p className="text-[#023E8A] text-xs font-bold tracking-widest uppercase mb-2">Movilidad regional</p>
+            <h2 className="text-3xl md:text-4xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif)' }}>
               Transporte
             </h2>
           </div>
-          <Link href="/transportes" className="text-sm font-semibold text-[#023E8A] hover:underline whitespace-nowrap">Ver todos →</Link>
+          <Link href="/transportes" className="text-sm font-bold text-[#023E8A] hover:underline whitespace-nowrap bg-[#023E8A]/10 px-4 py-2 rounded-full transition-colors hover:bg-[#023E8A]/20">Ver todos →</Link>
         </div>
         <div className="relative">
-          <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+          <div className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
             {transportes.slice(0, 6).map(t => {
               const precioMin = t.rutas.length > 0 ? Math.min(...t.rutas.map(r => Number(r.precioAsiento))) : null
               return (
-                <Link key={t.id} href={`/transportes/${t.id}`}
-                  className="flex-shrink-0 w-40 sm:w-48 md:w-52 bg-[#F8F5F0] rounded-2xl overflow-hidden hover:shadow-md transition-shadow border border-[#E8DCC8]">
-                  <div className="h-32 bg-gradient-to-br from-[#023E8A] to-[#0077B6] flex items-center justify-center overflow-hidden">
-                    {t.fotos[0]
-                      ? <img src={optimizarImagenPequena(t.fotos[0])} alt={t.nombre} className="w-full h-full object-cover" />
-                      : <span className="text-4xl">{TIPO_ICONO[t.tipo] ?? '🛥️'}</span>}
-                  </div>
-                  <div className="p-3">
-                    <p className="font-semibold text-[#1A1A1A] text-sm truncate">{t.nombre}</p>
-                    <p className="text-xs text-gray-500 truncate">📍 {t.comercio.municipio}</p>
-                    {precioMin !== null && (
-                      <p className="text-xs text-[#023E8A] font-bold mt-1">Desde {formatearPrecio(precioMin)}<span className="font-normal text-gray-400">/asiento</span></p>
+                <Link key={t.id} href={`/transportes/${t.id}`} className="snap-start flex-shrink-0 w-64 sm:w-72 group block rounded-3xl overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 bg-white border border-gray-100 shadow-sm relative h-80">
+                  {/* Foto full */}
+                  <div className="absolute inset-0 bg-[#023E8A]">
+                    {t.fotos[0] ? (
+                      <img src={optimizarImagenPequena(t.fotos[0])} alt={t.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                    ) : (
+                      <span className="text-6xl absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">{TIPO_ICONO[t.tipo] ?? '🛥️'}</span>
                     )}
-                    <p className="text-xs text-gray-400 mt-0.5">{t.rutas.length} ruta{t.rutas.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  {/* Overlay gradiente */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                  
+                  {/* Badge Tipo Vehiculo */}
+                  <div className="absolute top-4 left-4">
+                    <span className="bg-black/40 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded-full border border-white/10">
+                      {TIPO_ICONO[t.tipo] ?? '🛥️'} {t.tipo}
+                    </span>
+                  </div>
+
+                  {/* Precio flotante */}
+                  {precioMin !== null && (
+                    <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-2xl px-3 py-1.5 shadow-lg">
+                      <p className="text-[10px] text-gray-500 font-medium leading-none mb-0.5">desde</p>
+                      <p className="text-[#023E8A] font-black text-sm leading-none">{formatearPrecio(precioMin)}</p>
+                    </div>
+                  )}
+
+                  {/* Info abajo */}
+                  <div className="absolute bottom-0 left-0 right-0 p-5">
+                    <p className="text-white/80 text-xs font-semibold mb-1 uppercase tracking-wide flex items-center gap-1">
+                      📍 {t.comercio.municipio} <span className="mx-1">•</span> {t.rutas.length} ruta{t.rutas.length !== 1 ? 's' : ''}
+                    </p>
+                    <h3 className="text-white font-bold text-lg leading-tight line-clamp-2">{t.nombre}</h3>
                   </div>
                 </Link>
               )
             })}
           </div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent md:hidden" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-white to-transparent md:hidden" />
         </div>
       </div>
     </section>
@@ -251,10 +292,10 @@ function SeccionTransporte({ transportes }: { transportes: ConfigTransporte[] })
 /* ─── Componente SeccionCategorias ──────────────────────────────── */
 function SeccionCategorias() {
   return (
-    <section className="bg-white py-10">
+    <section className="bg-white py-12">
       <div className="max-w-7xl mx-auto px-4 md:px-6">
         <h2
-          className="text-2xl md:text-3xl text-[#1A1A1A] text-center mb-8"
+          className="text-3xl md:text-4xl text-[#1A1A1A] text-center mb-10"
           style={{ fontFamily: 'var(--font-dm-serif)' }}
         >
           Explora por categoría
@@ -263,32 +304,32 @@ function SeccionCategorias() {
         {/* Pills — scroll en mobile, centrados en desktop */}
         <div className="relative">
           <div
-            className="flex gap-3 overflow-x-auto pb-1 justify-start md:justify-center"
+            className="flex gap-4 overflow-x-auto pb-4 justify-start md:justify-center snap-x"
             style={{ scrollbarWidth: 'none' } as React.CSSProperties}
           >
             {CATEGORIAS.map((cat) => {
-              const claseBase = `flex flex-col items-center gap-1.5 px-5 py-4 rounded-2xl transition-all duration-200 min-w-[90px] ${cat.fondo}`
+              const claseBase = `flex flex-col items-center justify-center gap-2 p-5 rounded-3xl transition-all duration-300 min-w-[110px] bg-white border border-gray-100 shadow-sm snap-start`
               const contenido = (
                 <>
-                  <span className="text-3xl leading-none">{cat.emoji}</span>
-                  <span className={`text-xs font-semibold ${cat.texto} whitespace-nowrap`}>{cat.nombre}</span>
+                  <span className="text-4xl leading-none drop-shadow-sm group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300">{cat.emoji}</span>
+                  <span className={`text-xs font-bold ${cat.texto} whitespace-nowrap mt-1`}>{cat.nombre}</span>
                 </>
               )
               const destino = cat.href ?? (cat.slug ? `/buscar?categoria=${cat.slug}` : null)
               const activa = !cat.proximamente && !!destino
               return (
-                <div key={cat.nombre} className="relative flex-shrink-0">
+                <div key={cat.nombre} className="relative flex-shrink-0 group">
                   {activa ? (
-                    <Link href={destino!} className={`${claseBase} hover:scale-105 hover:shadow-md`}>
+                    <Link href={destino!} className={`${claseBase} hover:shadow-xl hover:border-gray-200 hover:-translate-y-1`}>
                       {contenido}
                     </Link>
                   ) : (
-                    <button disabled className={`${claseBase} opacity-60 cursor-not-allowed`}>
+                    <button disabled className={`${claseBase} opacity-50 cursor-not-allowed`}>
                       {contenido}
                     </button>
                   )}
                   {cat.proximamente && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-[#D4A017] text-[#1A1A1A] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none whitespace-nowrap">
+                    <span className="absolute -top-2 -right-2 bg-[#D4A017] text-[#1A1A1A] text-[9px] font-bold px-2 py-1 rounded-full shadow-md leading-none whitespace-nowrap">
                       Próximo
                     </span>
                   )}
@@ -296,7 +337,7 @@ function SeccionCategorias() {
               )
             })}
           </div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent md:hidden" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-white to-transparent md:hidden" />
         </div>
       </div>
     </section>
@@ -311,8 +352,8 @@ function SeccionDestacados({ productos, destacadosPagados, etiquetasPagadas }: {
 }) {
   const idsDestacados = new Set(destacadosPagados.map(p => p.id))
   const topVentas = [...productos]
-    .filter(p => !idsDestacados.has(p.id))
-    .sort((a, b) => b.comercio.totalVentas - a.comercio.totalVentas)
+    .filter((p: any) => !idsDestacados.has(p.id) && !p.esBannerDisplay)
+    .sort((a, b) => (b.comercio?.totalVentas || 0) - (a.comercio?.totalVentas || 0))
   const top3 = [...destacadosPagados.slice(0, 2), ...topVentas].slice(0, 3)
 
   if (top3.length === 0) return null
@@ -640,32 +681,30 @@ export default function Home() {
         <BannerCarrusel />
 
         {/* Propuesta de valor */}
-        <section className="bg-white border-y border-[#E8DCC8] py-8">
+        <section className="bg-[#0f2419] border-y border-[#1a3a2a] py-16">
           <div className="max-w-7xl mx-auto px-4 md:px-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
               {[
                 {
                   icono: '🌿',
                   titulo: 'Directo del productor',
-                  desc: 'Sin intermediarios. Tu compra llega directamente a las familias productoras.',
+                  desc: 'Sin intermediarios. Tu compra llega directamente a las familias productoras mejorando sus ingresos.',
                 },
                 {
                   icono: '🤝',
                   titulo: 'Comercio justo',
-                  desc: 'Precios justos para los productores. Tu compra transforma vidas.',
+                  desc: 'Precios transparentes y justos. Tu compra transforma vidas y apoya el desarrollo en el territorio.',
                 },
                 {
                   icono: '📍',
-                  titulo: '100% Colombia',
-                  desc: 'Productos, tours y servicios auténticos de comunidades afro, indígenas y campesinas de todo el país.',
+                  titulo: '100% Auténtico',
+                  desc: 'Productos, tours y servicios auténticos de comunidades afro, indígenas y campesinas del país.',
                 },
               ].map((item) => (
-                <div key={item.titulo} className="flex items-start gap-4">
-                  <span className="text-3xl flex-shrink-0">{item.icono}</span>
-                  <div>
-                    <h3 className="font-semibold text-[#1A1A1A] text-sm">{item.titulo}</h3>
-                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">{item.desc}</p>
-                  </div>
+                <div key={item.titulo} className="flex flex-col items-center text-center p-8 rounded-3xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300">
+                  <span className="text-5xl mb-5 drop-shadow-lg">{item.icono}</span>
+                  <h3 className="font-bold text-white text-lg mb-2">{item.titulo}</h3>
+                  <p className="text-sm text-white/70 leading-relaxed">{item.desc}</p>
                 </div>
               ))}
             </div>
@@ -790,16 +829,22 @@ export default function Home() {
               {(() => {
                 const MAX_PATROCINADOS_PCT = 0.15
                 const maxPatrocinados = Math.max(1, Math.floor(productos.length * MAX_PATROCINADOS_PCT))
-                const patrocinados = productos.filter(p => destCatalogo.has(p.id)).slice(0, maxPatrocinados)
-                const organicos = productos.filter(p => !destCatalogo.has(p.id))
+                const patrocinados = productos.filter((p: any) => destCatalogo.has(p.id)).slice(0, maxPatrocinados)
+                const organicos = productos.filter((p: any) => !destCatalogo.has(p.id))
                 return intercalarDestacados(patrocinados, organicos)
-              })().map(producto => (
-                <TarjetaProducto
-                  key={producto.id}
-                  producto={producto}
-                  esDestacado={destCatalogo.has(producto.id)}
-                  etiquetaDestacado={destCatalogo.get(producto.id)}
-                />
+              })().map((producto: any) => (
+                producto.esBannerDisplay ? (
+                  <div key={producto.id} className="col-span-full mt-2 mb-2">
+                    <BannerDisplay banner={producto} />
+                  </div>
+                ) : (
+                  <TarjetaProducto
+                    key={producto.id}
+                    producto={producto}
+                    esDestacado={destCatalogo.has(producto.id)}
+                    etiquetaDestacado={destCatalogo.get(producto.id)}
+                  />
+                )
               ))}
             </div>
           )}

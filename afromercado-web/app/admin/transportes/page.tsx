@@ -8,11 +8,21 @@ const TIPO_ICONO: Record<string, string> = { LANCHA: '🛥️', BOTE: '⛵', CHA
 export default function AdminTransportesPage() {
   const [transportes, setTransportes] = useState<TransporteAdmin[]>([])
   const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [filtroActivo, setFiltroActivo] = useState<'todos' | 'activos' | 'inactivos'>('todos')
 
   useEffect(() => {
-    adminListarTransportes().then(d => { setTransportes(d); setCargando(false) })
+    (async () => {
+      try {
+        const d = await adminListarTransportes()
+        setTransportes(d)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar los transportes.')
+      } finally {
+        setCargando(false)
+      }
+    })()
   }, [])
 
   async function toggleEstado(t: TransporteAdmin) {
@@ -38,6 +48,12 @@ export default function AdminTransportesPage() {
         <h1 className="text-2xl font-bold text-[#1A1A1A]">🛥️ Transporte Fluvial</h1>
         <p className="text-sm text-gray-500 mt-1">Servicios de transporte fluvial registrados</p>
       </div>
+
+      {error && (
+        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4 mb-6">
         {[{ label: 'Total', val: stats.total, color: 'text-[#023E8A]' }, { label: 'Activos', val: stats.activos, color: 'text-green-600' }].map(s => (

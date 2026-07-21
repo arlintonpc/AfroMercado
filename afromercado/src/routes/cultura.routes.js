@@ -2,12 +2,44 @@ const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
 const express = require("express");
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 const { autenticar, autorizar, autenticarOpcional } = require("../middlewares/auth");
 const CulturaController = require("../controllers/cultura.controller");
 const ReviewController = require("../controllers/review.controller");
-const { subirACloudinary, subirVideoACloudinary } = require("../utils/cloudinary");
+const { subirACloudinary, subirVideoACloudinary, construirUrlVideoOptimizada, construirPosterVideo } = require("../utils/cloudinary");
+const { crearUploadVideo, extraerVideoMeta, normalizarRecorteVideo, urlLocalVideo } = require("../utils/video-media");
 
 const router = express.Router();
+
+// Límite anti-spam: máx. 25 publicaciones/adjuntos por usuario cada 24h
+// (mismo estilo que apiLimiter/authLimiter en app.js, pero por usuario en
+// vez de por IP ya que estos endpoints requieren autenticación).
+const publicacionLimiter = rateLimit({
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 25,
+  keyGenerator: (req) => (req.usuario?.id ? `usuario:${req.usuario.id}` : `ip:${ipKeyGenerator(req.ip)}`),
+  skip: () => process.env.NODE_ENV !== "production",
+  message: { ok: false, error: "Alcanzaste el límite diario de publicaciones. Intenta mañana." },
+});
+
+// Límite anti-spam para comentarios en publicaciones de Vitrina/Comparte tu
+// Chocó — sin cola de moderación previa (a diferencia de Empleo/Inmueble),
+// así que este límite es la única barrera contra un usuario inundando de
+// comentarios una publicación. Más permisivo que publicacionLimiter porque
+// comentar es una acción más liviana que publicar con adjuntos.
+const comentarioLimiter = rateLimit({
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 60,
+  keyGenerator: (req) => (req.usuario?.id ? `usuario:${req.usuario.id}` : `ip:${ipKeyGenerator(req.ip)}`),
+  skip: () => process.env.NODE_ENV !== "production",
+  message: { ok: false, error: "Alcanzaste el límite diario de comentarios. Intenta mañana." },
+});
 
 const soloAuth     = [autenticar];
 const soloComercio = [autenticar, autorizar("COMERCIANTE")];
@@ -89,12 +121,48 @@ const uploadVideoReviewCultura = crearUploaderVideo(DIR_REVIEWS_CULTURA, "review
 const handlerSubidaFotoReviewCultura = crearHandlerSubidaFoto("afromercado/reviews-cultura", "reviews-cultura");
 const handlerSubidaVideoReviewCultura = crearHandlerSubidaVideo("afromercado/reviews-cultura", "reviews-cultura");
 
-// Publicaciones comunitarias ("Comparte tu Chocó")
+// Publicaciones comunitarias ("Comparte tu Chocó") y vitrina de video de comercio
 const DIR_PUBLICACIONES_CULTURA = path.join(__dirname, "..", "..", "uploads", "publicaciones-cultura");
 const uploadFotoPublicacion = crearUploaderFoto(DIR_PUBLICACIONES_CULTURA, "publicacion-cultura");
-const uploadVideoPublicacion = crearUploaderVideo(DIR_PUBLICACIONES_CULTURA, "publicacion-cultura");
 const handlerSubidaFotoPublicacion = crearHandlerSubidaFoto("afromercado/publicaciones-cultura", "publicaciones-cultura");
-const handlerSubidaVideoPublicacion = crearHandlerSubidaVideo("afromercado/publicaciones-cultura", "publicaciones-cultura");
+
+// Video de publicaciones: migrado al middleware maduro de video-media.js
+// (usado por Tour) — valida duración máxima 45s server-side (con recorte) y
+// captura metadata rica, a diferencia del multer bespoke que usan reseñas/eventos.
+const DIR_VIDEOS_PUBLICACIONES = path.join(__dirname, "..", "..", "uploads", "videos", "publicaciones-cultura");
+const _uploadVideoPublicacion = crearUploadVideo({
+  dir: DIR_VIDEOS_PUBLICACIONES,
+  prefijo: "publicacion-cultura-video",
+  fieldName: "video",
+  maxFileSize: 45 * 1024 * 1024, // 45 MB — menor que los 100MB de Tour: video vertical corto no lo necesita
+});
+function uploadVideoPublicacion(req, res, next) {
+  _uploadVideoPublicacion(req, res, (err) => { if (err) return next(err); next(); });
+}
+
+async function handlerSubidaVideoPublicacion(req, res, next) {
+  const filePath = req.file?.path;
+  let mantenerLocal = false;
+  try {
+    if (!req.file) return res.status(400).json({ ok: false, error: "No se recibió video" });
+    const meta = extraerVideoMeta(req.body);
+    const subida = await subirVideoACloudinary(req.file.path, "afromercado/publicaciones-cultura");
+    const recorte = normalizarRecorteVideo(meta, subida?.duration ?? null);
+    mantenerLocal = !subida?.secureUrl;
+    const secureUrl = subida?.secureUrl ?? urlLocalVideo(req, `uploads/videos/publicaciones-cultura/${req.file.filename}`);
+    const videoUrl = construirUrlVideoOptimizada(secureUrl, recorte);
+    const posterUrl = construirPosterVideo(secureUrl, recorte);
+    res.json({
+      ok: true,
+      url: videoUrl,
+      posterUrl,
+      duracionSegundos: recorte.duracionFinal,
+      publicId: subida?.publicId ?? null,
+    });
+  } catch (e) { next(e); } finally {
+    if (filePath && !mantenerLocal) fs.unlink(filePath, () => {});
+  }
+}
 
 // Media de eventos (organizador): portada, galería de fotos y video del evento
 const DIR_EVENTOS_CULTURA = path.join(__dirname, "..", "..", "uploads", "eventos-cultura");
@@ -133,12 +201,21 @@ router.get("/galeria", ReviewController.galeriaCultura);
 
 // ── COMPARTE TU CHOCÓ (publicaciones comunitarias, sin moderación previa) ──
 // Cualquier usuario autenticado publica; control solo reactivo vía denuncias.
-router.post("/publicaciones",               ...soloAuth, CulturaController.crearPublicacion);
+router.post("/publicaciones",               ...soloAuth, publicacionLimiter, CulturaController.crearPublicacion);
 router.get(  "/publicaciones",                            autenticarOpcional, CulturaController.listarPublicaciones);
-router.post("/publicaciones/foto",          ...soloAuth, uploadFotoPublicacion.single("foto"),   handlerSubidaFotoPublicacion);
-router.post("/publicaciones/video",         ...soloAuth, uploadVideoPublicacion.single("video"), handlerSubidaVideoPublicacion);
+router.post("/publicaciones/foto",          ...soloAuth, publicacionLimiter, uploadFotoPublicacion.single("foto"), handlerSubidaFotoPublicacion);
+router.post("/publicaciones/video",         ...soloAuth, publicacionLimiter, uploadVideoPublicacion, handlerSubidaVideoPublicacion);
 router.post("/publicaciones/:id/denunciar", ...soloAuth, CulturaController.denunciarPublicacion);
 router.post("/publicaciones/:id/like/toggle", ...soloAuth, CulturaController.toggleLikePublicacion);
+router.post("/publicaciones/:id/favorito/toggle", ...soloAuth, CulturaController.toggleFavoritoPublicacion);
+router.post("/publicaciones/:id/vista",           autenticarOpcional, CulturaController.registrarVista);
+router.post("/publicaciones/:id/compartir",       autenticarOpcional, CulturaController.registrarCompartido);
+router.get("/publicaciones/:id/comentarios",      autenticarOpcional, CulturaController.listarComentarios);
+router.post("/publicaciones/:id/comentarios",     ...soloAuth, comentarioLimiter, CulturaController.crearComentario);
+
+// ── VITRINA DE VIDEO (v0) — publicaciones de comercio ──────────
+// Antes de "/:id" para evitar ambigüedad de rutas.
+router.get("/vitrina", autenticarOpcional, CulturaController.listarVitrina);
 
 // ── ADMIN ─────────────────────────────────────────────────────
 router.get(  "/admin/todos",      ...soloAdmin, CulturaController.adminListar);

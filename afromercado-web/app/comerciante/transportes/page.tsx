@@ -172,6 +172,7 @@ export default function ComercianteTransportesPage() {
   const [cfg, setCfg] = useState<ConfigTransporte | null>(null)
   const [reservas, setReservas] = useState<ReservaTransporte[]>([])
   const [cargando, setCargando] = useState(true)
+  const [errorCarga, setErrorCarga] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [editCfg, setEditCfg] = useState<Partial<ConfigTransporte>>({})
   const [formRuta, setFormRuta] = useState<Partial<RutaTransporte>>(RUTA_VACIA)
@@ -195,16 +196,22 @@ export default function ComercianteTransportesPage() {
   })
 
   useEffect(() => {
-    Promise.all([obtenerMiTransporte(), reservasOperadorTransporte()]).then(([t, rs]) => {
-      setCfg(t); setEditCfg(t); setReservas(rs); reservasRef.current = rs
-      setVideoEstadoTransporte({
-        videoUrl: t.videoUrl ?? null,
-        videoPosterUrl: t.videoPosterUrl ?? null,
-        videoDuracionSegundos: null,
-        videoMimeType: null,
-      })
-      setCargando(false)
-    })
+    (async () => {
+      try {
+        const [t, rs] = await Promise.all([obtenerMiTransporte(), reservasOperadorTransporte()])
+        setCfg(t); setEditCfg(t); setReservas(rs); reservasRef.current = rs
+        setVideoEstadoTransporte({
+          videoUrl: t.videoUrl ?? null,
+          videoPosterUrl: t.videoPosterUrl ?? null,
+          videoDuracionSegundos: null,
+          videoMimeType: null,
+        })
+      } catch (e) {
+        setErrorCarga(e instanceof Error ? e.message : 'No se pudo cargar la información del transporte.')
+      } finally {
+        setCargando(false)
+      }
+    })()
   }, [])
 
   useEffect(() => {
@@ -241,6 +248,8 @@ export default function ComercianteTransportesPage() {
           try { const ctx = new AudioContext(); const b = (t: number) => { const o = ctx.createOscillator(); const g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.value = 520; g.gain.setValueAtTime(0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3); o.start(t); o.stop(t + 0.35) }; b(ctx.currentTime); b(ctx.currentTime + 0.4) } catch {}
         }
         reservasRef.current = nuevas; setReservas(nuevas)
+      }).catch(err => {
+        console.error('Error al refrescar reservas de transporte:', err)
       })
     }, 20000)
     return () => clearInterval(iv)
@@ -334,6 +343,10 @@ export default function ComercianteTransportesPage() {
           <span className="text-xs text-gray-500">{cfg?.activo ? 'Visible al público' : 'Oculto'}</span>
         </div>
       </div>
+
+      {errorCarga && (
+        <div className="bg-red-50 border border-red-100 text-red-700 rounded-2xl px-4 py-3 text-sm mb-5">{errorCarga}</div>
+      )}
 
       <div className="flex gap-1 bg-gray-100 rounded-2xl p-1 mb-5">
         {TABS.map(t => (

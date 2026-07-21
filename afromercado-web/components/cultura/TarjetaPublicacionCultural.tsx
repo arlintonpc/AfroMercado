@@ -1,10 +1,15 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { toggleLikePublicacion, type PublicacionCultural } from '@/lib/api/cultura'
-import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
+import { useVitrinaAudio } from '@/context/VitrinaAudioContext'
+import { toggleLikePublicacion, toggleFavoritoPublicacionCultural, registrarVistaPublicacion, registrarCompartidoPublicacion, type PublicacionCultural } from '@/lib/api/cultura'
+import ModalComentarios from './ModalComentarios'
+import { toggleSeguirComercio } from '@/lib/api/comercios'
+import ReproductorVideo, { detectar } from '@/components/comerciante/ReproductorVideo'
+import { ModalCompartir } from './ModalCompartir'
 
 function fechaCorta(iso: string): string {
   const fecha = new Date(iso)
@@ -31,11 +36,32 @@ function useCerrarAlClicFuera<T extends HTMLElement>(abierto: boolean, cerrar: (
   return ref
 }
 
+/** Mismo criterio de detección de plataforma que ReproductorVideo.tsx (no exportado ahí),
+ *  duplicado a propósito: solo necesitamos saber si es un archivo propio (Cloudinary/mp4)
+ *  para decidir si podemos usar <video autoPlay muted loop> como fondo del cuadro inmersivo,
+ *  o si es un link externo (YouTube/TikTok/etc.) que debe abrir en el lightbox existente. */
+function esVideoDirecto(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.replace('www.', '')
+    return !['youtube.com', 'youtu.be', 'vimeo.com', 'facebook.com', 'fb.watch', 'tiktok.com', 'instagram.com'].includes(host)
+  } catch {
+    return true
+  }
+}
+
 function IconoPlaySuperpuesto() {
   return (
     <span className="pointer-events-none absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z" /></svg>
     </span>
+  )
+}
+
+function IconoAltavoz({ silenciado }: { silenciado: boolean }) {
+  return silenciado ? (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M4 9v6h4l5 5V4L8 9H4zm14.5 3a4.5 4.5 0 00-2.5-4.03v8.06A4.49 4.49 0 0018.5 12zM16 20.4l1.6-1.6a1 1 0 011.4 1.4L15.4 24 12 20.6l1.4-1.4L16 20.4zM2.1 3.51L3.51 2.1l18.39 18.39-1.41 1.41-4.24-4.24A6.96 6.96 0 0114 19.14v-2.06a5 5 0 001.61-.98L2.1 3.51z" /></svg>
+  ) : (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M4 9v6h4l5 5V4L8 9H4zm11.5 3a4.5 4.5 0 00-2.5-4.03v8.06A4.49 4.49 0 0015.5 12zM14 3.23v2.06a7 7 0 010 13.42v2.06a9 9 0 000-17.54z" /></svg>
   )
 }
 
@@ -159,24 +185,45 @@ interface TarjetaPublicacionCulturalProps {
 export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDenunciar }: TarjetaPublicacionCulturalProps) {
   const { autenticado } = useAuth()
   const router = useRouter()
+  const { muted, toggleMuted } = useVitrinaAudio()
+
+  // Publicaciones de la Vitrina de video (comerciantes) traen `comercio`; las
+  // de "Comparte tu Territorio" (vecinos) nunca lo traen — este único campo
+  // decide la variante visual sin necesitar una prop nueva ni tocar los
+  // llamadores existentes de esta tarjeta.
+  const comercio = publicacion.comercio ?? null
 
   const ubicacion = [publicacion.municipio, publicacion.departamento].filter(Boolean).join(', ') || 'Chocó'
-  const inicial = publicacion.autor?.nombre?.[0]?.toUpperCase() || '?'
+  const nombreMostrado = publicacion.esAnuncio ? publicacion.etiqueta || 'Patrocinado' : comercio?.nombre || publicacion.autor?.nombre || 'Un vecino'
+  const inicial = publicacion.esAnuncio ? '⭐' : nombreMostrado[0]?.toUpperCase() || '?'
 
   const [menuAbierto, setMenuAbierto] = useState(false)
   const menuRef = useCerrarAlClicFuera<HTMLDivElement>(menuAbierto, () => setMenuAbierto(false))
 
   const [compartirAbierto, setCompartirAbierto] = useState(false)
   const compartirRef = useCerrarAlClicFuera<HTMLDivElement>(compartirAbierto, () => setCompartirAbierto(false))
-  const [copiado, setCopiado] = useState(false)
+
+  const [comentariosAbierto, setComentariosAbierto] = useState(false)
+  const [totalComentarios, setTotalComentarios] = useState(publicacion.totalComentarios ?? 0)
+  const [totalCompartidos, setTotalCompartidos] = useState(publicacion.totalCompartidos ?? 0)
 
   const [meGusta, setMeGusta] = useState(publicacion.meGusta)
   const [totalLikes, setTotalLikes] = useState(publicacion.totalLikes)
   const [enVueloLike, setEnVueloLike] = useState(false)
 
+  const [esFavorito, setEsFavorito] = useState(publicacion.esFavorito ?? false)
+  const [enVueloFavorito, setEnVueloFavorito] = useState(false)
+
+  const [siguiendo, setSiguiendo] = useState(comercio?.siguiendo ?? false)
+  const [enVueloSeguir, setEnVueloSeguir] = useState(false)
+
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  const rutaRedirect = comercio ? '/vitrina' : '/cultura/galeria'
+
   async function manejarLike() {
     if (!autenticado) {
-      router.push(`/ingresar?redirect=${encodeURIComponent('/cultura/galeria')}`)
+      router.push(`/ingresar?redirect=${encodeURIComponent(rutaRedirect)}`)
       return
     }
     if (enVueloLike) return
@@ -198,29 +245,435 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
     }
   }
 
-  async function copiarEnlace() {
-    const url = `${window.location.origin}/cultura/galeria`
+  async function manejarGuardar() {
+    if (!autenticado) {
+      router.push(`/ingresar?redirect=${encodeURIComponent(rutaRedirect)}`)
+      return
+    }
+    if (enVueloFavorito) return
+    const anterior = esFavorito
+    setEsFavorito(!anterior)
+    setEnVueloFavorito(true)
     try {
-      await navigator.clipboard.writeText(url)
-      setCopiado(true)
-      setTimeout(() => setCopiado(false), 2000)
+      const r = await toggleFavoritoPublicacionCultural(publicacion.id)
+      setEsFavorito(r.esFavorito)
     } catch {
-      // clipboard no disponible
+      setEsFavorito(anterior)
+    } finally {
+      setEnVueloFavorito(false)
     }
   }
 
-  const urlGaleria = typeof window !== 'undefined' ? `${window.location.origin}/cultura/galeria` : 'https://afromercado.vercel.app/cultura/galeria'
-  const textoWhatsapp = `Mira esta historia en Teravia: "${publicacion.titulo}" — ${urlGaleria}`
+  async function manejarSeguir() {
+    if (!comercio) return
+    if (!autenticado) {
+      router.push(`/ingresar?redirect=${encodeURIComponent(rutaRedirect)}`)
+      return
+    }
+    if (enVueloSeguir) return
+    const anterior = siguiendo
+    setSiguiendo(!anterior)
+    setEnVueloSeguir(true)
+    try {
+      const r = await toggleSeguirComercio(comercio.id)
+      setSiguiendo(r.siguiendo)
+    } catch {
+      setSiguiendo(anterior)
+    } finally {
+      setEnVueloSeguir(false)
+    }
+  }
+
+  const [reproduciendo, setReproduciendo] = useState(true)
+  const tiempoVistaRef = useRef<NodeJS.Timeout | null>(null)
+
+  const iniciarConteoVista = () => {
+    if (tiempoVistaRef.current) return
+    tiempoVistaRef.current = setTimeout(() => {
+      const sesionId = typeof window !== 'undefined' ? window.localStorage.getItem('afromercado_sesion_id') || undefined : undefined
+      registrarVistaPublicacion(publicacion.id, sesionId, 3)
+    }, 3000)
+  }
+
+  const pararConteoVista = () => {
+    if (tiempoVistaRef.current) {
+      clearTimeout(tiempoVistaRef.current)
+      tiempoVistaRef.current = null
+    }
+  }
+
+  const togglePlayPausa = () => {
+    const video = videoRef.current
+    if (!video) return
+    if (video.paused) {
+      video.play().catch(() => {})
+      setReproduciendo(true)
+      iniciarConteoVista()
+    } else {
+      video.pause()
+      setReproduciendo(false)
+      pararConteoVista()
+    }
+  }
+
+  // Reproduce/pausa el video de la tarjeta inmersiva según su visibilidad en
+  // pantalla, para que solo suene/anime el que el usuario tiene enfocado.
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          video.play().catch(() => {})
+          setReproduciendo(true)
+          iniciarConteoVista()
+        } else {
+          video.pause()
+          setReproduciendo(false)
+          pararConteoVista()
+        }
+      },
+      { threshold: 0.3 }
+    )
+    observer.observe(video)
+    return () => {
+      observer.disconnect()
+      pararConteoVista()
+    }
+    // iniciarConteoVista/pararConteoVista se recrean cada render (no son
+    // useCallback) — el observer solo debe reconstruirse si cambia la
+    // publicación mostrada en esta tarjeta, no en cada re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publicacion.id])
+
+  const urlGaleria = typeof window !== 'undefined' ? `${window.location.origin}${comercio ? `/vitrina?video=${publicacion.id}` : rutaRedirect}` : `https://afromercado.vercel.app${comercio ? `/vitrina?video=${publicacion.id}` : rutaRedirect}`
+
+  const reportarCompartido = async () => {
+    try {
+      await registrarCompartidoPublicacion(publicacion.id)
+      setTotalCompartidos(prev => prev + 1)
+    } catch {
+      // no interrumpe el flujo de compartir si falla el conteo
+    }
+  }
+
+  function manejarCompartirNativo() {
+    setCompartirAbierto((v) => !v)
+  }
+
+  // Botón de acción dinámico, mismo criterio que /producto/[id]: si el comercio
+  // vende dentro de la plataforma, lleva a su perfil; si vende por contacto
+  // directo, WhatsApp (solo si el comercio decidió mostrar su número).
+  const mensajeWaComercio = comercio ? `Hola, vi tu publicación "${publicacion.titulo}" en Teravia` : ''
+  const enlaceWaComercio =
+    comercio && comercio.comprableEnPlataforma === false && comercio.whatsapp && comercio.whatsappVisible
+      ? `https://wa.me/57${comercio.whatsapp}?text=${encodeURIComponent(mensajeWaComercio)}`
+      : null
+
+  const [cargandoVideo, setCargandoVideo] = useState(false)
+  const [youtubeActivo, setYoutubeActivo] = useState(false)
+
+  let posterUrl = publicacion.videoPosterUrl ?? undefined
+  let embedUrlFinal = ''
+  let esVerticalMedia = false
+  let esExterna = false
+
+  if (publicacion.videoUrl) {
+    if (publicacion.videoUrl.includes('res.cloudinary.com')) {
+      // Reemplaza extensión y fuerza formato jpg en Cloudinary para evitar que devuelva video/mp4
+      if (!posterUrl) posterUrl = publicacion.videoUrl.replace(/\.[^/.]+$/, '.jpg').replace(/f_[^,]+/, 'f_jpg')
+    } else {
+      const { embedUrl, esVertical, videoId, plataforma } = detectar(publicacion.videoUrl)
+      if (embedUrl) {
+        embedUrlFinal = embedUrl
+        esVerticalMedia = esVertical
+        esExterna = true
+        if (!posterUrl && plataforma === 'youtube' && videoId) {
+          posterUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+        }
+      }
+    }
+  }
+
+  // Cuadro inmersivo (formato Reels/TikTok): solo para publicaciones de la
+  // Vitrina de video que traen un video propio — las de fotos siguen usando
+  // el collage clásico de abajo, y "Comparte tu Territorio" no cambia.
+  if (comercio && publicacion.videoUrl) {
+    const directo = esVideoDirecto(publicacion.videoUrl)
+    return (
+      <article className="relative mx-auto aspect-[9/16] max-h-[720px] w-full overflow-hidden rounded-2xl bg-black shadow-lg">
+        {directo ? (
+          <>
+            <video
+              ref={videoRef}
+              src={publicacion.videoUrl}
+              poster={posterUrl}
+              className="absolute inset-0 h-full w-full object-cover cursor-pointer"
+              muted={muted}
+              loop
+              playsInline
+              onClick={togglePlayPausa}
+              onWaiting={() => setCargandoVideo(true)}
+              onPlaying={() => setCargandoVideo(false)}
+              onCanPlay={() => setCargandoVideo(false)}
+            />
+            {/* Mostrar ícono de carga si el video está pausado por buffering y debería estar reproduciendo */}
+            {cargandoVideo && reproduciendo && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-white border-t-transparent"></div>
+              </div>
+            )}
+            {!reproduciendo && (
+              <button
+                type="button"
+                onClick={togglePlayPausa}
+                className="absolute inset-0 flex items-center justify-center transition-all hover:bg-black/5"
+              >
+                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 shadow-lg">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="#1B4332"><path d="M8 5v14l11-7z" /></svg>
+                </span>
+              </button>
+            )}
+          </>
+        ) : (
+          <div className="absolute inset-0 h-full w-full bg-black flex items-center justify-center">
+            {!youtubeActivo ? (
+              <button
+                type="button"
+                onClick={() => embedUrlFinal ? setYoutubeActivo(true) : onAbrir(publicacion, 0)}
+                aria-label={`Reproducir video de ${publicacion.titulo}`}
+                className="absolute inset-0 block h-full w-full group z-0"
+              >
+                {posterUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={posterUrl} alt={publicacion.titulo} className="h-full w-full object-cover transition-opacity" />
+                ) : (
+                  <div className="h-full w-full bg-gradient-to-br from-[#1B4332] to-black" />
+                )}
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 shadow-lg transition-transform group-hover:scale-110">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="#1B4332"><path d="M8 5v14l11-7z" /></svg>
+                  </span>
+                </span>
+              </button>
+            ) : (
+              embedUrlFinal ? (
+                <iframe
+                  src={embedUrlFinal}
+                  className="absolute inset-0 w-full h-full"
+                  style={{ aspectRatio: esVerticalMedia ? '9/16' : '16/9' }}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  frameBorder="0"
+                />
+              ) : null
+            )}
+          </div>
+        )}
+
+        {/* Franja superior: comercio + menú */}
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-4 pb-8 pointer-events-none">
+          <div className="flex min-w-0 items-center gap-2.5 pointer-events-auto">
+            {comercio?.logoUrl || publicacion.imagenUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={comercio?.logoUrl || publicacion.imagenUrl || ''} alt={nombreMostrado} className="h-9 w-9 flex-shrink-0 rounded-full border border-white/40 object-cover shadow-sm" />
+            ) : (
+              <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-white/40 text-sm font-bold text-white shadow-sm ${publicacion.esAnuncio ? 'bg-[#9B7300]' : 'bg-[#1B4332]'}`}>
+                {inicial}
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="truncate text-sm font-semibold text-white" style={{ textShadow: '0px 1px 3px rgba(0,0,0,0.8)' }}>
+                  {publicacion.esAnuncio ? '⭐' : '🏪'} {nombreMostrado}
+                </p>
+                {!publicacion.esAnuncio && (
+                  <button
+                    type="button"
+                    onClick={manejarSeguir}
+                    disabled={enVueloSeguir}
+                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide transition-all ${
+                      siguiendo
+                        ? 'bg-black/40 text-white border border-white/30 backdrop-blur-sm'
+                        : 'bg-[#2D6A4F] text-white shadow-sm hover:bg-[#245a42]'
+                    }`}
+                    style={{ minHeight: 'auto' }}
+                  >
+                    {siguiendo ? 'Siguiendo' : 'Seguir'}
+                  </button>
+                )}
+              </div>
+              <p className="truncate text-xs text-white/90" style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.8)' }}>{publicacion.esAnuncio ? 'Anuncio' : ubicacion}</p>
+            </div>
+          </div>
+          <div ref={menuRef} className="relative flex-shrink-0 pointer-events-auto">
+            <button
+              type="button"
+              onClick={() => setMenuAbierto((v) => !v)}
+              aria-label="Más opciones"
+              aria-expanded={menuAbierto}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-white transition hover:bg-black/20"
+              style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.8))' }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
+              </svg>
+            </button>
+            {menuAbierto && (
+              <div className="absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-xl border border-[#1A1A1A]/10 bg-white text-left shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => { setMenuAbierto(false); onDenunciar(publicacion.id) }}
+                  className="block w-full px-4 py-2.5 text-left text-sm font-medium text-[#C0392B] hover:bg-[#C0392B]/8"
+                >
+                  Denunciar publicación
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Riel de acciones a la derecha */}
+        <div className="absolute bottom-28 right-3 flex flex-col items-center gap-5 pointer-events-none">
+          {directo && (
+            <button
+              type="button"
+              onClick={toggleMuted}
+              aria-label={muted ? 'Activar sonido' : 'Silenciar'}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/25 text-white border border-white/20 backdrop-blur-sm shadow-md transition hover:bg-black/40 pointer-events-auto"
+              style={{ minHeight: 'auto' }}
+            >
+              <IconoAltavoz silenciado={muted} />
+            </button>
+          )}
+
+          {!publicacion.esAnuncio && (
+            <>
+              <button type="button" onClick={manejarLike} aria-pressed={meGusta} className="flex flex-col items-center gap-1 text-white pointer-events-auto" style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.8))' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill={meGusta ? '#C0392B' : 'rgba(0,0,0,0.4)'} stroke="white" strokeWidth="1.5">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {totalLikes > 0 && <span className="text-xs font-semibold">{totalLikes}</span>}
+              </button>
+              <button type="button" onClick={manejarGuardar} aria-pressed={esFavorito} className="flex flex-col items-center gap-1 text-white pointer-events-auto" style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.8))' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill={esFavorito ? '#D4A017' : 'rgba(0,0,0,0.4)'} stroke="white" strokeWidth="1.5">
+                  <path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2v16z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button type="button" onClick={() => setComentariosAbierto(true)} className="flex flex-col items-center gap-1 text-white pointer-events-auto" style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.8))' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="rgba(0,0,0,0.4)" stroke="white" strokeWidth="1.5">
+                  <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {totalComentarios > 0 && <span className="text-xs font-semibold">{totalComentarios}</span>}
+              </button>
+            </>
+          )}
+          <div ref={compartirRef} className="relative pointer-events-auto">
+            <button type="button" onClick={manejarCompartirNativo} aria-expanded={compartirAbierto} className="flex flex-col items-center gap-1 text-white" style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.8))' }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="rgba(0,0,0,0.4)" stroke="white" strokeWidth="1.5">
+                <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {totalCompartidos > 0 && <span className="text-xs font-semibold">{totalCompartidos}</span>}
+            </button>
+          </div>
+        </div>
+
+        {/* Franja inferior: título/descripción + botón de acción */}
+        <div className="absolute inset-x-0 bottom-0 px-4 pb-4 pt-16 pointer-events-none">
+          <p className="pr-14 font-serif text-base font-semibold text-white pointer-events-auto" style={{ textShadow: '0px 1px 3px rgba(0,0,0,0.8)' }}>{publicacion.titulo}</p>
+          {publicacion.descripcion && (
+            <p className="mt-1 line-clamp-2 pr-14 text-sm text-white/95 pointer-events-auto" style={{ textShadow: '0px 1px 3px rgba(0,0,0,0.8)' }}>{publicacion.descripcion}</p>
+          )}
+          
+          {publicacion.esAnuncio ? (
+            <div className="mt-3 pointer-events-auto">
+              <a
+                href={publicacion.urlDestino}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#D4A017] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#b08513] shadow-md shadow-[#D4A017]/20"
+              >
+                {publicacion.ctaTexto || 'Ver más'}
+              </a>
+            </div>
+          ) : (comercio?.comprableEnPlataforma !== false || enlaceWaComercio) ? (
+            <div className="mt-3 pointer-events-auto">
+              {comercio?.comprableEnPlataforma !== false ? (
+                <Link
+                  href={`/comercio/${comercio?.id}`}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2D6A4F] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#245a42]"
+                >
+                  Ver comercio
+                </Link>
+              ) : (
+                <a
+                  href={enlaceWaComercio as string}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1ebe5a]"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.32 4.96L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm0 18.15h-.01c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 01-1.26-4.38c0-4.54 3.7-8.24 8.26-8.24 2.2 0 4.27.86 5.83 2.42a8.18 8.18 0 012.42 5.83c0 4.55-3.7 8.23-8.25 8.23z" />
+                  </svg>
+                  Contactar por WhatsApp
+                </a>
+              )}
+            </div>
+          ) : null}
+        </div>
+        {comentariosAbierto && (
+          <ModalComentarios
+            publicacionId={publicacion.id}
+            totalComentariosInit={totalComentarios}
+            onClose={() => setComentariosAbierto(false)}
+            onComentarioAgregado={() => setTotalComentarios(prev => prev + 1)}
+          />
+        )}
+        <ModalCompartir
+          abierto={compartirAbierto}
+          onClose={() => setCompartirAbierto(false)}
+          url={urlGaleria}
+          titulo={publicacion.titulo}
+          onCompartir={reportarCompartido}
+        />
+      </article>
+    )
+  }
 
   return (
     <article className="overflow-hidden rounded-2xl border border-[#1A1A1A]/8 bg-white shadow-sm">
       <div className="flex items-start justify-between gap-2 p-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#1B4332] text-sm font-bold text-white">
-            {inicial}
-          </div>
+          {comercio?.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={comercio.logoUrl} alt={comercio.nombre} className="h-10 w-10 flex-shrink-0 rounded-full object-cover" />
+          ) : (
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#1B4332] text-sm font-bold text-white">
+              {inicial}
+            </div>
+          )}
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-[#1A1A1A]">{publicacion.autor?.nombre || 'Un vecino'}</p>
+            <div className="flex items-center gap-2">
+              <p className="truncate text-sm font-semibold text-[#1A1A1A]">
+                {comercio && <span className="mr-1" aria-hidden="true">🏪</span>}
+                {nombreMostrado}
+              </p>
+              {comercio && (
+                <button
+                  type="button"
+                  onClick={manejarSeguir}
+                  disabled={enVueloSeguir}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide transition-all ${
+                    siguiendo
+                      ? 'bg-[#1A1A1A]/10 text-[#1A1A1A]/70 border border-[#1A1A1A]/20'
+                      : 'bg-[#2D6A4F] text-white hover:bg-[#245a42]'
+                  }`}
+                  style={{ minHeight: 'auto' }}
+                >
+                  {siguiendo ? 'Siguiendo' : 'Seguir'}
+                </button>
+              )}
+            </div>
             <p className="truncate text-xs text-[#1A1A1A]/55">{ubicacion} · {fechaCorta(publicacion.createdAt)}</p>
           </div>
         </div>
@@ -293,6 +746,29 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
           Me gusta{totalLikes > 0 ? ` · ${totalLikes}` : ''}
         </button>
 
+        {comercio && (
+          <button
+            type="button"
+            onClick={manejarGuardar}
+            aria-pressed={esFavorito}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition hover:bg-[#F8F5F0] ${
+              esFavorito ? 'text-[#D4A017]' : 'text-[#1A1A1A]/65'
+            }`}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill={esFavorito ? '#D4A017' : 'none'}
+              stroke={esFavorito ? '#D4A017' : 'currentColor'}
+              strokeWidth="2"
+            >
+              <path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2v16z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {esFavorito ? 'Guardado' : 'Guardar'}
+          </button>
+        )}
+
         <div ref={compartirRef} className="relative flex-1">
           <button
             type="button"
@@ -306,28 +782,42 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
             Compartir
           </button>
 
-          {compartirAbierto && (
-            <div className="absolute right-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-xl border border-[#1A1A1A]/10 bg-white shadow-lg">
-              <a
-                href={`https://wa.me/?text=${encodeURIComponent(textoWhatsapp)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setCompartirAbierto(false)}
-                className="block px-4 py-2.5 text-sm font-medium text-[#128C7E] hover:bg-[#25D366]/10"
-              >
-                Enviar por WhatsApp
-              </a>
-              <button
-                type="button"
-                onClick={copiarEnlace}
-                className="block w-full px-4 py-2.5 text-left text-sm font-medium text-[#1A1A1A]/75 hover:bg-[#F8F5F0]"
-              >
-                {copiado ? '¡Copiado!' : 'Copiar enlace'}
-              </button>
-            </div>
+          </div>
+      </div>
+
+      {/* Botón de acción dinámico — solo en tarjetas de la Vitrina de video (comercio). */}
+      {comercio && (comercio.comprableEnPlataforma !== false || enlaceWaComercio) && (
+        <div className="border-t border-[#1A1A1A]/8 px-4 py-3">
+          {comercio.comprableEnPlataforma !== false ? (
+            <Link
+              href={`/comercio/${comercio.id}`}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2D6A4F] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#245a42]"
+            >
+              Ver comercio
+            </Link>
+          ) : (
+            <a
+              href={enlaceWaComercio as string}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1ebe5a]"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.32 4.96L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm0 18.15h-.01c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 01-1.26-4.38c0-4.54 3.7-8.24 8.26-8.24 2.2 0 4.27.86 5.83 2.42a8.18 8.18 0 012.42 5.83c0 4.55-3.7 8.23-8.25 8.23z" />
+              </svg>
+              Contactar por WhatsApp
+            </a>
           )}
         </div>
-      </div>
+      )}
+
+      <ModalCompartir 
+        abierto={compartirAbierto} 
+        onClose={() => setCompartirAbierto(false)} 
+        url={urlGaleria} 
+        titulo={publicacion.titulo} 
+        onCompartir={reportarCompartido} 
+      />
     </article>
   )
 }

@@ -261,7 +261,7 @@ const PagoPublicidadService = {
     const estado = String(evento.estado || "").trim().toUpperCase();
     if (ESTADOS_APROBADOS.has(estado)) {
       validarMontoEvento(solicitud, evento);
-      return prisma.solicitudPublicidad.update({
+      const actualizada = await prisma.solicitudPublicidad.update({
         where: { id: solicitud.id },
         data: {
           pagoEstado: "PAGADA",
@@ -272,6 +272,23 @@ const PagoPublicidadService = {
           pagoActualizadoAt: new Date(),
         },
       });
+
+      // Disparar conversion automatica
+      try {
+        const PublicidadController = require("../controllers/publicidad.controller");
+        await PublicidadController.convertirSistema(solicitud.id);
+      } catch (err) {
+        console.error("[PAGOS-PUBLICIDAD] Error en auto-conversion de campaña:", err.message);
+        // Si falla, al menos la solicitud queda como PAGADA y el Admin puede reintentar.
+        await prisma.solicitudPublicidad.update({
+          where: { id: solicitud.id },
+          data: {
+            notasAdmin: (actualizada.notasAdmin || "") + `\nError en auto-conversión: ${err.message}`,
+          }
+        });
+      }
+
+      return actualizada;
     }
 
     if (ESTADOS_FALLIDOS.has(estado)) {

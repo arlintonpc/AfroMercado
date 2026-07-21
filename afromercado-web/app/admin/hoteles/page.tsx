@@ -16,6 +16,7 @@ const ESTADO_COLOR: Record<string, string> = {
 export default function AdminHotelesPage() {
   const [hoteles, setHoteles] = useState<HotelAdmin[]>([])
   const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [filtroActivo, setFiltroActivo] = useState<'todos' | 'activos' | 'inactivos'>('todos')
   const [verReservas, setVerReservas] = useState<HotelAdmin | null>(null)
@@ -23,7 +24,16 @@ export default function AdminHotelesPage() {
   const [cargandoReservas, setCargandoReservas] = useState(false)
 
   useEffect(() => {
-    adminListarHoteles().then(d => { setHoteles(d); setCargando(false) })
+    (async () => {
+      try {
+        const d = await adminListarHoteles()
+        setHoteles(d)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar los hoteles.')
+      } finally {
+        setCargando(false)
+      }
+    })()
   }, [])
 
   async function toggleEstado(hotel: HotelAdmin) {
@@ -70,6 +80,12 @@ export default function AdminHotelesPage() {
         <h1 className="text-2xl font-bold text-[#1A1A1A]">🏨 Hoteles & Hospedaje</h1>
         <p className="text-sm text-gray-500 mt-1">Gestión de hoteles registrados en Teravia</p>
       </div>
+
+      {error && (
+        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+          {error}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">

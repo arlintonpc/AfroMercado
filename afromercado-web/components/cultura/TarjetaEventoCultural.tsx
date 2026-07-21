@@ -27,63 +27,88 @@ interface TarjetaEventoCulturalProps {
 export default function TarjetaEventoCultural({ ev, esFavorito = false, onFavoritoChange }: TarjetaEventoCulturalProps) {
   const desde = precioDesde(ev)
   const imagen = ev.portadaUrl || ev.fotos?.[0] || ''
+  
+  const esAnuncio = (ev as any).esAnuncio
+  const enlaceDestino = esAnuncio ? ((ev as any).anuncioUrl || '#') : `/cultura/${ev.id}`
 
   return (
     <Link
-      href={`/cultura/${ev.id}`}
-      className="group flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-[#1A1A1A]/8 bg-white/95 transition duration-200 hover:-translate-y-0.5 hover:border-[#2D6A4F]/30 hover:shadow-[0_16px_40px_rgba(26,26,26,0.08)]"
+      href={enlaceDestino}
+      target={esAnuncio ? "_blank" : undefined}
+      className="group relative flex flex-col justify-end overflow-hidden rounded-[2rem] bg-gray-900 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl aspect-[3/4] sm:aspect-[4/5] w-full"
     >
-      <div className="relative h-44 overflow-hidden bg-[#1B4332] text-white">
+      {/* Background Image / Video */}
+      <div className="absolute inset-0 z-0">
         {imagen ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imagen} alt={ev.titulo} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
+          imagen.endsWith('.mp4') ? (
+            <video src={imagen} autoPlay loop muted playsInline className="h-full w-full object-cover opacity-90 transition duration-700 group-hover:scale-105 group-hover:opacity-100" />
+          ) : (
+            <img src={imagen} alt={ev.titulo} className="h-full w-full object-cover opacity-90 transition duration-700 group-hover:scale-105 group-hover:opacity-100" />
+          )
         ) : (
-          <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_center,_rgba(212,160,23,0.18),_transparent_62%),linear-gradient(135deg,_#1B4332,_#2D6A4F)] text-5xl" aria-hidden="true">
-            🎭
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#1B4332] to-[#2D6A4F]">
+            <span className="text-6xl opacity-30">🎭</span>
           </div>
         )}
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_25%,rgba(18,33,25,0.78)_100%)]" />
-        <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-          {ev.destacado && (
-            <span className="rounded-full bg-[#D4A017] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#412402] shadow-sm">
-              Destacado
-            </span>
-          )}
-          {ev.patrimonio && (
-            <span className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#1B4332] shadow-sm">
-              {ev.patrimonioNota || 'Patrimonio'}
-            </span>
-          )}
-        </div>
-        <div className="absolute right-3 top-3">
+        {/* Gradient Overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/10" />
+      </div>
+
+      {/* Top Badges */}
+      <div className="absolute left-4 top-4 z-10 flex flex-wrap gap-2">
+        {esAnuncio && (
+           <span className="flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white backdrop-blur-md border border-white/20">
+             Promocionado
+           </span>
+        )}
+        {ev.destacado && !esAnuncio && (
+          <span className="rounded-full bg-[#D4A017] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#412402] shadow-sm">
+            Destacado
+          </span>
+        )}
+        {ev.patrimonio && (
+          <span className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#1B4332] shadow-sm">
+            {ev.patrimonioNota || 'Patrimonio'}
+          </span>
+        )}
+      </div>
+      
+      {/* Favorite Button */}
+      {!esAnuncio && (
+        <div className="absolute right-4 top-4 z-10">
           <BotonFavoritoCultura
-            eventoId={ev.id}
+            eventoId={Number(ev.id)}
             esFavorito={esFavorito}
-            onChange={(nuevo) => onFavoritoChange?.(ev.id, nuevo)}
+            onChange={(nuevo) => onFavoritoChange?.(Number(ev.id), nuevo)}
           />
         </div>
-        <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#EAF3DE]">{rangoFechas(ev.fechaInicio, ev.fechaFin)}</p>
-            <p className="mt-1 text-sm text-white/80">
-              {ev.municipio}, {ev.departamento}
-            </p>
-          </div>
-          <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[#1B4332] shadow-sm">
+      )}
+
+      {/* Content Bottom Overlay */}
+      <div className="relative z-10 p-5 pt-12">
+        <div className="mb-2 flex items-center gap-2">
+          <span className="rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-bold tracking-widest text-white backdrop-blur-md border border-white/10">
             {ev.categoria || 'Cultural'}
           </span>
+          <span className="text-[11px] font-bold uppercase tracking-widest text-[#EAF3DE]">
+            {esAnuncio ? 'Patrocinado' : rangoFechas(ev.fechaInicio, ev.fechaFin)}
+          </span>
         </div>
-      </div>
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <div>
-          <h3 className="font-serif text-xl leading-tight text-[#1B4332] transition group-hover:text-[#2D6A4F]">{ev.titulo}</h3>
-          {ev.descripcion && <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#1A1A1A]/65">{ev.descripcion}</p>}
-        </div>
-        <div className="mt-auto flex items-center justify-between gap-3">
-          <span className="text-sm font-semibold text-[#1B4332]">{formatearPrecio(desde)}</span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#F8F5F0] px-3 py-1 text-xs font-semibold text-[#1A1A1A]/55 transition group-hover:bg-[#EAF3DE] group-hover:text-[#1B4332]">
-            Ver detalle
-            <span aria-hidden="true">→</span>
+        
+        <h3 className="mb-1 font-serif text-2xl leading-tight text-white drop-shadow-md transition-colors group-hover:text-[#D4A017]">
+          {ev.titulo}
+        </h3>
+        
+        <p className="mb-4 text-sm font-medium text-white/80 drop-shadow">
+          📍 {ev.municipio}, {ev.departamento}
+        </p>
+        
+        <div className="flex items-center justify-between border-t border-white/20 pt-3">
+          <span className="text-lg font-black text-white drop-shadow-md">
+            {esAnuncio ? 'Conocer más' : formatearPrecio(desde)}
+          </span>
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-md transition-all group-hover:bg-[#D4A017] group-hover:text-black">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
           </span>
         </div>
       </div>

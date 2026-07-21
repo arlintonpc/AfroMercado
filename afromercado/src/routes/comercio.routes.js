@@ -167,6 +167,14 @@ router.get(
   ComercioController.buscar,
 );
 
+// POST /comercios/:id/seguir/toggle - seguir/dejar de seguir un comercio
+// (Vitrina v0.2). Cualquier usuario autenticado, sin restricción de rol.
+router.post(
+  "/:id/seguir/toggle",
+  autenticar,
+  ComercioController.toggleSeguir,
+);
+
 // GET /comercios/:id - ver cualquier comercio (publico)
 router.get("/:id", ComercioController.obtener);
 

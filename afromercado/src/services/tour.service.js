@@ -194,11 +194,53 @@ const TourService = {
     if (municipio) comercioWhere.municipio = { contains: municipio, mode: "insensitive" };
     if (departamento) comercioWhere.departamento = { contains: departamento, mode: "insensitive" };
 
-    return prisma.configTour.findMany({
+    const tours = await prisma.configTour.findMany({
       where: { activo: true, comercio: comercioWhere },
       include: TOUR_DETAIL_INCLUDE,
       orderBy: { creadoAt: "desc" },
     });
+    
+    // Inyectar Banners Publicitarios (Red de Display Cruzada)
+    const banners = await prisma.anuncioUbicacion.findMany({
+      where: { 
+        modulo: 'TOURS', 
+        formato: 'BANNER', 
+        activa: true,
+        campana: { estado: 'ACTIVA' }
+      },
+      include: { campana: true },
+    });
+
+    const shuffledBanners = banners.sort(() => 0.5 - Math.random()).slice(0, 2);
+    let itemsHibridos = [...tours];
+
+    if (shuffledBanners[0] && itemsHibridos.length >= 3) {
+      itemsHibridos.splice(3, 0, {
+        id: `banner-${shuffledBanners[0].id}`,
+        esBannerDisplay: true,
+        titulo: shuffledBanners[0].titulo,
+        subtitulo: shuffledBanners[0].subtitulo,
+        mediaUrl: shuffledBanners[0].mediaUrl,
+        urlDestino: shuffledBanners[0].urlDestino,
+        ctaTexto: shuffledBanners[0].ctaTexto,
+        etiqueta: shuffledBanners[0].etiqueta,
+      });
+    }
+
+    if (shuffledBanners[1] && itemsHibridos.length >= 7) {
+      itemsHibridos.splice(7, 0, {
+        id: `banner-${shuffledBanners[1].id}`,
+        esBannerDisplay: true,
+        titulo: shuffledBanners[1].titulo,
+        subtitulo: shuffledBanners[1].subtitulo,
+        mediaUrl: shuffledBanners[1].mediaUrl,
+        urlDestino: shuffledBanners[1].urlDestino,
+        ctaTexto: shuffledBanners[1].ctaTexto,
+        etiqueta: shuffledBanners[1].etiqueta,
+      });
+    }
+
+    return itemsHibridos;
   },
 
   async obtenerTour(id) {

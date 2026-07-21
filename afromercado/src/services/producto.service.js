@@ -57,7 +57,7 @@ const ProductoService = {
     if (alcance && !ALCANCES_VALIDOS.includes(alcance)) {
       throw new ErrorValidacion(`Alcance inválido. Opciones: ${ALCANCES_VALIDOS.join(", ")}`);
     }
-    if (parseFloat(precio) <= 0) {
+    if (Number.isNaN(Number(precio)) || Number(precio) <= 0) {
       throw new ErrorValidacion("El precio debe ser mayor a cero");
     }
     const min = parseInt(diasAlistamientoMin ?? 1);
@@ -67,6 +67,12 @@ const ProductoService = {
     }
     if (pesoKg !== undefined && pesoKg !== null && parseFloat(pesoKg) <= 0) {
       throw new ErrorValidacion("El peso debe ser mayor a cero");
+    }
+    if (stock !== undefined && stock !== null && (!Number.isInteger(Number(stock)) || Number(stock) < 0)) {
+      throw new ErrorValidacion("El stock debe ser un número entero mayor o igual a cero");
+    }
+    if (stockMinimo !== undefined && stockMinimo !== null && (!Number.isInteger(Number(stockMinimo)) || Number(stockMinimo) < 0)) {
+      throw new ErrorValidacion("El stock mínimo debe ser un número entero mayor o igual a cero");
     }
 
     return ProductoRepository.crear({
@@ -90,7 +96,50 @@ const ProductoService = {
 
   async listar(filtros) {
     const resultado = await ProductoRepository.listar(filtros);
-    resultado.items = resultado.items.map(mapearComercioPublico);
+    let items = resultado.items.map(mapearComercioPublico);
+
+    // Inyectar Banners Publicitarios (Red de Display Cruzada)
+    // Usamos el módulo 'VITRINA' (que también cubre 'AGRO' ya que comparten la misma base de productos)
+    const banners = await prisma.anuncioUbicacion.findMany({
+      where: { 
+        modulo: 'VITRINA', 
+        formato: 'BANNER', 
+        activa: true,
+        campana: { estado: 'ACTIVA' }
+      },
+      include: { campana: true },
+    });
+
+    const shuffledBanners = banners.sort(() => 0.5 - Math.random()).slice(0, 2);
+    let itemsHibridos = [...items];
+
+    if (shuffledBanners[0] && itemsHibridos.length >= 3) {
+      itemsHibridos.splice(3, 0, {
+        id: `banner-${shuffledBanners[0].id}`,
+        esBannerDisplay: true,
+        titulo: shuffledBanners[0].titulo,
+        subtitulo: shuffledBanners[0].subtitulo,
+        mediaUrl: shuffledBanners[0].mediaUrl,
+        urlDestino: shuffledBanners[0].urlDestino,
+        ctaTexto: shuffledBanners[0].ctaTexto,
+        etiqueta: shuffledBanners[0].etiqueta,
+      });
+    }
+
+    if (shuffledBanners[1] && itemsHibridos.length >= 7) {
+      itemsHibridos.splice(7, 0, {
+        id: `banner-${shuffledBanners[1].id}`,
+        esBannerDisplay: true,
+        titulo: shuffledBanners[1].titulo,
+        subtitulo: shuffledBanners[1].subtitulo,
+        mediaUrl: shuffledBanners[1].mediaUrl,
+        urlDestino: shuffledBanners[1].urlDestino,
+        ctaTexto: shuffledBanners[1].ctaTexto,
+        etiqueta: shuffledBanners[1].etiqueta,
+      });
+    }
+
+    resultado.items = itemsHibridos;
     return resultado;
   },
 
@@ -120,11 +169,19 @@ const ProductoService = {
     if (datos.nombre) campos.nombre = datos.nombre.trim();
     if (datos.descripcion !== undefined) campos.descripcion = datos.descripcion?.trim();
     if (datos.precio) {
-      if (parseFloat(datos.precio) <= 0) throw new ErrorValidacion("El precio debe ser mayor a cero");
+      if (Number.isNaN(Number(datos.precio)) || Number(datos.precio) <= 0) throw new ErrorValidacion("El precio debe ser mayor a cero");
       campos.precio = parseFloat(datos.precio);
     }
-    if (datos.stockMinimo !== undefined) campos.stockMinimo = parseInt(datos.stockMinimo) || 0;
+    if (datos.stockMinimo !== undefined) {
+      if (!Number.isInteger(Number(datos.stockMinimo)) || Number(datos.stockMinimo) < 0) {
+        throw new ErrorValidacion("El stock mínimo debe ser un número entero mayor o igual a cero");
+      }
+      campos.stockMinimo = parseInt(datos.stockMinimo);
+    }
     if (datos.stock !== undefined) {
+      if (!Number.isInteger(Number(datos.stock)) || Number(datos.stock) < 0) {
+        throw new ErrorValidacion("El stock debe ser un número entero mayor o igual a cero");
+      }
       campos.stock = parseInt(datos.stock);
       // Si se repone stock por encima del mínimo, se resetea el aviso para
       // que una futura venta que vuelva a cruzar el umbral notifique de nuevo.

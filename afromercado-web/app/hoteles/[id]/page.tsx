@@ -74,6 +74,7 @@ function resumenCancelacionHotel(hotel: ConfigHotel): string {
 function PanelConfianzaHotel({ hotel }: { hotel: ConfigHotel }) {
   const senales = [
     {
+      icono: '🛡️',
       titulo: hotel.rntVerificado ? 'RNT verificado' : hotel.rnt ? 'RNT en revision' : 'RNT no visible',
       detalle: hotel.rntVerificado && hotel.rnt
         ? `Registro ${hotel.rnt}`
@@ -82,26 +83,30 @@ function PanelConfianzaHotel({ hotel }: { hotel: ConfigHotel }) {
           : 'Pide soporte si necesitas validar el registro turistico.',
     },
     {
+      icono: '💳',
       titulo: 'Pagos claros',
       detalle: resumenPagosHotel(hotel),
     },
     {
+      icono: '📅',
       titulo: 'Reglas de reserva',
       detalle: resumenCancelacionHotel(hotel),
     },
   ]
 
   return (
-    <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
-      {senales.map((item, idx) => (
-        <div key={item.titulo} className="rounded-2xl border border-[#E6D8BE] bg-[#FFFBF3] px-4 py-3">
-          <div className="flex items-start gap-3">
-            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1B4332] text-xs font-black text-white">
-              {idx + 1}
-            </span>
+    <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+      {senales.map((item) => (
+        <div key={item.titulo} className="group relative rounded-3xl bg-white p-5 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden">
+          {/* Fondo sutil hover */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#1B4332]/0 to-[#1B4332]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <div className="relative flex flex-col gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#F8F5F0] flex items-center justify-center text-xl shadow-sm border border-[#E8DCC8] group-hover:scale-110 transition-transform duration-300">
+              {item.icono}
+            </div>
             <div>
-              <p className="text-sm font-black text-gray-900">{item.titulo}</p>
-              <p className="mt-1 text-xs leading-relaxed text-gray-600">{item.detalle}</p>
+              <p className="text-sm font-bold text-gray-900 mb-1">{item.titulo}</p>
+              <p className="text-xs leading-relaxed text-gray-500">{item.detalle}</p>
             </div>
           </div>
         </div>
@@ -163,54 +168,78 @@ function Lightbox({ fotos, inicial, onClose }: { fotos: string[]; inicial: numbe
   )
 }
 
-/* ── Galería tipo Airbnb ─────────────────────────────── */
+/* ── Galería tipo Airbnb (Rediseño Premium) ─────────────────────────────── */
 function GaleriaHero({ fotos, nombre, onOpen }: { fotos: string[]; nombre: string; onOpen: (i: number) => void }) {
   if (fotos.length === 0) {
     return (
-      <div className="h-64 lg:h-[460px] bg-gradient-to-br from-[#1B4332] to-[#40916C] flex items-center justify-center rounded-2xl">
+      <div className="h-64 lg:h-[460px] bg-gradient-to-br from-[#1B4332] to-[#40916C] flex items-center justify-center rounded-[2rem]">
         <span className="text-8xl opacity-30">🏨</span>
       </div>
     )
   }
   if (fotos.length === 1) {
     return (
-      <div className="relative h-64 lg:h-[460px] cursor-pointer overflow-hidden rounded-2xl" onClick={() => onOpen(0)}>
+      <div className="relative h-64 lg:h-[460px] cursor-pointer overflow-hidden rounded-[2rem]" onClick={() => onOpen(0)}>
         <img src={fotos[0]} alt={nombre} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
-        <button onClick={() => onOpen(0)}
-          className="absolute bottom-4 right-4 bg-white text-gray-800 font-semibold text-sm px-4 py-2 rounded-xl shadow-lg hover:bg-gray-50 transition-colors flex items-center gap-2 border border-gray-200">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          Ver 1 foto
-        </button>
+      </div>
+    )
+  }
+  
+  if (fotos.length === 2) {
+    return (
+      <div className="grid gap-2 h-64 lg:h-[460px] grid-cols-2 rounded-[2rem] overflow-hidden cursor-pointer" onClick={() => onOpen(0)}>
+        <img src={fotos[0]} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+        <img src={fotos[1]} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
       </div>
     )
   }
 
+  // Airbnb style: 1 large left, 4 small right
   return (
-    <div className="relative">
-      <div className={`grid gap-2 h-64 lg:h-[460px] overflow-hidden rounded-2xl ${fotos.length >= 3 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-        <div className={`relative cursor-pointer overflow-hidden ${fotos.length >= 3 ? 'row-span-2' : ''}`} onClick={() => onOpen(0)}>
+    <div className="relative group">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 h-[320px] sm:h-[400px] lg:h-[460px] rounded-[2rem] overflow-hidden">
+        {/* Foto principal */}
+        <div className="sm:col-span-2 sm:row-span-2 relative cursor-pointer overflow-hidden" onClick={() => onOpen(0)}>
           <img src={fotos[0]} alt={nombre} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
         </div>
-        {fotos.length >= 2 && (
-          <div className="relative cursor-pointer overflow-hidden" onClick={() => onOpen(1)}>
-            <img src={fotos[1]} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
-          </div>
-        )}
-        {fotos.length >= 3 && (
-          <div className="relative cursor-pointer overflow-hidden" onClick={() => onOpen(2)}>
+        
+        {/* Foto 2 */}
+        <div className="col-span-1 row-span-1 relative cursor-pointer overflow-hidden hidden sm:block" onClick={() => onOpen(1)}>
+          <img src={fotos[1]} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+        </div>
+        
+        {/* Foto 3 */}
+        {fotos.length >= 3 ? (
+          <div className="col-span-1 row-span-1 relative cursor-pointer overflow-hidden hidden sm:block" onClick={() => onOpen(2)}>
             <img src={fotos[2]} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
-            {fotos.length > 3 && (
-              <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
-                <span className="text-white font-bold text-lg">+{fotos.length - 3} fotos</span>
-              </div>
-            )}
           </div>
+        ) : (
+          <div className="col-span-1 row-span-1 bg-gray-100 hidden sm:block"></div>
+        )}
+        
+        {/* Foto 4 */}
+        {fotos.length >= 4 ? (
+          <div className="col-span-1 row-span-1 relative cursor-pointer overflow-hidden hidden sm:block" onClick={() => onOpen(3)}>
+            <img src={fotos[3]} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+          </div>
+        ) : (
+          <div className="col-span-1 row-span-1 bg-gray-100 hidden sm:block"></div>
+        )}
+
+        {/* Foto 5 */}
+        {fotos.length >= 5 ? (
+          <div className="col-span-1 row-span-1 relative cursor-pointer overflow-hidden hidden sm:block" onClick={() => onOpen(4)}>
+            <img src={fotos[4]} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+          </div>
+        ) : (
+          <div className="col-span-1 row-span-1 bg-gray-100 hidden sm:block"></div>
         )}
       </div>
+
       <button onClick={() => onOpen(0)}
-        className="absolute bottom-4 right-4 bg-white text-gray-800 font-semibold text-sm px-4 py-2 rounded-xl shadow-lg hover:bg-gray-50 transition-colors flex items-center gap-2 border border-gray-200">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        Ver {fotos.length} fotos
+        className="absolute bottom-6 right-6 bg-white/95 text-gray-900 font-bold text-sm px-4 py-2 rounded-xl shadow-md hover:bg-white transition-all flex items-center gap-2 border border-gray-200 backdrop-blur-md">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Mostrar todas las fotos
       </button>
     </div>
   )
@@ -423,58 +452,65 @@ function WidgetReserva({ hotel, habitaciones, habIdx, fechaEntrada, fechaSalida,
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-xl p-6 sticky top-20">
-      <div className="flex items-baseline gap-1 mb-5">
-        <span className="text-3xl font-black text-gray-900">{hab ? formatearPrecio(Number(hab.precioPorNoche)) : '—'}</span>
-        <span className="text-gray-500 text-sm">/ noche</span>
+    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] p-7 sticky top-24">
+      <div className="flex items-baseline gap-1.5 mb-6">
+        <span className="text-4xl font-black text-gray-900 tracking-tight">{hab ? formatearPrecio(Number(hab.precioPorNoche)) : '—'}</span>
+        <span className="text-gray-500 text-sm font-medium">/ noche</span>
       </div>
 
       {hab && hotel.permiteReservasPorHora && hab.permitePorHoras && hab.precioPorHora && (
-        <div className="-mt-3 mb-4 inline-flex rounded-full bg-[#2D6A4F]/10 px-3 py-1 text-xs font-bold text-[#1B4332]">
-          Tambien por horas: {formatearPrecio(Number(hab.precioPorHora))}/hora
+        <div className="-mt-3 mb-5 inline-flex items-center gap-1.5 rounded-full bg-[#D4A017]/10 border border-[#D4A017]/20 px-3.5 py-1.5 text-xs font-bold text-[#D4A017]">
+          <span>⏱️</span> También {formatearPrecio(Number(hab.precioPorHora))}/hora
         </div>
       )}
 
       {habitaciones.length > 1 && (
-        <div className="mb-4">
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Alojamiento</label>
-          <select value={habIdx} onChange={e => onHabIdx(Number(e.target.value))}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#1B4332] bg-white">
-            {habitaciones.map((h, i) => (
-              <option key={h.id} value={i}>{h.nombre} — {formatearPrecio(Number(h.precioPorNoche))}/noche</option>
-            ))}
-          </select>
+        <div className="mb-5">
+          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Selecciona un alojamiento</label>
+          <div className="relative">
+            <select value={habIdx} onChange={e => onHabIdx(Number(e.target.value))}
+              className="w-full appearance-none border border-gray-200 rounded-2xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:border-[#1B4332] bg-gray-50/50 hover:bg-gray-50 cursor-pointer transition-colors pr-10">
+              {habitaciones.map((h, i) => (
+                <option key={h.id} value={i}>{h.nombre} — {formatearPrecio(Number(h.precioPorNoche))}</option>
+              ))}
+            </select>
+            <svg className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
         </div>
       )}
 
-      <div className="border border-gray-200 rounded-xl overflow-hidden mb-4">
+      <div className="border border-gray-200 rounded-2xl overflow-hidden mb-6 shadow-sm">
         <div className="grid grid-cols-2 divide-x divide-gray-200">
-          <div className="px-3 py-3">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Llegada</p>
+          <div className="px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Llegada</p>
             <input type="date" value={fechaEntrada} onChange={e => onFechaEntrada(e.target.value)}
-              className="text-sm font-semibold text-gray-800 border-none p-0 focus:outline-none w-full bg-transparent" />
+              className="text-sm font-bold text-gray-900 border-none p-0 focus:outline-none w-full bg-transparent cursor-pointer" />
           </div>
-          <div className="px-3 py-3">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Salida</p>
+          <div className="px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Salida</p>
             <input type="date" value={fechaSalida} onChange={e => onFechaSalida(e.target.value)}
-              className="text-sm font-semibold text-gray-800 border-none p-0 focus:outline-none w-full bg-transparent" />
+              className="text-sm font-bold text-gray-900 border-none p-0 focus:outline-none w-full bg-transparent cursor-pointer" />
           </div>
         </div>
       </div>
 
       <button
         onClick={() => { if (!autenticado) { router.push('/ingresar'); return }; if (hab) onReservar(hab) }}
-        className="w-full bg-[#1B4332] hover:bg-[#15362A] text-white font-bold py-4 rounded-xl text-base transition-all active:scale-[0.98] shadow-md mb-4">
-        Reservar ahora
+        className="w-full relative overflow-hidden group bg-[#1B4332] text-white font-black py-4.5 rounded-2xl text-base transition-all active:scale-[0.98] shadow-lg shadow-[#1B4332]/30 mb-5">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+        <span className="relative flex items-center justify-center gap-2">
+          Reservar ahora
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="group-hover:translate-x-1 transition-transform"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </span>
       </button>
 
       {hab && (
-        <div className="space-y-2 text-sm text-gray-600 border-t border-gray-100 pt-4 mb-4">
-          <div className="flex justify-between">
-            <span className="underline decoration-dotted">{formatearPrecio(Number(hab.precioPorNoche))} × {noches} noche{noches !== 1 ? 's' : ''}</span>
+        <div className="space-y-2.5 text-sm text-gray-600 border-t border-gray-100 pt-5 mb-5">
+          <div className="flex justify-between font-medium">
+            <span className="underline decoration-dotted underline-offset-2">{formatearPrecio(Number(hab.precioPorNoche))} × {noches} noche{noches !== 1 ? 's' : ''}</span>
             <span>{formatearPrecio(Number(hab.precioPorNoche) * noches)}</span>
           </div>
-          <div className="flex justify-between font-bold text-gray-900 text-base pt-1">
+          <div className="flex justify-between font-black text-gray-900 text-lg pt-2">
             <span>Total</span>
             <span>{formatearPrecio(Number(hab.precioPorNoche) * noches)}</span>
           </div>
@@ -482,12 +518,15 @@ function WidgetReserva({ hotel, habitaciones, habIdx, fechaEntrada, fechaSalida,
       )}
 
       <button onClick={compartir}
-        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-gray-600 font-medium text-sm border border-gray-200 hover:bg-gray-50 transition-colors">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-gray-600 font-bold text-sm border-2 border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-colors">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
         Compartir alojamiento
       </button>
 
-      <p className="text-xs text-center text-gray-400 mt-3">Sin cobros ocultos · Pago en el hotel</p>
+      <p className="text-xs text-center text-gray-400 mt-4 font-medium flex items-center justify-center gap-1.5">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Sin cobros ocultos · Pago seguro
+      </p>
     </div>
   )
 }
@@ -1112,10 +1151,11 @@ export default function HotelDetallePage() {
         setHotel(d)
         setCargando(false)
         if (usuario) {
-          esFavoritoHotel(d.id).then(r => setEsFav(r.favorito)).catch(() => {})
+          esFavoritoHotel(d.id).then(r => setEsFav(r.favorito)).catch(() => mostrarToast('No pudimos verificar tus favoritos'))
         }
       })
       .catch(() => setCargando(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mostrarToast se recrea en cada render, no debe disparar el efecto
   }, [id, usuario])
 
   useEffect(() => {
@@ -1139,7 +1179,8 @@ export default function HotelDetallePage() {
     if (!hotel) return
     listarHoteles({ municipio: hotel.comercio.municipio })
       .then(lista => setSimilares(lista.filter(h => h.id !== hotel.id).slice(0, 3)))
-      .catch(() => {})
+      .catch(() => mostrarToast('No pudimos cargar hoteles similares'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mostrarToast se recrea en cada render, no debe disparar el efecto
   }, [hotel])
 
   useEffect(() => {
@@ -1147,7 +1188,8 @@ export default function HotelDetallePage() {
     misReservasHotel().then(rs => {
       const elegible = rs.find(r => r.configHotelId === hotel.id && r.estado === 'CHECKOUT' && !r.review)
       setReservaElegibleId(elegible?.id)
-    }).catch(() => {})
+    }).catch(() => mostrarToast('No pudimos verificar si puedes dejar una reseña'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mostrarToast se recrea en cada render, no debe disparar el efecto
   }, [autenticado, hotel])
 
   if (cargando) return (
@@ -1209,20 +1251,28 @@ export default function HotelDetallePage() {
         {hotel.habitaciones.length > 0 && (
           <button
             onClick={() => document.querySelector('[data-rooms]')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            className="mt-4 w-full flex items-center justify-between bg-[#F0FDF4] border border-[#BBF7D0] hover:border-[#1B4332] rounded-2xl px-5 py-4 transition-all group">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">🛏️</span>
-              <div className="text-left">
-                <p className="font-bold text-gray-900 text-sm">
-                  {hotel.habitaciones.length === 1 ? '1 tipo de alojamiento disponible' : `${hotel.habitaciones.length} tipos de alojamiento disponibles`}
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Desde {formatearPrecio(Math.min(...hotel.habitaciones.map(h => Number(h.precioPorNoche))))} / noche
-                  {hotel.habitaciones.some(h => h.videoUrl) && <span className="ml-2 text-[#1B4332] font-medium">· Incluye video</span>}
-                </p>
+            className="mt-6 w-full relative overflow-hidden rounded-[2rem] p-[2px] transition-transform hover:-translate-y-1 group">
+            {/* Gradiente animado en el borde */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#D4A017] via-[#1B4332] to-[#D4A017] bg-[length:200%_auto] animate-gradient" />
+            <div className="relative flex items-center justify-between bg-white rounded-[calc(2rem-2px)] px-6 py-5 shadow-inner">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#1B4332]/10 to-[#52B788]/20 flex items-center justify-center text-2xl shadow-sm border border-[#1B4332]/10 group-hover:scale-110 transition-transform duration-300">
+                  🛏️
+                </div>
+                <div className="text-left">
+                  <p className="font-black text-gray-900 text-base mb-0.5">
+                    {hotel.habitaciones.length === 1 ? '1 tipo de alojamiento disponible' : `${hotel.habitaciones.length} tipos de alojamiento disponibles`}
+                  </p>
+                  <p className="text-sm text-gray-500 font-medium">
+                    Desde <strong className="text-[#1B4332]">{formatearPrecio(Math.min(...hotel.habitaciones.map(h => Number(h.precioPorNoche))))}</strong> / noche
+                    {hotel.habitaciones.some(h => h.videoUrl) && <span className="ml-2 inline-flex items-center gap-1 bg-[#1B4332]/10 text-[#1B4332] px-2 py-0.5 rounded-full text-[10px] font-bold"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>VIDEO</span>}
+                  </p>
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-[#1B4332] group-hover:text-white transition-colors">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="transition-transform"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
               </div>
             </div>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="text-[#1B4332] group-hover:translate-y-1 transition-transform"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
           </button>
         )}
 

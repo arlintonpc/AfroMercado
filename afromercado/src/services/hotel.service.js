@@ -333,7 +333,48 @@ const HotelService = {
       include: HOTEL_INCLUDE,
       orderBy: { creadoAt: "desc" },
     });
-    return hoteles;
+    
+    // Inyectar Banners Publicitarios (Red de Display Cruzada)
+    const banners = await prisma.anuncioUbicacion.findMany({
+      where: { 
+        modulo: 'HOTELES', 
+        formato: 'BANNER', 
+        activa: true,
+        campana: { estado: 'ACTIVA' }
+      },
+      include: { campana: true },
+    });
+
+    const shuffledBanners = banners.sort(() => 0.5 - Math.random()).slice(0, 2);
+    let itemsHibridos = [...hoteles];
+
+    if (shuffledBanners[0] && itemsHibridos.length >= 3) {
+      itemsHibridos.splice(3, 0, {
+        id: `banner-${shuffledBanners[0].id}`,
+        esBannerDisplay: true,
+        titulo: shuffledBanners[0].titulo,
+        subtitulo: shuffledBanners[0].subtitulo,
+        mediaUrl: shuffledBanners[0].mediaUrl,
+        urlDestino: shuffledBanners[0].urlDestino,
+        ctaTexto: shuffledBanners[0].ctaTexto,
+        etiqueta: shuffledBanners[0].etiqueta,
+      });
+    }
+
+    if (shuffledBanners[1] && itemsHibridos.length >= 7) {
+      itemsHibridos.splice(7, 0, {
+        id: `banner-${shuffledBanners[1].id}`,
+        esBannerDisplay: true,
+        titulo: shuffledBanners[1].titulo,
+        subtitulo: shuffledBanners[1].subtitulo,
+        mediaUrl: shuffledBanners[1].mediaUrl,
+        urlDestino: shuffledBanners[1].urlDestino,
+        ctaTexto: shuffledBanners[1].ctaTexto,
+        etiqueta: shuffledBanners[1].etiqueta,
+      });
+    }
+
+    return itemsHibridos;
   },
 
   async obtenerHotel(configHotelId) {

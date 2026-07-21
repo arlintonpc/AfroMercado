@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
@@ -10,6 +10,7 @@ import { listarProductos, listarCategorias } from '@/lib/api/productos'
 import { mapearProductos } from '@/lib/mapearProducto'
 import type { Producto } from '@/types/producto'
 import type { Categoria } from '@/types/categoria'
+import BannerDisplay from '@/components/publicidad/BannerDisplay'
 
 // Vitrina pública del vertical Agro (Capítulo 3, sección 3.4.1): reutiliza
 // por completo el Producto/carrito/checkout del Marketplace — TERAVIA es la
@@ -39,6 +40,25 @@ export default function AgroPage() {
     return () => clearTimeout(t)
   }, [categoriaId, busqueda])
 
+  const [fotoHeroIdx, setFotoHeroIdx] = useState(0)
+
+  const heroFotos = useMemo(() => {
+    const urls = new Set<string>()
+    productos.forEach((p: any) => {
+      if (p.fotoUrl) urls.add(p.fotoUrl)
+    })
+    const arr = Array.from(urls)
+    return arr.length > 0 ? arr : ['https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1600&q=80']
+  }, [productos])
+
+  useEffect(() => {
+    if (heroFotos.length <= 1) return
+    const id = setInterval(() => {
+      setFotoHeroIdx(prev => (prev + 1) % heroFotos.length)
+    }, 4000)
+    return () => clearInterval(id)
+  }, [heroFotos])
+
   const categoriasAgro = categorias.filter(c => c.grupo === 'AGRO')
 
   return (
@@ -46,12 +66,21 @@ export default function AgroPage() {
       <Header />
 
       {/* ── HERO ─────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden" style={{ backgroundImage: "linear-gradient(135deg, rgba(13,43,29,0.88) 0%, rgba(27,67,50,0.80) 50%, rgba(45,106,79,0.75) 100%), url('https://images.unsplash.com/photo-1595855759920-86582396756c?auto=format&fit=crop&w=1600&q=80')", backgroundSize: 'cover', backgroundPosition: 'center' }}>
-        <div className="absolute -top-16 -right-16 w-72 h-72 bg-white/5 rounded-full" />
-        <div className="absolute top-12 -left-10 w-40 h-40 bg-[#D4A017]/10 rounded-full" />
-        <div className="absolute bottom-0 right-1/3 w-96 h-32 bg-[#52B788]/10 rounded-full blur-2xl" />
+      <div className="relative overflow-hidden min-h-[280px] sm:min-h-[320px] flex flex-col justify-end bg-[#111]">
+        {heroFotos.map((url, idx) => (
+          <img 
+            key={url}
+            src={url} 
+            alt="Agro directo a tu mesa"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${idx === fotoHeroIdx ? 'opacity-100' : 'opacity-0'}`} 
+          />
+        ))}
+        <div className="absolute inset-0 bg-black/50" />
+        <div className="absolute top-0 right-0 p-12 opacity-30 pointer-events-none">
+          <div className="w-72 h-72 bg-white/20 rounded-full blur-3xl mix-blend-overlay" />
+        </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
+        <div className="relative max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -80,15 +109,15 @@ export default function AgroPage() {
           </div>
 
           {/* Barra de búsqueda */}
-          <div className="mt-6 bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-2 flex flex-col sm:flex-row gap-2">
+          <div className="mt-6 bg-white shadow-2xl rounded-2xl p-2 flex flex-col sm:flex-row gap-2 border border-gray-100 relative z-10">
             <div className="flex-1 relative">
-              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
                 placeholder="Cacao, borojó, chontaduro…"
-                className="w-full pl-10 pr-4 py-2.5 bg-transparent text-white placeholder-white/40 text-sm focus:outline-none" />
+                className="w-full pl-10 pr-4 py-2.5 bg-transparent text-gray-900 placeholder-gray-400 text-sm font-medium focus:outline-none" />
             </div>
             <Link href="/comerciante/publicar"
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-white text-[#1B4332] hover:bg-white/90 transition-all whitespace-nowrap">
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-[#1B4332] text-white hover:bg-[#2D6A4F] transition-all whitespace-nowrap">
               ¿Vendes del campo? Publica gratis
             </Link>
           </div>
@@ -143,7 +172,15 @@ export default function AgroPage() {
           />
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {productos.map(p => <TarjetaProducto key={p.id} producto={p} mostrarBadgeVerificado />)}
+            {productos.map((p: any) => (
+              p.esBannerDisplay ? (
+                <div key={p.id} className="col-span-full mt-2 mb-2">
+                  <BannerDisplay banner={p} />
+                </div>
+              ) : (
+                <TarjetaProducto key={p.id} producto={p} mostrarBadgeVerificado />
+              )
+            ))}
           </div>
         )}
       </main>

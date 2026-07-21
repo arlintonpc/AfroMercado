@@ -13,6 +13,7 @@ import {
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { optimizarImagenPequena } from '@/lib/cloudinary'
 import { DEPARTAMENTOS, MUNICIPIOS_POR_DEPARTAMENTO } from '@/lib/data/colombia'
+import BannerDisplay from '@/components/publicidad/BannerDisplay'
 
 function SkeletonCard() {
   return (
@@ -231,23 +232,52 @@ export default function BienesRaicesPage() {
   const filtrados = useMemo(() => {
     if (!busqueda) return inmuebles
     const q = busqueda.toLowerCase()
-    return inmuebles.filter(i =>
-      i.titulo.toLowerCase().includes(q) ||
-      i.municipio.toLowerCase().includes(q) ||
-      i.departamento.toLowerCase().includes(q)
+    return inmuebles.filter((i: any) =>
+      i.esBannerDisplay ||
+      i.titulo?.toLowerCase().includes(q) ||
+      i.municipio?.toLowerCase().includes(q) ||
+      i.departamento?.toLowerCase().includes(q)
     )
   }, [inmuebles, busqueda])
+
+  const [fotoHeroIdx, setFotoHeroIdx] = useState(0)
+
+  const heroFotos = useMemo(() => {
+    const urls = new Set<string>()
+    inmuebles.forEach((i: any) => {
+      i.fotoUrls?.forEach((f: string) => urls.add(f))
+    })
+    const arr = Array.from(urls)
+    return arr.length > 0 ? arr : ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1600&q=80']
+  }, [inmuebles])
+
+  useEffect(() => {
+    if (heroFotos.length <= 1) return
+    const id = setInterval(() => {
+      setFotoHeroIdx(prev => (prev + 1) % heroFotos.length)
+    }, 4000)
+    return () => clearInterval(id)
+  }, [heroFotos])
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
 
       {/* ── HERO ─────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden" style={{ backgroundImage: "linear-gradient(135deg, rgba(13,43,29,0.88) 0%, rgba(27,67,50,0.80) 50%, rgba(45,106,79,0.75) 100%), url('https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1600&q=80')", backgroundSize: 'cover', backgroundPosition: 'center' }}>
-        <div className="absolute -top-16 -right-16 w-72 h-72 bg-white/5 rounded-full" />
-        <div className="absolute top-12 -left-10 w-40 h-40 bg-[#D4A017]/10 rounded-full" />
-        <div className="absolute bottom-0 right-1/3 w-96 h-32 bg-[#52B788]/10 rounded-full blur-2xl" />
+      <div className="relative overflow-hidden min-h-[280px] sm:min-h-[320px] flex flex-col justify-end bg-[#111]">
+        {heroFotos.map((url, idx) => (
+          <img 
+            key={url}
+            src={url} 
+            alt="Bienes Raíces del territorio"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${idx === fotoHeroIdx ? 'opacity-100' : 'opacity-0'}`} 
+          />
+        ))}
+        <div className="absolute inset-0 bg-black/50" />
+        <div className="absolute top-0 right-0 p-12 opacity-30 pointer-events-none">
+          <div className="w-72 h-72 bg-white/20 rounded-full blur-3xl mix-blend-overlay" />
+        </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
+        <div className="relative max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
           <Link href="/" className="inline-flex items-center gap-1.5 text-white/60 hover:text-white text-sm mb-6 transition-colors">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
             Inicio
@@ -286,28 +316,28 @@ export default function BienesRaicesPage() {
           </div>
 
           {/* Barra de búsqueda */}
-          <div className="mt-6 bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-2 flex flex-col sm:flex-row gap-2">
+          <div className="mt-6 bg-white shadow-2xl rounded-2xl p-2 flex flex-col sm:flex-row gap-2 border border-gray-100 relative z-10">
             <div className="flex-1 relative">
-              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
                 placeholder="Título, municipio, departamento…"
-                className="w-full pl-10 pr-4 py-2.5 bg-transparent text-white placeholder-white/40 text-sm focus:outline-none" />
+                className="w-full pl-10 pr-4 py-2.5 bg-transparent text-gray-900 placeholder-gray-400 text-sm font-medium focus:outline-none" />
             </div>
             <div className="flex gap-2">
               <button onClick={() => setMostrarFiltros(true)}
-                className={`relative flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  filtrosActivos ? 'bg-[#D4A017] text-white' : 'bg-white/10 hover:bg-white/20 text-white/70'
+                className={`relative flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  filtrosActivos ? 'bg-[#D4A017] text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                 }`}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
                 Filtros
                 {filtrosActivos && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-white text-[#D4A017] text-[9px] font-black rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-white text-[#D4A017] text-[9px] font-black rounded-full flex items-center justify-center shadow-sm">
                     {nFiltros}
                   </span>
                 )}
               </button>
               <Link href="/bienes-raices/publicar"
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-white text-[#1B4332] hover:bg-white/90 transition-all whitespace-nowrap">
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-[#1B4332] text-white hover:bg-[#2D6A4F] transition-all whitespace-nowrap">
                 Publicar mi predio
               </Link>
             </div>
@@ -381,7 +411,15 @@ export default function BienesRaicesPage() {
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filtrados.map(i => <TarjetaInmueble key={i.id} inmueble={i} />)}
+            {filtrados.map((i: any) => (
+              i.esBannerDisplay ? (
+                <div key={i.id} className="col-span-full mt-2 mb-2">
+                  <BannerDisplay banner={i} />
+                </div>
+              ) : (
+                <TarjetaInmueble key={i.id} inmueble={i} />
+              )
+            ))}
           </div>
         )}
       </main>

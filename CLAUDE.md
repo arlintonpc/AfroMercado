@@ -18,7 +18,7 @@ Mata procesos Node anteriores, regenera Prisma, e inicia backend (3001) y fronte
 ```bash
 npm run dev          # nodemon — recarga en cambios en src/
 npm run build        # prisma generate (regenera el cliente Prisma)
-npm test             # tests unitarios: comisión, productos, pago-repartidor
+npm test             # tests unitarios: comisión, productos, pagos, y los 4 verticales de servicio (hotel/tour/transporte/cultura), disputas — ver `afromercado/tests/`
 npm run test:e2e     # flujos end-to-end contra la API local
 npm run prisma:studio  # Prisma Studio en navegador
 ```

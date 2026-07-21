@@ -11,6 +11,7 @@ const InmuebleRepository = require("../repositories/inmueble.repository");
 const ComercioRepository = require("../repositories/comercio.repository");
 const UsuarioService = require("./usuario.service");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
+const { validarUbicacion } = require("../utils/ubicacion");
 
 const TIPOS_INMUEBLE = ["LOTE", "CASA", "APARTAMENTO", "FINCA", "LOCAL_COMERCIAL", "BODEGA", "OTRO"];
 const TIPOS_OPERACION = ["VENTA", "ARRIENDO"];
@@ -35,6 +36,7 @@ function validarDatosInmueble(datos) {
   }
   if (!datos.departamento?.trim()) throw new ErrorValidacion("El departamento es obligatorio");
   if (!datos.municipio?.trim()) throw new ErrorValidacion("El municipio es obligatorio");
+  validarUbicacion(datos.departamento.trim(), datos.municipio.trim());
 }
 
 const InmuebleService = {

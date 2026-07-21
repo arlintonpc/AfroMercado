@@ -39,8 +39,13 @@ function TarjetaDenunciaPublicacion({ denuncia, onResuelta }: { denuncia: Denunc
   return (
     <div className="rounded-2xl border border-red-200 bg-red-50/40 p-5">
       <p className="font-semibold text-[#1A1A1A]">{publicacion?.titulo ?? `Publicación #${denuncia.publicacionCulturalId}`}</p>
-      <p className="text-xs text-[#1A1A1A]/50 mt-0.5">
-        Publicada por {publicacion?.autor?.nombre ?? 'Desconocido'} · Denunciada por {denuncia.denunciante?.nombre ?? 'Desconocido'}
+      {publicacion?.comercio && (
+        <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#D4A017]/12 px-2.5 py-1 text-xs font-semibold text-[#8A5A00]">
+          🏪 Comercio: {publicacion.comercio.nombre}
+        </p>
+      )}
+      <p className="text-xs text-[#1A1A1A]/50 mt-1">
+        {publicacion?.comercio ? 'Publicada por el comercio' : `Publicada por ${publicacion?.autor?.nombre ?? 'Desconocido'}`} · Denunciada por {denuncia.denunciante?.nombre ?? 'Desconocido'}
       </p>
       <p className="text-xs font-bold text-red-700 mt-2">Motivo: {MOTIVO_DENUNCIA_LABEL[denuncia.motivo]}</p>
       {denuncia.descripcion && <p className="text-sm text-[#1A1A1A]/70 mt-1 whitespace-pre-wrap">{denuncia.descripcion}</p>}

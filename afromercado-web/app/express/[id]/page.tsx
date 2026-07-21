@@ -101,25 +101,25 @@ function TarjetaProducto({
   const cant = cantidadItem(p.id)
   return (
     <>
-      <div className={`bg-white rounded-2xl shadow-sm overflow-hidden ${bloqueado ? 'opacity-50' : ''}`}>
+      <div className={`bg-white rounded-[1.5rem] shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden ${bloqueado ? 'opacity-50' : ''}`}>
         <div role="button" tabIndex={0}
           onClick={() => setVerDetalle(true)}
           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setVerDetalle(true) } }}
-          className="w-full flex gap-3 p-3 text-left cursor-pointer">
+          className="w-full flex gap-4 p-4 text-left cursor-pointer group">
           {p.fotoUrl ? (
-            <div className="relative w-24 h-24 rounded-xl overflow-hidden flex-shrink-0">
-              <Image src={p.fotoUrl} alt={p.nombre} fill className="object-cover" sizes="96px" />
+            <div className="relative w-28 h-28 rounded-xl overflow-hidden flex-shrink-0 border border-gray-100">
+              <Image src={p.fotoUrl} alt={p.nombre} fill className="object-cover group-hover:scale-105 transition-transform duration-500" sizes="112px" />
             </div>
           ) : (
-            <div className="w-24 h-24 rounded-xl bg-[#F0EBE3] flex items-center justify-center text-3xl flex-shrink-0">🥘</div>
+            <div className="w-28 h-28 rounded-xl bg-[#F8F5F0] flex items-center justify-center text-4xl flex-shrink-0 group-hover:scale-105 transition-transform duration-500 border border-[#E8DCC8]">🥘</div>
           )}
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-[#1A1A1A] text-sm leading-tight">{p.nombre}</p>
-            {p.descripcion && <p className="text-xs text-[#999] mt-0.5 line-clamp-2">{p.descripcion}</p>}
-            <div className="flex items-center justify-between mt-2">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <p className="font-bold text-gray-900 text-base leading-tight group-hover:text-[#1B4332] transition-colors">{p.nombre}</p>
+            {p.descripcion && <p className="text-xs text-gray-500 mt-1.5 line-clamp-2 leading-relaxed">{p.descripcion}</p>}
+            <div className="flex items-center justify-between mt-3">
               <div>
-                <span className="font-bold text-[#1A1A1A]">{formatearPrecio(Number(p.precio))}</span>
-                <span className="text-xs text-[#999] ml-1">/ {p.unidad.toLowerCase()}</span>
+                <span className="font-black text-gray-900">{formatearPrecio(Number(p.precio))}</span>
+                <span className="text-[10px] text-gray-400 font-bold ml-1 uppercase tracking-wider">/ {p.unidad}</span>
               </div>
               <div onClick={e => e.stopPropagation()}>
                 <BotonAgregarQuitar p={p} cant={cant} agotado={agotado} cerrado={cerrado} agregar={agregar} quitar={quitar} />
@@ -219,6 +219,7 @@ function MenuExpressContent() {
   const [pedidoElegibleId, setPedidoElegibleId] = useState<number | undefined>()
   const [esFav, setEsFav] = useState(false)
   const [toggling, setToggling] = useState(false)
+  const [avisoSecundario, setAvisoSecundario] = useState<string | null>(null)
 
   // Cupón
   const [codigoCupon, setCodigoCupon]         = useState('')
@@ -234,6 +235,9 @@ function MenuExpressContent() {
   const [telefonoEntrega, setTelefonoEntrega] = useState('')
   const [notaCliente, setNotaCliente] = useState('')
   const [mesa, setMesa] = useState('')
+
+  // Hero Slider
+  const [fotoHeroIdx, setFotoHeroIdx] = useState(0)
 
   // Cuándo: ahora vs. programado para más tarde
   const [cuando, setCuando] = useState<'ahora' | 'programado'>('ahora')
@@ -252,7 +256,7 @@ function MenuExpressContent() {
     setCargando(false)
     if (data?.modalidades?.length) setModalidad(data.modalidades[0])
     if (usuario && data) {
-      esFavoritoExpress(data.id).then(r => setEsFav(r.favorito)).catch(() => {})
+      esFavoritoExpress(data.id).then(r => setEsFav(r.favorito)).catch(() => setAvisoSecundario('No pudimos verificar tus favoritos.'))
     }
   }, [comercioId, usuario])
 
@@ -303,7 +307,9 @@ function MenuExpressContent() {
   }
 
   useEffect(() => {
-    reviewsExpress(comercioId).then(r => { setReviews(r); setCargandoRev(false) }).catch(() => setCargandoRev(false))
+    reviewsExpress(comercioId)
+      .then(r => { setReviews(r); setCargandoRev(false) })
+      .catch(() => { setCargandoRev(false); setAvisoSecundario('No pudimos cargar las reseñas de este restaurante.') })
   }, [comercioId])
 
   useEffect(() => {
@@ -311,7 +317,7 @@ function MenuExpressContent() {
     misPedidosExpress().then(ps => {
       const elegible = ps.find((p: any) => p.comercioId === comercioId && p.estado === 'ENTREGADO' && !p.review)
       setPedidoElegibleId(elegible?.id)
-    }).catch(() => {})
+    }).catch(() => setAvisoSecundario('No pudimos verificar el estado de tus pedidos anteriores.'))
   }, [usuario, comercioId])
 
   useEffect(() => {
@@ -320,6 +326,17 @@ function MenuExpressContent() {
     }
     return () => { document.title = 'Teravia' }
   }, [menu?.comercio?.nombre])
+
+  // Slider de fotos en el Hero
+  useEffect(() => {
+    if (!menu) return
+    const fotosUnicas = Array.from(new Set(menu.productos.map(p => p.fotoUrl).filter(Boolean) as string[]))
+    if (fotosUnicas.length <= 1) return
+    const interval = setInterval(() => {
+      setFotoHeroIdx(prev => (prev + 1) % fotosUnicas.length)
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [menu])
 
   function agregar(p: MenuComercioExpress['productos'][0]) {
     if ((p.gruposComplemento?.length ?? 0) > 0) {
@@ -810,19 +827,23 @@ function MenuExpressContent() {
   }
 
   // ── MENÚ ───────────────────────────────────────────────────
-  const mejorFotoPlato = menu.productos.find(p => p.fotoUrl)?.fotoUrl ?? null
+  const fotosUnicas = menu ? Array.from(new Set(menu.productos.map(p => p.fotoUrl).filter(Boolean) as string[])) : []
+  
   return (
     <div className="min-h-screen bg-[#FAF8F5]">
       {/* Header del restaurante */}
-      <header className="bg-white border-b border-[#E8DCC8]">
-        {/* Banner — video de la tienda si existe, si no la mejor foto de plato, si no el logo */}
-        <div className="relative h-48 sm:h-56 overflow-hidden bg-[#1B4332]">
+      <header className="bg-white border-b border-gray-100">
+        {/* Banner — video de la tienda si existe, si no slider de fotos, si no el logo */}
+        <div className="relative h-64 sm:h-80 lg:h-[400px] overflow-hidden bg-[#1B4332]">
           {menu.videoUrl ? (
             <video src={menu.videoUrl} poster={menu.videoPosterUrl ?? undefined}
               autoPlay muted loop playsInline
-              className="w-full h-full object-cover" />
-          ) : mejorFotoPlato ? (
-            <img src={mejorFotoPlato} alt={menu.comercio.nombre} className="w-full h-full object-cover" />
+              className="w-full h-full object-cover opacity-90" />
+          ) : fotosUnicas.length > 0 ? (
+            fotosUnicas.map((foto, idx) => (
+              <img key={foto} src={foto} alt={menu.comercio.nombre} 
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${idx === fotoHeroIdx ? 'opacity-100' : 'opacity-0'}`} />
+            ))
           ) : menu.comercio.logoUrl ? (
             <Image src={menu.comercio.logoUrl} alt={menu.comercio.nombre} fill className="object-cover" />
           ) : (
@@ -830,56 +851,63 @@ function MenuExpressContent() {
               <span className="text-7xl opacity-20">🍽️</span>
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-black/30" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
 
-          <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4">
-            <Link href="/express" className="inline-flex items-center gap-1.5 text-sm text-white/90 hover:text-white bg-black/20 backdrop-blur-sm rounded-full px-3 py-1.5">
+          <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 sm:px-6 lg:px-8 py-5">
+            <Link href="/express" className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/90 hover:text-white bg-black/30 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 transition-all hover:bg-black/40 hover:scale-105">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
               Express
             </Link>
             <button onClick={toggleFav} disabled={toggling}
-              className={`flex-shrink-0 p-2 rounded-full backdrop-blur-sm transition-colors ${esFav ? 'bg-white text-red-500' : 'bg-black/20 text-white hover:bg-black/30'}`}
+              className={`flex-shrink-0 p-2.5 rounded-full backdrop-blur-md border border-white/10 transition-all hover:scale-110 shadow-lg ${esFav ? 'bg-white text-red-500' : 'bg-black/30 text-white hover:bg-black/40'}`}
               title={esFav ? 'Quitar de favoritos' : 'Guardar en favoritos'}>
-              <svg className="w-5 h-5" fill={esFav ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill={esFav ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
             </button>
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-3">
-            {menu.comercio.logoUrl && (mejorFotoPlato || menu.videoUrl) && (
-              <div className="relative w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 ring-2 ring-white/80 shadow-lg">
+          <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row sm:items-end gap-5">
+            {menu.comercio.logoUrl && (fotosUnicas.length > 0 || menu.videoUrl) && (
+              <div className="relative w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 ring-4 ring-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.4)]">
                 <Image src={menu.comercio.logoUrl} alt={menu.comercio.nombre} fill className="object-cover" />
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-bold text-white leading-tight">{menu.comercio.nombre}</h1>
-              <p className="text-sm text-white/85 flex items-center gap-1.5 flex-wrap mt-0.5">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                {menu.comercio.municipio}
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`text-[10px] font-bold px-3 py-1 rounded-full backdrop-blur-md border shadow-sm ${
+                  menu.abiertoAhora ? 'bg-emerald-500/90 text-white border-white/20' : 'bg-black/60 text-white/90 border-white/10'
+                }`}>
+                  {menu.abiertoAhora ? '● Abierto ahora' : '○ Cerrado'}
+                </span>
                 {Number(menu.comercio.calificacion) > 0 && (
-                  <span>· ⭐ {Number(menu.comercio.calificacion).toFixed(1)}</span>
+                  <span className="text-[10px] font-bold px-3 py-1 rounded-full backdrop-blur-md bg-black/40 border border-white/10 text-white flex items-center gap-1 shadow-sm">
+                    ⭐ {Number(menu.comercio.calificacion).toFixed(1)}
+                  </span>
                 )}
+              </div>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight drop-shadow-lg mb-2">{menu.comercio.nombre}</h1>
+              <p className="text-sm text-white/90 flex items-center gap-2 flex-wrap font-medium">
+                <span className="flex items-center gap-1">📍 {menu.comercio.municipio}</span>
+                <span className="text-white/40">•</span>
                 <a href={urlComoLlegar(menu.comercio.latitud, menu.comercio.longitud, menu.comercio.municipio)}
                   target="_blank" rel="noopener noreferrer"
-                  className="font-semibold underline hover:no-underline text-white">
+                  className="underline decoration-white/50 underline-offset-2 hover:decoration-white text-white">
                   Cómo llegar
                 </a>
               </p>
-              <span className={`inline-block mt-1.5 text-xs font-bold px-2 py-0.5 rounded-full backdrop-blur-sm ${
-                menu.abiertoAhora ? 'bg-emerald-500/90 text-white' : 'bg-black/40 text-white/80'
-              }`}>
-                {menu.abiertoAhora ? '● Abierto' : '● Cerrado'}
-              </span>
             </div>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           {!menu.abiertoAhora && (
-            <p className="mt-3 text-sm text-[#721C24] bg-[#F8D7DA] rounded-xl px-3 py-2">
-              Este restaurante está cerrado ahora. Puedes ver el menú pero no hacer pedidos.
-            </p>
+            <div className="mb-4 flex gap-3 bg-red-50 border border-red-100 rounded-xl p-4">
+              <span className="text-xl flex-shrink-0 mt-0.5">⚠️</span>
+              <p className="text-sm text-red-800 leading-relaxed font-medium">
+                Este restaurante está cerrado ahora. Puedes ver el menú pero no hacer pedidos.
+              </p>
+            </div>
           )}
 
           {hayTabs && (
@@ -887,10 +915,10 @@ function MenuExpressContent() {
               <div className="flex gap-2 py-2 min-w-max">
                 <button
                   onClick={() => setTabActiva('todos')}
-                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  className={`flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm ${
                     tabActiva === 'todos'
-                      ? 'bg-[#2D6A4F] text-white'
-                      : 'bg-[#F0EBE3] text-[#555]'
+                      ? 'bg-[#1B4332] text-white ring-2 ring-[#1B4332] ring-offset-2'
+                      : 'bg-[#F8F5F0] text-gray-600 hover:bg-[#E8DCC8]'
                   }`}
                 >
                   🍽️ Todo el menú
@@ -904,10 +932,10 @@ function MenuExpressContent() {
                         document.getElementById(`seccion-${s.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                       }, 50)
                     }}
-                    className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    className={`flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm ${
                       tabActiva === s.id
-                        ? 'bg-[#2D6A4F] text-white'
-                        : 'bg-[#F0EBE3] text-[#555]'
+                        ? 'bg-[#1B4332] text-white ring-2 ring-[#1B4332] ring-offset-2'
+                        : 'bg-[#F8F5F0] text-gray-600 hover:bg-[#E8DCC8]'
                     }`}
                   >
                     {s.icono} {s.nombre}
@@ -921,6 +949,11 @@ function MenuExpressContent() {
 
       {/* Menú */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 pb-40 lg:pb-8">
+        {avisoSecundario && (
+          <div className="mb-4 bg-red-50 border border-red-100 text-red-600 rounded-xl px-4 py-3 text-sm">
+            {avisoSecundario}
+          </div>
+        )}
         {productosNoDisponibles.length > 0 && (
           <div className="mb-4 flex items-start justify-between gap-3 bg-[#FFF3EE] border border-[#F0C9AE] rounded-xl px-4 py-3">
             <p className="text-sm text-[#8A4B1E]">
@@ -1019,35 +1052,40 @@ function MenuExpressContent() {
 
         {/* Sidebar carrito — solo desktop */}
         <div className="hidden lg:block">
-          <div className="lg:sticky lg:top-20 bg-white rounded-2xl border border-[#E8DCC8] shadow-lg p-5 space-y-4">
-            <p className="font-bold text-[#1A1A1A] text-base">🛒 Tu pedido</p>
+          <div className="lg:sticky lg:top-24 bg-white rounded-[2rem] border border-gray-100 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] p-7 space-y-6">
+            <p className="font-black text-gray-900 text-xl tracking-tight">🛒 Tu pedido</p>
             {carrito.length === 0 ? (
-              <p className="text-sm text-[#999] text-center py-6">Agrega productos del menú</p>
+              <div className="py-10 text-center">
+                <span className="text-5xl opacity-40 mb-3 block">🥡</span>
+                <p className="text-sm font-medium text-gray-400">Agrega productos del menú para comenzar</p>
+              </div>
             ) : (
               <>
-                <div className="space-y-2">
+                <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-2 scrollbar-hide">
                   {carrito.map((i, idx) => (
                     <div key={`${i.productoId}-${idx}`} className="text-sm">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => quitarIdx(idx)} className="w-6 h-6 rounded-full bg-[#F0EBE3] flex items-center justify-center text-[#2D6A4F] font-bold">−</button>
-                            <span className="w-5 text-center font-semibold">{i.cantidad}</span>
-                            <button onClick={() => setCarrito(prev => prev.map((x, xi) => xi === idx ? { ...x, cantidad: x.cantidad + 1 } : x))} className="w-6 h-6 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center font-bold">+</button>
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <span className="font-bold text-gray-900 block truncate leading-tight mb-1">{i.nombre}</span>
+                          <div className="flex items-center gap-1.5">
+                            <button onClick={() => quitarIdx(idx)} className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors flex items-center justify-center text-gray-600 font-bold">−</button>
+                            <span className="w-5 text-center font-bold text-gray-900">{i.cantidad}</span>
+                            <button onClick={() => setCarrito(prev => prev.map((x, xi) => xi === idx ? { ...x, cantidad: x.cantidad + 1 } : x))} className="w-6 h-6 rounded-full bg-[#1B4332] text-white flex items-center justify-center font-bold shadow-sm hover:scale-105 transition-transform">+</button>
                           </div>
-                          <span className="truncate text-[#1A1A1A]">{i.nombre}</span>
                         </div>
-                        <span className="text-[#1A1A1A] font-medium ml-2 flex-shrink-0">{formatearPrecio(i.precio * i.cantidad)}</span>
+                        <span className="text-gray-900 font-bold ml-2 flex-shrink-0 mt-0.5">{formatearPrecio(i.precio * i.cantidad)}</span>
                       </div>
                       {i.complementos && i.complementos.length > 0 && (
-                        <p className="text-xs text-gray-400 pl-16 mt-0.5 truncate">+ {i.complementos.map(c => c.nombre).join(', ')}</p>
+                        <p className="text-[11px] text-gray-500 font-medium pl-1 mt-2 line-clamp-2">+ {i.complementos.map(c => c.nombre).join(', ')}</p>
                       )}
                     </div>
                   ))}
                 </div>
-                <div className="border-t border-[#E8DCC8] pt-3 flex justify-between font-bold text-[#1A1A1A]">
-                  <span>Total</span>
-                  <span>{formatearPrecio(totalPrecio)}</span>
+                <div className="border-t border-gray-100 pt-5 space-y-1">
+                  <div className="flex justify-between font-black text-gray-900 text-lg">
+                    <span>Total</span>
+                    <span>{formatearPrecio(totalPrecio)}</span>
+                  </div>
                 </div>
                 <button
                   onClick={() => {
@@ -1056,9 +1094,12 @@ function MenuExpressContent() {
                     setPaso('checkout')
                   }}
                   disabled={!menu.abiertoAhora}
-                  className="w-full rounded-xl bg-[#2D6A4F] text-white py-3 font-bold text-sm disabled:opacity-50"
+                  className="w-full relative overflow-hidden group bg-[#1B4332] text-white font-black py-4.5 rounded-2xl text-base transition-all active:scale-[0.98] shadow-lg shadow-[#1B4332]/30 disabled:opacity-50"
                 >
-                  {menu.abiertoAhora ? 'Confirmar pedido' : 'Restaurante cerrado'}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                  <span className="relative flex items-center justify-center gap-2">
+                    {menu.abiertoAhora ? 'Confirmar pedido' : 'Restaurante cerrado'}
+                  </span>
                 </button>
               </>
             )}

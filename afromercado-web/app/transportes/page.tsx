@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { listarTransportes, type ConfigTransporte } from '@/lib/api/transporte'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { optimizarImagenPequena } from '@/lib/cloudinary'
+import BannerDisplay from '@/components/publicidad/BannerDisplay'
 
 const MapaTransportes = dynamic(() => import('@/components/hoteles/MapaTransportes'), { ssr: false })
 
@@ -166,6 +167,24 @@ export default function TransportesPage() {
   const [gpsCiudad, setGpsCiudad]     = useState('')
   const [tipoFiltro, setTipoFiltro]   = useState('')
   const [vista, setVista]             = useState<'lista' | 'mapa'>('lista')
+  const [fotoHeroIdx, setFotoHeroIdx] = useState(0)
+
+  const heroFotos = useMemo(() => {
+    const urls = new Set<string>()
+    transportes.forEach(t => {
+      if (t.comercio?.logoUrl) urls.add(t.comercio.logoUrl)
+    })
+    const arr = Array.from(urls)
+    return arr.length > 0 ? arr : ['https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=1600&q=80']
+  }, [transportes])
+
+  useEffect(() => {
+    if (heroFotos.length <= 1) return
+    const id = setInterval(() => {
+      setFotoHeroIdx(prev => (prev + 1) % heroFotos.length)
+    }, 4000)
+    return () => clearInterval(id)
+  }, [heroFotos])
 
   function cargar() {
     setCargando(true)
@@ -196,27 +215,38 @@ export default function TransportesPage() {
     )
   }
 
-  const filtrados = transportes.filter(t => {
+  const banners = transportes.filter((t: any) => t.esBannerDisplay)
+  const organicos = transportes.filter((t: any) => !t.esBannerDisplay)
+
+  let filtrados = organicos.filter((t: any) => {
     if (tipoFiltro && t.tipo !== tipoFiltro) return false
     if (!busqueda) return true
     const q = busqueda.toLowerCase()
-    return t.nombre.toLowerCase().includes(q) || t.comercio.municipio.toLowerCase().includes(q) ||
-      t.rutas.some(r => r.origen.toLowerCase().includes(q) || r.destino.toLowerCase().includes(q))
+    return t.nombre?.toLowerCase().includes(q) || t.comercio?.municipio?.toLowerCase().includes(q) ||
+      (t.rutas && t.rutas.some((r: any) => r.origen.toLowerCase().includes(q) || r.destino.toLowerCase().includes(q)))
   })
 
-  const ordenados = userLat && userLon
-    ? [...filtrados].sort((a, b) => {
-        const da = a.comercio.latitud && a.comercio.longitud ? distanciaKm(userLat, userLon, a.comercio.latitud, a.comercio.longitud) : 9999
-        const db = b.comercio.latitud && b.comercio.longitud ? distanciaKm(userLat, userLon, b.comercio.latitud, b.comercio.longitud) : 9999
+  if (userLat && userLon) {
+    filtrados = [...filtrados].sort((a: any, b: any) => {
+        const da = a.comercio?.latitud && a.comercio?.longitud ? distanciaKm(userLat, userLon, a.comercio.latitud, a.comercio.longitud) : 9999
+        const db = b.comercio?.latitud && b.comercio?.longitud ? distanciaKm(userLat, userLon, b.comercio.latitud, b.comercio.longitud) : 9999
         return da - db
       })
-    : filtrados
+  }
 
   const cercanos = userLat && userLon
-    ? ordenados.filter(t => t.comercio.latitud && t.comercio.longitud && distanciaKm(userLat, userLon, t.comercio.latitud, t.comercio.longitud) <= RADIO_CERCA_KM)
-    : ordenados
+    ? filtrados.filter((t: any) => t.comercio?.latitud && t.comercio?.longitud && distanciaKm(userLat, userLon, t.comercio.latitud, t.comercio.longitud) <= RADIO_CERCA_KM)
+    : filtrados
 
-  const sinCercania = userLat != null && userLon != null && cercanos.length === 0 && ordenados.length > 0
+  const ordenados = [...cercanos]
+  if (banners.length > 0 && ordenados.length >= 3) {
+    ordenados.splice(3, 0, banners[0])
+    if (banners.length > 1 && ordenados.length >= 7) {
+      ordenados.splice(7, 0, banners[1])
+    }
+  }
+
+  const sinCercania = userLat != null && userLon != null && cercanos.length === 0 && filtrados.length > 0
 
   function limpiarGPS() {
     setUserLat(null); setUserLon(null); setGpsCiudad('')
@@ -228,12 +258,21 @@ export default function TransportesPage() {
     <div className="min-h-screen bg-[#F7F5F2]">
 
       {/* ── HERO ─────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden" style={{ backgroundImage: "linear-gradient(135deg, rgba(13,43,29,0.88) 0%, rgba(27,67,50,0.80) 50%, rgba(45,106,79,0.75) 100%), url('https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?auto=format&fit=crop&w=1600&q=80')", backgroundSize: 'cover', backgroundPosition: 'center' }}>
-        <div className="absolute -top-16 -right-16 w-72 h-72 bg-white/5 rounded-full" />
-        <div className="absolute top-12 -left-10 w-40 h-40 bg-[#D4A017]/10 rounded-full" />
-        <div className="absolute bottom-0 right-1/3 w-96 h-32 bg-[#52B788]/10 rounded-full blur-2xl" />
+      <div className="relative overflow-hidden min-h-[280px] sm:min-h-[320px] flex flex-col justify-end bg-[#111]">
+        {heroFotos.map((url, idx) => (
+          <img 
+            key={url}
+            src={url} 
+            alt="Transporte de Colombia"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${idx === fotoHeroIdx ? 'opacity-100' : 'opacity-0'}`} 
+          />
+        ))}
+        <div className="absolute inset-0 bg-black/50" />
+        <div className="absolute top-0 right-0 p-12 opacity-30 pointer-events-none">
+          <div className="w-72 h-72 bg-white/20 rounded-full blur-3xl mix-blend-overlay" />
+        </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
+        <div className="relative max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
           <Link href="/" className="inline-flex items-center gap-1.5 text-white/60 hover:text-white text-sm mb-6 transition-colors">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
             Inicio
@@ -267,18 +306,18 @@ export default function TransportesPage() {
           </div>
 
           {/* Búsqueda */}
-          <div className="mt-6 bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-2 flex flex-col sm:flex-row gap-2">
+          <div className="mt-6 bg-white shadow-2xl rounded-2xl p-2 flex flex-col sm:flex-row gap-2 border border-gray-100 relative z-10">
             <div className="flex-1 relative">
-              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
                 placeholder="Ruta, origen, destino o municipio…"
-                className="w-full pl-10 pr-4 py-2.5 bg-transparent text-white placeholder-white/40 text-sm focus:outline-none" />
+                className="w-full pl-10 pr-4 py-2.5 bg-transparent text-gray-900 placeholder-gray-400 text-sm font-medium focus:outline-none" />
             </div>
             <button onClick={activarGPS}
-              className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                userLat ? 'bg-blue-500/80 text-white' : 'bg-white/10 hover:bg-white/20 text-white/70'
+              className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                userLat ? 'bg-[#1B4332] text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
               }`}>
-              {gpsCargando ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : (
+              {gpsCargando ? <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" /> : (
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
               )}
               {gpsCiudad || 'Cerca de mí'}
@@ -384,7 +423,15 @@ export default function TransportesPage() {
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {cercanos.map(t => <TarjetaTransporte key={t.id} t={t} userLat={userLat} userLon={userLon} />)}
+            {cercanos.map((t: any) => (
+              t.esBannerDisplay ? (
+                <div key={t.id} className="col-span-full mt-2 mb-2">
+                  <BannerDisplay banner={t} />
+                </div>
+              ) : (
+                <TarjetaTransporte key={t.id} t={t} userLat={userLat} userLon={userLon} />
+              )
+            ))}
           </div>
         )}
       </main>

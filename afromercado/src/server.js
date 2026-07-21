@@ -845,6 +845,9 @@ async function aplicarMigraciones() {
     // ── ReservaTransporte: columnas de descuento/cupón ──────────────────
     `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "montoDescuento" DECIMAL(10,2)`,
     `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "codigoCupon" TEXT`,
+    // ── ReservaTransporte: comisión de plataforma (antes no cobraba, alineado con Hotel/Tour) ──
+    `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "comision" DECIMAL(10,2)`,
+    `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "tasaComision" DECIMAL(5,4)`,
 
     // ── EstadoEventoCultural: agrega POSPUESTO ──────────────────────────
     `ALTER TYPE "EstadoEventoCultural" ADD VALUE IF NOT EXISTS 'POSPUESTO'`,
@@ -856,20 +859,112 @@ async function aplicarMigraciones() {
     `ALTER TABLE "ReservaHotel" ADD COLUMN IF NOT EXISTS "grupoReservaId" TEXT`,
     `CREATE INDEX IF NOT EXISTS "ReservaHotel_grupoReservaId_idx" ON "ReservaHotel"("grupoReservaId")`,
 
-    // ── Publicidad: alcance geográfico (Municipio / Departamento / Nacional) ──
-    // Default 'NACIONAL' preserva el comportamiento actual de las pautas ya existentes.
-    `ALTER TABLE "VisibilidadPagada" ADD COLUMN IF NOT EXISTS "alcance" TEXT NOT NULL DEFAULT 'NACIONAL'`,
-    `ALTER TABLE "VisibilidadPagada" ADD COLUMN IF NOT EXISTS "departamento" TEXT`,
-    `ALTER TABLE "VisibilidadPagada" ADD COLUMN IF NOT EXISTS "municipio" TEXT`,
-    `ALTER TABLE "SolicitudPublicidad" ADD COLUMN IF NOT EXISTS "alcance" TEXT NOT NULL DEFAULT 'NACIONAL'`,
-    `ALTER TABLE "SolicitudPublicidad" ADD COLUMN IF NOT EXISTS "departamento" TEXT`,
-    `ALTER TABLE "SolicitudPublicidad" ADD COLUMN IF NOT EXISTS "municipio" TEXT`,
+    // ── TERAVIA ADS (PUBLICIDAD CENTRALIZADA) ──
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoCampana') THEN
+        CREATE TYPE "EstadoCampana" AS ENUM ('ACTIVA', 'PAUSADA', 'FINALIZADA');
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "CampanaPublicitaria" (
+      "id" SERIAL PRIMARY KEY,
+      "comercioId" INTEGER,
+      "anuncianteId" INTEGER,
+      "nombre" TEXT NOT NULL,
+      "presupuestoTotal" DECIMAL(12,2) NOT NULL,
+      "presupuestoGastado" DECIMAL(12,2) NOT NULL DEFAULT 0,
+      "inicio" TIMESTAMP(3) NOT NULL,
+      "fin" TIMESTAMP(3) NOT NULL,
+      "estado" "EstadoCampana" NOT NULL DEFAULT 'ACTIVA',
+      "notas" TEXT,
+      "creadoPor" INTEGER NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ModuloAnuncio') THEN
+        CREATE TYPE "ModuloAnuncio" AS ENUM ('VITRINA', 'EMPLEOS', 'PRODUCTOS', 'HOTELES', 'TOURS');
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'FormatoAnuncio') THEN
+        CREATE TYPE "FormatoAnuncio" AS ENUM ('NATIVO', 'BANNER', 'VIDEO');
+      END IF;
+    END $$`,
+    `CREATE TABLE IF NOT EXISTS "AnuncioUbicacion" (
+      "id" SERIAL PRIMARY KEY,
+      "campanaId" INTEGER NOT NULL,
+      "modulo" "ModuloAnuncio" NOT NULL,
+      "formato" "FormatoAnuncio" NOT NULL,
+      "productoId" INTEGER,
+      "ofertaEmpleoId" INTEGER,
+      "habitacionId" INTEGER,
+      "titulo" TEXT,
+      "subtitulo" TEXT,
+      "mediaUrl" TEXT,
+      "urlDestino" TEXT,
+      "ctaTexto" TEXT DEFAULT 'Ver más',
+      "alcance" TEXT NOT NULL DEFAULT 'NACIONAL',
+      "departamento" TEXT,
+      "municipio" TEXT,
+      "etiqueta" TEXT NOT NULL DEFAULT 'Patrocinado',
+      "activa" BOOLEAN NOT NULL DEFAULT true,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    // tipoCampana agregada después del CREATE TABLE de arriba — ALTER idempotente
+    // por si el CREATE TABLE ya corrió una vez sin esta columna en algún entorno.
+    `ALTER TABLE "AnuncioUbicacion" ADD COLUMN IF NOT EXISTS "tipoCampana" TEXT`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoMetricaAnuncio') THEN
+        CREATE TYPE "TipoMetricaAnuncio" AS ENUM ('IMPRESION', 'CLIC', 'CONVERSION_COMPRA', 'POSTULACION_EMPLEO');
+      END IF;
+    END $$`,
+    `ALTER TYPE "TipoMetricaAnuncio" ADD VALUE IF NOT EXISTS 'CARRITO'`,
+    `CREATE TABLE IF NOT EXISTS "MetricaPublicitaria" (
+      "id" SERIAL PRIMARY KEY,
+      "anuncioId" INTEGER NOT NULL,
+      "tipoEvento" "TipoMetricaAnuncio" NOT NULL,
+      "usuarioId" INTEGER,
+      "sesionId" TEXT,
+      "valorAtribuido" DECIMAL(12,2) NOT NULL DEFAULT 0,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    // referenciaExterna agregada después del CREATE TABLE — permite idempotencia
+    // al atribuir una venta (ver VisibilidadRepository.atribuirVentaProducto).
+    `ALTER TABLE "MetricaPublicitaria" ADD COLUMN IF NOT EXISTS "referenciaExterna" TEXT`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "MetricaPublicitaria_anuncioId_tipoEvento_referenciaExterna_key" ON "MetricaPublicitaria"("anuncioId", "tipoEvento", "referenciaExterna")`,
+    `CREATE INDEX IF NOT EXISTS "MetricaPublicitaria_anuncioId_tipoEvento_createdAt_idx" ON "MetricaPublicitaria"("anuncioId", "tipoEvento", "createdAt")`,
 
-    // ── Publicidad: BANNER_CARRUSEL / IRRUPTOR_BIENVENIDA (imagen diseñada propia) ──
-    `ALTER TABLE "SolicitudPublicidad" ADD COLUMN IF NOT EXISTS "imagenPersonalizadaUrl" TEXT`,
-    `ALTER TABLE "CampanaHero" ADD COLUMN IF NOT EXISTS "alcance" TEXT NOT NULL DEFAULT 'NACIONAL'`,
-    `ALTER TABLE "CampanaHero" ADD COLUMN IF NOT EXISTS "departamento" TEXT`,
-    `ALTER TABLE "CampanaHero" ADD COLUMN IF NOT EXISTS "municipio" TEXT`,
+    // ── Teravia Ads: foreign keys (faltaban en el commit original de este refactor) ──
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'CampanaPublicitaria_comercioId_fkey') THEN
+        ALTER TABLE "CampanaPublicitaria" ADD CONSTRAINT "CampanaPublicitaria_comercioId_fkey"
+          FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'CampanaPublicitaria_creadoPor_fkey') THEN
+        ALTER TABLE "CampanaPublicitaria" ADD CONSTRAINT "CampanaPublicitaria_creadoPor_fkey"
+          FOREIGN KEY ("creadoPor") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'AnuncioUbicacion_campanaId_fkey') THEN
+        ALTER TABLE "AnuncioUbicacion" ADD CONSTRAINT "AnuncioUbicacion_campanaId_fkey"
+          FOREIGN KEY ("campanaId") REFERENCES "CampanaPublicitaria"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'MetricaPublicitaria_anuncioId_fkey') THEN
+        ALTER TABLE "MetricaPublicitaria" ADD CONSTRAINT "MetricaPublicitaria_anuncioId_fkey"
+          FOREIGN KEY ("anuncioId") REFERENCES "AnuncioUbicacion"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'AnuncioUbicacion_productoId_fkey') THEN
+        ALTER TABLE "AnuncioUbicacion" ADD CONSTRAINT "AnuncioUbicacion_productoId_fkey"
+          FOREIGN KEY ("productoId") REFERENCES "Producto"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$`,
 
     // ── Alianzas comerciales (cupón compartido entre comercios de distintos módulos) ──
     `CREATE TABLE IF NOT EXISTS "AlianzaComercial" (
@@ -944,8 +1039,7 @@ async function aplicarMigraciones() {
         ALTER TABLE "DenunciaOfertaEmpleo" ADD CONSTRAINT "DenunciaOfertaEmpleo_denuncianteId_fkey" FOREIGN KEY ("denuncianteId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
       END IF;
     END $$`,
-    `ALTER TABLE "CampanaHero" ADD COLUMN IF NOT EXISTS "videoUrl" TEXT`,
-    `ALTER TABLE "CampanaHero" ADD COLUMN IF NOT EXISTS "etiqueta" TEXT NOT NULL DEFAULT 'Patrocinado'`,
+
 
     // ── Comparte tu Chocó: publicaciones comunitarias + denuncias ──
     `CREATE TABLE IF NOT EXISTS "PublicacionCultural" (
@@ -966,6 +1060,22 @@ async function aplicarMigraciones() {
         ALTER TABLE "PublicacionCultural" ADD CONSTRAINT "PublicacionCultural_autorId_fkey" FOREIGN KEY ("autorId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
       END IF;
     END $$`,
+
+    // ── Vitrina de comercio (v0): generaliza PublicacionCultural para que un
+    // comercio publique video/foto de negocio, sin mezclarse con "Comparte tu
+    // Chocó" (comercioId null = personal, con valor = vitrina). ──
+    `ALTER TABLE "PublicacionCultural" ADD COLUMN IF NOT EXISTS "comercioId" INTEGER`,
+    `ALTER TABLE "PublicacionCultural" ADD COLUMN IF NOT EXISTS "moduloOrigen" TEXT`,
+    `ALTER TABLE "PublicacionCultural" ADD COLUMN IF NOT EXISTS "videoPosterUrl" TEXT`,
+    `ALTER TABLE "PublicacionCultural" ADD COLUMN IF NOT EXISTS "videoDuracionSegundos" INTEGER`,
+    `ALTER TABLE "PublicacionCultural" ADD COLUMN IF NOT EXISTS "videoPublicId" TEXT`,
+    `CREATE INDEX IF NOT EXISTS "PublicacionCultural_comercioId_activa_createdAt_idx" ON "PublicacionCultural"("comercioId", "activa", "createdAt")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'PublicacionCultural_comercioId_fkey') THEN
+        ALTER TABLE "PublicacionCultural" ADD CONSTRAINT "PublicacionCultural_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+
     `DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'MotivoDenunciaPublicacion') THEN
         CREATE TYPE "MotivoDenunciaPublicacion" AS ENUM ('CONTENIDO_INAPROPIADO','SPAM','DERECHOS_DE_AUTOR','NO_RELACIONADO','OTRO');
@@ -1062,6 +1172,9 @@ async function aplicarMigraciones() {
     END $$`,
     `ALTER TABLE "Favorito" ADD COLUMN IF NOT EXISTS "tipoEntidad" "TipoEntidadFavorita"`,
     `ALTER TABLE "Favorito" ADD COLUMN IF NOT EXISTS "entidadId" INTEGER`,
+
+    // ── Vitrina de comercio (v0): permite "guardar" un video/publicación de la vitrina ──
+    `ALTER TYPE "TipoEntidadFavorita" ADD VALUE IF NOT EXISTS 'PUBLICACION_CULTURAL'`,
     `DO $$ BEGIN
       IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Favorito' AND column_name = 'productoId') THEN
         UPDATE "Favorito" SET "tipoEntidad" = 'PRODUCTO', "entidadId" = "productoId"
@@ -1501,6 +1614,81 @@ async function aplicarMigraciones() {
           FOREIGN KEY ("denuncianteId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
       END IF;
     END $$`,
+
+    // ── Seguir comercio (Vitrina v0.2): base para notificaciones y ranking heurístico ──
+    `CREATE TABLE IF NOT EXISTS "SeguidorComercio" (
+      "id"         SERIAL NOT NULL,
+      "usuarioId"  INTEGER NOT NULL,
+      "comercioId" INTEGER NOT NULL,
+      "createdAt"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "SeguidorComercio_pkey" PRIMARY KEY ("id")
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "SeguidorComercio_usuarioId_comercioId_key" ON "SeguidorComercio"("usuarioId", "comercioId")`,
+    `CREATE INDEX IF NOT EXISTS "SeguidorComercio_comercioId_idx" ON "SeguidorComercio"("comercioId")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'SeguidorComercio_usuarioId_fkey') THEN
+        ALTER TABLE "SeguidorComercio" ADD CONSTRAINT "SeguidorComercio_usuarioId_fkey"
+          FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'SeguidorComercio_comercioId_fkey') THEN
+        ALTER TABLE "SeguidorComercio" ADD CONSTRAINT "SeguidorComercio_comercioId_fkey"
+          FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+
+    // ── Registrar vista de publicación (Vitrina v0.3): base para afinidad y recomendación ──
+    `CREATE TABLE IF NOT EXISTS "VistaPublicacionCultural" (
+      "id"                    SERIAL NOT NULL,
+      "publicacionCulturalId" INTEGER NOT NULL,
+      "usuarioId"              INTEGER,
+      "sesionId"              TEXT,
+      "duracionSegundos"      INTEGER,
+      "createdAt"             TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "VistaPublicacionCultural_pkey" PRIMARY KEY ("id")
+    )`,
+    `CREATE INDEX IF NOT EXISTS "VistaPublicacionCultural_publicacionCulturalId_createdAt_idx" ON "VistaPublicacionCultural"("publicacionCulturalId", "createdAt")`,
+    `CREATE INDEX IF NOT EXISTS "VistaPublicacionCultural_usuarioId_createdAt_idx" ON "VistaPublicacionCultural"("usuarioId", "createdAt")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'VistaPublicacionCultural_publicacionCulturalId_fkey') THEN
+        ALTER TABLE "VistaPublicacionCultural" ADD CONSTRAINT "VistaPublicacionCultural_publicacionCulturalId_fkey"
+          FOREIGN KEY ("publicacionCulturalId") REFERENCES "PublicacionCultural"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'VistaPublicacionCultural_usuarioId_fkey') THEN
+        ALTER TABLE "VistaPublicacionCultural" ADD CONSTRAINT "VistaPublicacionCultural_usuarioId_fkey"
+          FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    // ── Compartidos y Comentarios (Vitrina v0.4) ──
+    `ALTER TABLE "PublicacionCultural" ADD COLUMN IF NOT EXISTS "totalCompartidos" INTEGER NOT NULL DEFAULT 0`,
+    `CREATE TABLE IF NOT EXISTS "ComentarioPublicacionCultural" (
+      "id"                    SERIAL NOT NULL,
+      "publicacionCulturalId" INTEGER NOT NULL,
+      "usuarioId"             INTEGER NOT NULL,
+      "texto"                 TEXT NOT NULL,
+      "createdAt"             TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ComentarioPublicacionCultural_pkey" PRIMARY KEY ("id")
+    )`,
+    `CREATE INDEX IF NOT EXISTS "ComentarioPublicacionCultural_publicacionCulturalId_createdAt_idx" ON "ComentarioPublicacionCultural"("publicacionCulturalId", "createdAt")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'ComentarioPublicacionCultural_publicacionCulturalId_fkey') THEN
+        ALTER TABLE "ComentarioPublicacionCultural" ADD CONSTRAINT "ComentarioPublicacionCultural_publicacionCulturalId_fkey"
+          FOREIGN KEY ("publicacionCulturalId") REFERENCES "PublicacionCultural"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'ComentarioPublicacionCultural_usuarioId_fkey') THEN
+        ALTER TABLE "ComentarioPublicacionCultural" ADD CONSTRAINT "ComentarioPublicacionCultural_usuarioId_fkey"
+          FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `ALTER TYPE "ModuloAnuncio" ADD VALUE IF NOT EXISTS 'EXPRESS'`,
+    `ALTER TYPE "ModuloAnuncio" ADD VALUE IF NOT EXISTS 'TRANSPORTE'`,
+    `ALTER TYPE "ModuloAnuncio" ADD VALUE IF NOT EXISTS 'CULTURA'`,
+    `ALTER TYPE "ModuloAnuncio" ADD VALUE IF NOT EXISTS 'BIENES_RAICES'`,
   ];
   for (const sql of migraciones) {
     try {

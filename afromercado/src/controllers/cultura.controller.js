@@ -129,6 +129,15 @@ const CulturaController = {
     } catch (e) { next(e); }
   },
 
+  // ── Vitrina de video (v0) ──
+  async listarVitrina(req, res, next) {
+    try {
+      const { departamento, modulo, search, page } = req.query;
+      const { items, total, pagina } = await CulturaService.listarVitrina({ departamento, modulo, search, page, usuarioId: req.usuario?.id });
+      res.json({ ok: true, items, total, pagina });
+    } catch (e) { next(e); }
+  },
+
   async denunciarPublicacion(req, res, next) {
     try {
       res.status(201).json({ ok: true, data: await CulturaService.denunciarPublicacion(req.usuario.id, Number(req.params.id), req.body) });
@@ -153,6 +162,43 @@ const CulturaController = {
       const data = await CulturaService.toggleLikePublicacion(req.usuario.id, Number(req.params.id));
       res.json({ ok: true, data });
     } catch (err) { next(err); }
+  },
+
+  // ── Favoritos de publicaciones de vitrina ──
+  async toggleFavoritoPublicacion(req, res, next) {
+    try {
+      const data = await CulturaService.toggleFavoritoPublicacion(req.usuario.id, Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  // ── Registrar vista de publicación ──
+  async registrarVista(req, res, next) {
+    try {
+      const data = await CulturaService.registrarVista(req.usuario?.id || null, Number(req.params.id), req.body);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async registrarCompartido(req, res, next) {
+    try {
+      const data = await CulturaService.registrarCompartido(Number(req.params.id));
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async listarComentarios(req, res, next) {
+    try {
+      const data = await CulturaService.listarComentarios(Number(req.params.id), req.query);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async crearComentario(req, res, next) {
+    try {
+      const data = await CulturaService.crearComentario(req.usuario.id, Number(req.params.id), req.body);
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
   },
 
   // ── Favoritos Cultura ──

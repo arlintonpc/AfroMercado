@@ -1,12 +1,34 @@
 const prisma = require("../config/prisma");
-const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
+const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
 const FacturacionService = require("./facturacion.service");
 const CulturaRepository = require("../repositories/cultura.repository");
+const { validarUbicacion } = require("../utils/ubicacion");
+const { assertPuedePublicar, comercioComprableEnPlataforma } = require("../utils/comercio-publicacion");
 
 const TASA_COMISION_CULTURA = 0.10;
 const ESTADOS_EVENTO = ["BORRADOR", "PUBLICADO", "FINALIZADO", "CANCELADO", "POSPUESTO"];
 const MOTIVOS_DENUNCIA_PUBLICACION = ["CONTENIDO_INAPROPIADO", "SPAM", "DERECHOS_DE_AUTOR", "NO_RELACIONADO", "OTRO"];
+// Vitrina de video (v0): qué vertical promociona la publicación de comercio.
+// Allowlist en código sobre columna TEXT libre (mismo patrón que
+// disputa.service.js::MODULOS_VALIDOS).
+const MODULOS_ORIGEN_VITRINA_VALIDOS = ["PEDIDO", "EXPRESS", "HOTEL", "TOUR", "TRANSPORTE", "AGRO"];
+
+// Limpia del objeto comercio los campos internos que no deben exponerse
+// públicamente y agrega el booleano derivado `comprableEnPlataforma`
+// (mismo criterio que producto.service.js::mapearComercioPublico).
+function mapearComercioVitrina(publicacion) {
+  if (!publicacion?.comercio) return publicacion;
+  publicacion.comercio.comprableEnPlataforma = comercioComprableEnPlataforma(publicacion.comercio);
+  delete publicacion.comercio.rut;
+  delete publicacion.comercio.cuentaDispersion;
+  delete publicacion.comercio.activo;
+  delete publicacion.comercio.estadoRegistro;
+  delete publicacion.comercio.fotoDocumentoUrl;
+  delete publicacion.comercio.fotoDocumentoFrenteUrl;
+  delete publicacion.comercio.fotoDocumentoReversoUrl;
+  return publicacion;
+}
 const ESTADOS_RESERVA_CULTURA_TRANSICIONES = {
   PENDIENTE: ["CONFIRMADA", "RECHAZADA", "CANCELADA"],
   CONFIRMADA: ["USADA", "CANCELADA"],
@@ -158,11 +180,53 @@ const CulturaService = {
       };
     }
 
-    return prisma.eventoCultural.findMany({
+    const eventos = await prisma.eventoCultural.findMany({
       where,
       include: EVENTO_INCLUDE,
       orderBy: [{ destacado: "desc" }, { fechaInicio: "asc" }],
     });
+
+    // Inyección de Anuncios (Red de Display Cruzada)
+    const campanas = await prisma.anuncioUbicacion.findMany({
+      where: {
+        activa: true,
+        modulo: "CULTURA",
+        formato: "BANNER",
+        campana: { estado: "ACTIVA" },
+      },
+      include: { campana: true },
+    });
+
+    const shuffledBanners = campanas.sort(() => 0.5 - Math.random()).slice(0, 2);
+    let itemsHibridos = [...eventos];
+
+    if (shuffledBanners[0] && itemsHibridos.length >= 3) {
+      itemsHibridos.splice(3, 0, {
+        id: `banner-${shuffledBanners[0].id}`,
+        esBannerDisplay: true,
+        titulo: shuffledBanners[0].titulo,
+        subtitulo: shuffledBanners[0].subtitulo,
+        mediaUrl: shuffledBanners[0].mediaUrl,
+        urlDestino: shuffledBanners[0].urlDestino,
+        ctaTexto: shuffledBanners[0].ctaTexto,
+        etiqueta: shuffledBanners[0].etiqueta,
+      });
+    }
+
+    if (shuffledBanners[1] && itemsHibridos.length >= 7) {
+      itemsHibridos.splice(7, 0, {
+        id: `banner-${shuffledBanners[1].id}`,
+        esBannerDisplay: true,
+        titulo: shuffledBanners[1].titulo,
+        subtitulo: shuffledBanners[1].subtitulo,
+        mediaUrl: shuffledBanners[1].mediaUrl,
+        urlDestino: shuffledBanners[1].urlDestino,
+        ctaTexto: shuffledBanners[1].ctaTexto,
+        etiqueta: shuffledBanners[1].etiqueta,
+      });
+    }
+
+    return itemsHibridos;
   },
 
   async obtenerEvento(id) {
@@ -295,6 +359,7 @@ const CulturaService = {
     if (!data.departamento || !data.municipio) {
       throw new ErrorValidacion("El departamento y el municipio son obligatorios");
     }
+    validarUbicacion(data.departamento, data.municipio);
     if (!data.fechaInicio) throw new ErrorValidacion("La fecha de inicio es obligatoria");
     return prisma.eventoCultural.create({
       data: { ...data, comercioId, fotos: data.fotos ?? [] },
@@ -303,8 +368,14 @@ const CulturaService = {
   },
 
   async actualizarEvento(comercioId, eventoId, datos) {
-    await obtenerEventoDelComercio(comercioId, eventoId);
+    const eventoActual = await obtenerEventoDelComercio(comercioId, eventoId);
     const data = camposEvento(datos);
+    if (data.departamento !== undefined || data.municipio !== undefined) {
+      validarUbicacion(
+        data.departamento ?? eventoActual.departamento,
+        data.municipio ?? eventoActual.municipio
+      );
+    }
     // El organizador puede publicar, volver a borrador, posponer o cancelar; no finalizar (solo admin)
     if (datos.estado && ["BORRADOR", "PUBLICADO", "POSPUESTO", "CANCELADO"].includes(datos.estado)) {
       data.estado = datos.estado;
@@ -440,6 +511,7 @@ const CulturaService = {
     if (!data.departamento || !data.municipio) {
       throw new ErrorValidacion("El departamento y el municipio son obligatorios");
     }
+    validarUbicacion(data.departamento, data.municipio);
     if (!data.fechaInicio) throw new ErrorValidacion("La fecha de inicio es obligatoria");
     if (datos.estado && ESTADOS_EVENTO.includes(datos.estado)) data.estado = datos.estado;
     return prisma.eventoCultural.create({
@@ -461,22 +533,82 @@ const CulturaService = {
   // ── COMPARTE TU CHOCÓ (publicaciones comunitarias) ───────────
   // Cualquier usuario autenticado publica sin moderación previa; control
   // solo reactivo vía denuncias (ver sección de denuncias más abajo).
-  async crearPublicacion(usuarioId, { titulo, descripcion, fotoUrls, videoUrl, departamento, municipio }) {
+  async crearPublicacion(usuarioId, {
+    titulo, descripcion, fotoUrls, videoUrl, videoPosterUrl, videoDuracionSegundos, videoPublicId,
+    departamento, municipio, comercioId, moduloOrigen,
+  }) {
     if (!titulo?.trim()) throw new ErrorValidacion("El título es obligatorio");
     if (!departamento?.trim()) throw new ErrorValidacion("El departamento es obligatorio");
+    if (municipio?.trim()) validarUbicacion(departamento.trim(), municipio.trim());
     const fotos = Array.isArray(fotoUrls) ? fotoUrls.slice(0, 6) : [];
     if (fotos.length === 0 && !videoUrl) {
       throw new ErrorValidacion("Debes adjuntar al menos una foto o un video");
     }
-    return CulturaRepository.crearPublicacion({
+
+    let comercioIdFinal = null;
+    let moduloOrigenFinal = null;
+    let comercioParaNotificar = null;
+    if (comercioId) {
+      const comercio = await prisma.comercio.findUnique({
+        where: { id: Number(comercioId) },
+        include: { cuentaDispersion: true },
+      });
+      if (!comercio || comercio.usuarioId !== usuarioId) {
+        throw new ErrorProhibido("No puedes publicar en la vitrina de este comercio");
+      }
+      assertPuedePublicar(comercio);
+      if (moduloOrigen !== undefined && moduloOrigen !== null) {
+        if (!MODULOS_ORIGEN_VITRINA_VALIDOS.includes(moduloOrigen)) {
+          throw new ErrorValidacion(`Módulo inválido. Opciones: ${MODULOS_ORIGEN_VITRINA_VALIDOS.join(", ")}`);
+        }
+        moduloOrigenFinal = moduloOrigen;
+      }
+      comercioIdFinal = comercio.id;
+      comercioParaNotificar = comercio;
+    }
+
+    const publicacion = await CulturaRepository.crearPublicacion({
       autorId: usuarioId,
       titulo: titulo.trim(),
       descripcion: descripcion?.trim() || null,
       fotoUrls: fotos,
       videoUrl: videoUrl || null,
+      videoPosterUrl: videoPosterUrl || null,
+      videoDuracionSegundos: numeroONull(videoDuracionSegundos),
+      videoPublicId: videoPublicId || null,
       departamento: departamento.trim(),
       municipio: municipio?.trim() || null,
+      comercioId: comercioIdFinal,
+      moduloOrigen: moduloOrigenFinal,
     });
+
+    // Vitrina v0.2: avisa a los seguidores del comercio de la nueva publicación.
+    // Fire-and-forget — nunca debe poder tumbar la creación de la publicación.
+    if (comercioIdFinal) {
+      setImmediate(async () => {
+        try {
+          const seguidores = await prisma.seguidorComercio.findMany({
+            where: { comercioId: comercioIdFinal },
+            select: { usuarioId: true },
+          });
+          const nombreComercio = comercioParaNotificar?.nombre || "Un comercio que sigues";
+          for (const seguidor of seguidores) {
+            if (seguidor.usuarioId === usuarioId) continue;
+            await NotificacionService.crearYEnviar({
+              usuarioId: seguidor.usuarioId,
+              tipo: "VITRINA_NUEVA_PUBLICACION",
+              titulo: `${nombreComercio} publicó algo nuevo`,
+              mensaje: publicacion.titulo,
+              url: "/vitrina",
+            });
+          }
+        } catch (e) {
+          console.error("[VITRINA] Error notificando seguidores:", e.message);
+        }
+      });
+    }
+
+    return publicacion;
   },
 
   async listarPublicaciones(filtros = {}) {
@@ -491,6 +623,169 @@ const CulturaService = {
           meGusta: Array.isArray(likes) && likes.length > 0,
         };
       }),
+    };
+  },
+
+  // ── Vitrina de video (v0.2) — ranking heurístico ─────────────────
+  // El repository ya no pagina en SQL: trae una ventana acotada (hasta 200)
+  // de las publicaciones más recientes. Acá se calcula esFavorito/siguiendo,
+  // se les asigna un puntaje heurístico simple (afinidad + engagement +
+  // recencia) y RECIÉN ahí se pagina en memoria. Sin usuarioId (visitante
+  // anónimo), el puntaje se reduce a recencia+engagement — mismo orden que
+  // antes, no rompe el comportamiento para anónimos.
+  async listarVitrina(filtros = {}) {
+    const resultado = await CulturaRepository.listarVitrina(filtros);
+    const usuarioId = filtros.usuarioId;
+    const pagina = resultado.pagina;
+    const take = Number(filtros.take) || 20;
+
+    let favoritosSet = new Set();
+    let siguiendoSet = new Set();
+    let afinidadModulos = new Set();
+
+    if (usuarioId && resultado.itemsVentana.length > 0) {
+      const publicacionIds = resultado.itemsVentana.map((p) => p.id);
+      const comercioIds = [...new Set(resultado.itemsVentana.map((p) => p.comercio?.id).filter(Boolean))];
+
+      const [favoritos, seguidores, likesUsuario, favoritosPublicacionesUsuario, vistasUsuario] = await Promise.all([
+        prisma.favorito.findMany({
+          where: { usuarioId, tipoEntidad: "PUBLICACION_CULTURAL", entidadId: { in: publicacionIds } },
+          select: { entidadId: true },
+        }),
+        comercioIds.length
+          ? prisma.seguidorComercio.findMany({
+              where: { usuarioId, comercioId: { in: comercioIds } },
+              select: { comercioId: true },
+            })
+          : Promise.resolve([]),
+        prisma.likePublicacionCultural.findMany({
+          where: { usuarioId },
+          select: { publicacionCulturalId: true },
+        }),
+        prisma.favorito.findMany({
+          where: { usuarioId, tipoEntidad: "PUBLICACION_CULTURAL" },
+          select: { entidadId: true },
+        }),
+        prisma.vistaPublicacionCultural.findMany({
+          where: { usuarioId },
+          select: { publicacionCulturalId: true },
+          take: 50,
+          orderBy: { createdAt: "desc" },
+        }),
+      ]);
+
+      favoritosSet = new Set(favoritos.map((f) => f.entidadId));
+      siguiendoSet = new Set(seguidores.map((s) => s.comercioId));
+
+      const idsInteractuados = [
+        ...new Set([
+          ...likesUsuario.map((l) => l.publicacionCulturalId),
+          ...favoritosPublicacionesUsuario.map((f) => f.entidadId),
+          ...vistasUsuario.map((v) => v.publicacionCulturalId),
+        ]),
+      ];
+      if (idsInteractuados.length > 0) {
+        const publicacionesInteractuadas = await prisma.publicacionCultural.findMany({
+          where: { id: { in: idsInteractuados } },
+          select: { moduloOrigen: true },
+        });
+        afinidadModulos = new Set(publicacionesInteractuadas.map((p) => p.moduloOrigen).filter(Boolean));
+      }
+    }
+
+    const itemsMapeados = resultado.itemsVentana.map((p) => {
+      const { _count, likes, ...resto } = p;
+      mapearComercioVitrina(resto);
+      if (resto.comercio) {
+        resto.comercio.siguiendo = usuarioId ? siguiendoSet.has(resto.comercio.id) : false;
+      }
+      return {
+        ...resto,
+        totalLikes: _count?.likes ?? 0,
+        totalComentarios: _count?.comentarios ?? 0,
+        meGusta: Array.isArray(likes) && likes.length > 0,
+        esFavorito: favoritosSet.has(resto.id),
+      };
+    });
+
+    // Puntaje heurístico simple y transparente (no es un motor de recomendación real):
+    // seguir el comercio pesa más, luego afinidad de módulo, engagement (likes,
+    // topeado) y un pequeño empujón a lo reciente. En empate, mantiene el orden
+    // de creación (recencia) que ya traía la ventana.
+    const itemsConPuntaje = itemsMapeados.map((item, index) => {
+      const diasDesdeCreacion = (Date.now() - new Date(item.createdAt).getTime()) / 86400000;
+      const puntaje =
+        (item.comercio?.siguiendo ? 40 : 0) +
+        (afinidadModulos.has(item.moduloOrigen) ? 15 : 0) +
+        Math.min(item.totalLikes, 20) +
+        Math.max(0, 10 - diasDesdeCreacion);
+      return { item, puntaje, index };
+    });
+
+    itemsConPuntaje.sort((a, b) => (b.puntaje !== a.puntaje ? b.puntaje - a.puntaje : a.index - b.index));
+
+    const inicio = (pagina - 1) * take;
+    const itemsPagina = itemsConPuntaje.slice(inicio, inicio + take).map((x) => x.item);
+
+    // ── Inyección de Anuncios (Video Historia) ──────────────────
+    let itemsFinales = itemsPagina;
+    if (itemsPagina.length > 0) {
+      const configFrecuencia = await prisma.config.findUnique({ where: { clave: "vitrina_frecuencia_anuncios" } });
+      const frecuencia = configFrecuencia ? parseInt(configFrecuencia.valor) || 5 : 5;
+
+      const ahora = new Date();
+      const campanas = await prisma.anuncioUbicacion.findMany({
+        where: {
+          activa: true,
+          modulo: "VITRINA",
+          formato: "VIDEO",
+          campana: {
+            estado: "ACTIVA",
+            inicio: { lte: ahora },
+            fin: { gte: ahora },
+          },
+        },
+        include: { campana: true },
+      });
+
+      if (campanas.length > 0) {
+        itemsFinales = [];
+        let contadorAds = 0;
+        for (let i = 0; i < itemsPagina.length; i++) {
+          itemsFinales.push(itemsPagina[i]);
+          const posicionGlobal = inicio + i + 1;
+          if (posicionGlobal % frecuencia === 0) {
+            const anuncio = campanas[contadorAds % campanas.length];
+            contadorAds++;
+            itemsFinales.push({
+              id: `ad-${anuncio.id}-${posicionGlobal}`, // ID único para React key
+              esAnuncio: true,
+              campanaId: anuncio.campana.id,
+              titulo: anuncio.titulo || anuncio.campana.nombre,
+              descripcion: anuncio.subtitulo || "",
+              videoUrl: anuncio.mediaUrl,
+              imagenUrl: null, // es video
+              ctaTexto: anuncio.ctaTexto || "Ver más",
+              urlDestino: anuncio.urlDestino,
+              etiqueta: anuncio.etiqueta || "Patrocinado",
+              comercioId: anuncio.campana.comercioId || null,
+              comercio: null,
+              autor: null,
+              createdAt: anuncio.createdAt,
+              totalLikes: 0,
+              totalComentarios: 0,
+              meGusta: false,
+              esFavorito: false,
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      items: itemsFinales,
+      total: resultado.total,
+      pagina,
     };
   },
 
@@ -554,6 +849,86 @@ const CulturaService = {
     }
     const totalLikes = await prisma.likePublicacionCultural.count({ where: { publicacionCulturalId: publicacionId } });
     return { meGusta: !existe, totalLikes };
+  },
+
+  // ── REGISTRAR VISTA DE PUBLICACIÓN ──────────────────────────────
+
+  async registrarVista(usuarioId, publicacionId, { sesionId, duracionSegundos } = {}) {
+    const publicacion = await CulturaRepository.buscarPublicacionPorId(publicacionId);
+    if (!publicacion || !publicacion.activa) throw new ErrorNoEncontrado("Publicación no encontrada");
+
+    return prisma.vistaPublicacionCultural.create({
+      data: {
+        publicacionCulturalId: publicacionId,
+        usuarioId: usuarioId || null,
+        sesionId: sesionId || null,
+        duracionSegundos: numeroONull(duracionSegundos),
+      },
+    });
+  },
+
+  // ── FAVORITOS DE PUBLICACIONES DE VITRINA ───────────────────────
+
+  async toggleFavoritoPublicacion(usuarioId, publicacionId) {
+    const existe = await prisma.favorito.findUnique({
+      where: { usuarioId_tipoEntidad_entidadId: { usuarioId, tipoEntidad: "PUBLICACION_CULTURAL", entidadId: publicacionId } },
+    });
+    if (existe) {
+      await prisma.favorito.delete({ where: { id: existe.id } });
+      return { esFavorito: false };
+    }
+    await prisma.favorito.create({ data: { usuarioId, tipoEntidad: "PUBLICACION_CULTURAL", entidadId: publicacionId } });
+    return { esFavorito: true };
+  },
+
+  // ── COMPARTIDOS Y COMENTARIOS DE PUBLICACIONES ──────────────────────
+
+  async registrarCompartido(publicacionId) {
+    const publicacion = await CulturaRepository.buscarPublicacionPorId(publicacionId);
+    if (!publicacion || !publicacion.activa) throw new ErrorNoEncontrado("Publicación no encontrada");
+
+    await prisma.publicacionCultural.update({
+      where: { id: publicacionId },
+      data: { totalCompartidos: { increment: 1 } },
+    });
+    return { ok: true };
+  },
+
+  async listarComentarios(publicacionId, { page = 1, limit = 20 } = {}) {
+    const offset = (Math.max(1, Number(page)) - 1) * Number(limit);
+    const where = { publicacionCulturalId: publicacionId };
+    
+    const [items, total] = await Promise.all([
+      prisma.comentarioPublicacionCultural.findMany({
+        where,
+        take: Number(limit),
+        skip: offset,
+        orderBy: { createdAt: "desc" },
+        include: { usuario: { select: { id: true, nombre: true, avatarUrl: true } } },
+      }),
+      prisma.comentarioPublicacionCultural.count({ where }),
+    ]);
+    
+    return { items, total, pagina: Number(page) };
+  },
+
+  async crearComentario(usuarioId, publicacionId, { texto }) {
+    const textoValidado = textoLimpio(texto, 1000);
+    if (!textoValidado) throw new ErrorValidacion("El comentario no puede estar vacío");
+    
+    const publicacion = await CulturaRepository.buscarPublicacionPorId(publicacionId);
+    if (!publicacion || !publicacion.activa) throw new ErrorNoEncontrado("Publicación no encontrada");
+    
+    const comentario = await prisma.comentarioPublicacionCultural.create({
+      data: {
+        publicacionCulturalId: publicacionId,
+        usuarioId,
+        texto: textoValidado,
+      },
+      include: { usuario: { select: { id: true, nombre: true, avatarUrl: true } } },
+    });
+    
+    return comentario;
   },
 
   // ── FAVORITOS CULTURA ───────────────────────────────────────────

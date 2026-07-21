@@ -6,12 +6,20 @@ const router = express.Router();
 
 router.get("/politicas", PublicidadController.politicas);
 router.get("/paquetes", PublicidadController.listarPaquetes);
+router.post("/track", PublicidadController.trackMetrica);
 
 router.get(
   "/mis-solicitudes",
   autenticar,
   autorizar("COMERCIANTE", "ADMIN"),
   PublicidadController.misSolicitudes,
+);
+
+router.get(
+  "/mis-metricas",
+  autenticar,
+  autorizar("COMERCIANTE", "ADMIN"),
+  PublicidadController.misMetricas,
 );
 
 router.post(

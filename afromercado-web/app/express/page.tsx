@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { listarComerciosExpress, type ComercioExpress } from '@/lib/api/express'
 import TarjetaRestaurante from '@/components/express/TarjetaRestaurante'
+import BannerDisplay from '@/components/publicidad/BannerDisplay'
 
 const MapaExpress = dynamic(() => import('@/components/express/MapaExpress'), {
   ssr: false,
@@ -50,6 +51,9 @@ export default function ExpressPage() {
   const [cargando, setCargando]         = useState(true)
   const [error, setError]               = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  
+  // Carrusel dinámico
+  const [fotoHeroIdx, setFotoHeroIdx] = useState(0)
 
   useEffect(() => {
     async function cargar() {
@@ -68,29 +72,54 @@ export default function ExpressPage() {
     return () => clearInterval(interval)
   }, [])
 
-  const municipios = Array.from(new Set(todos.map(c => c.comercio.municipio).filter(Boolean)))
+  const heroFotos = useMemo(() => {
+    const urls = new Set<string>()
+    todos.forEach(c => {
+      if (c.comercio.logoUrl) urls.add(c.comercio.logoUrl)
+    })
+    const arr = Array.from(urls)
+    return arr.length > 0 ? arr : ['https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1600&q=80']
+  }, [todos])
+
+  useEffect(() => {
+    if (heroFotos.length <= 1) return
+    const id = setInterval(() => {
+      setFotoHeroIdx(prev => (prev + 1) % heroFotos.length)
+    }, 4000)
+    return () => clearInterval(id)
+  }, [heroFotos])
+
+  const banners = todos.filter((c: any) => c.esBannerDisplay)
+  const organicos = todos.filter((c: any) => !c.esBannerDisplay)
+
+  const municipios = Array.from(new Set(organicos.map(c => c.comercio?.municipio).filter(Boolean)))
   const termino = busqueda.trim().toLowerCase()
 
-  const filtrados = todos
+  let filtrados = organicos
     .filter(c => !soloAbiertos || c.abierto)
     .filter(c => !termino ||
-      c.comercio.nombre.toLowerCase().includes(termino) ||
-      (c.comercio.municipio ?? '').toLowerCase().includes(termino)
+      c.comercio?.nombre.toLowerCase().includes(termino) ||
+      (c.comercio?.municipio ?? '').toLowerCase().includes(termino)
     )
 
-  const ordenados = userLat && userLon
-    ? [...filtrados].sort((a, b) => {
-        const dA = a.comercio.latitud && a.comercio.longitud ? distanciaKm(userLat!, userLon!, a.comercio.latitud, a.comercio.longitud) : Infinity
-        const dB = b.comercio.latitud && b.comercio.longitud ? distanciaKm(userLat!, userLon!, b.comercio.latitud, b.comercio.longitud) : Infinity
-        return dA - dB
-      })
-    : filtrados
+  if (userLat && userLon) {
+    filtrados = [...filtrados].sort((a, b) => {
+      const dA = a.comercio?.latitud && a.comercio?.longitud ? distanciaKm(userLat!, userLon!, a.comercio.latitud, a.comercio.longitud) : Infinity
+      const dB = b.comercio?.latitud && b.comercio?.longitud ? distanciaKm(userLat!, userLon!, b.comercio.latitud, b.comercio.longitud) : Infinity
+      return dA - dB
+    }).filter(c => c.comercio?.latitud && c.comercio?.longitud && distanciaKm(userLat!, userLon!, c.comercio.latitud, c.comercio.longitud) <= RADIO_CERCA_KM)
+  }
 
-  const comercios = userLat && userLon
-    ? ordenados.filter(c => c.comercio.latitud && c.comercio.longitud && distanciaKm(userLat, userLon, c.comercio.latitud, c.comercio.longitud) <= RADIO_CERCA_KM)
-    : ordenados
+  const sinCercania = userLat != null && userLon != null && filtrados.length === 0 && organicos.length > 0
 
-  const sinCercania = userLat != null && userLon != null && comercios.length === 0 && ordenados.length > 0
+  // Reinjectar banners en los resultados finales (e.g. en la posición 3 y 7)
+  const comercios = [...filtrados]
+  if (banners.length > 0 && comercios.length >= 3) {
+    comercios.splice(3, 0, banners[0])
+    if (banners.length > 1 && comercios.length >= 7) {
+      comercios.splice(7, 0, banners[1])
+    }
+  }
 
   function limpiarGPS() {
     setUserLat(null); setUserLon(null); setGpsCiudad(''); setGpsEstado('idle')
@@ -126,12 +155,21 @@ export default function ExpressPage() {
     <div className="min-h-screen bg-[#F7F5F2]">
 
       {/* ── HERO ─────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden" style={{ backgroundImage: "linear-gradient(135deg, rgba(13,43,29,0.88) 0%, rgba(27,67,50,0.80) 50%, rgba(45,106,79,0.75) 100%), url('https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1600&q=80')", backgroundSize: 'cover', backgroundPosition: 'center' }}>
-        <div className="absolute -top-16 -right-16 w-72 h-72 bg-white/5 rounded-full" />
-        <div className="absolute top-12 -left-10 w-40 h-40 bg-[#D4A017]/10 rounded-full" />
-        <div className="absolute bottom-0 right-1/3 w-96 h-32 bg-[#52B788]/10 rounded-full blur-2xl" />
+      <div className="relative overflow-hidden min-h-[280px] sm:min-h-[320px] flex flex-col justify-end bg-[#111]">
+        {heroFotos.map((url, idx) => (
+          <img 
+            key={url}
+            src={url} 
+            alt="Gastronomía local"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${idx === fotoHeroIdx ? 'opacity-100' : 'opacity-0'}`} 
+          />
+        ))}
+        <div className="absolute inset-0 bg-black/50" />
+        <div className="absolute top-0 right-0 p-12 opacity-30 pointer-events-none">
+          <div className="w-72 h-72 bg-white/20 rounded-full blur-3xl mix-blend-overlay" />
+        </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
+        <div className="relative max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
           <Link href="/" className="inline-flex items-center gap-1.5 text-white/60 hover:text-white text-sm mb-6 transition-colors">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
             Inicio
@@ -165,19 +203,19 @@ export default function ExpressPage() {
           </div>
 
           {/* Barra de búsqueda */}
-          <div className="mt-6 bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-2 flex flex-col sm:flex-row gap-2">
+          <div className="mt-6 bg-white shadow-2xl rounded-2xl p-2 flex flex-col sm:flex-row gap-2 border border-gray-100 relative z-10">
             <div className="flex-1 relative">
-              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <input ref={inputRef} value={busqueda}
                 onChange={e => { setBusqueda(e.target.value); setGpsCiudad(''); setGpsEstado('idle') }}
                 placeholder="Ciudad o restaurante…"
-                className="w-full pl-10 pr-4 py-2.5 bg-transparent text-white placeholder-white/40 text-sm focus:outline-none" />
+                className="w-full pl-10 pr-4 py-2.5 bg-transparent text-gray-900 placeholder-gray-400 text-sm font-medium focus:outline-none" />
             </div>
             <button onClick={usarUbicacion} disabled={gpsEstado === 'buscando'}
-              className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                gpsEstado === 'ok' ? 'bg-blue-500/80 text-white' : 'bg-white/10 hover:bg-white/20 text-white/70'
+              className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                gpsEstado === 'ok' ? 'bg-[#1B4332] text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
               }`}>
-              {gpsEstado === 'buscando' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : (
+              {gpsEstado === 'buscando' ? <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" /> : (
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
               )}
               {gpsEstado === 'ok' ? gpsCiudad : gpsEstado === 'error' ? 'Sin permiso' : 'Cerca de mí'}
@@ -285,8 +323,14 @@ export default function ExpressPage() {
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {comercios.map(cfg => (
-              <TarjetaRestaurante key={cfg.id} cfg={cfg} userLat={userLat} userLon={userLon} />
+            {comercios.map((cfg: any) => (
+              cfg.esBannerDisplay ? (
+                <div key={cfg.id} className="col-span-full mt-2 mb-2">
+                  <BannerDisplay banner={cfg} />
+                </div>
+              ) : (
+                <TarjetaRestaurante key={cfg.id} cfg={cfg} userLat={userLat} userLon={userLon} />
+              )
             ))}
           </div>
         )}

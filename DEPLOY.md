@@ -72,7 +72,7 @@ git push -u origin main
    ```bash
    node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
    ```
-5. **Create Web Service.** Render hará el build, aplicará las migraciones (`prisma migrate deploy`) y arrancará.
+5. **Create Web Service.** Render hará el build (`npm install && npm run build`, que solo corre `prisma generate` — no toca la base de datos) y luego arrancará (`npm start`). Las migraciones de schema se aplican automáticamente al iniciar el servidor, vía `aplicarMigraciones()` en `afromercado/src/server.js`, que corre sentencias DDL idempotentes con `$executeRawUnsafe` (no se usa `prisma migrate deploy`, porque el connection pooler de Neon en producción lo bloquea).
 6. Cuando termine, copia la URL del servicio, ej: `https://afromercado-api.onrender.com`
 
 ### Sembrar datos iniciales (una sola vez)

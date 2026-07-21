@@ -9,6 +9,8 @@ const {
   calcularDescuento, intentarAlianza, registrarUsoVertical, mapearCuponVertical,
 } = require("../utils/cupon-vertical");
 
+const TASA_COMISION_TRANSPORTE = 0.10;
+
 function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
   const rnd = Math.random().toString(36).substring(2, 5).toUpperCase();
@@ -79,11 +81,53 @@ const TransporteService = {
     if (municipio) comercioWhere.municipio = { contains: municipio, mode: "insensitive" };
     if (departamento) comercioWhere.departamento = { contains: departamento, mode: "insensitive" };
 
-    return prisma.configTransporte.findMany({
+    const transportes = await prisma.configTransporte.findMany({
       where: { activo: true, comercio: comercioWhere },
       include: { ...TRANSPORTE_INCLUDE, rutas: { where: { activo: true }, orderBy: { horario: "asc" } } },
       orderBy: { creadoAt: "desc" },
     });
+    
+    // Inyectar Banners Publicitarios (Red de Display Cruzada)
+    const banners = await prisma.anuncioUbicacion.findMany({
+      where: { 
+        modulo: 'TRANSPORTE', 
+        formato: 'BANNER', 
+        activa: true,
+        campana: { estado: 'ACTIVA' }
+      },
+      include: { campana: true },
+    });
+
+    const shuffledBanners = banners.sort(() => 0.5 - Math.random()).slice(0, 2);
+    let itemsHibridos = [...transportes];
+
+    if (shuffledBanners[0] && itemsHibridos.length >= 3) {
+      itemsHibridos.splice(3, 0, {
+        id: `banner-${shuffledBanners[0].id}`,
+        esBannerDisplay: true,
+        titulo: shuffledBanners[0].titulo,
+        subtitulo: shuffledBanners[0].subtitulo,
+        mediaUrl: shuffledBanners[0].mediaUrl,
+        urlDestino: shuffledBanners[0].urlDestino,
+        ctaTexto: shuffledBanners[0].ctaTexto,
+        etiqueta: shuffledBanners[0].etiqueta,
+      });
+    }
+
+    if (shuffledBanners[1] && itemsHibridos.length >= 7) {
+      itemsHibridos.splice(7, 0, {
+        id: `banner-${shuffledBanners[1].id}`,
+        esBannerDisplay: true,
+        titulo: shuffledBanners[1].titulo,
+        subtitulo: shuffledBanners[1].subtitulo,
+        mediaUrl: shuffledBanners[1].mediaUrl,
+        urlDestino: shuffledBanners[1].urlDestino,
+        ctaTexto: shuffledBanners[1].ctaTexto,
+        etiqueta: shuffledBanners[1].etiqueta,
+      });
+    }
+
+    return itemsHibridos;
   },
 
   async obtener(id) {
@@ -118,12 +162,30 @@ const TransporteService = {
     });
     if (!ruta || !ruta.activo) throw new ErrorValidacion("Ruta no disponible");
 
+    // Chequeo rápido fuera de la transacción (optimización UX, no atómico) — la
+    // garantía real contra sobreventa concurrente viene del lock dentro de la
+    // transacción, igual que en Hotel/Tour.
     const disp = await TransporteService.verificarDisponibilidad(rutaTransporteId, fechaViaje);
     if (disp.disponibles < asientos) throw new ErrorValidacion("No hay suficientes asientos disponibles");
 
     const totalOriginal = Number(ruta.precioAsiento) * asientos;
 
     const { reserva } = await prisma.$transaction(async (tx) => {
+      // Bloquea la fila de la ruta para serializar reservas concurrentes sobre el
+      // mismo cupo (antes esta verificación no tenía ningún lock — dos reservas
+      // simultáneas podían ambas pasar el chequeo y sobrevender asientos).
+      await tx.$queryRaw`SELECT id FROM "RutaTransporte" WHERE id = ${rutaTransporteId} FOR UPDATE`;
+
+      const fechaD = new Date(fechaViaje);
+      const inicio = new Date(fechaD); inicio.setHours(0, 0, 0, 0);
+      const fin    = new Date(fechaD); fin.setHours(23, 59, 59, 999);
+      const reservadosDentroDeTx = await tx.reservaTransporte.aggregate({
+        where: { rutaTransporteId, fechaViaje: { gte: inicio, lte: fin }, estado: { in: ["PENDIENTE", "CONFIRMADA"] } },
+        _sum: { asientos: true },
+      });
+      const disponiblesDentroDeTx = Math.max(0, ruta.capacidad - (reservadosDentroDeTx._sum.asientos ?? 0));
+      if (disponiblesDentroDeTx < asientos) throw new ErrorValidacion("No hay suficientes asientos disponibles");
+
       let montoDescuento = 0;
       let cuponValidado = null;
       let cuponEsAlianza = false;
@@ -143,6 +205,7 @@ const TransporteService = {
       }
 
       const total = totalOriginal - montoDescuento;
+      const comision = Math.round(total * TASA_COMISION_TRANSPORTE);
 
       const nuevaReserva = await tx.reservaTransporte.create({
         data: {
@@ -152,6 +215,8 @@ const TransporteService = {
           fechaViaje: new Date(fechaViaje),
           asientos,
           total,
+          comision,
+          tasaComision: TASA_COMISION_TRANSPORTE,
           estado: "PENDIENTE",
           metodoPago,
           notasCliente: notasCliente || null,
@@ -364,6 +429,12 @@ const TransporteService = {
     const ingresoMes = reservas
       .filter(r => ['CONFIRMADA','COMPLETADA'].includes(r.estado) && new Date(r.creadoAt) >= inicioMes)
       .reduce((s, r) => s + Number(r.total), 0);
+    const comisionTotal = reservas
+      .filter(r => ['CONFIRMADA','COMPLETADA'].includes(r.estado))
+      .reduce((s, r) => s + Number(r.comision ?? 0), 0);
+    const comisionMes = reservas
+      .filter(r => ['CONFIRMADA','COMPLETADA'].includes(r.estado) && new Date(r.creadoAt) >= inicioMes)
+      .reduce((s, r) => s + Number(r.comision ?? 0), 0);
 
     // Reservas por mes (últimos 6 meses)
     const reservasPorMes = [];
@@ -403,6 +474,8 @@ const TransporteService = {
       reservasCanceladas: canceladas,
       ingresoTotal,
       ingresoMes,
+      comisionTotal,
+      comisionMes,
       reservasPorMes,
       rutasPopulares,
       ocupacionPromedio: Math.round(ocupacion),

@@ -47,7 +47,9 @@ export default function AdminCategoriasPage() {
     try {
       const res = await apiFetch<{ ok: boolean; data: Categoria[] }>('/admin/categorias')
       setCategorias(res.data ?? [])
-    } catch { /**/ } finally {
+    } catch (err) {
+      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudieron cargar las categorías.' })
+    } finally {
       setCargando(false)
     }
   }, [])

@@ -76,6 +76,16 @@ export interface OfertaEmpleo {
   publicadoPor?: { id: number; nombre: string }
   comercio?: { id: number; nombre: string; verificado: boolean; logoUrl: string | null } | null
   _count?: { postulaciones: number }
+  anuncioActivo?: boolean
+
+  // Banner Display
+  esBannerDisplay?: boolean
+  tituloBanner?: string | null
+  subtitulo?: string | null
+  mediaUrl?: string | null
+  urlDestino?: string | null
+  ctaTexto?: string | null
+  etiqueta?: string
 }
 
 export interface ExperienciaItem {

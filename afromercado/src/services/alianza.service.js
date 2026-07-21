@@ -11,6 +11,7 @@
 const prisma = require("../config/prisma");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
+const { validarUbicacion } = require("../utils/ubicacion");
 
 const MODULOS_VALIDOS = ["PEDIDO", "EXPRESS", "HOTEL", "TOUR", "TRANSPORTE"];
 const TIPOS_DESCUENTO_VALIDOS = ["PORCENTAJE", "VALOR_FIJO"];
@@ -126,6 +127,9 @@ const AlianzaService = {
     validarTipoDescuento(tipoDescuento);
     const valor = Number(valorDescuento);
     if (!Number.isFinite(valor) || valor <= 0) throw new ErrorValidacion("El valor del descuento no es válido");
+    if (departamento && String(departamento).trim() && municipio && String(municipio).trim()) {
+      validarUbicacion(String(departamento).trim(), String(municipio).trim());
+    }
 
     await obtenerComercioVerificado(comercioId);
 

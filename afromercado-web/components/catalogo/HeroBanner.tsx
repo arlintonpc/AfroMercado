@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Producto } from '@/types/producto'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
@@ -22,7 +22,7 @@ interface FotoHero {
   tipoCampana?: TipoCampana
   subtitulo?: string
   videoUrl?: string
-  etiquetaCampana?: string  // texto del badge (ej. "Patrocinado", "Comunidad", "Aliado")
+  etiquetaCampana?: string
 }
 
 interface HeroConfig {
@@ -43,85 +43,21 @@ interface CampanaAPI {
   etiqueta:   string
 }
 
-/* ─── Fallback visual cuando no hay productos ni campañas ───── */
+/* ─── Fallback visual inmersivo ─────────────────────────────── */
 const FALLBACK: FotoHero[] = [
-  { url: 'https://images.unsplash.com/photo-1743252878695-367d69dc87a8?w=600&q=80&auto=format&fit=crop', alt: 'Cacao fino de aroma',     etiqueta: 'Cacao fino',     precio: '$32.000', href: '/' },
-  { url: 'https://images.unsplash.com/photo-1589820296156-2454bb8a6ad1?w=600&q=80&auto=format&fit=crop', alt: 'Piña perolera del Pacífico', etiqueta: 'Piña perolera', precio: '$6.000',  href: '/' },
-  { url: 'https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=600&q=80&auto=format&fit=crop', alt: 'Plátano hartón orgánico',   etiqueta: 'Plátano hartón', precio: '$4.500',  href: '/' },
-  { url: 'https://images.unsplash.com/photo-1775817590687-f1da5d70d9ad?w=600&q=80&auto=format&fit=crop', alt: 'Panela negra artesanal',    etiqueta: 'Panela negra',   precio: '$8.000',  href: '/' },
+  { url: 'https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?w=1600&q=80', alt: 'Paisaje del Pacífico', etiqueta: 'Paisaje Pacífico', precio: '', href: '/' },
+  { url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1600&q=80', alt: 'Gastronomía', etiqueta: 'Sabores locales', precio: '', href: '/express' },
+  { url: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1600&q=80', alt: 'Alojamiento', etiqueta: 'Descanso natural', precio: '', href: '/hoteles' },
+  { url: 'https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=1600&q=80', alt: 'Productos', etiqueta: 'Productos del campo', precio: '', href: '#catalogo' },
 ]
 
-/* ─── Video de campaña: solo YouTube y archivo directo logran el
-   autoplay silencioso en loop sin interfaz de la plataforma (el look
-   "estilo Facebook" que se busca). TikTok/Instagram/Facebook muestran su
-   propia marca/controles al incrustarse, así que ahí se usa una miniatura
-   estática en vez de fingir un autoplay que no se ve limpio. ─────── */
-type TipoVideoAnuncio = 'directo' | 'youtube' | 'otro'
-
-function detectarVideoAnuncio(url?: string): { tipo: TipoVideoAnuncio; embedUrl?: string } {
-  if (!url) return { tipo: 'otro' }
-  try {
-    const u = new URL(url)
-    const host = u.hostname.replace(/^www\./, '')
-    if (host === 'youtube.com' || host === 'youtu.be') {
-      const vid = host === 'youtu.be' ? u.pathname.slice(1) : u.searchParams.get('v')
-      if (vid) {
-        return {
-          tipo: 'youtube',
-          embedUrl: `https://www.youtube.com/embed/${vid}?autoplay=1&mute=1&loop=1&playlist=${vid}&controls=0&modestbranding=1&playsinline=1&rel=0`,
-        }
-      }
-    }
-    if (/\.(mp4|webm|mov|m3u8)(\?|$)/i.test(u.pathname)) return { tipo: 'directo' }
-    if (host.includes('cloudinary.com') && u.pathname.includes('/video/')) return { tipo: 'directo' }
-  } catch { /* URL invalida */ }
-  return { tipo: 'otro' }
-}
-
-/** Fondo de la tarjeta del hero: video directo, YouTube en loop silencioso, o imagen estática. */
-function MediaFondoHero({ foto, className, priority }: { foto: FotoHero; className: string; priority?: boolean }) {
-  const video = useMemo(() => detectarVideoAnuncio(foto.videoUrl), [foto.videoUrl])
-
-  if (video.tipo === 'directo') {
-    return (
-      <video src={foto.videoUrl} poster={foto.url} autoPlay muted loop playsInline className={className} />
-    )
-  }
-
-  if (video.tipo === 'youtube' && video.embedUrl) {
-    return (
-      <div className={`${className} relative overflow-hidden bg-black`}>
-        <iframe
-          src={video.embedUrl}
-          className="absolute top-1/2 left-1/2 pointer-events-none"
-          style={{ width: '250%', height: '250%', transform: 'translate(-50%, -50%)', border: 0 }}
-          allow="autoplay; encrypted-media"
-          tabIndex={-1}
-          aria-hidden="true"
-        />
-      </div>
-    )
-  }
-
-  return (
-    <>
-      <Image
-        src={foto.url}
-        alt={foto.alt}
-        fill
-        sizes="(max-width: 1024px) 160px, 25vw"
-        className={className}
-        priority={priority}
-      />
-      {foto.videoUrl && (
-        <span className="absolute top-3 left-3 flex items-center gap-1 bg-black/50 backdrop-blur text-white text-[10px] font-semibold px-2 py-1 rounded-full">
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
-          Video
-        </span>
-      )}
-    </>
-  )
-}
+const VERTICALES = [
+  { id: 'tienda', icon: '🛒', label: 'Tienda', href: '#catalogo' },
+  { id: 'express', icon: '🍽️', label: 'Restaurantes', href: '/express' },
+  { id: 'hoteles', icon: '🏨', label: 'Hoteles', href: '/hoteles' },
+  { id: 'tours', icon: '🌴', label: 'Tours', href: '/tours' },
+  { id: 'transporte', icon: '🚐', label: 'Transporte', href: '/transportes' },
+]
 
 /* ─── Utilidades ─────────────────────────────────────────────── */
 function mezclar<T>(arr: T[]): T[] {
@@ -133,132 +69,14 @@ function mezclar<T>(arr: T[]): T[] {
   return a
 }
 
-function badgeCampana(foto: FotoHero) {
-  const esSocial = foto.tipoCampana === 'SOCIAL'
-  return {
-    label: foto.etiquetaCampana || (esSocial ? 'Comunidad' : 'Publicidad'),
-    cls: esSocial
-      ? 'bg-[#52B788] text-white'
-      : 'bg-[#D4A017] text-[#1A1A1A]',
-    ctaCls: esSocial
-      ? 'bg-[#52B788] text-white'
-      : 'bg-white text-[#2D6A4F]',
-  }
-}
-
-/* ─── Sub-componente: rejilla de 4 tarjetas ─────────────────── */
-function Collage({ fotos, priority = false, onClic }: {
-  fotos:    FotoHero[]
-  priority?: boolean
-  onClic:   (foto: FotoHero) => void
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-4">
-      {fotos.map((foto, idx) => (
-        <Link
-          key={idx}
-          href={foto.href}
-          onClick={() => onClic(foto)}
-          className="group relative block rounded-3xl overflow-hidden ring-1 ring-white/10 shadow-2xl shadow-black/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A017]"
-          style={{ aspectRatio: '3 / 4' }}
-          tabIndex={0}
-        >
-          <MediaFondoHero
-            foto={foto}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-            priority={priority && idx < 2}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
-
-          {/* Badge campaña */}
-          {foto.esCampaña && (
-            <span className={`absolute top-3 right-3 text-[9px] font-bold px-2 py-0.5 rounded-full leading-none tracking-wide uppercase ${badgeCampana(foto).cls}`}>
-              {badgeCampana(foto).label}
-            </span>
-          )}
-
-          <figcaption className="absolute bottom-3 left-3 right-3">
-            {foto.subtitulo && (
-              <p className="text-white/70 text-[10px] mb-0.5 truncate">{foto.subtitulo}</p>
-            )}
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-white text-sm font-semibold drop-shadow truncate">{foto.etiqueta}</span>
-              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0 ${
-                foto.esCampaña
-                  ? badgeCampana(foto).ctaCls
-                  : 'bg-[#D4A017] text-[#1A1A1A]'
-              }`}>
-                {foto.precio}
-              </span>
-            </div>
-          </figcaption>
-        </Link>
-      ))}
-    </div>
-  )
-}
-
-/* ─── Sub-componente: tira mobile ───────────────────────────── */
-function CollageMobile({ fotos, onClic }: {
-  fotos:  FotoHero[]
-  onClic: (foto: FotoHero) => void
-}) {
-  return (
-    <>
-      {fotos.map((foto, idx) => (
-        <Link
-          key={idx}
-          href={foto.href}
-          onClick={() => onClic(foto)}
-          className="group relative flex-shrink-0 w-40 block rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A017]"
-          style={{ aspectRatio: '3 / 4' }}
-        >
-          <MediaFondoHero
-            foto={foto}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-            priority={idx === 0}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
-          {foto.esCampaña && (
-            <span className={`absolute top-2 right-2 text-[8px] font-bold px-1.5 py-0.5 rounded-full leading-none tracking-wide uppercase ${badgeCampana(foto).cls}`}>
-              {badgeCampana(foto).label}
-            </span>
-          )}
-          <figcaption className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-1">
-            <span className="text-white text-xs font-semibold drop-shadow truncate">{foto.etiqueta}</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${foto.esCampaña ? badgeCampana(foto).ctaCls : 'bg-[#D4A017] text-[#1A1A1A]'}`}>
-              {foto.precio}
-            </span>
-          </figcaption>
-        </Link>
-      ))}
-    </>
-  )
-}
-
 /* ─── Componente principal ───────────────────────────────────── */
 export default function HeroBanner({ productos = [] }: { productos?: Producto[] }) {
   const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')
 
   const [config, setConfig] = useState<HeroConfig>({ modo: 'FIJAS', intervaloSegundos: 10, fuente: 'ORGANICO' })
   const [campanas, setCampanas] = useState<CampanaAPI[]>([])
-
-  /* Dos capas para slide sin parpadeo */
-  const [fotosA, setFotosA] = useState<FotoHero[]>(FALLBACK)
-  const [fotosB, setFotosB] = useState<FotoHero[]>(FALLBACK)
-  const [xA, setXA] = useState(0)
-  const [xB, setXB] = useState(100)
-  const [transA, setTransA] = useState(false)
-  const [transB, setTransB] = useState(false)
-
-  /* Dots */
-  const [grupoActual, setGrupoActual] = useState(0)
-  const [totalGrupos, setTotalGrupos] = useState(1)
-
-  const activoRef      = useRef<'A' | 'B'>('A')
-  const deslizandoRef  = useRef(false)
-  const seqRef         = useRef<FotoHero[]>([])
-  const idxRef         = useRef(0)
+  
+  const [currentIdx, setCurrentIdx] = useState(0)
 
   /* ── Cargar config y campañas ── */
   useEffect(() => {
@@ -308,7 +126,6 @@ export default function HeroBanner({ productos = [] }: { productos?: Producto[] 
     if (config.fuente === 'CAMPANAS') {
       base = campanasHero.length >= 4 ? campanasHero : [...campanasHero, ...organico]
     } else if (config.fuente === 'MIXTO') {
-      // Las sociales no consumen el slot pagado: se intercalan aparte.
       const result: FotoHero[] = []
       let si = 0, pi = 0, oi = 0
       while (si < sociales.length || pi < pagadas.length || oi < organico.length) {
@@ -322,232 +139,145 @@ export default function HeroBanner({ productos = [] }: { productos?: Producto[] 
     }
 
     if (base.length === 0) return FALLBACK
-    // Relleno para tener al menos 4
-    if (base.length < 4) {
-      const pad = [...base]
-      while (pad.length < 4) pad.push(FALLBACK[pad.length % FALLBACK.length])
-      return pad
-    }
-    return base
-  }, [productos, campanas, config.fuente])
+    return config.modo === 'ALEATORIO' ? mezclar(base) : base
+  }, [productos, campanas, config.fuente, config.modo])
 
   /* ── Registrar vista / clic ── */
-  const registrarVista = useCallback((fotos: FotoHero[]) => {
-    fotos.forEach(f => {
-      if (f.campanaId) fetch(`${API_URL}/campanas/${f.campanaId}/vista`, { method: 'POST' }).catch(() => {})
-    })
+  const registrarVista = useCallback((foto: FotoHero) => {
+    if (foto.campanaId) fetch(`${API_URL}/campanas/${foto.campanaId}/vista`, { method: 'POST' }).catch(() => {})
   }, [API_URL])
 
   function registrarClic(foto: FotoHero) {
     if (foto.campanaId) fetch(`${API_URL}/campanas/${foto.campanaId}/clic`, { method: 'POST' }).catch(() => {})
   }
 
-  /* ── Slide: la capa inactiva carga imágenes off-screen, luego ambas se deslizan ── */
-  const deslizar = useCallback((siguientes: FotoHero[], nuevoIdx: number) => {
-    if (deslizandoRef.current) return
-    deslizandoRef.current = true
-
-    const activo   = activoRef.current
-    const inactivo: 'A' | 'B' = activo === 'A' ? 'B' : 'A'
-
-    // 1. Cargar nuevas fotos en la capa oculta (fuera de pantalla, sin parpadeo)
-    if (inactivo === 'A') setFotosA(siguientes)
-    else setFotosB(siguientes)
-
-    // 2. Un frame después, activar transición y deslizar ambas capas
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setTransA(true)
-        setTransB(true)
-        if (activo   === 'A') setXA(-100); else setXB(-100)   // activa sale por la izquierda
-        if (inactivo === 'A') setXA(0);    else setXB(0)      // inactiva entra por la derecha
-
-        activoRef.current = inactivo
-        setGrupoActual(nuevoIdx)
-        registrarVista(siguientes)
-
-        // 3. Al terminar la animación, desactivar transición y resetear capa vieja
-        setTimeout(() => {
-          if (activo === 'A') { setTransA(false); setXA(100) }
-          else                { setTransB(false); setXB(100) }
-          deslizandoRef.current = false
-        }, 720)
+  /* ── Rotación del fondo ── */
+  useEffect(() => {
+    if (config.modo === 'FIJAS' || pool.length === 0) return
+    const id = setInterval(() => {
+      setCurrentIdx((prev) => {
+        const next = (prev + 1) % pool.length
+        registrarVista(pool[next])
+        return next
       })
-    })
-  }, [registrarVista])
-
-  /* ── Inicializar secuencia cuando cambia el pool o el modo ── */
-  useEffect(() => {
-    seqRef.current = config.modo === 'ALEATORIO' ? mezclar(pool) : [...pool]
-    idxRef.current = 0
-    const primeras = seqRef.current.slice(0, 4)
-    setFotosA(primeras)
-    setFotosB(primeras)
-    setXA(0); setXB(100)
-    setTransA(false); setTransB(false)
-    activoRef.current = 'A'
-    deslizandoRef.current = false
-    setGrupoActual(0)
-    setTotalGrupos(Math.max(1, Math.ceil(seqRef.current.length / 4)))
-    registrarVista(primeras)
-  }, [pool, config.modo, registrarVista])
-
-  /* ── Rotación automática ── */
-  useEffect(() => {
-    if (config.modo === 'FIJAS') return
-    const girar = () => {
-      idxRef.current = (idxRef.current + 4) % seqRef.current.length
-      if (config.modo === 'ALEATORIO' && idxRef.current === 0) seqRef.current = mezclar(pool)
-      const inicio = idxRef.current
-      const sig: FotoHero[] = []
-      for (let i = 0; i < 4; i++) sig.push(seqRef.current[(inicio + i) % seqRef.current.length])
-      const grupoIdx = Math.floor(idxRef.current / 4)
-      deslizar(sig, grupoIdx)
-    }
-    const id = setInterval(girar, config.intervaloSegundos * 1000)
+    }, config.intervaloSegundos * 1000)
+    
+    // Registrar vista inicial
+    registrarVista(pool[0])
+    
     return () => clearInterval(id)
-  }, [config, pool, deslizar])
+  }, [config, pool, registrarVista])
 
-  /* ── Navegación manual por dots ── */
-  function irAGrupo(grupoIdx: number) {
-    if (deslizandoRef.current) return
-    const idx = grupoIdx * 4
-    const sig: FotoHero[] = []
-    for (let i = 0; i < 4; i++) sig.push(seqRef.current[(idx + i) % seqRef.current.length])
-    idxRef.current = idx
-    deslizar(sig, grupoIdx)
-  }
-
-  const esInteractivo = config.modo !== 'FIJAS' || totalGrupos > 1
+  const activeItem = pool[currentIdx] || FALLBACK[0]
 
   return (
-    <section className="relative overflow-hidden bg-[#1a3a2a]">
-      {/* Patrón decorativo */}
-      <div className="absolute inset-0 opacity-[0.06]">
-        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="lp" x="0" y="0" width="64" height="64" patternUnits="userSpaceOnUse">
-              <circle cx="32" cy="32" r="22" fill="none" stroke="#52B788" strokeWidth="1" />
-              <circle cx="32" cy="32" r="8" fill="#52B788" opacity="0.5" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#lp)" />
-        </svg>
-      </div>
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0f2419] via-[#1a3a2a] to-[#23503a]" />
-      <div className="absolute top-0 right-1/4 w-[520px] h-[520px] opacity-20 -translate-y-1/3 rounded-full bg-[#D4A017] blur-[90px]" />
-      <div className="absolute bottom-0 left-0 w-72 h-72 opacity-25 -translate-x-1/4 translate-y-1/4 rounded-full bg-[#52B788] blur-[70px]" />
-
-      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-16 lg:py-20">
-        <div className="grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
-
-          {/* ─── Texto ─── */}
-          <div className="max-w-xl">
-            <div className="inline-flex items-center gap-2 bg-white/5 border border-[#D4A017]/30 backdrop-blur-sm rounded-full px-4 py-1.5 mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#D4A017] animate-pulse" />
-              <span className="text-[#D4A017] text-xs font-semibold tracking-widest uppercase">Marketplace de Colombia</span>
-            </div>
-            <h1 className="leading-[0.95] mb-6" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
-              <span className="block text-white text-5xl md:text-6xl lg:text-[68px] font-normal">Del Chocó</span>
-              <span className="block text-5xl md:text-6xl lg:text-[68px] font-normal bg-gradient-to-r from-[#D4A017] via-[#F4C842] to-[#D4A017] bg-clip-text text-transparent">para toda Colombia</span>
-            </h1>
-            <p className="text-white/65 text-base md:text-lg mb-7 leading-relaxed max-w-md">
-              Productos ancestrales, artesanías y sabores auténticos directo de las comunidades afro, indígenas y campesinas de todo el país.
-            </p>
-            <div className="flex items-center gap-3 mb-8">
-              <div className="flex">
-                {[{ i: 'J', c: 'bg-[#52B788]' }, { i: 'A', c: 'bg-[#D4A017]' }, { i: 'M', c: 'bg-[#2D6A4F]' }].map((a, idx) => (
-                  <span key={a.i} className={`w-9 h-9 rounded-full ${a.c} ring-2 ring-[#1a3a2a] flex items-center justify-center text-white text-xs font-bold ${idx > 0 ? '-ml-2.5' : ''}`}>{a.i}</span>
-                ))}
-              </div>
-              <p className="text-white/55 text-sm">José, Ana Tulia, Marta <span className="text-white/40">y más productores</span></p>
-            </div>
-            <div className="flex flex-wrap gap-3 mb-10">
-              <a href="#catalogo" className="group relative overflow-hidden bg-[#D4A017] text-[#1A1A1A] font-semibold px-7 py-3.5 rounded-full transition-all duration-300 hover:shadow-xl hover:shadow-[#D4A017]/25 hover:scale-[1.03] min-h-[48px] text-sm flex items-center">
-                <span className="relative z-10">Explorar productos</span>
-                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-              </a>
-              <a href="/comerciante/ingresar" className="border border-white/20 text-white/85 hover:text-white hover:border-white/40 font-medium px-7 py-3.5 rounded-full transition-all duration-200 hover:bg-white/5 min-h-[48px] text-sm backdrop-blur-sm flex items-center">
-                Soy comerciante →
-              </a>
-            </div>
-            <div className="flex gap-8 pt-7 border-t border-white/10">
-              {[{ valor: '6+', label: 'Productos' }, { valor: '4', label: 'Productores' }, { valor: '100%', label: 'Auténtico' }].map(s => (
-                <div key={s.label}>
-                  <p className="text-3xl text-white font-bold" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>{s.valor}</p>
-                  <p className="text-white/40 text-xs tracking-wide uppercase mt-0.5">{s.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ─── Collage desktop con slide ─── */}
-          <div className="hidden lg:block">
-            {/* Dos capas apiladas en la misma celda CSS grid → el overflow se recorta */}
-            <div className="overflow-hidden" style={{ display: 'grid' }}>
-              <div
-                className={transA ? 'transition-transform duration-700 ease-in-out' : ''}
-                style={{ gridArea: '1/1', transform: `translateX(${xA}%)` }}
-              >
-                <Collage fotos={fotosA} priority onClic={registrarClic} />
-              </div>
-              <div
-                className={transB ? 'transition-transform duration-700 ease-in-out' : ''}
-                style={{ gridArea: '1/1', transform: `translateX(${xB}%)` }}
-              >
-                <Collage fotos={fotosB} onClic={registrarClic} />
-              </div>
-            </div>
-
-            {/* Dots de navegación */}
-            {esInteractivo && totalGrupos > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-5">
-                {Array.from({ length: totalGrupos }).map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => irAGrupo(i)}
-                    aria-label={`Grupo ${i + 1}`}
-                    className={`rounded-full transition-all duration-300 ${
-                      i === grupoActual
-                        ? 'w-6 h-2 bg-[#D4A017]'
-                        : 'w-2 h-2 bg-white/30 hover:bg-white/60'
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ─── Tira mobile con slide ─── */}
-          <div className="lg:hidden" style={{ height: 224 }}>
-            <div className="relative overflow-hidden h-full" style={{ display: 'grid' }}>
-              <div
-                className={`${transA ? 'transition-transform duration-700 ease-in-out' : ''} px-4 flex gap-3 overflow-x-auto pb-2`}
-                style={{ gridArea: '1/1', transform: `translateX(${xA}%)`, scrollbarWidth: 'none' } as React.CSSProperties}
-              >
-                <CollageMobile fotos={fotosA} onClic={registrarClic} />
-              </div>
-              <div
-                className={`${transB ? 'transition-transform duration-700 ease-in-out' : ''} px-4 flex gap-3 overflow-x-auto pb-2`}
-                style={{ gridArea: '1/1', transform: `translateX(${xB}%)`, scrollbarWidth: 'none' } as React.CSSProperties}
-              >
-                <CollageMobile fotos={fotosB} onClic={registrarClic} />
-              </div>
-            </div>
-          </div>
-
+    <section className="relative w-full h-[85vh] min-h-[600px] flex items-center justify-center overflow-hidden bg-[#0f2419]">
+      {/* ─── Carrusel de Fondos ─── */}
+      {pool.map((slide, idx) => (
+        <div
+          key={slide.url + idx}
+          className={`absolute inset-0 transition-opacity duration-[1500ms] ease-in-out ${
+            idx === currentIdx ? 'opacity-100 z-0' : 'opacity-0 -z-10'
+          }`}
+        >
+          {/* Si es video directo se podría manejar aquí, por ahora usamos la imagen como poster para simplicidad y estética */}
+          <Image
+            src={slide.url}
+            alt={slide.alt}
+            fill
+            className="object-cover object-center transition-transform duration-[15000ms] ease-out"
+            style={{ transform: idx === currentIdx ? 'scale(1)' : 'scale(1.1)' }}
+            priority={idx === 0}
+          />
         </div>
-      </div>
+      ))}
 
-      {/* Indicador de modo */}
-      {config.modo !== 'FIJAS' && (
-        <div className="absolute bottom-3 right-4 flex items-center gap-1.5 bg-black/30 backdrop-blur-sm rounded-full px-3 py-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#D4A017] animate-pulse" />
-          <span className="text-white/60 text-[10px] tracking-wide">
-            {config.modo === 'ALEATORIO' ? 'Aleatorio' : 'Automático'} · {config.intervaloSegundos}s
+      {/* Capa de oscurecimiento (Overlay) para asegurar legibilidad */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#0f2419]/80 via-[#0f2419]/50 to-[#0f2419]/90 z-10" />
+
+      {/* ─── Contenido Centrado ─── */}
+      <div className="relative z-20 w-full max-w-5xl mx-auto px-4 flex flex-col items-center text-center mt-8">
+        
+        {/* Píldora Superior */}
+        <div className="inline-flex items-center gap-2 bg-white/10 border border-[#D4A017]/40 backdrop-blur-md rounded-full px-5 py-2 mb-8 shadow-2xl">
+          <span className="w-2 h-2 rounded-full bg-[#D4A017] animate-pulse" />
+          <span className="text-[#D4A017] text-[10px] sm:text-xs font-bold tracking-widest uppercase">
+            Plataforma Multiservicios de Colombia
           </span>
         </div>
+
+        {/* Título Principal */}
+        <h1 className="leading-[1.05] mb-6 drop-shadow-2xl" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
+          <span className="block text-white text-5xl md:text-7xl lg:text-[80px] font-normal mb-1">
+            Conectando territorios,
+          </span>
+          <span className="block text-4xl md:text-6xl lg:text-[70px] font-normal bg-gradient-to-r from-[#D4A017] via-[#F4C842] to-[#D4A017] bg-clip-text text-transparent">
+            creando oportunidades.
+          </span>
+        </h1>
+
+        {/* Subtítulo */}
+        <p className="text-white/80 text-sm md:text-lg lg:text-xl max-w-3xl mx-auto mb-10 md:mb-12 leading-relaxed drop-shadow-lg">
+          Descubre artesanías ancestrales, saborea la gastronomía local, hospédate en el territorio y vive experiencias inolvidables con nuestras comunidades.
+        </p>
+
+        {/* ─── Hub de Navegación "Glassmorphism" ─── */}
+        <div className="w-full max-w-4xl bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-3 shadow-2xl">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            {VERTICALES.map((v) => (
+              <Link
+                key={v.id}
+                href={v.href}
+                className="group flex flex-col items-center justify-center p-4 rounded-2xl bg-white/5 hover:bg-white/20 border border-transparent hover:border-white/30 transition-all duration-300"
+              >
+                <span className="text-3xl mb-2 group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-300 drop-shadow-md">
+                  {v.icon}
+                </span>
+                <span className="text-white text-xs md:text-sm font-semibold tracking-wide">
+                  {v.label}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Botón de Comerciante (Secundario) */}
+        <div className="mt-12 flex justify-center">
+           <Link href="/comerciante/ingresar" className="inline-flex items-center text-white/60 hover:text-white text-xs md:text-sm font-medium transition-colors border-b border-transparent hover:border-white/50 pb-0.5">
+             Soy comerciante. Quiero vender mis productos o servicios →
+           </Link>
+        </div>
+
+      </div>
+
+      {/* ─── Tarjeta Flotante: Anuncio o Producto Activo ─── */}
+      {activeItem && (activeItem.esCampaña || activeItem.precio) && (
+        <div className="absolute bottom-6 right-4 md:right-8 z-30 animate-fade-in">
+          <Link 
+            href={activeItem.href} 
+            onClick={() => registrarClic(activeItem)}
+            className="flex items-center gap-3 bg-black/40 hover:bg-black/70 backdrop-blur-md rounded-2xl p-2.5 pr-5 border border-white/10 hover:border-white/30 transition-all shadow-xl group max-w-xs"
+          >
+             <div className="w-14 h-14 rounded-xl overflow-hidden relative flex-shrink-0">
+               <Image src={activeItem.url} alt={activeItem.alt} fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
+             </div>
+             <div className="flex flex-col min-w-0">
+               <span className="text-[9px] text-[#52B788] font-bold uppercase tracking-wider mb-0.5">
+                 {activeItem.etiquetaCampana || (activeItem.esCampaña ? 'Recomendado' : 'Destacado')}
+               </span>
+               <p className="text-white text-xs md:text-sm font-semibold truncate leading-tight">
+                 {activeItem.etiqueta}
+               </p>
+               {activeItem.precio && (
+                 <span className="text-[#D4A017] text-xs font-bold mt-1 inline-block">
+                   {activeItem.precio}
+                 </span>
+               )}
+             </div>
+          </Link>
+        </div>
       )}
+
     </section>
   )
 }

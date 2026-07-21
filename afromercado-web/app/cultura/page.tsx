@@ -8,6 +8,7 @@ import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 import { CATEGORIAS_CULTURA } from '@/lib/data/culturaCategorias'
 import { useAuth } from '@/context/AuthContext'
 import TarjetaEventoCultural from '@/components/cultura/TarjetaEventoCultural'
+import BannerDisplay from '@/components/publicidad/BannerDisplay'
 import {
   CulturaCard,
   CulturaHero,
@@ -129,13 +130,16 @@ export default function CulturaPage() {
 
   const municipiosDisponibles = useMemo(() => (departamento ? municipiosDe(departamento) : []), [departamento])
 
+  const banners = eventos.filter((ev: any) => ev.esBannerDisplay)
+  const organicos = eventos.filter((ev: any) => !ev.esBannerDisplay)
+
   const estadisticas = useMemo(() => {
-    const total = eventos.length
-    const gratis = eventos.filter((ev) => precioDesde(ev) === 0 || ev.gratuito).length
-    const patrimonio = eventos.filter((ev) => ev.patrimonio).length
-    const departamentos = new Set(eventos.map((ev) => ev.departamento)).size
+    const total = organicos.length
+    const gratis = organicos.filter((ev) => precioDesde(ev) === 0 || ev.gratuito).length
+    const patrimonio = organicos.filter((ev) => ev.patrimonio).length
+    const departamentos = new Set(organicos.map((ev) => ev.departamento)).size
     return { total, gratis, patrimonio, departamentos }
-  }, [eventos])
+  }, [organicos])
 
   const actions = (
     <div className="flex flex-wrap gap-2">
@@ -354,13 +358,19 @@ export default function CulturaPage() {
           </CulturaCard>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {eventos.map((ev) => (
-              <TarjetaEventoCultural
-                key={ev.id}
-                ev={ev}
-                esFavorito={favoritosIds.has(ev.id)}
-                onFavoritoChange={manejarFavoritoCambio}
-              />
+            {eventos.map((ev: any) => (
+              ev.esBannerDisplay ? (
+                <div key={ev.id} className="col-span-full mt-2 mb-2">
+                  <BannerDisplay banner={ev} />
+                </div>
+              ) : (
+                <TarjetaEventoCultural
+                  key={ev.id}
+                  ev={ev}
+                  esFavorito={favoritosIds.has(ev.id)}
+                  onFavoritoChange={manejarFavoritoCambio}
+                />
+              )
             ))}
           </div>
         )}

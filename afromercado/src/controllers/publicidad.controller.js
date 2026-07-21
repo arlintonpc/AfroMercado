@@ -197,6 +197,36 @@ function whereCreatedAt({ desde, hasta }) {
   return Object.keys(createdAt).length ? { createdAt } : {};
 }
 
+// Reconstruye vistas/clics/conversiones/gmv por anuncio agregando
+// MetricaPublicitaria (Teravia Ads) — reemplaza los contadores denormalizados
+// que tenían CampanaHero/VisibilidadPagada en el sistema anterior. Nota: el
+// nuevo TipoMetricaAnuncio no distingue "agregado al carrito" como evento
+// propio (solo IMPRESION/CLIC/CONVERSION_COMPRA/POSTULACION_EMPLEO), así que
+// "carritos" queda en 0 y "unidadesAtribuidas" se aproxima con el conteo de
+// conversiones — simplificación deliberada del refactor, no un bug de este fix.
+async function agregarMetricasPorAnuncio(anuncioIds) {
+  const mapa = new Map(anuncioIds.map((id) => [id, { vistas: 0, clics: 0, carritos: 0, pedidosAtribuidos: 0, gmvAtribuido: 0 }]));
+  if (anuncioIds.length === 0) return mapa;
+  const grupos = await prisma.metricaPublicitaria.groupBy({
+    by: ["anuncioId", "tipoEvento"],
+    where: { anuncioId: { in: anuncioIds } },
+    _count: { _all: true },
+    _sum: { valorAtribuido: true },
+  });
+  for (const g of grupos) {
+    const fila = mapa.get(g.anuncioId);
+    if (!fila) continue;
+    if (g.tipoEvento === "IMPRESION") fila.vistas = g._count._all;
+    else if (g.tipoEvento === "CLIC") fila.clics = g._count._all;
+    else if (g.tipoEvento === "CARRITO") fila.carritos = g._count._all;
+    else if (g.tipoEvento === "CONVERSION_COMPRA") {
+      fila.pedidosAtribuidos = g._count._all;
+      fila.gmvAtribuido = Number(g._sum.valorAtribuido || 0);
+    }
+  }
+  return mapa;
+}
+
 function selectPaqueteConfig() {
   return {
     id: true,
@@ -554,44 +584,91 @@ function construirAnaliticaAfroMedia({ visibilidades, solicitudes, campanas, paq
 
 async function obtenerDatosAfroMedia({ desde = null, hasta = null } = {}) {
   const filtro = whereCreatedAt({ desde, hasta });
-  const [paquetes, solicitudes, visibilidades, campanas] = await Promise.all([
+  const [paquetes, solicitudes, anunciosProductos, anunciosVitrina] = await Promise.all([
     listarPaquetesConfig(),
     prisma.solicitudPublicidad.findMany({
       where: filtro,
       orderBy: { createdAt: "desc" },
       select: selectSolicitud(),
     }),
-    prisma.visibilidadPagada.findMany({
-      where: filtro,
+    // Reemplaza VisibilidadPagada: anuncios nativos dentro del catálogo de productos.
+    // `productoId` es un Int suelto (sin relación Prisma declarada en
+    // AnuncioUbicacion) — el producto se resuelve aparte más abajo, no con `include`.
+    prisma.anuncioUbicacion.findMany({
+      where: { modulo: "PRODUCTOS", ...filtro },
       orderBy: { createdAt: "desc" },
       include: {
-        comercio: { select: { id: true, nombre: true, municipio: true } },
-        producto: {
-          select: {
-            id: true,
-            nombre: true,
-            categoria: { select: { id: true, nombre: true, slug: true } },
-          },
-        },
+        campana: { select: { presupuestoTotal: true, comercioId: true } },
       },
     }),
-    prisma.campanaHero.findMany({
-      where: filtro,
+    // Reemplaza CampanaHero: banners/irruptor/video del hero y la Vitrina.
+    prisma.anuncioUbicacion.findMany({
+      where: { modulo: "VITRINA", ...filtro },
       orderBy: { createdAt: "desc" },
       select: {
-        id: true,
-        tipo: true,
-        titulo: true,
-        inicio: true,
-        fin: true,
-        activa: true,
-        vistas: true,
-        clics: true,
-        montoCOP: true,
-        createdAt: true,
+        id: true, tipoCampana: true, formato: true, titulo: true, activa: true, createdAt: true,
+        campana: { select: { presupuestoTotal: true, inicio: true, fin: true } },
       },
     }),
   ]);
+
+  const comercioIds = [...new Set(anunciosProductos.map((a) => a.campana?.comercioId).filter(Boolean))];
+  const comercios = comercioIds.length
+    ? await prisma.comercio.findMany({ where: { id: { in: comercioIds } }, select: { id: true, nombre: true, municipio: true } })
+    : [];
+  const comercioPorId = new Map(comercios.map((c) => [c.id, c]));
+
+  const productoIds = [...new Set(anunciosProductos.map((a) => a.productoId).filter(Boolean))];
+  const productos = productoIds.length
+    ? await prisma.producto.findMany({
+        where: { id: { in: productoIds } },
+        select: { id: true, nombre: true, categoria: { select: { id: true, nombre: true, slug: true } } },
+      })
+    : [];
+  const productoPorId = new Map(productos.map((p) => [p.id, p]));
+
+  const metricas = await agregarMetricasPorAnuncio([
+    ...anunciosProductos.map((a) => a.id),
+    ...anunciosVitrina.map((a) => a.id),
+  ]);
+
+  const visibilidades = anunciosProductos.map((a) => {
+    const m = metricas.get(a.id) || { vistas: 0, clics: 0, carritos: 0, pedidosAtribuidos: 0, gmvAtribuido: 0 };
+    return {
+      id: a.id,
+      comercioId: a.campana?.comercioId ?? null,
+      comercio: a.campana?.comercioId ? comercioPorId.get(a.campana.comercioId) ?? null : null,
+      productoId: a.productoId,
+      producto: a.productoId ? productoPorId.get(a.productoId) ?? null : null,
+      vistas: m.vistas,
+      clics: m.clics,
+      carritos: m.carritos,
+      pedidosAtribuidos: m.pedidosAtribuidos,
+      unidadesAtribuidas: m.pedidosAtribuidos,
+      gmvAtribuido: m.gmvAtribuido,
+      montoCOP: Number(a.campana?.presupuestoTotal || 0),
+      inicio: a.createdAt,
+      fin: a.createdAt,
+      activa: a.activa,
+      createdAt: a.createdAt,
+    };
+  });
+
+  const campanas = anunciosVitrina.map((a) => {
+    const m = metricas.get(a.id) || { vistas: 0, clics: 0 };
+    return {
+      id: a.id,
+      tipo: a.tipoCampana || (a.formato === "VIDEO" ? "VIDEO_HISTORIA" : "PUBLICIDAD"),
+      titulo: a.titulo,
+      vistas: m.vistas,
+      clics: m.clics,
+      montoCOP: Number(a.campana?.presupuestoTotal || 0),
+      inicio: a.campana?.inicio ?? a.createdAt,
+      fin: a.campana?.fin ?? a.createdAt,
+      activa: a.activa,
+      createdAt: a.createdAt,
+    };
+  });
 
   return {
     paquetes,
@@ -950,31 +1027,38 @@ const PublicidadController = {
         solicitud.mensaje ? `Mensaje: ${solicitud.mensaje}` : null,
       ].filter(Boolean).join("\n");
 
+      const campana = await prisma.campanaPublicitaria.create({
+        data: {
+          comercioId: solicitud.comercioId,
+          nombre: tituloCampana(solicitud),
+          presupuestoTotal: montoCOP,
+          inicio,
+          fin,
+          notas,
+          creadoPor: req.usuario.id,
+          estado: 'ACTIVA'
+        }
+      });
+
       let destino;
 
       if (PAQUETES_VISIBILIDAD.has(solicitud.paquete) && solicitud.productoId) {
         if (!solicitud.producto?.activo || solicitud.producto.stock <= 0) {
           throw new ErrorValidacion("El producto ya no esta activo o no tiene stock.");
         }
-        const tipo = solicitud.paquete === "HOME_DESTACADO" ? "HOME_DESTACADO" : "CATALOGO";
-        const visibilidad = await prisma.visibilidadPagada.create({
+        const anuncio = await prisma.anuncioUbicacion.create({
           data: {
-            comercioId: solicitud.comercioId,
+            campanaId: campana.id,
+            modulo: 'PRODUCTOS',
+            formato: 'NATIVO',
             productoId: solicitud.productoId,
-            tipo,
             alcance: solicitud.alcance || "NACIONAL",
             departamento: solicitud.departamento || null,
             municipio: solicitud.municipio || null,
-            inicio,
-            fin,
-            montoCOP,
-            notas,
-            etiqueta: "Patrocinado",
-            creadoPor: req.usuario.id,
-          },
-          select: { id: true, tipo: true },
+            etiqueta: "Patrocinado"
+          }
         });
-        destino = { tipo: "VISIBILIDAD", id: visibilidad.id, subtipo: visibilidad.tipo };
+        destino = { tipo: "ANUNCIO_UBICACION", id: anuncio.id, subtipo: "PRODUCTOS_NATIVO" };
       } else {
         const esImagenPersonalizada = PAQUETES_IMAGEN_PERSONALIZADA.has(solicitud.paquete);
         if (solicitud.paquete === "VIDEO_HISTORIA") {
@@ -1002,28 +1086,38 @@ const PublicidadController = {
             throw new ErrorValidacion("Para crear una campana necesitas un producto con foto o un logo de comercio.");
           }
         }
-        const campana = await prisma.campanaHero.create({
+
+        let modulo = 'VITRINA';
+        let formato = 'BANNER';
+        
+        if (solicitud.paquete === 'BANNER_CARRUSEL') {
+           modulo = 'VITRINA'; formato = 'BANNER';
+        } else if (solicitud.paquete === 'IRRUPTOR_BIENVENIDA') {
+           modulo = 'VITRINA'; formato = 'BANNER';
+        } else if (solicitud.paquete === 'VIDEO_HISTORIA') {
+           modulo = 'VITRINA'; formato = 'VIDEO';
+        } else {
+           modulo = 'VITRINA'; formato = 'BANNER';
+        }
+
+        const anuncio = await prisma.anuncioUbicacion.create({
           data: {
-            tipo: esImagenPersonalizada ? solicitud.paquete : "PUBLICIDAD",
-            titulo: tituloCampana(solicitud),
-            subtitulo: solicitud.objetivo,
-            imagenUrl,
-            videoUrl: solicitud.paquete === "VIDEO_HISTORIA" ? solicitud.videoUrl : null,
-            ctaTexto: ctaPorPaquete(solicitud.paquete),
-            urlDestino: destinoSolicitud(solicitud),
-            alcance: solicitud.alcance || "NACIONAL",
-            departamento: solicitud.departamento || null,
-            municipio: solicitud.municipio || null,
-            inicio,
-            fin,
-            montoCOP,
-            notas,
-            prioridad: solicitud.paquete === "MARCA_ALIADA" ? 10 : 6,
-            creadoPor: req.usuario.id,
-          },
-          select: { id: true, tipo: true },
+             campanaId: campana.id,
+             modulo,
+             formato,
+             tipoCampana: solicitud.paquete,
+             titulo: tituloCampana(solicitud),
+             subtitulo: solicitud.objetivo,
+             mediaUrl: solicitud.paquete === "VIDEO_HISTORIA" ? solicitud.videoUrl : imagenUrl,
+             ctaTexto: ctaPorPaquete(solicitud.paquete),
+             urlDestino: destinoSolicitud(solicitud),
+             alcance: solicitud.alcance || "NACIONAL",
+             departamento: solicitud.departamento || null,
+             municipio: solicitud.municipio || null,
+             etiqueta: "Patrocinado"
+          }
         });
-        destino = { tipo: "CAMPANA_HERO", id: campana.id, subtipo: campana.tipo };
+        destino = { tipo: "ANUNCIO_UBICACION", id: anuncio.id, subtipo: `${modulo}_${formato}` };
       }
 
       const solicitudActualizada = await prisma.solicitudPublicidad.update({
@@ -1145,19 +1239,20 @@ const PublicidadController = {
 
       const [eventosRaw, atribucionesRaw, solicitudesRaw] = await Promise.all([
         prisma.$queryRawUnsafe(`
-          SELECT ${truncFn}::date AS fecha, tipo, COUNT(*)::int AS total
-          FROM "PublicidadEvento"
+          SELECT ${truncFn}::date AS fecha, "tipoEvento" AS tipo, COUNT(*)::int AS total
+          FROM "MetricaPublicitaria"
           WHERE "createdAt" >= $1 AND "createdAt" <= $2
-          GROUP BY fecha, tipo
+          GROUP BY fecha, "tipoEvento"
           ORDER BY fecha ASC
         `, fechaDesde, fechaHasta),
 
         prisma.$queryRawUnsafe(`
           SELECT ${truncFn}::date AS fecha,
                  COUNT(*)::int AS pedidos,
-                 COALESCE(SUM(subtotal), 0)::float AS gmv
-          FROM "PublicidadAtribucion"
-          WHERE "createdAt" >= $1 AND "createdAt" <= $2
+                 COALESCE(SUM("valorAtribuido"), 0)::float AS gmv
+          FROM "MetricaPublicitaria"
+          WHERE "tipoEvento" = 'CONVERSION_COMPRA' 
+            AND "createdAt" >= $1 AND "createdAt" <= $2
           GROUP BY fecha
           ORDER BY fecha ASC
         `, fechaDesde, fechaHasta),
@@ -1264,37 +1359,33 @@ const PublicidadController = {
   async resumenAdmin(req, res, next) {
     try {
       const ahora = new Date();
+      const filtroActivaAhora = {
+        activa: true,
+        campana: { estado: "ACTIVA", inicio: { lte: ahora }, fin: { gte: ahora } },
+      };
       const [
         pendientes,
         aprobadas,
         convertidas,
         campanasActivas,
         visibilidadesActivas,
-        campanas,
-        visibilidades,
+        anunciosVitrinaActivos,
+        anunciosProductosActivos,
         pagosPendientesPublicidad,
         pagosConfirmadosPublicidad,
       ] = await Promise.all([
         prisma.solicitudPublicidad.count({ where: { estado: "PENDIENTE" } }),
         prisma.solicitudPublicidad.count({ where: { estado: "APROBADA" } }),
         prisma.solicitudPublicidad.count({ where: { estado: "CONVERTIDA" } }),
-        prisma.campanaHero.count({ where: { activa: true, inicio: { lte: ahora }, fin: { gte: ahora } } }),
-        prisma.visibilidadPagada.count({ where: { activa: true, inicio: { lte: ahora }, fin: { gte: ahora } } }),
-        prisma.campanaHero.findMany({
-          where: { activa: true, inicio: { lte: ahora }, fin: { gte: ahora } },
-          select: { vistas: true, clics: true, montoCOP: true },
+        prisma.anuncioUbicacion.count({ where: { modulo: "VITRINA", ...filtroActivaAhora } }),
+        prisma.anuncioUbicacion.count({ where: { modulo: "PRODUCTOS", ...filtroActivaAhora } }),
+        prisma.anuncioUbicacion.findMany({
+          where: { modulo: "VITRINA", ...filtroActivaAhora },
+          select: { id: true, campana: { select: { presupuestoTotal: true } } },
         }),
-        prisma.visibilidadPagada.findMany({
-          where: { activa: true, inicio: { lte: ahora }, fin: { gte: ahora } },
-          select: {
-            vistas: true,
-            clics: true,
-            carritos: true,
-            pedidosAtribuidos: true,
-            unidadesAtribuidas: true,
-            gmvAtribuido: true,
-            montoCOP: true,
-          },
+        prisma.anuncioUbicacion.findMany({
+          where: { modulo: "PRODUCTOS", ...filtroActivaAhora },
+          select: { id: true, campana: { select: { presupuestoTotal: true } } },
         }),
         prisma.solicitudPublicidad.aggregate({
           where: {
@@ -1311,17 +1402,31 @@ const PublicidadController = {
         }),
       ]);
 
-      const vistasCampanas = campanas.reduce((acc, c) => acc + c.vistas, 0);
-      const clicsCampanas = campanas.reduce((acc, c) => acc + c.clics, 0);
-      const vistasVisibilidad = visibilidades.reduce((acc, v) => acc + v.vistas, 0);
-      const clicsVisibilidad = visibilidades.reduce((acc, v) => acc + v.clics, 0);
-      const carritosVisibilidad = visibilidades.reduce((acc, v) => acc + v.carritos, 0);
-      const pedidosAtribuidos = visibilidades.reduce((acc, v) => acc + v.pedidosAtribuidos, 0);
-      const unidadesAtribuidas = visibilidades.reduce((acc, v) => acc + v.unidadesAtribuidas, 0);
-      const gmvAtribuido = visibilidades.reduce((acc, v) => acc + Number(v.gmvAtribuido || 0), 0);
-      const inversionRegistrada =
-        campanas.reduce((acc, c) => acc + Number(c.montoCOP || 0), 0) +
-        visibilidades.reduce((acc, v) => acc + Number(v.montoCOP || 0), 0);
+      const metricas = await agregarMetricasPorAnuncio([
+        ...anunciosVitrinaActivos.map((a) => a.id),
+        ...anunciosProductosActivos.map((a) => a.id),
+      ]);
+
+      let vistasCampanas = 0, clicsCampanas = 0, inversionVitrina = 0;
+      for (const a of anunciosVitrinaActivos) {
+        const m = metricas.get(a.id) || { vistas: 0, clics: 0 };
+        vistasCampanas += m.vistas;
+        clicsCampanas += m.clics;
+        inversionVitrina += Number(a.campana?.presupuestoTotal || 0);
+      }
+
+      let vistasVisibilidad = 0, clicsVisibilidad = 0, carritosVisibilidad = 0, pedidosAtribuidos = 0, gmvAtribuido = 0, inversionProductos = 0;
+      for (const a of anunciosProductosActivos) {
+        const m = metricas.get(a.id) || { vistas: 0, clics: 0, carritos: 0, pedidosAtribuidos: 0, gmvAtribuido: 0 };
+        vistasVisibilidad += m.vistas;
+        clicsVisibilidad += m.clics;
+        carritosVisibilidad += m.carritos;
+        pedidosAtribuidos += m.pedidosAtribuidos;
+        gmvAtribuido += m.gmvAtribuido;
+        inversionProductos += Number(a.campana?.presupuestoTotal || 0);
+      }
+      const unidadesAtribuidas = pedidosAtribuidos;
+      const inversionRegistrada = inversionVitrina + inversionProductos;
 
       res.json({
         ok: true,
@@ -1377,6 +1482,106 @@ const PublicidadController = {
       const slots = await VisibilidadService.obtenerTodosLimites();
       res.json({ ok: true, data: slots });
     } catch (err) { next(err); }
+  },
+
+  // GET /api/publicidad/mis-metricas
+  async misMetricas(req, res, next) {
+    try {
+      const comercio = await prisma.comercio.findUnique({ where: { usuarioId: req.usuario.id } });
+      if (!comercio) throw new ErrorValidacion("No tienes un comercio asociado.");
+
+      const campanas = await prisma.campanaPublicitaria.findMany({
+        where: { comercioId: comercio.id },
+        include: {
+          anuncios: {
+            include: {
+              metricas: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      const metricasRes = campanas.map(campana => {
+        let impresiones = 0;
+        let clics = 0;
+        let conversiones = 0;
+        let gmv = 0;
+
+        campana.anuncios.forEach(anuncio => {
+          anuncio.metricas.forEach(m => {
+            if (m.tipoEvento === 'IMPRESION') impresiones++;
+            else if (m.tipoEvento === 'CLIC') clics++;
+            else if (m.tipoEvento === 'CONVERSION_COMPRA') {
+              conversiones++;
+              gmv += Number(m.valorAtribuido || 0);
+            } else if (m.tipoEvento === 'POSTULACION_EMPLEO') {
+              conversiones++;
+            }
+          });
+        });
+
+        return {
+          id: campana.id,
+          nombre: campana.nombre,
+          presupuestoTotal: Number(campana.presupuestoTotal || 0),
+          estado: campana.estado,
+          inicio: campana.inicio,
+          fin: campana.fin,
+          impresiones,
+          clics,
+          conversiones,
+          gmv,
+          ctr: impresiones > 0 ? (clics / impresiones) * 100 : 0
+        };
+      });
+
+      res.json({ ok: true, data: metricasRes });
+    } catch (err) { next(err); }
+  },
+
+  async trackMetrica(req, res, next) {
+    try {
+      const { anuncioId, tipoEvento } = req.body;
+      if (!anuncioId || !tipoEvento) {
+        return res.status(400).json({ ok: false, mensaje: "Faltan datos" });
+      }
+
+      await prisma.metricaPublicitaria.create({
+        data: {
+          anuncioId: Number(anuncioId),
+          tipoEvento,
+        }
+      });
+
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async convertirSistema(solicitudId) {
+    // Busca el primer admin para registrar como creador de la pauta.
+    const admin = await prisma.usuario.findFirst({ where: { rol: "ADMIN" } });
+    if (!admin) throw new Error("No hay un administrador en el sistema para atribuir la creacion");
+    
+    // Simula el objeto `req` y `res` para reutilizar `convertirAdmin`
+    const req = {
+      params: { id: solicitudId },
+      usuario: admin,
+      headers: { "x-forwarded-for": "127.0.0.1" },
+      ip: "127.0.0.1"
+    };
+    
+    return new Promise((resolve, reject) => {
+      const res = {
+        json: (data) => resolve(data),
+        status: () => res,
+      };
+      const next = (err) => reject(err);
+      
+      PublicidadController.convertirAdmin(req, res, next);
+    });
   },
 
 };

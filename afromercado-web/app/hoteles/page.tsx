@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { listarHoteles, type ConfigHotel, type TipoAlojamiento, TIPOS_ALOJAMIENTO } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { optimizarImagenPequena } from '@/lib/cloudinary'
+import BannerDisplay from '@/components/publicidad/BannerDisplay'
 
 const MapaHoteles = dynamic(() => import('@/components/hoteles/MapaHoteles'), { ssr: false })
 
@@ -67,9 +68,9 @@ function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat
   const inicial = hotel.comercio.nombre.charAt(0).toUpperCase()
 
   return (
-    <Link href={`/hoteles/${hotel.id}`} className="group block rounded-2xl overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 bg-white border border-gray-100/80 shadow-sm">
-      {/* Imagen */}
-      <div className="relative h-64 overflow-hidden bg-[#1B4332]">
+    <Link href={`/hoteles/${hotel.id}`} className="group block rounded-[2rem] overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 bg-white shadow-sm relative h-[22rem] sm:h-96">
+      {/* Imagen full */}
+      <div className="absolute inset-0 bg-[#1B4332]">
         {foto ? (
           <img src={optimizarImagenPequena(foto)} alt={hotel.comercio.nombre}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
@@ -80,77 +81,69 @@ function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat
             </svg>
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+      </div>
+      {/* Overlay gradiente profundo */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
 
-        {/* Badge de tipo + urgencia */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
-          {badgeTipo && (
-            <span className="bg-white/90 backdrop-blur-sm text-[#1B4332] text-[10px] font-bold px-2.5 py-1 rounded-full">{badgeTipo.icono} {badgeTipo.label}</span>
-          )}
-          {hotel.habitaciones.length === 1 && (
-            <span className="bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded-full">🔥 Última unidad</span>
-          )}
-        </div>
-
-        {/* Precio */}
-        <div className="absolute top-3 right-3">
-          <div className="bg-white/95 backdrop-blur-sm rounded-xl px-3 py-1.5 shadow-lg">
-            <p className="text-[9px] text-gray-400 font-medium leading-none mb-0.5">desde</p>
-            <p className="text-[#1B4332] font-black text-sm leading-none">
-              {desde !== null ? formatearPrecio(desde) : '–'}
-            </p>
-          </div>
-        </div>
-
-        {/* Nombre + ubicación */}
-        <div className="absolute bottom-0 left-0 right-0 p-4">
-          <div className="flex items-end justify-between gap-2">
-            <div className="min-w-0">
-              <h3 className="text-white font-bold text-base leading-snug line-clamp-2">{hotel.comercio.nombre}</h3>
-              <div className="flex items-center gap-1.5 mt-1">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" className="opacity-70 flex-shrink-0"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                <span className="text-white/75 text-xs">{hotel.comercio.municipio}{hotel.comercio.departamento ? `, ${hotel.comercio.departamento}` : ''}</span>
-              </div>
-            </div>
-            {dist !== null && (
-              <span className="text-white/65 text-[10px] flex-shrink-0 bg-black/20 px-2 py-0.5 rounded-full">
-                {dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`}
-              </span>
-            )}
-          </div>
-        </div>
+      {/* Badges superiores */}
+      <div className="absolute top-4 left-4 flex flex-col gap-1.5 items-start">
+        {badgeTipo && (
+          <span className="bg-white/10 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1.5 rounded-full border border-white/20 shadow-sm">{badgeTipo.icono} {badgeTipo.label}</span>
+        )}
+        {hotel.habitaciones.length === 1 && (
+          <span className="bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm">🔥 Última unidad</span>
+        )}
       </div>
 
-      {/* Footer */}
-      <div className="px-4 py-3 flex items-center gap-3">
-        <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-[#2D6A4F] to-[#1B4332] flex items-center justify-center shadow-sm">
-          {hotel.comercio.logoUrl ? (
-            <img src={hotel.comercio.logoUrl} alt={hotel.comercio.nombre} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-white text-xs font-bold">{inicial}</span>
+      {/* Precio */}
+      <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md rounded-2xl px-3 py-2 shadow-xl border border-white/40">
+        <p className="text-[10px] text-gray-500 font-medium leading-none mb-0.5 text-right">desde</p>
+        <p className="text-[#1A1A1A] font-black text-base leading-none">
+          {desde !== null ? formatearPrecio(desde) : '–'}
+        </p>
+      </div>
+
+      {/* Info inferior superpuesta */}
+      <div className="absolute bottom-0 left-0 right-0 p-5">
+        <p className="text-white/80 text-xs font-semibold mb-2 uppercase tracking-widest flex items-center justify-between gap-1">
+          <span>📍 {hotel.comercio.municipio}{hotel.comercio.departamento ? `, ${hotel.comercio.departamento}` : ''}</span>
+          {dist !== null && (
+            <span className="bg-black/50 backdrop-blur-sm px-2.5 py-1 rounded-full text-[10px] text-white/90">
+              {dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`}
+            </span>
           )}
-        </div>
-        <div className="min-w-0 flex-1">
-          {reviews > 0 ? (
-            <div className="flex items-center gap-1">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              <span className="text-xs font-semibold text-gray-800">{rating.toFixed(1)}</span>
-              <span className="text-[11px] text-gray-400">({reviews})</span>
+        </p>
+        <h3 className="text-white font-black text-2xl leading-tight line-clamp-2 mb-4 drop-shadow-md">{hotel.comercio.nombre}</h3>
+        
+        <div className="flex items-center justify-between border-t border-white/20 pt-4">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-inner">
+              {hotel.comercio.logoUrl ? (
+                <img src={hotel.comercio.logoUrl} alt={hotel.comercio.nombre} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white text-sm font-bold">{inicial}</span>
+              )}
             </div>
-          ) : (
-            <span className="text-[11px] text-gray-400">Sin reseñas aún</span>
-          )}
-          {hotel.habitaciones.length > 0 && (
-            <p className="text-[11px] text-gray-400 mt-0.5">{hotel.habitaciones.length} tipo{hotel.habitaciones.length !== 1 ? 's' : ''} de alojamiento</p>
+            {reviews > 0 ? (
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                  <span className="text-sm font-black text-white">{rating.toFixed(1)}</span>
+                </div>
+                <span className="text-[10px] text-white/70 font-medium tracking-wide">({reviews} RESEÑAS)</span>
+              </div>
+            ) : (
+              <span className="text-[11px] text-white/50 font-medium">Sin reseñas</span>
+            )}
+          </div>
+          {hotel.servicios.length > 0 && (
+            <div className="flex gap-1.5 flex-shrink-0">
+              {hotel.servicios.slice(0, 3).map(s => (
+                <span key={s} className="text-xs bg-white/10 backdrop-blur-md w-8 h-8 rounded-full flex items-center justify-center border border-white/10 shadow-sm" title={s}>{SERVICIOS_ICONOS[s] ?? '✓'}</span>
+              ))}
+            </div>
           )}
         </div>
-        {hotel.servicios.length > 0 && (
-          <div className="flex gap-1 flex-shrink-0">
-            {hotel.servicios.slice(0, 3).map(s => (
-              <span key={s} className="text-xs" title={s}>{SERVICIOS_ICONOS[s] ?? '✓'}</span>
-            ))}
-          </div>
-        )}
       </div>
     </Link>
   )
@@ -257,11 +250,31 @@ export default function HotelesPage() {
   const [gpsCiudad, setGpsCiudad] = useState('')
   const [mostrarFiltros, setMostrarFiltros] = useState(false)
   const [filtros, setFiltros] = useState({ precioMax: 0, capacidad: 1, servicios: [] as string[], tipos: [] as TipoAlojamiento[] })
+  const [fotoHeroIdx, setFotoHeroIdx] = useState(0)
 
   useEffect(() => {
     const t = setTimeout(() => setTardando(true), 6000)
     listarHoteles().then(data => { setHoteles(data); setCargando(false) }).finally(() => clearTimeout(t))
   }, [])
+
+  const heroFotos = useMemo(() => {
+    const urls = new Set<string>()
+    hoteles.forEach(h => {
+      h.habitaciones?.forEach((hab: any) => {
+        hab.fotos?.forEach((f: string) => urls.add(f))
+      })
+    })
+    const arr = Array.from(urls)
+    return arr.length > 0 ? arr : ['https://images.unsplash.com/photo-1542314831-c6a4d14d8387?auto=format&fit=crop&w=1600&q=80']
+  }, [hoteles])
+
+  useEffect(() => {
+    if (heroFotos.length <= 1) return
+    const id = setInterval(() => {
+      setFotoHeroIdx(prev => (prev + 1) % heroFotos.length)
+    }, 4000)
+    return () => clearInterval(id)
+  }, [heroFotos])
 
   function activarGPS() {
     if (!navigator.geolocation) return
@@ -285,7 +298,10 @@ export default function HotelesPage() {
   const filtrosActivos = filtros.precioMax > 0 || filtros.capacidad > 1 || filtros.servicios.length > 0 || filtros.tipos.length > 0
   const nFiltros = [filtros.precioMax > 0, filtros.capacidad > 1, filtros.servicios.length > 0, filtros.tipos.length > 0].filter(Boolean).length
 
-  const filtrados = hoteles.filter(h => {
+  const banners = hoteles.filter((h: any) => h.esBannerDisplay)
+  const organicos = hoteles.filter((h: any) => !h.esBannerDisplay)
+
+  let filtrados = organicos.filter(h => {
     if (busqueda) {
       const q = busqueda.toLowerCase()
       if (!h.comercio.nombre.toLowerCase().includes(q) && !h.comercio.municipio.toLowerCase().includes(q) && !(h.comercio.departamento?.toLowerCase().includes(q) ?? false)) return false
@@ -303,17 +319,25 @@ export default function HotelesPage() {
     return true
   })
 
-  const ordenados = userLat && userLon
-    ? [...filtrados].sort((a, b) => {
+  if (userLat && userLon) {
+    filtrados = [...filtrados].sort((a, b) => {
         const da = a.comercio.latitud && a.comercio.longitud ? distanciaKm(userLat, userLon, a.comercio.latitud, a.comercio.longitud) : 9999
         const db = b.comercio.latitud && b.comercio.longitud ? distanciaKm(userLat, userLon, b.comercio.latitud, b.comercio.longitud) : 9999
         return da - db
       })
-    : filtrados
+  }
 
   const cercanos = userLat && userLon
-    ? ordenados.filter(h => h.comercio.latitud && h.comercio.longitud && distanciaKm(userLat, userLon, h.comercio.latitud, h.comercio.longitud) <= RADIO_CERCA_KM)
-    : ordenados
+    ? filtrados.filter(h => h.comercio.latitud && h.comercio.longitud && distanciaKm(userLat, userLon, h.comercio.latitud, h.comercio.longitud) <= RADIO_CERCA_KM)
+    : filtrados
+
+  const ordenados = [...cercanos]
+  if (banners.length > 0 && ordenados.length >= 3) {
+    ordenados.splice(3, 0, banners[0])
+    if (banners.length > 1 && ordenados.length >= 7) {
+      ordenados.splice(7, 0, banners[1])
+    }
+  }
 
   const sinCercania = userLat != null && userLon != null && cercanos.length === 0 && ordenados.length > 0
 
@@ -325,12 +349,21 @@ export default function HotelesPage() {
     <div className="min-h-screen bg-[#F7F5F2]">
 
       {/* ── HERO ─────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden" style={{ backgroundImage: "linear-gradient(135deg, rgba(13,43,29,0.88) 0%, rgba(27,67,50,0.80) 50%, rgba(45,106,79,0.75) 100%), url('https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1600&q=80')", backgroundSize: 'cover', backgroundPosition: 'center' }}>
-        <div className="absolute -top-16 -right-16 w-72 h-72 bg-white/5 rounded-full" />
-        <div className="absolute top-12 -left-10 w-40 h-40 bg-[#D4A017]/10 rounded-full" />
-        <div className="absolute bottom-0 right-1/3 w-96 h-32 bg-[#52B788]/10 rounded-full blur-2xl" />
+      <div className="relative overflow-hidden min-h-[280px] sm:min-h-[320px] flex flex-col justify-end bg-[#111]">
+        {heroFotos.map((url, idx) => (
+          <img 
+            key={url}
+            src={url} 
+            alt="Hoteles de Colombia"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${idx === fotoHeroIdx ? 'opacity-100' : 'opacity-0'}`} 
+          />
+        ))}
+        <div className="absolute inset-0 bg-black/50" />
+        <div className="absolute top-0 right-0 p-12 opacity-30 pointer-events-none">
+          <div className="w-72 h-72 bg-white/20 rounded-full blur-3xl mix-blend-overlay" />
+        </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
+        <div className="relative max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
           <Link href="/" className="inline-flex items-center gap-1.5 text-white/60 hover:text-white text-sm mb-6 transition-colors">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
             Inicio
@@ -368,32 +401,32 @@ export default function HotelesPage() {
             </div>
           </div>
 
-          {/* Barra de búsqueda */}
-          <div className="mt-6 bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-2 flex flex-col sm:flex-row gap-2">
+          {/* Barra de búsqueda dentro del hero */}
+          <div className="mt-6 bg-white shadow-2xl rounded-2xl p-2 flex flex-col sm:flex-row gap-2 border border-gray-100 relative z-10">
             <div className="flex-1 relative">
-              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
                 placeholder="Ciudad, hotel, hospedaje…"
-                className="w-full pl-10 pr-4 py-2.5 bg-transparent text-white placeholder-white/40 text-sm focus:outline-none" />
+                className="w-full pl-10 pr-4 py-2.5 bg-transparent text-gray-900 placeholder-gray-400 text-sm font-medium focus:outline-none" />
             </div>
             <div className="flex gap-2">
               <button onClick={activarGPS}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  userLat ? 'bg-blue-500/80 text-white' : 'bg-white/10 hover:bg-white/20 text-white/70'
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  userLat ? 'bg-[#1B4332] text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                 }`}>
-                {gpsCargando ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : (
+                {gpsCargando ? <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" /> : (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                 )}
                 {gpsCiudad || 'Cerca de mí'}
               </button>
-              <button onClick={() => setMostrarFiltros(true)}
-                className={`relative flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  filtrosActivos ? 'bg-[#D4A017] text-white' : 'bg-white/10 hover:bg-white/20 text-white/70'
+              <button onClick={() => setMostrarFiltros(v => !v)}
+                className={`relative flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  mostrarFiltros || filtrosActivos ? 'bg-[#D4A017] text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                 }`}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
                 Filtros
                 {filtrosActivos && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-white text-[#D4A017] text-[9px] font-black rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-white text-[#D4A017] text-[9px] font-black rounded-full flex items-center justify-center shadow-sm">
                     {nFiltros}
                   </span>
                 )}
@@ -485,7 +518,15 @@ export default function HotelesPage() {
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {cercanos.map(h => <TarjetaHotel key={h.id} hotel={h} userLat={userLat} userLon={userLon} />)}
+            {cercanos.map((h: any) => (
+              h.esBannerDisplay ? (
+                <div key={h.id} className="col-span-full mt-2 mb-2">
+                  <BannerDisplay banner={h} />
+                </div>
+              ) : (
+                <TarjetaHotel key={h.id} hotel={h} userLat={userLat} userLon={userLon} />
+              )
+            ))}
           </div>
         )}
       </main>

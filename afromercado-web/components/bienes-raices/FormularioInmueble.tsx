@@ -183,28 +183,28 @@ export default function FormularioInmueble({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Título</label>
-        <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ej: Casa de dos plantas cerca al río"
+        <label htmlFor="titulo-inmueble" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Título</label>
+        <input id="titulo-inmueble" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ej: Casa de dos plantas cerca al río"
           className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Descripción</label>
-        <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={4} placeholder="Describe el predio con detalle: acceso, construcción, servicios cercanos…"
+        <label htmlFor="descripcion-inmueble" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Descripción</label>
+        <textarea id="descripcion-inmueble" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={4} placeholder="Describe el predio con detalle: acceso, construcción, servicios cercanos…"
           className="w-full resize-none rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">
+          <label htmlFor="precio-inmueble" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">
             Precio {tipoOperacion === 'ARRIENDO' && <span className="text-[#1A1A1A]/40 font-normal">(por mes)</span>}
           </label>
-          <input type="number" min={0} value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="Ej: 80000000"
+          <input id="precio-inmueble" type="number" min={0} value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="Ej: 80000000"
             className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Área (m²) <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span></label>
-          <input type="number" min={0} value={areaM2} onChange={(e) => setAreaM2(e.target.value)} placeholder="Ej: 120"
+          <label htmlFor="area-inmueble" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Área (m²) <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span></label>
+          <input id="area-inmueble" type="number" min={0} value={areaM2} onChange={(e) => setAreaM2(e.target.value)} placeholder="Ej: 120"
             className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
         </div>
       </div>
@@ -212,13 +212,13 @@ export default function FormularioInmueble({
       {!esLote && (
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Habitaciones <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span></label>
-            <input type="number" min={0} value={habitaciones} onChange={(e) => setHabitaciones(e.target.value)}
+            <label htmlFor="habitaciones-inmueble" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Habitaciones <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span></label>
+            <input id="habitaciones-inmueble" type="number" min={0} value={habitaciones} onChange={(e) => setHabitaciones(e.target.value)}
               className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Baños <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span></label>
-            <input type="number" min={0} value={banos} onChange={(e) => setBanos(e.target.value)}
+            <label htmlFor="banos-inmueble" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Baños <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span></label>
+            <input id="banos-inmueble" type="number" min={0} value={banos} onChange={(e) => setBanos(e.target.value)}
               className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
           </div>
         </div>
@@ -226,8 +226,9 @@ export default function FormularioInmueble({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Departamento</label>
+          <label htmlFor="departamento-inmueble" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Departamento</label>
           <select
+            id="departamento-inmueble"
             value={departamento}
             onChange={(e) => { setDepartamento(e.target.value); setMunicipio(''); setMunicipioOtro(false) }}
             className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none"
@@ -237,10 +238,11 @@ export default function FormularioInmueble({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Municipio</label>
+          <label htmlFor="municipio-inmueble" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Municipio</label>
           {usarTextoMunicipio ? (
             <div className="flex flex-col gap-1">
               <input
+                id="municipio-inmueble"
                 value={municipio}
                 onChange={(e) => setMunicipio(e.target.value)}
                 placeholder="Escribe el municipio"
@@ -255,6 +257,7 @@ export default function FormularioInmueble({
             </div>
           ) : (
             <select
+              id="municipio-inmueble"
               value={municipio}
               disabled={!departamento}
               onChange={(e) => {
@@ -273,31 +276,31 @@ export default function FormularioInmueble({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Vereda <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span></label>
-          <input value={vereda} onChange={(e) => setVereda(e.target.value)}
+          <label htmlFor="vereda-inmueble" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">Vereda <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span></label>
+          <input id="vereda-inmueble" value={vereda} onChange={(e) => setVereda(e.target.value)}
             className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">WhatsApp de contacto</label>
-          <input value={contactoWhatsapp} onChange={(e) => setContactoWhatsapp(e.target.value)} placeholder="3001234567"
+          <label htmlFor="whatsapp-inmueble" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">WhatsApp de contacto</label>
+          <input id="whatsapp-inmueble" value={contactoWhatsapp} onChange={(e) => setContactoWhatsapp(e.target.value)} placeholder="3001234567"
             className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">
+        <label htmlFor="referencia-inmueble" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">
           Referencia de ubicación <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span>
         </label>
-        <input value={direccionReferencia} onChange={(e) => setDireccionReferencia(e.target.value)} placeholder="Ej: cerca a la escuela, 10 min del pueblo"
+        <input id="referencia-inmueble" value={direccionReferencia} onChange={(e) => setDireccionReferencia(e.target.value)} placeholder="Ej: cerca a la escuela, 10 min del pueblo"
           className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
         <p className="text-xs text-[#1A1A1A]/40 mt-1">Solo es una referencia general, no se muestra como una dirección exacta.</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">
+        <label htmlFor="folio-inmueble" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1">
           Folio de matrícula inmobiliaria <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span>
         </label>
-        <input value={folioMatricula} onChange={(e) => setFolioMatricula(e.target.value)} placeholder="Ej: 160-12345"
+        <input id="folio-inmueble" value={folioMatricula} onChange={(e) => setFolioMatricula(e.target.value)} placeholder="Ej: 160-12345"
           className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30" />
         <p className="text-xs text-[#2D6A4F] mt-1">Si lo agregas, tu publicación genera más confianza.</p>
       </div>
@@ -305,7 +308,7 @@ export default function FormularioInmueble({
       {mostrarArchivos && (
         <>
           <div>
-            <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1.5">Fotos <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span></label>
+            <label htmlFor="fotos-inmueble" className="block text-sm font-medium text-[#1A1A1A]/70 mb-1.5">Fotos <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span></label>
             <div className="flex flex-wrap gap-2">
               {fotosPreview.map((url, i) => (
                 <div key={url + i} className="relative w-20 h-20 rounded-xl overflow-hidden border border-[#1A1A1A]/12">
@@ -322,9 +325,9 @@ export default function FormularioInmueble({
                   )}
                 </div>
               ))}
-              <label className="w-20 h-20 flex flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-[#1A1A1A]/20 bg-[#F8F5F0] text-xs text-[#1A1A1A]/50 cursor-pointer hover:bg-[#1A1A1A]/[0.03] text-center">
+              <label htmlFor="fotos-inmueble" className="w-20 h-20 flex flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-[#1A1A1A]/20 bg-[#F8F5F0] text-xs text-[#1A1A1A]/50 cursor-pointer hover:bg-[#1A1A1A]/[0.03] text-center">
                 + Agregar
-                <input ref={inputFotosRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFotos} />
+                <input id="fotos-inmueble" ref={inputFotosRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFotos} />
               </label>
             </div>
           </div>
@@ -344,9 +347,9 @@ export default function FormularioInmueble({
                 </button>
               </div>
             ) : (
-              <label className="mt-2 flex items-center justify-center gap-1 rounded-lg border border-dashed border-[#D4A017]/50 bg-white px-3 py-3 text-xs text-[#6B4E0D] cursor-pointer hover:bg-[#D4A017]/5">
+              <label htmlFor="documento-inmueble" className="mt-2 flex items-center justify-center gap-1 rounded-lg border border-dashed border-[#D4A017]/50 bg-white px-3 py-3 text-xs text-[#6B4E0D] cursor-pointer hover:bg-[#D4A017]/5">
                 Haz clic para subir tu documento (PDF o imagen)
-                <input type="file" accept="application/pdf,image/*" className="hidden" onChange={handleDocumento} />
+                <input id="documento-inmueble" type="file" accept="application/pdf,image/*" className="hidden" onChange={handleDocumento} />
               </label>
             )}
           </div>

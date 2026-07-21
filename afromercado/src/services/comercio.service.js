@@ -373,6 +373,30 @@ const ComercioService = {
 
     return { ...actualizado, envioGratisDesde: await leerEnvioGratis(comercio.id) };
   },
+
+  // Vitrina v0.2 — seguir comercio: cualquier usuario autenticado puede seguir
+  // un comercio para recibir notificación cuando publique algo nuevo en la
+  // vitrina y para que el ranking heurístico del feed lo priorice.
+  // Mismo patrón que CulturaService.toggleFavoritoPublicacion.
+  async toggleSeguir(usuarioId, comercioId) {
+    const cId = Number(comercioId);
+    const existe = await prisma.seguidorComercio.findUnique({
+      where: { usuarioId_comercioId: { usuarioId, comercioId: cId } },
+    });
+    if (existe) {
+      await prisma.seguidorComercio.delete({ where: { id: existe.id } });
+      return { siguiendo: false };
+    }
+    await prisma.seguidorComercio.create({ data: { usuarioId, comercioId: cId } });
+    return { siguiendo: true };
+  },
+
+  async sigo(usuarioId, comercioId) {
+    const existe = await prisma.seguidorComercio.findUnique({
+      where: { usuarioId_comercioId: { usuarioId, comercioId: Number(comercioId) } },
+    });
+    return { siguiendo: !!existe };
+  },
 };
 
 module.exports = ComercioService;

@@ -67,8 +67,8 @@ export default function AdminUsuariosPage() {
         `/admin/usuarios?${params.toString()}`,
       )
       setPagina(resp.data)
-    } catch {
-      // silencioso
+    } catch (err) {
+      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudieron cargar los usuarios.' })
     } finally {
       setCargando(false)
     }

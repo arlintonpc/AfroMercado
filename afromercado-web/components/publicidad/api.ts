@@ -319,6 +319,25 @@ export async function listarMisSolicitudesPublicidad(): Promise<SolicitudPublici
   return res.data ?? []
 }
 
+export interface MetricaCampanaComerciante {
+  id: number
+  nombre: string
+  presupuestoTotal: number
+  estado: string
+  inicio: string
+  fin: string
+  impresiones: number
+  clics: number
+  conversiones: number
+  gmv: number
+  ctr: number
+}
+
+export async function obtenerMisMetricasPublicidad(): Promise<MetricaCampanaComerciante[]> {
+  const res = await apiFetch<{ ok: boolean; data: MetricaCampanaComerciante[] }>('/publicidad/mis-metricas')
+  return res.data ?? []
+}
+
 export async function iniciarPagoSolicitudPublicidad(id: number): Promise<ResultadoPagoPublicidad> {
   const res = await apiFetch<{ ok: boolean; data: ResultadoPagoPublicidad }>(
     `/publicidad/solicitudes/${id}/pago/iniciar`,
@@ -419,4 +438,13 @@ export async function convertirSolicitudPublicidadAdmin(
     { method: 'POST' },
   )
   return res.data
+}
+
+export async function trackMetrica(anuncioId: number | string, tipoEvento: 'IMPRESION' | 'CLIC'): Promise<void> {
+  // Try to fire and forget
+  fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/publicidad/track`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ anuncioId, tipoEvento })
+  }).catch(() => { /* ignore */ })
 }

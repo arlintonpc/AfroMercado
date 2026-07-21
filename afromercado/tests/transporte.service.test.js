@@ -43,6 +43,10 @@ prisma.pushSubscripcion = {
 // $transaction: el service la llama como función async (tx) => {...}
 prisma.$transaction = async (fn) => fn(prisma);
 
+// prisma.$queryRaw: usado como plantilla con tag (`tx.$queryRaw\`SELECT ... FOR UPDATE\``)
+// para el lock pesimista de la ruta antes de crear la reserva.
+prisma.$queryRaw = async () => [];
+
 // Ahora sí cargamos el servicio (ya ve los mocks en memoria)
 const TransporteService = require("../src/services/transporte.service");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../src/utils/errores");
@@ -192,6 +196,18 @@ async function runCrearReservaTests() {
     true
   );
   esperar("La reserva creada queda en estado PENDIENTE", reservaCreada.estado, "PENDIENTE");
+
+  // 5. Calcula y guarda la comisión de plataforma (10%, igual que Hotel/Tour —
+  //    antes Transporte no cobraba comisión en absoluto)
+  mockRuta = { ...rutaFake, capacidad: 10 };
+  mockReservasAgregadas = { _sum: { asientos: 0 } };
+  reservaCreada = null;
+  await TransporteService.crearReserva("cliente-1", { ...datosReservaValidos, asientos: 2 });
+  esperar(
+    "Guarda comision = 10% del total y tasaComision = 0.10",
+    reservaCreada !== null && Number(reservaCreada.comision) === 4000 && Number(reservaCreada.tasaComision) === 0.10,
+    true
+  );
 }
 
 // ── Ejecución ─────────────────────────────────────────────────────────────────

@@ -103,7 +103,10 @@ function aId(valor: unknown): string {
  * compartido), así que la página de detalle lo lee directamente del objeto
  * crudo; aquí preservamos el resto de campos que sí espera el frontend.
  */
-export function mapearProducto(crudo: ProductoCrudo): Producto {
+export function mapearProducto(crudo: any): Producto {
+  if (crudo.esBannerDisplay) {
+    return crudo as any
+  }
   const comercio = crudo.comercio ?? {}
 
   return {

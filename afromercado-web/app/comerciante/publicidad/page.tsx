@@ -15,10 +15,12 @@ import {
   iniciarPagoSolicitudPublicidad,
   listarPaquetesPublicidad,
   listarMisSolicitudesPublicidad,
+  obtenerMisMetricasPublicidad,
   type AlcancePublicidad,
   type PaquetePublicidad,
   type PublicidadPaqueteConfig,
   type SolicitudPublicidad,
+  type MetricaCampanaComerciante,
 } from '@/components/publicidad/api'
 import { Button } from '@/components/ui/Button'
 import { formatearPrecio } from '@/lib/formatearPrecio'
@@ -164,6 +166,8 @@ export default function PublicidadComerciantePage() {
   const [productos, setProductos] = useState<ProductoComerciante[]>([])
   const [solicitudes, setSolicitudes] = useState<SolicitudPublicidad[]>([])
   const [paquetesConfig, setPaquetesConfig] = useState<PublicidadPaqueteConfig[]>([])
+  const [metricas, setMetricas] = useState<MetricaCampanaComerciante[]>([])
+  const [tab, setTab] = useState<'pautar' | 'rendimiento'>('pautar')
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [pagandoId, setPagandoId] = useState<number | null>(null)
@@ -191,18 +195,20 @@ export default function PublicidadComerciantePage() {
     setCargando(true)
     setAviso(null)
     try {
-      const [comercioRes, cuentaRes, productosRes, solicitudesRes, paquetesRes] = await Promise.all([
+      const [comercioRes, cuentaRes, productosRes, solicitudesRes, paquetesRes, metricasRes] = await Promise.all([
         obtenerMiComercio(),
         obtenerCuentaDispersion().catch(() => null),
         listarMisProductos().catch(() => []),
         listarMisSolicitudesPublicidad().catch(() => []),
         listarPaquetesPublicidad().catch(() => []),
+        obtenerMisMetricasPublicidad().catch(() => []),
       ])
       setComercio(comercioRes)
       setCuenta(cuentaRes)
       setProductos(productosRes)
       setSolicitudes(solicitudesRes)
       setPaquetesConfig(paquetesRes)
+      setMetricas(metricasRes)
       setForm((actual) => (
         paquetesRes.length > 0 && !paquetesRes.some((p) => p.codigo === actual.paquete && !p.cupoLleno)
           ? { ...actual, paquete: (paquetesRes.find((p) => !p.cupoLleno) ?? paquetesRes[0]).codigo as PaquetePublicidad }
@@ -322,6 +328,27 @@ export default function PublicidadComerciantePage() {
               Impulsa productos, videos, turismo, gastronomia o tu tienda completa sin parecer un anuncio invasivo.
               Teravia revisa cada solicitud para proteger la confianza de compradores y comerciantes.
             </p>
+            
+            <div className="mt-8 flex gap-4 border-b border-white/20 pb-2">
+              <button
+                type="button"
+                onClick={() => setTab('pautar')}
+                className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors ${
+                  tab === 'pautar' ? 'border-b-2 border-[#D4A017] text-[#D4A017]' : 'text-white/60 hover:text-white'
+                }`}
+              >
+                Comprar Pauta
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab('rendimiento')}
+                className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors ${
+                  tab === 'rendimiento' ? 'border-b-2 border-[#D4A017] text-[#D4A017]' : 'text-white/60 hover:text-white'
+                }`}
+              >
+                Rendimiento y Métricas
+              </button>
+            </div>
           </div>
           <div className="rounded-3xl border border-white/12 bg-white/10 p-4 backdrop-blur">
             <p className="text-sm font-bold text-white">Checklist para anunciar</p>
@@ -359,6 +386,88 @@ export default function PublicidadComerciantePage() {
         </div>
       )}
 
+      {tab === 'rendimiento' && (
+        <section className="grid gap-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-black text-[#1A1A1A]">Rendimiento de tus Campañas</h2>
+              <p className="mt-1 text-sm text-[#1A1A1A]/60">Mide el impacto real de tus anuncios en Teravia.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void cargar()}
+              className="rounded-full border border-[#1A1A1A]/10 px-4 py-2 text-sm font-bold text-[#1A1A1A]/60 hover:bg-[#F8F5F0]"
+            >
+              Actualizar
+            </button>
+          </div>
+          
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="rounded-3xl border border-[#1A1A1A]/8 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]/40">Impresiones Totales</p>
+              <p className="mt-2 text-4xl font-black text-[#1A1A1A]">{metricas.reduce((acc, m) => acc + m.impresiones, 0).toLocaleString()}</p>
+              <p className="mt-2 text-xs text-[#1A1A1A]/50">Veces que tus anuncios fueron vistos</p>
+            </div>
+            <div className="rounded-3xl border border-[#1A1A1A]/8 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]/40">Clics Totales</p>
+              <p className="mt-2 text-4xl font-black text-[#2D6A4F]">{metricas.reduce((acc, m) => acc + m.clics, 0).toLocaleString()}</p>
+              <p className="mt-2 text-xs text-[#1A1A1A]/50">Interacciones directas con tus anuncios</p>
+            </div>
+            <div className="rounded-3xl border border-[#1A1A1A]/8 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]/40">Ventas Generadas (ROI)</p>
+              <p className="mt-2 text-4xl font-black text-[#D4A017]">{formatearPrecio(metricas.reduce((acc, m) => acc + m.gmv, 0))}</p>
+              <p className="mt-2 text-xs text-[#1A1A1A]/50">Ventas directamente atribuidas a pauta</p>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-[#1A1A1A]/8 bg-white p-5 shadow-sm">
+            <h3 className="text-lg font-black text-[#1A1A1A]">Desglose por Campaña</h3>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[#1A1A1A]/10 text-xs uppercase tracking-wider text-[#1A1A1A]/40">
+                    <th className="pb-3 font-bold">Campaña</th>
+                    <th className="pb-3 font-bold">Estado</th>
+                    <th className="pb-3 text-right font-bold">Inversión</th>
+                    <th className="pb-3 text-right font-bold">Vistas</th>
+                    <th className="pb-3 text-right font-bold">Clics</th>
+                    <th className="pb-3 text-right font-bold">CTR</th>
+                    <th className="pb-3 text-right font-bold">Ventas Atribuidas</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1A1A1A]/5">
+                  {metricas.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-6 text-center text-[#1A1A1A]/50">
+                        No hay campañas activas o finalizadas para mostrar métricas.
+                      </td>
+                    </tr>
+                  ) : metricas.map(m => (
+                    <tr key={m.id} className="transition-colors hover:bg-[#FDFBF7]">
+                      <td className="py-4 font-bold text-[#1A1A1A]">{m.nombre}</td>
+                      <td className="py-4">
+                        <span className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wider ${
+                          m.estado === 'ACTIVA' ? 'bg-[#52B788]/15 text-[#2D6A4F]' : 'bg-[#1A1A1A]/5 text-[#1A1A1A]/50'
+                        }`}>
+                          {m.estado}
+                        </span>
+                      </td>
+                      <td className="py-4 text-right font-semibold text-[#1A1A1A]/70">{formatearPrecio(m.presupuestoTotal)}</td>
+                      <td className="py-4 text-right font-bold text-[#1A1A1A]/80">{m.impresiones.toLocaleString()}</td>
+                      <td className="py-4 text-right font-bold text-[#1A1A1A]/80">{m.clics.toLocaleString()}</td>
+                      <td className="py-4 text-right font-bold text-[#1A1A1A]/80">{m.ctr.toFixed(2)}%</td>
+                      <td className="py-4 text-right font-black text-[#2D6A4F]">{formatearPrecio(m.gmv)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {tab === 'pautar' && (
+      <>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {paquetes.map((p) => (
           <button
@@ -717,6 +826,8 @@ export default function PublicidadComerciantePage() {
           </div>
         </div>
       </section>
+      </>
+      )}
     </div>
   )
 }

@@ -193,6 +193,7 @@ export default function ComercianteLayout({
     { href: '/comerciante/cultura',        etiqueta: '🎭 Cultura' },
     { href: '/comerciante/mis-productos',  etiqueta: 'Mis productos' },
     { href: '/comerciante/publicar',       etiqueta: 'Publicar' },
+    { href: '/comerciante/vitrina',        etiqueta: '🎥 Vitrina de video' },
     { href: '/comerciante/ofertas',        etiqueta: 'Ofertas' },
     { href: '/comerciante/cupones',        etiqueta: 'Cupones' },
     { href: '/comerciante/alianzas',       etiqueta: 'Alianzas' },

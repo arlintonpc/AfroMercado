@@ -193,8 +193,7 @@ model Usuario {
   direcciones          Direccion[]
   carrito              CarritoItem[]
   resenas              Resena[]
-  visibilidadesAdmin   VisibilidadPagada[] @relation("VisibilidadAdmin")
-  campanasAdmin        CampanaHero[]       @relation("CampanaAdmin")
+  campanasPublicitariasAdmin CampanaPublicitaria[] @relation("CampanaAdmin")
   solicitudesPublicidadRevisadas SolicitudPublicidad[] @relation("SolicitudPublicidadRevisor")
   notificaciones       Notificacion[]
   favoritos            Favorito[]
@@ -232,6 +231,9 @@ model Usuario {
   denunciasPublicacionCulturalHechas DenunciaPublicacionCultural[]
   likesPublicacionesCultura          LikePublicacionCultural[]
   denunciasProductoHechas   DenunciaProducto[]       @relation("DenunciasProductoHechas")
+  comerciosSeguidos         SeguidorComercio[]
+  vistasPublicacionCultural VistaPublicacionCultural[] @relation("VistasPublicacionUsuario")
+  comentariosPublicacionCultural ComentarioPublicacionCultural[]
 }
 
 model Comercio {
@@ -292,7 +294,7 @@ model Comercio {
   productos         Producto[]
   subPedidos        SubPedido[]
   resenas           Resena[]
-  visibilidades     VisibilidadPagada[]
+  campanasPublicitarias CampanaPublicitaria[]
   vistasProductos   VistaProducto[]
   conversaciones    Conversacion[]
   cuponComercio     CuponComercio[]
@@ -307,6 +309,8 @@ model Comercio {
   configTransporte      ConfigTransporte?
   gruposComplementoBiblioteca GrupoComplementoBiblioteca[]
   eventosCulturales     EventoCultural[]  @relation("EventosCulturalesComercio")
+  publicacionesVitrina  PublicacionCultural[]
+  seguidores            SeguidorComercio[]
   alianzasSocio         AlianzaSocio[]
   disputas              Disputa[]         @relation("DisputasComercio")
   configFiscal          ConfigFiscalComercio?
@@ -392,10 +396,10 @@ model Producto {
   carrito          CarritoItem[]
   pedidoItems      PedidoItem[]
   historialPrecios PrecioHistorial[]
-  visibilidades    VisibilidadPagada[]
   ofertas          Oferta[]
   vistas           VistaProducto[]
   solicitudesPublicidad SolicitudPublicidad[]
+  anunciosUbicacion     AnuncioUbicacion[]
   itemsExpress          ItemPedidoExpress[]
   menuSeccion      MenuSeccion?       @relation("ProductoMenuSeccion", fields: [menuSeccionId], references: [id], onDelete: SetNull)
   gruposComplemento GrupoComplemento[]
@@ -1050,6 +1054,7 @@ enum TipoEntidadFavorita {
   CONFIG_TRANSPORTE
   EVENTO_CULTURAL
   OFERTA_EMPLEO
+  PUBLICACION_CULTURAL
 }
 
 model Favorito {
@@ -1403,38 +1408,122 @@ model PostulacionEmpleo {
   @@index([postulanteId])
 }
 
-model CampanaHero {
-  id          Int      @id @default(autoincrement())
-  tipo        String   @default("PUBLICIDAD")
-  titulo      String
-  subtitulo   String?
-  imagenUrl   String
-  videoUrl    String?
-  ctaTexto    String   @default("Ver más")
-  urlDestino  String
-  activa      Boolean  @default(true)
-  prioridad   Int      @default(0)
-  inicio      DateTime
-  fin         DateTime
-  montoCOP    Decimal? @db.Decimal(10, 2)
-  notas       String?
-  vistas      Int      @default(0)
-  clics       Int      @default(0)
-  creadoPor   Int
-  createdAt   DateTime @default(now())
+// ─── TERAVIA ADS (PUBLICIDAD CENTRALIZADA) ─────────────────────
 
-  // Alcance geográfico (mismo patrón que VisibilidadPagada/SolicitudPublicidad).
-  alcance      String  @default("NACIONAL")
-  departamento String?
-  municipio    String?
+enum EstadoCampana {
+  ACTIVA
+  PAUSADA
+  FINALIZADA
+}
 
-  // Texto del badge visible sobre el anuncio (ej. "Patrocinado", "Comunidad",
-  // "Aliado") — personalizable por campaña en vez de fijo en el componente.
-  etiqueta String @default("Patrocinado")
+model CampanaPublicitaria {
+  id               Int           @id @default(autoincrement())
+  comercioId       Int?          // Opcional si la paga un usuario particular (ej. profesional independiente)
+  anuncianteId     Int?          // Usuario que paga (si no tiene comercio)
+  nombre           String
+  presupuestoTotal Decimal       @db.Decimal(12, 2)
+  presupuestoGastado Decimal     @default(0) @db.Decimal(12, 2)
+  inicio           DateTime
+  fin              DateTime
+  estado           EstadoCampana @default(ACTIVA)
+  notas            String?
+  creadoPor        Int
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  admin Usuario @relation("CampanaAdmin", fields: [creadoPor], references: [id])
+  comercio         Comercio?     @relation(fields: [comercioId], references: [id])
+  admin            Usuario       @relation("CampanaAdmin", fields: [creadoPor], references: [id])
+  anuncios         AnuncioUbicacion[]
 
-  @@index([activa, fin])
+  @@index([estado, fin])
+}
+
+enum ModuloAnuncio {
+  VITRINA
+  EMPLEOS
+  PRODUCTOS
+  HOTELES
+  TOURS
+  EXPRESS
+  TRANSPORTE
+  CULTURA
+  BIENES_RAICES
+}
+
+enum FormatoAnuncio {
+  NATIVO
+  BANNER
+  VIDEO
+}
+
+model AnuncioUbicacion {
+  id               Int           @id @default(autoincrement())
+  campanaId        Int
+  modulo           ModuloAnuncio
+  formato          FormatoAnuncio
+  
+  // Relaciones específicas (solo una debería estar llena según el módulo)
+  productoId       Int?
+  ofertaEmpleoId   Int?
+  habitacionId     Int?
+  
+  // Contenido estático si es un banner o video suelto (ej. para Vitrina)
+  titulo           String?
+  subtitulo        String?
+  mediaUrl         String?
+  urlDestino       String?
+  ctaTexto         String?       @default("Ver más")
+
+  // Paquete/formato de origen (ej. "BANNER_CARRUSEL", "IRRUPTOR_BIENVENIDA",
+  // "VIDEO_HISTORIA", "PUBLICIDAD", "SOCIAL") — sin esto, modulo+formato no
+  // alcanzan para distinguir un banner de carrusel de un irruptor de
+  // bienvenida (ambos son VITRINA+BANNER). GET /campanas/activas lo usa
+  // para filtrar por ?tipo= y para excluir los formatos exclusivos de la
+  // rotación general del hero cuando no se pide un tipo específico.
+  tipoCampana      String?
+  
+  // Opciones de segmentación
+  alcance          String        @default("NACIONAL") // "MUNICIPIO" | "DEPARTAMENTO" | "NACIONAL"
+  departamento     String?
+  municipio        String?
+  etiqueta         String        @default("Patrocinado")
+  
+  activa           Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+
+  campana          CampanaPublicitaria @relation(fields: [campanaId], references: [id], onDelete: Cascade)
+  producto         Producto?           @relation(fields: [productoId], references: [id], onDelete: SetNull)
+  metricas         MetricaPublicitaria[]
+
+  @@index([modulo, activa])
+}
+
+enum TipoMetricaAnuncio {
+  IMPRESION
+  CLIC
+  CARRITO
+  CONVERSION_COMPRA
+  POSTULACION_EMPLEO
+}
+
+model MetricaPublicitaria {
+  id               Int                @id @default(autoincrement())
+  anuncioId        Int
+  tipoEvento       TipoMetricaAnuncio
+  usuarioId        Int?
+  sesionId         String?
+  valorAtribuido   Decimal            @default(0) @db.Decimal(12, 2) // Ej. Valor de la compra si es CONVERSION
+  // Referencia externa idempotente (ej. "pedidoItem:123") — evita duplicar
+  // una atribución de venta si el webhook/flujo de confirmación se reprocesa.
+  // Null en IMPRESION/CLIC/CARRITO, donde no aplica (Postgres no choca por
+  // NULLs repetidos en un unique compuesto).
+  referenciaExterna String?
+  createdAt        DateTime           @default(now())
+
+  anuncio          AnuncioUbicacion   @relation(fields: [anuncioId], references: [id], onDelete: Cascade)
+
+  @@unique([anuncioId, tipoEvento, referenciaExterna])
+  @@index([anuncioId, tipoEvento, createdAt])
 }
 
 // ─── FASE 2 ───────────────────────────────────────────────────
@@ -1576,77 +1665,6 @@ model TarifaEnvio {
 
   @@unique([departamento, pesoMaxKg])
   @@index([departamento, activa])
-}
-
-// ──────────────────────────────────────────────────────────────
-
-model VisibilidadPagada {
-  id         Int      @id @default(autoincrement())
-  comercioId Int
-  productoId Int?
-  tipo       String   // "CATALOGO" | "HOME_DESTACADO"
-  activa     Boolean  @default(true)
-  alcance      String  @default("NACIONAL") // "MUNICIPIO" | "DEPARTAMENTO" | "NACIONAL"
-  departamento String?
-  municipio    String?
-  inicio     DateTime
-  fin        DateTime
-  montoCOP   Decimal  @db.Decimal(10, 2)
-  notas      String?
-  creadoPor  Int
-  vistas     Int      @default(0)
-  clics      Int      @default(0)
-  carritos   Int      @default(0)
-  pedidosAtribuidos  Int     @default(0)
-  unidadesAtribuidas Int     @default(0)
-  gmvAtribuido       Decimal @default(0) @db.Decimal(12, 2)
-  etiqueta   String?
-  createdAt  DateTime @default(now())
-
-  comercio Comercio  @relation(fields: [comercioId], references: [id])
-  producto Producto? @relation(fields: [productoId], references: [id])
-  admin    Usuario   @relation("VisibilidadAdmin", fields: [creadoPor], references: [id])
-
-  @@index([tipo, activa, fin])
-  @@index([comercioId])
-}
-
-model PublicidadEvento {
-  id             Int      @id @default(autoincrement())
-  visibilidadId  Int
-  productoId     Int
-  comercioId     Int
-  usuarioId      Int?
-  sesionId       String?
-  tipo           String
-  userAgent      String?
-  referer        String?
-  createdAt      DateTime @default(now())
-
-  @@index([visibilidadId, tipo, createdAt])
-  @@index([productoId, tipo, createdAt])
-  @@index([usuarioId, productoId, tipo, createdAt])
-  @@index([sesionId, productoId, tipo, createdAt])
-}
-
-model PublicidadAtribucion {
-  id                 Int      @id @default(autoincrement())
-  pedidoId           Int
-  pedidoItemId       Int
-  visibilidadId      Int
-  publicidadEventoId Int?
-  productoId         Int
-  usuarioId          Int?
-  sesionId           String?
-  cantidad           Int
-  subtotal           Decimal  @db.Decimal(12, 2)
-  modelo             String   @default("ULTIMO_CLIC_7D")
-  createdAt          DateTime @default(now())
-
-  @@unique([pedidoItemId, modelo])
-  @@index([pedidoId])
-  @@index([visibilidadId, createdAt])
-  @@index([usuarioId, productoId, createdAt])
 }
 
 model SolicitudPublicidad {
@@ -2399,6 +2417,8 @@ model ReservaTransporte {
   notasCliente     String?
   nombreContacto   String
   telefonoContacto String
+  comision         Decimal?                @db.Decimal(10, 2)
+  tasaComision     Decimal?                @db.Decimal(5, 4)
   montoDescuento   Decimal?                @db.Decimal(10, 2)
   codigoCupon      String?
   creadoAt         DateTime                @default(now())
@@ -2602,11 +2622,41 @@ model PublicacionCultural {
   activa       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
+  // Vitrina de comercio (v0): null = publicación personal "Comparte tu
+  // Chocó" (comportamiento original, sin cambios); con valor = video de
+  // negocio, listado aparte en /vitrina, nunca mezclado con el feed personal.
+  comercioId            Int?
+  moduloOrigen          String?
+  videoPosterUrl        String?
+  videoDuracionSegundos Int?
+  videoPublicId         String?
+
+  totalCompartidos Int @default(0)
+
   autor     Usuario                       @relation(fields: [autorId], references: [id])
+  comercio  Comercio?                     @relation(fields: [comercioId], references: [id])
   denuncias DenunciaPublicacionCultural[]
   likes     LikePublicacionCultural[]
+  vistas    VistaPublicacionCultural[]
+  comentarios ComentarioPublicacionCultural[]
 
   @@index([activa, departamento, createdAt])
+  @@index([comercioId, activa, createdAt])
+}
+
+// Seguir un comercio (cualquier vertical, no exclusivo de la Vitrina) — base
+// para notificar novedades y para el ranking heurístico del feed (§3 del plan).
+model SeguidorComercio {
+  id         Int      @id @default(autoincrement())
+  usuarioId  Int
+  comercioId Int
+  createdAt  DateTime @default(now())
+
+  usuario  Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, comercioId])
+  @@index([comercioId])
 }
 
 model LikePublicacionCultural {
@@ -2655,6 +2705,21 @@ model DenunciaPublicacionCultural {
   @@index([estado, createdAt])
 }
 
+model VistaPublicacionCultural {
+  id                    Int      @id @default(autoincrement())
+  publicacionCulturalId Int
+  usuarioId              Int?
+  sesionId              String?
+  duracionSegundos      Int?
+  createdAt             DateTime @default(now())
+
+  publicacion PublicacionCultural @relation(fields: [publicacionCulturalId], references: [id], onDelete: Cascade)
+  usuario     Usuario?            @relation("VistasPublicacionUsuario", fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([publicacionCulturalId, createdAt])
+  @@index([usuarioId, createdAt])
+}
+
 // ─── ALIANZAS COMERCIALES ─────────────────────────────────────
 // Cupón compartido entre comercios de distintos módulos (Express, Hotel,
 // Tour, Transporte, Pedido) para campañas conjuntas de turismo regional.
@@ -2701,4 +2766,17 @@ model AlianzaSocio {
 
   @@unique([alianzaId, comercioId, modulo])
   @@index([comercioId, modulo, aceptado, activo])
+}
+
+model ComentarioPublicacionCultural {
+  id                    Int      @id @default(autoincrement())
+  publicacionCulturalId Int
+  usuarioId             Int
+  texto                 String
+  createdAt             DateTime @default(now())
+
+  publicacion           PublicacionCultural @relation(fields: [publicacionCulturalId], references: [id], onDelete: Cascade)
+  usuario               Usuario             @relation(fields: [usuarioId], references: [id])
+
+  @@index([publicacionCulturalId, createdAt])
 }

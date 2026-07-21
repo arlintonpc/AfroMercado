@@ -58,26 +58,33 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
   const [copiado, setCopiado] = useState(false)
   const [yaDenuncio, setYaDenuncio] = useState(false)
   const [mostrarModalDenuncia, setMostrarModalDenuncia] = useState(false)
+  const [avisoSecundario, setAvisoSecundario] = useState<string | null>(null)
 
   useEffect(() => {
     obtenerOfertaEmpleo(Number(id))
       .then(setOferta)
       .catch((e) => setError(e instanceof Error ? e.message : 'No pudimos cargar esta oferta.'))
       .finally(() => setCargando(false))
-    otrasOfertasDelPublicador(Number(id)).then(setOtrasOfertas).catch(() => {})
+    otrasOfertasDelPublicador(Number(id))
+      .then(setOtrasOfertas)
+      .catch(() => setAvisoSecundario('No pudimos cargar otras ofertas de este publicador.'))
   }, [id])
 
   useEffect(() => {
     if (!autenticado) return
     obtenerMiHojaDeVida().then((h) => setTieneHojaDeVida(!!h)).catch(() => setTieneHojaDeVida(false))
-    esFavoritoEmpleo(Number(id)).then((r) => setFavorito(r.favorito)).catch(() => {})
-    yaDenuncieOferta(Number(id)).then((r) => setYaDenuncio(r.denunciado)).catch(() => {})
+    esFavoritoEmpleo(Number(id))
+      .then((r) => setFavorito(r.favorito))
+      .catch(() => setAvisoSecundario('No pudimos verificar tus favoritos.'))
+    yaDenuncieOferta(Number(id))
+      .then((r) => setYaDenuncio(r.denunciado))
+      .catch(() => setAvisoSecundario('No pudimos verificar el estado de denuncia de esta oferta.'))
     misPostulacionesEmpleo()
       .then((lista) => {
         const existente = lista.find((p) => p.ofertaEmpleoId === Number(id))
         if (existente && existente.estado !== 'RETIRADA') setMiEstadoPostulacion(existente.estado)
       })
-      .catch(() => {})
+      .catch(() => setAvisoSecundario('No pudimos cargar el estado de tu postulación.'))
   }, [autenticado, id])
 
   async function handleToggleFavorito() {
@@ -131,6 +138,11 @@ export default function PaginaDetalleEmpleo({ params }: { params: Promise<{ id: 
         ) : (
           <>
             <Link href="/empleo" className="text-xs text-[#2D6A4F] hover:underline">← Volver a empleo</Link>
+            {avisoSecundario && (
+              <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600">
+                {avisoSecundario}
+              </div>
+            )}
             <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 overflow-hidden mt-3">
               {oferta.imagenUrl && (
                 <div className="relative h-48 md:h-64 w-full bg-[#1B4332]">

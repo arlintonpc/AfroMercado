@@ -41,12 +41,19 @@ export default function MisReservasTourPage() {
   const { usuario } = useAuth()
   const [reservas, setReservas] = useState<ReservaTour[]>([])
   const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [cancelando, setCancelando] = useState<number | null>(null)
   const [reservaACancelar, setReservaACancelar] = useState<number | null>(null)
 
   useEffect(() => {
     if (!usuario) return
-    misReservasTour().then(d => { setReservas(d); setCargando(false) })
+    let cancelado = false
+    setCargando(true)
+    misReservasTour()
+      .then(d => { if (!cancelado) setReservas(d) })
+      .catch((e: unknown) => { if (!cancelado) setError(e instanceof Error ? e.message : 'No se pudieron cargar tus reservas.') })
+      .finally(() => { if (!cancelado) setCargando(false) })
+    return () => { cancelado = true }
   }, [usuario])
 
   function cancelar(id: number) {
@@ -152,6 +159,11 @@ export default function MisReservasTourPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-4 pb-10">
+        {error && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+            {error}
+          </div>
+        )}
         {cargando ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (

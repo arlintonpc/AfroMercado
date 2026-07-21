@@ -42,6 +42,7 @@ export default function ComercianteTourPage() {
   const [tour, setTour] = useState<ConfigTour | null>(null)
   const [reservas, setReservas] = useState<ReservaTour[]>([])
   const [cargando, setCargando] = useState(true)
+  const [errorCarga, setErrorCarga] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [subiendoFotos, setSubiendoFotos] = useState(false)
   const [editConfig, setEditConfig] = useState<Partial<ConfigTour>>({})
@@ -79,20 +80,26 @@ export default function ComercianteTourPage() {
   const pendientes = reservas.filter(r => r.estado === 'PENDIENTE')
 
   useEffect(() => {
-    Promise.all([obtenerMiTour(), reservasOperadorTour()]).then(([t, rs]) => {
-      setTour(t)
-      setEditConfig(t)
-      setLugares(t.lugares ?? [])
-      setReservas(rs)
-      reservasRef.current = rs
-      setVideoEstadoTour({
-        videoUrl: (t as any).videoUrl ?? null,
-        videoPosterUrl: (t as any).videoPosterUrl ?? null,
-        videoDuracionSegundos: null,
-        videoMimeType: null,
-      })
-      setCargando(false)
-    })
+    (async () => {
+      try {
+        const [t, rs] = await Promise.all([obtenerMiTour(), reservasOperadorTour()])
+        setTour(t)
+        setEditConfig(t)
+        setLugares(t.lugares ?? [])
+        setReservas(rs)
+        reservasRef.current = rs
+        setVideoEstadoTour({
+          videoUrl: (t as any).videoUrl ?? null,
+          videoPosterUrl: (t as any).videoPosterUrl ?? null,
+          videoDuracionSegundos: null,
+          videoMimeType: null,
+        })
+      } catch (e) {
+        setErrorCarga(e instanceof Error ? e.message : 'No se pudo cargar la información del tour.')
+      } finally {
+        setCargando(false)
+      }
+    })()
   }, [])
 
   // Polling de reservas cada 20s
@@ -116,6 +123,8 @@ export default function ComercianteTourPage() {
         }
         reservasRef.current = nuevas
         setReservas(nuevas)
+      }).catch(err => {
+        console.error('Error al refrescar reservas del tour:', err)
       })
     }, 20000)
     return () => clearInterval(iv)
@@ -404,6 +413,10 @@ export default function ComercianteTourPage() {
           <span className="text-xs text-gray-500">{tour?.activo ? 'Visible al público' : 'Oculto'}</span>
         </div>
       </div>
+
+      {errorCarga && (
+        <div className="bg-red-50 border border-red-100 text-red-700 rounded-2xl px-4 py-3 text-sm mb-5">{errorCarga}</div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200 gap-1 overflow-x-auto mb-5">

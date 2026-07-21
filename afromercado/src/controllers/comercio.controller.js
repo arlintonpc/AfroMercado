@@ -136,6 +136,17 @@ const ComercioController = {
     }
   },
 
+  // POST /comercios/:id/seguir/toggle - seguir/dejar de seguir un comercio
+  // (Vitrina v0.2). Cualquier usuario autenticado, sin restricción de rol.
+  async toggleSeguir(req, res, next) {
+    try {
+      const resultado = await ComercioService.toggleSeguir(req.usuario.id, req.params.id);
+      res.json({ ok: true, ...resultado });
+    } catch (e) {
+      next(e);
+    }
+  },
+
   // GET /comercios/mis-analiticas — analíticas completas del comerciante
   async obtenerCuentaDispersion(req, res, next) {
     try {

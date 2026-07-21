@@ -211,20 +211,54 @@ export type MotivoDenunciaPublicacion = 'CONTENIDO_INAPROPIADO' | 'SPAM' | 'DERE
 export type EstadoDenunciaPublicacion = 'PENDIENTE' | 'DESESTIMADA' | 'PUBLICACION_OCULTADA'
 export type AccionResolverDenunciaPublicacion = 'DESESTIMAR' | 'OCULTAR'
 
+/** Módulo de servicio desde el que se originó una publicación de la vitrina comercial. */
+export type ModuloOrigenVitrina = 'PEDIDO' | 'EXPRESS' | 'HOTEL' | 'TOUR' | 'TRANSPORTE' | 'AGRO'
+
+/** Datos mínimos del comercio dueño de una publicación de la Vitrina de video. */
+export interface ComercioVitrina {
+  id: number
+  nombre: string
+  logoUrl?: string | null
+  whatsapp?: string | null
+  whatsappVisible?: boolean
+  comprableEnPlataforma?: boolean
+  /** Solo presente para publicaciones consultadas con sesión iniciada. */
+  siguiendo?: boolean
+}
+
 export interface PublicacionCultural {
   id: number
-  autorId: number
+  /** Ausente en publicaciones de la Vitrina comercial (esas se identifican por `comercio`, no por autor). */
+  autorId?: number
   titulo: string
   descripcion?: string | null
   fotoUrls: string[]
   videoUrl?: string | null
+  /** Miniatura del video, solo presente en publicaciones con video subido (no en links externos). */
+  videoPosterUrl?: string | null
+  videoDuracionSegundos?: number | null
   departamento: string
   municipio?: string | null
-  activa: boolean
+  activa?: boolean
   createdAt: string
   autor?: { id: number; nombre: string }
   totalLikes: number
+  totalComentarios?: number
+  totalCompartidos?: number
   meGusta: boolean
+  /** Solo presente para publicaciones consultadas con sesión iniciada. */
+  esFavorito?: boolean
+  moduloOrigen?: ModuloOrigenVitrina | null
+  /** No nulo únicamente en publicaciones de la Vitrina de video (comerciantes). */
+  comercio?: ComercioVitrina | null
+
+  // ── Propiedades para Anuncios Inyectados (Publicidad) ──
+  esAnuncio?: boolean
+  campanaId?: number
+  ctaTexto?: string
+  urlDestino?: string
+  etiqueta?: string
+  imagenUrl?: string
 }
 
 export interface DenunciaPublicacionCultural {
@@ -238,7 +272,7 @@ export interface DenunciaPublicacionCultural {
   revisadoAt?: string | null
   notaRevision?: string | null
   createdAt: string
-  publicacion?: { titulo: string; autor?: { id: number; nombre: string } }
+  publicacion?: { titulo: string; autor?: { id: number; nombre: string }; comercio?: ComercioVitrina | null }
   denunciante?: { id: number; nombre: string }
 }
 
@@ -247,8 +281,14 @@ export interface PublicacionCulturalInput {
   descripcion?: string
   fotoUrls?: string[]
   videoUrl?: string
+  videoPosterUrl?: string
+  videoDuracionSegundos?: number
+  videoPublicId?: string
   departamento: string
   municipio?: string
+  /** Presente cuando la publica un comerciante desde la Vitrina de video. */
+  comercioId?: number
+  moduloOrigen?: ModuloOrigenVitrina
 }
 
 export function normalizarPublicacionCultural(publicacion: PublicacionCultural): PublicacionCultural {
@@ -257,11 +297,16 @@ export function normalizarPublicacionCultural(publicacion: PublicacionCultural):
     descripcion: publicacion.descripcion ?? null,
     fotoUrls: Array.isArray(publicacion.fotoUrls) ? publicacion.fotoUrls : [],
     videoUrl: publicacion.videoUrl ?? null,
-    activa: Boolean(publicacion.activa),
+    videoPosterUrl: publicacion.videoPosterUrl ?? null,
+    videoDuracionSegundos: publicacion.videoDuracionSegundos ?? null,
+    activa: publicacion.activa ?? true,
     municipio: publicacion.municipio ?? null,
     autor: publicacion.autor ?? undefined,
     totalLikes: publicacion.totalLikes ?? 0,
     meGusta: publicacion.meGusta ?? false,
+    esFavorito: publicacion.esFavorito ?? false,
+    moduloOrigen: publicacion.moduloOrigen ?? null,
+    comercio: publicacion.comercio ?? null,
   }
 }
 
@@ -282,6 +327,28 @@ export async function listarPublicacionesCulturales(params: { departamento?: str
   }
 }
 
+// ── Vitrina de video (comerciantes) ──────────────────────────
+
+/**
+ * Feed público de publicaciones de comercio ("Vitrina de video"): reseñas
+ * en video/foto de hoteles, tours, transportes, express, agro y pedidos.
+ * Funciona con o sin sesión (con sesión trae `meGusta`/`esFavorito`).
+ */
+export async function obtenerVitrina(params: { departamento?: string; modulo?: string; search?: string; page?: number } = {}): Promise<{ items: PublicacionCultural[]; total: number; pagina: number }> {
+  const qs = new URLSearchParams()
+  if (params.departamento) qs.set('departamento', params.departamento)
+  if (params.modulo) qs.set('modulo', params.modulo)
+  if (params.search) qs.set('search', params.search)
+  if (params.page) qs.set('page', String(params.page))
+  const q = qs.toString()
+  const r = await apiFetch<{ ok: boolean; items: PublicacionCultural[]; total: number; pagina: number }>(`/cultura/vitrina${q ? `?${q}` : ''}`)
+  return {
+    items: Array.isArray(r.items) ? r.items.map(normalizarPublicacionCultural) : [],
+    total: r.total ?? 0,
+    pagina: r.pagina ?? 1,
+  }
+}
+
 export async function subirFotoPublicacionCultural(file: File): Promise<string> {
   const fd = new FormData()
   fd.append('foto', file)
@@ -296,9 +363,55 @@ export async function subirVideoPublicacionCultural(file: File): Promise<string>
   return r.url
 }
 
+export interface VideoVitrinaSubido {
+  url: string
+  posterUrl: string | null
+  duracionSegundos: number | null
+  publicId: string | null
+}
+
+/**
+ * Sube el video corto de una publicación de la Vitrina de video (máx. 45MB/45s).
+ * Mismo endpoint que `subirVideoPublicacionCultural`, pero devuelve también la
+ * miniatura y duración generadas por el backend, que la Vitrina sí necesita.
+ */
+export async function subirVideoVitrina(file: File): Promise<VideoVitrinaSubido> {
+  const fd = new FormData()
+  fd.append('video', file)
+  const r = await apiFetch<{ ok: boolean; url: string; posterUrl?: string; duracionSegundos?: number; publicId?: string }>(
+    '/cultura/publicaciones/video',
+    { method: 'POST', body: fd },
+  )
+  return {
+    url: r.url,
+    posterUrl: r.posterUrl ?? null,
+    duracionSegundos: r.duracionSegundos ?? null,
+    publicId: r.publicId ?? null,
+  }
+}
+
 export async function toggleLikePublicacion(id: number): Promise<{ meGusta: boolean; totalLikes: number }> {
   const r = await apiFetch<{ ok: boolean; data: { meGusta: boolean; totalLikes: number } }>(`/cultura/publicaciones/${id}/like/toggle`, { method: 'POST', body: {} })
   return r.data
+}
+
+export async function toggleFavoritoPublicacionCultural(id: number): Promise<{ esFavorito: boolean }> {
+  const r = await apiFetch<{ ok: boolean; esFavorito?: boolean; data?: { esFavorito: boolean } }>(`/cultura/publicaciones/${id}/favorito/toggle`, { method: 'POST', body: {} })
+  return { esFavorito: r.data?.esFavorito ?? r.esFavorito ?? false }
+}
+
+/**
+ * Registra una vista de una publicación en la Vitrina de video (fire-and-forget).
+ */
+export async function registrarVistaPublicacion(id: number, sesionId?: string, duracionSegundos?: number): Promise<void> {
+  try {
+    await apiFetch<{ ok: boolean }>(`/cultura/publicaciones/${id}/vista`, {
+      method: 'POST',
+      body: { sesionId, duracionSegundos },
+    })
+  } catch {
+    // Ignorar errores silenciosamente para no interrumpir la reproducción
+  }
 }
 
 export async function denunciarPublicacionCultural(id: number, datos: { motivo: MotivoDenunciaPublicacion; descripcion?: string }): Promise<DenunciaPublicacionCultural> {
@@ -349,4 +462,34 @@ export async function esFavoritoCultura(id: number): Promise<boolean> {
     const r = await apiFetch<{ ok: boolean; data: { esFavorito: boolean } }>(`/cultura/favoritos/${id}`)
     return r.data?.esFavorito ?? false
   } catch { return false }
+}
+
+export interface ComentarioPublicacionCultural {
+  id: number
+  publicacionCulturalId: number
+  usuarioId: number
+  texto: string
+  createdAt: string
+  usuario?: { id: number; nombre: string; avatarUrl?: string | null }
+}
+
+export async function registrarCompartidoPublicacion(id: number) {
+  return apiFetch<{ ok: boolean }>(`/cultura/publicaciones/${id}/compartir`, { method: "POST", body: {} })
+}
+
+export async function listarComentariosPublicacion(id: number, params?: { page?: number; limit?: number }) {
+  const q = new URLSearchParams()
+  if (params?.page) q.set("page", String(params.page))
+  if (params?.limit) q.set("limit", String(params.limit))
+  const qs = q.toString()
+  return apiFetch<{ ok: boolean; data: { items: ComentarioPublicacionCultural[]; total: number; pagina: number } }>(
+    `/cultura/publicaciones/${id}/comentarios${qs ? `?${qs}` : ""}`
+  ).then((r) => r.data)
+}
+
+export async function crearComentarioPublicacion(id: number, texto: string) {
+  return apiFetch<{ ok: boolean; data: ComentarioPublicacionCultural }>(`/cultura/publicaciones/${id}/comentarios`, {
+    method: "POST",
+    body: { texto },
+  }).then((r) => r.data)
 }

@@ -12,6 +12,8 @@ const ComercioRepository = require("../repositories/comercio.repository");
 const Reglas = require("../config/reglas");
 const { ErrorValidacion, ErrorNoEncontrado, ErrorProhibido } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
+const { validarUbicacion } = require("../utils/ubicacion");
+const prisma = require("../config/prisma");
 
 const TIPOS_CONTRATO = ["TIEMPO_COMPLETO", "MEDIO_TIEMPO", "POR_DIAS", "TEMPORAL", "OTRO"];
 const TIPOS_PREGUNTA = ["TEXTO", "SI_NO", "OPCION_MULTIPLE"];
@@ -76,13 +78,25 @@ function validarDatosOferta(datos) {
   if (!TIPOS_CONTRATO.includes(datos.tipoContrato)) {
     throw new ErrorValidacion(`Tipo de contrato inválido. Opciones: ${TIPOS_CONTRATO.join(", ")}`);
   }
+  if (datos.salarioMin != null && (Number.isNaN(Number(datos.salarioMin)) || Number(datos.salarioMin) < 0)) {
+    throw new ErrorValidacion("El salario mínimo debe ser un número mayor o igual a cero");
+  }
+  if (datos.salarioMax != null && (Number.isNaN(Number(datos.salarioMax)) || Number(datos.salarioMax) < 0)) {
+    throw new ErrorValidacion("El salario máximo debe ser un número mayor o igual a cero");
+  }
   if (datos.salarioMin != null && datos.salarioMax != null && Number(datos.salarioMin) > Number(datos.salarioMax)) {
     throw new ErrorValidacion("El salario mínimo no puede ser mayor al máximo");
+  }
+  if (datos.vacantes != null && (!Number.isInteger(Number(datos.vacantes)) || Number(datos.vacantes) <= 0)) {
+    throw new ErrorValidacion("Las vacantes deben ser un número entero mayor a cero");
   }
   if (datos.fechaCierre) {
     const fecha = new Date(datos.fechaCierre);
     if (Number.isNaN(fecha.getTime())) throw new ErrorValidacion("Fecha de cierre inválida");
     if (fecha <= new Date()) throw new ErrorValidacion("La fecha de cierre debe ser futura");
+  }
+  if (datos.departamento?.trim() && datos.municipio?.trim()) {
+    validarUbicacion(datos.departamento.trim(), datos.municipio.trim());
   }
 }
 
@@ -161,7 +175,62 @@ const EmpleoService = {
   },
 
   async listarPublicas(filtros) {
-    return EmpleoRepository.listarPublicas(filtros);
+    const result = await EmpleoRepository.listarPublicas(filtros);
+    const ahora = new Date();
+
+    if (result.items.length > 0) {
+      const ids = result.items.map(i => i.id);
+      
+      // 1. Anuncios Nativos (Destacados)
+      const anunciosNativos = await prisma.anuncioUbicacion.findMany({
+        where: {
+          modulo: "EMPLEOS",
+          formato: "NATIVO",
+          ofertaEmpleoId: { in: ids },
+          activa: true,
+          campana: { estado: "ACTIVA", inicio: { lte: ahora }, fin: { gte: ahora } }
+        }
+      });
+      const idsConAnuncio = new Set(anunciosNativos.map(a => a.ofertaEmpleoId));
+      for (const item of result.items) {
+        if (idsConAnuncio.has(item.id)) {
+          item.anuncioActivo = true;
+        }
+      }
+      result.items.sort((a, b) => {
+        if (a.anuncioActivo && !b.anuncioActivo) return -1;
+        if (!a.anuncioActivo && b.anuncioActivo) return 1;
+        return 0;
+      });
+    }
+
+    // 2. Anuncios Display (Banners Cruzados)
+    // Solo si es la primera página o aleatoriamente para evitar saturar, o simplemente inyectamos 1 o 2 banners por página.
+    const banners = await prisma.anuncioUbicacion.findMany({
+      where: {
+        modulo: "EMPLEOS",
+        formato: "BANNER",
+        activa: true,
+        campana: { estado: "ACTIVA", inicio: { lte: ahora }, fin: { gte: ahora } }
+      },
+      take: 2 // Máximo 2 banners por página
+    });
+
+    if (banners.length > 0) {
+      // Inyectar el primer banner después del 3er elemento
+      if (result.items.length > 3) {
+        result.items.splice(3, 0, { ...banners[0], esBannerDisplay: true, id: 'banner-' + banners[0].id });
+      } else {
+        result.items.push({ ...banners[0], esBannerDisplay: true, id: 'banner-' + banners[0].id });
+      }
+      
+      // Inyectar el segundo banner después del 8vo elemento
+      if (banners.length > 1 && result.items.length > 8) {
+        result.items.splice(8, 0, { ...banners[1], esBannerDisplay: true, id: 'banner-' + banners[1].id });
+      }
+    }
+
+    return result;
   },
 
   async obtenerDetallePublico(ofertaId) {

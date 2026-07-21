@@ -152,11 +152,21 @@ function FilaTour({ t, onToggle, onToggleRnt }: { t: TourAdmin; onToggle: () => 
 export default function AdminToursPage() {
   const [tours, setTours] = useState<TourAdmin[]>([])
   const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [filtroActivo, setFiltroActivo] = useState<'todos' | 'activos' | 'inactivos'>('todos')
 
   useEffect(() => {
-    adminListarTours().then(d => { setTours(d); setCargando(false) })
+    (async () => {
+      try {
+        const d = await adminListarTours()
+        setTours(d)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar los tours.')
+      } finally {
+        setCargando(false)
+      }
+    })()
   }, [])
 
   async function toggleEstado(tour: TourAdmin) {
@@ -191,6 +201,12 @@ export default function AdminToursPage() {
         <h1 className="text-2xl font-bold text-[#1A1A1A]">Tours &amp; Experiencias</h1>
         <p className="text-sm text-gray-500 mt-1">Gestion de tours registrados en Teravia. Haz clic en el numero de reservas para verlas.</p>
       </div>
+
+      {error && (
+        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[

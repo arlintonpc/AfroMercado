@@ -37,14 +37,19 @@ function enmascararCuenta(numeroCuenta) {
 }
 
 function hashCuenta({ numeroCuenta, documento, comercioId }) {
-  const secreto = process.env.CUENTAS_DISPERSION_SECRET || process.env.JWT_SECRET || "afromercado-dev";
+  const secreto = process.env.CUENTAS_DISPERSION_SECRET || process.env.JWT_SECRET;
+  if (process.env.NODE_ENV === "production" && (!secreto || secreto.length < 32)) {
+    throw new Error(
+      "CUENTAS_DISPERSION_SECRET debe estar configurado con al menos 32 caracteres en produccion"
+    );
+  }
   const base = [
     limpiarNumeroCuenta(numeroCuenta),
     String(documento || "").trim(),
     String(comercioId || ""),
   ].join(":");
 
-  return crypto.createHmac("sha256", secreto).update(base).digest("hex");
+  return crypto.createHmac("sha256", secreto || "afromercado-dev").update(base).digest("hex");
 }
 
 function obtenerClaveCifrado() {

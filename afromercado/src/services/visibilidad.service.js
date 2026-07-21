@@ -29,8 +29,17 @@ async function obtenerLimite(tipo) {
 
 async function contarActivasPorTipo(tipo) {
   const ahora = new Date();
-  return prisma.visibilidadPagada.count({
-    where: { tipo, activa: true, inicio: { lte: ahora }, fin: { gt: ahora } },
+  return prisma.anuncioUbicacion.count({
+    where: { 
+      activa: true,
+      modulo: "PRODUCTOS", 
+      etiqueta: tipo === "HOME_DESTACADO" ? "HOME_DESTACADO" : "CATALOGO",
+      campana: {
+        estado: "ACTIVA", 
+        inicio: { lte: ahora }, 
+        fin: { gt: ahora }
+      }
+    },
   });
 }
 
