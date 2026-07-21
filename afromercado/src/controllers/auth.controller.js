@@ -5,11 +5,18 @@
 // ============================================================
 const AuthService = require("../services/auth.service");
 
+// Frontend (Vercel) y backend (Render) viven en dominios distintos, asi que
+// esto es cross-site de verdad, no solo cross-origin. Una cookie SameSite=Lax
+// no se envia en peticiones fetch/XHR cross-site (solo en navegacion top-level),
+// por eso en produccion necesita SameSite=None + Secure. En dev ambos corren en
+// localhost (mismo site, distinto puerto) y sin HTTPS, asi que ahi se mantiene Lax.
+const esProduccion = process.env.NODE_ENV === 'production';
+
 const setTokenCookie = (res, token) => {
   res.cookie('afromercado_token', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: esProduccion,
+    sameSite: esProduccion ? 'none' : 'lax',
     maxAge: 30 * 24 * 60 * 60 * 1000 // 30 dias
   });
 };
@@ -38,8 +45,8 @@ const AuthController = {
   async logout(req, res) {
     res.clearCookie('afromercado_token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax'
+      secure: esProduccion,
+      sameSite: esProduccion ? 'none' : 'lax'
     });
     res.json({ ok: true });
   },
