@@ -8,6 +8,7 @@ const router = express.Router();
 
 router.post("/registro", AuthController.registrar);
 router.post("/login", AuthController.login);
+router.post("/logout", AuthController.logout);
 router.get("/yo", autenticar, AuthController.yo);
 
 // Recuperación de contraseña

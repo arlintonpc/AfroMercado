@@ -440,7 +440,14 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
             {!youtubeActivo ? (
               <button
                 type="button"
-                onClick={() => embedUrlFinal ? setYoutubeActivo(true) : onAbrir(publicacion, 0)}
+                onClick={() => {
+                  if (embedUrlFinal) {
+                    setYoutubeActivo(true)
+                    iniciarConteoVista()
+                  } else {
+                    onAbrir(publicacion, 0)
+                  }
+                }}
                 aria-label={`Reproducir video de ${publicacion.titulo}`}
                 className="absolute inset-0 block h-full w-full group z-0"
               >
@@ -503,7 +510,9 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
                   </button>
                 )}
               </div>
-              <p className="truncate text-xs text-white/90" style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.8)' }}>{publicacion.esAnuncio ? 'Anuncio' : ubicacion}</p>
+              <p className="truncate text-xs text-white/90" style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.8)' }}>
+                {publicacion.esAnuncio ? 'Anuncio' : (comercio?.totalSeguidores != null ? `${comercio.totalSeguidores} ${comercio.totalSeguidores === 1 ? 'seguidor' : 'seguidores'} • ${ubicacion}` : ubicacion)}
+              </p>
             </div>
           </div>
           <div ref={menuRef} className="relative flex-shrink-0 pointer-events-auto">
@@ -553,7 +562,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
                 <svg width="26" height="26" viewBox="0 0 24 24" fill={meGusta ? '#C0392B' : 'rgba(0,0,0,0.4)'} stroke="white" strokeWidth="1.5">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                {totalLikes > 0 && <span className="text-xs font-semibold">{totalLikes}</span>}
+                <span className="text-xs font-semibold">{totalLikes}</span>
               </button>
               <button type="button" onClick={manejarGuardar} aria-pressed={esFavorito} className="flex flex-col items-center gap-1 text-white pointer-events-auto" style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.8))' }}>
                 <svg width="26" height="26" viewBox="0 0 24 24" fill={esFavorito ? '#D4A017' : 'rgba(0,0,0,0.4)'} stroke="white" strokeWidth="1.5">
@@ -564,8 +573,15 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="rgba(0,0,0,0.4)" stroke="white" strokeWidth="1.5">
                   <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                {totalComentarios > 0 && <span className="text-xs font-semibold">{totalComentarios}</span>}
+                <span className="text-xs font-semibold">{totalComentarios}</span>
               </button>
+              <div className="flex flex-col items-center gap-1 text-white" style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.8))' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="rgba(0,0,0,0.4)" stroke="white" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <span className="text-xs font-semibold">{publicacion.totalVistas || 0}</span>
+              </div>
             </>
           )}
           <div ref={compartirRef} className="relative pointer-events-auto">
@@ -573,13 +589,41 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
               <svg width="26" height="26" viewBox="0 0 24 24" fill="rgba(0,0,0,0.4)" stroke="white" strokeWidth="1.5">
                 <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              {totalCompartidos > 0 && <span className="text-xs font-semibold">{totalCompartidos}</span>}
+              <span className="text-xs font-semibold">{totalCompartidos}</span>
             </button>
           </div>
         </div>
 
         {/* Franja inferior: título/descripción + botón de acción */}
-        <div className="absolute inset-x-0 bottom-0 px-4 pb-4 pt-16 pointer-events-none">
+        <div className="absolute inset-x-0 bottom-0 px-4 pb-4 pt-16 pointer-events-none flex flex-col justify-end">
+          {publicacion.producto && (
+            <Link
+              href={publicacion.producto.esExpress ? `/express/${publicacion.producto.comercioId}` : `/producto/${publicacion.producto.id}`}
+              className="pointer-events-auto mb-3 flex w-max max-w-[85%] items-center gap-3 rounded-[20px] border border-white/10 bg-[#161616]/95 p-1.5 pr-4 shadow-2xl backdrop-blur-md transition hover:bg-[#1f1f1f] group"
+            >
+              {publicacion.producto.fotoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={publicacion.producto.fotoUrl} alt={publicacion.producto.nombre} className="h-[60px] w-[60px] flex-shrink-0 rounded-2xl object-cover shadow-md" />
+              ) : (
+                <div className="flex h-[60px] w-[60px] flex-shrink-0 items-center justify-center rounded-2xl bg-white/10 text-2xl shadow-md">📦</div>
+              )}
+              <div className="flex flex-col overflow-hidden py-1">
+                {publicacion.esAnuncio && (
+                  <p className="text-[10px] font-bold tracking-widest text-[#52B788] uppercase mb-0.5">
+                    DESTACADO
+                  </p>
+                )}
+                <p className="truncate text-[15px] font-bold text-white leading-tight pr-2">{publicacion.producto.nombre}</p>
+                <p className="text-[14px] font-black text-[#D4A017] mt-0.5">
+                  {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(Number(publicacion.producto.precio))}
+                </p>
+              </div>
+              <div className="ml-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#52B788]/10 text-[#52B788] transition-colors group-hover:bg-[#52B788]/20">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+            </Link>
+          )}
+
           <p className="pr-14 font-serif text-base font-semibold text-white pointer-events-auto" style={{ textShadow: '0px 1px 3px rgba(0,0,0,0.8)' }}>{publicacion.titulo}</p>
           {publicacion.descripcion && (
             <p className="mt-1 line-clamp-2 pr-14 text-sm text-white/95 pointer-events-auto" style={{ textShadow: '0px 1px 3px rgba(0,0,0,0.8)' }}>{publicacion.descripcion}</p>

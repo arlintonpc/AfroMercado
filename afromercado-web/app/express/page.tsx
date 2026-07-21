@@ -74,8 +74,8 @@ export default function ExpressPage() {
 
   const heroFotos = useMemo(() => {
     const urls = new Set<string>()
-    todos.forEach(c => {
-      if (c.comercio.logoUrl) urls.add(c.comercio.logoUrl)
+    todos.forEach((c: any) => {
+      if (c.comercio?.logoUrl) urls.add(c.comercio.logoUrl)
     })
     const arr = Array.from(urls)
     return arr.length > 0 ? arr : ['https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1600&q=80']

@@ -345,6 +345,59 @@ const CulturaService = {
   },
 
   // ── ORGANIZADOR (comercio) ───────────────────────────────────
+  async misPublicacionesVitrina(usuarioId, query) {
+    const comercio = await prisma.comercio.findUnique({ where: { usuarioId } });
+    if (!comercio) throw new ErrorValidacion("No tienes un comercio asociado");
+    
+    const resultado = await CulturaRepository.listarMisPublicaciones(comercio.id, query?.page);
+    
+    // Mapear los contadores al primer nivel para el frontend
+    const itemsMapeados = resultado.items.map(p => {
+      const { _count, ...resto } = p;
+      return {
+        ...resto,
+        totalLikes: _count?.likes ?? 0,
+        totalComentarios: _count?.comentarios ?? 0,
+        totalVistas: _count?.vistas ?? 0,
+      };
+    });
+    
+    return { ...resultado, items: itemsMapeados };
+  },
+
+  async actualizarMiPublicacion(usuarioId, id, datos) {
+    const comercio = await prisma.comercio.findUnique({ where: { usuarioId } });
+    if (!comercio) throw new ErrorValidacion("No tienes un comercio asociado");
+    
+    // Solo permitimos editar campos básicos (titulo, descripcion, moduloOrigen, productoId, activa)
+    const data = limpiarUndefined({
+      titulo: textoLimpio(datos.titulo, 160),
+      descripcion: textoLimpio(datos.descripcion, 6000),
+      moduloOrigen: datos.moduloOrigen && MODULOS_ORIGEN_VITRINA_VALIDOS.includes(datos.moduloOrigen) ? datos.moduloOrigen : undefined,
+      productoId: numeroONull(datos.productoId),
+      activa: boolOpcional(datos.activa),
+    });
+
+    try {
+      return await CulturaRepository.actualizarMiPublicacion(id, comercio.id, data);
+    } catch (e) {
+      if (e.code === "P2025") throw new ErrorNoEncontrado("Publicación no encontrada o no te pertenece");
+      throw e;
+    }
+  },
+
+  async eliminarMiPublicacion(usuarioId, id) {
+    const comercio = await prisma.comercio.findUnique({ where: { usuarioId } });
+    if (!comercio) throw new ErrorValidacion("No tienes un comercio asociado");
+
+    try {
+      return await CulturaRepository.eliminarPublicacion(id, comercio.id);
+    } catch (e) {
+      if (e.code === "P2025") throw new ErrorNoEncontrado("Publicación no encontrada o no te pertenece");
+      throw e;
+    }
+  },
+
   async misEventos(comercioId) {
     return prisma.eventoCultural.findMany({
       where: { comercioId },
@@ -535,7 +588,7 @@ const CulturaService = {
   // solo reactivo vía denuncias (ver sección de denuncias más abajo).
   async crearPublicacion(usuarioId, {
     titulo, descripcion, fotoUrls, videoUrl, videoPosterUrl, videoDuracionSegundos, videoPublicId,
-    departamento, municipio, comercioId, moduloOrigen,
+    departamento, municipio, comercioId, moduloOrigen, productoId,
   }) {
     if (!titulo?.trim()) throw new ErrorValidacion("El título es obligatorio");
     if (!departamento?.trim()) throw new ErrorValidacion("El departamento es obligatorio");
@@ -580,6 +633,7 @@ const CulturaService = {
       municipio: municipio?.trim() || null,
       comercioId: comercioIdFinal,
       moduloOrigen: moduloOrigenFinal,
+      productoId: productoId ? Number(productoId) : null,
     });
 
     // Vitrina v0.2: avisa a los seguidores del comercio de la nueva publicación.
@@ -698,11 +752,14 @@ const CulturaService = {
       mapearComercioVitrina(resto);
       if (resto.comercio) {
         resto.comercio.siguiendo = usuarioId ? siguiendoSet.has(resto.comercio.id) : false;
+        resto.comercio.totalSeguidores = resto.comercio._count?.seguidores ?? 0;
+        delete resto.comercio._count;
       }
       return {
         ...resto,
         totalLikes: _count?.likes ?? 0,
         totalComentarios: _count?.comentarios ?? 0,
+        totalVistas: _count?.vistas ?? 0,
         meGusta: Array.isArray(likes) && likes.length > 0,
         esFavorito: favoritosSet.has(resto.id),
       };

@@ -26,6 +26,7 @@ export function ModalCompartir({ abierto, onClose, url, titulo, onCompartir }: M
     try {
       await navigator.clipboard.writeText(url)
       setCopiado(true)
+      onCompartir()
       setTimeout(() => {
         setCopiado(false)
         onClose()

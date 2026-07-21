@@ -26,10 +26,12 @@ export default function Error({
       <p className="text-sm text-[#1A1A1A]/55 mt-2 max-w-sm">
         Ocurrió un error inesperado. Puedes intentarlo de nuevo o volver al inicio.
       </p>
-      <div className="mt-4 p-4 bg-red-100 text-red-900 rounded text-xs text-left overflow-auto max-w-3xl w-full">
-        <p className="font-bold">{error.message}</p>
-        <pre className="mt-2 whitespace-pre-wrap">{error.stack}</pre>
-      </div>
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-4 p-4 bg-red-100 text-red-900 rounded text-xs text-left overflow-auto max-w-3xl w-full">
+          <p className="font-bold">{error.message}</p>
+          <pre className="mt-2 whitespace-pre-wrap">{error.stack}</pre>
+        </div>
+      )}
       <div className="flex gap-3 mt-6">
         <button
           onClick={reset}

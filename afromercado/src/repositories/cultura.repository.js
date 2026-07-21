@@ -69,9 +69,11 @@ const CulturaRepository = {
               fotoDocumentoFrenteUrl: true,
               fotoDocumentoReversoUrl: true,
               cuentaDispersion: { select: { estado: true } },
+              _count: { select: { seguidores: true } },
             },
           },
-          _count: { select: { likes: true, comentarios: true } },
+          producto: { select: { id: true, nombre: true, precio: true, fotoUrl: true, esExpress: true, comercioId: true } },
+          _count: { select: { likes: true, comentarios: true, vistas: true } },
           ...(usuarioId ? { likes: { where: { usuarioId }, select: { id: true } } } : {}),
         },
       }),
@@ -86,6 +88,38 @@ const CulturaRepository = {
 
   async ocultarPublicacion(id) {
     return prisma.publicacionCultural.update({ where: { id }, data: { activa: false } });
+  },
+
+  async listarMisPublicaciones(comercioId, page = 1, take = 20) {
+    const where = { comercioId };
+    const skip = (Math.max(1, Number(page)) - 1) * take;
+    const [items, total] = await Promise.all([
+      prisma.publicacionCultural.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: "desc" },
+        include: {
+          _count: { select: { vistas: true, likes: true, comentarios: true } },
+          producto: { select: { id: true, nombre: true, comercioId: true, esExpress: true } },
+        },
+      }),
+      prisma.publicacionCultural.count({ where }),
+    ]);
+    return { items, total, pagina: Math.max(1, Number(page)) };
+  },
+
+  async actualizarMiPublicacion(id, comercioId, data) {
+    return prisma.publicacionCultural.update({
+      where: { id, comercioId },
+      data,
+    });
+  },
+
+  async eliminarPublicacion(id, comercioId) {
+    return prisma.publicacionCultural.delete({
+      where: { id, comercioId },
+    });
   },
 
   // ── Denuncias de publicaciones ─────────────────────────────────

@@ -11,8 +11,10 @@ import {
 import {
   registro as apiRegistro,
   login as apiLogin,
+  logoutApi,
+  yoApi,
 } from '@/lib/api/auth'
-import { TOKEN_KEY, USUARIO_KEY } from '@/lib/api/client'
+import { USUARIO_KEY } from '@/lib/api/client'
 import type { Usuario, DatosRegistro } from '@/types/usuario'
 
 interface AuthContextValor {
@@ -28,9 +30,8 @@ interface AuthContextValor {
 
 const AuthContext = createContext<AuthContextValor | undefined>(undefined)
 
-function guardarSesion(usuario: Usuario, token: string) {
+function guardarSesion(usuario: Usuario) {
   try {
-    window.localStorage.setItem(TOKEN_KEY, token)
     window.localStorage.setItem(USUARIO_KEY, JSON.stringify(usuario))
   } catch {
     // localStorage no disponible: la sesión vive solo en memoria.
@@ -39,7 +40,6 @@ function guardarSesion(usuario: Usuario, token: string) {
 
 function limpiarSesion() {
   try {
-    window.localStorage.removeItem(TOKEN_KEY)
     window.localStorage.removeItem(USUARIO_KEY)
   } catch {
     // noop
@@ -51,21 +51,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
 
-  // Restaura la sesión desde localStorage al montar.
+  // Restaura la sesión verificando con el backend.
   useEffect(() => {
-    try {
-      const tokenGuardado = window.localStorage.getItem(TOKEN_KEY)
-      const usuarioGuardado = window.localStorage.getItem(USUARIO_KEY)
-      if (tokenGuardado && usuarioGuardado) {
-        setToken(tokenGuardado)
-        setUsuario(JSON.parse(usuarioGuardado) as Usuario)
+    async function verificarSesion() {
+      try {
+        // Fast hydration visual:
+        const usuarioGuardado = window.localStorage.getItem(USUARIO_KEY)
+        if (usuarioGuardado) {
+          setUsuario(JSON.parse(usuarioGuardado) as Usuario)
+          setToken('http-only')
+        }
+        
+        // Verificación real con la cookie HttpOnly
+        const res = await yoApi()
+        if (res.ok && res.usuario) {
+          setUsuario(res.usuario)
+          setToken('http-only')
+          guardarSesion(res.usuario)
+        } else {
+          limpiarSesion()
+          setUsuario(null)
+          setToken(null)
+        }
+      } catch {
+        // Falló la verificación de sesión (token inválido/expirado)
+        limpiarSesion()
+        setUsuario(null)
+        setToken(null)
+      } finally {
+        setCargando(false)
       }
-    } catch {
-      // Datos corruptos: limpiamos para evitar estados inconsistentes.
-      limpiarSesion()
-    } finally {
-      setCargando(false)
     }
+    verificarSesion()
   }, [])
 
   // Cierra sesión automáticamente cuando cualquier petición recibe 401.
@@ -80,25 +97,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
-    const { usuario: u, token: t } = await apiLogin(email, password)
-    guardarSesion(u, t)
+    const { usuario: u } = await apiLogin(email, password)
+    guardarSesion(u)
     setUsuario(u)
-    setToken(t)
+    setToken('http-only')
     return u
   }, [])
 
   const registro = useCallback(async (datos: DatosRegistro) => {
-    const { usuario: u, token: t } = await apiRegistro(datos)
-    guardarSesion(u, t)
+    const { usuario: u } = await apiRegistro(datos)
+    guardarSesion(u)
     setUsuario(u)
-    setToken(t)
+    setToken('http-only')
     return u
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await logoutApi()
+    } catch {
+      // ignore
+    }
     limpiarSesion()
     setUsuario(null)
     setToken(null)
+    window.location.href = '/ingresar'
   }, [])
 
   const actualizarUsuario = useCallback((nuevoUsuario: Usuario) => {

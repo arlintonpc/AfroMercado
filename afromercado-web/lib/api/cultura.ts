@@ -224,6 +224,7 @@ export interface ComercioVitrina {
   comprableEnPlataforma?: boolean
   /** Solo presente para publicaciones consultadas con sesión iniciada. */
   siguiendo?: boolean
+  totalSeguidores?: number
 }
 
 export interface PublicacionCultural {
@@ -251,6 +252,9 @@ export interface PublicacionCultural {
   moduloOrigen?: ModuloOrigenVitrina | null
   /** No nulo únicamente en publicaciones de la Vitrina de video (comerciantes). */
   comercio?: ComercioVitrina | null
+  totalVistas?: number
+  productoId?: number | null
+  producto?: { id: number; nombre: string; precio: number | string; fotoUrl?: string | null; esExpress?: boolean; comercioId?: number } | null
 
   // ── Propiedades para Anuncios Inyectados (Publicidad) ──
   esAnuncio?: boolean
@@ -289,6 +293,7 @@ export interface PublicacionCulturalInput {
   /** Presente cuando la publica un comerciante desde la Vitrina de video. */
   comercioId?: number
   moduloOrigen?: ModuloOrigenVitrina
+  productoId?: number
 }
 
 export function normalizarPublicacionCultural(publicacion: PublicacionCultural): PublicacionCultural {
@@ -303,10 +308,15 @@ export function normalizarPublicacionCultural(publicacion: PublicacionCultural):
     municipio: publicacion.municipio ?? null,
     autor: publicacion.autor ?? undefined,
     totalLikes: publicacion.totalLikes ?? 0,
+    totalComentarios: publicacion.totalComentarios ?? 0,
+    totalCompartidos: publicacion.totalCompartidos ?? 0,
+    totalVistas: publicacion.totalVistas ?? 0,
     meGusta: publicacion.meGusta ?? false,
     esFavorito: publicacion.esFavorito ?? false,
     moduloOrigen: publicacion.moduloOrigen ?? null,
     comercio: publicacion.comercio ?? null,
+    productoId: publicacion.productoId ?? null,
+    producto: publicacion.producto ?? null,
   }
 }
 
@@ -328,6 +338,31 @@ export async function listarPublicacionesCulturales(params: { departamento?: str
 }
 
 // ── Vitrina de video (comerciantes) ──────────────────────────
+
+/** Lista las publicaciones de vitrina del comerciante autenticado */
+export async function listarMisPublicacionesVitrina(params: { page?: number } = {}): Promise<{ items: PublicacionCultural[]; total: number; pagina: number }> {
+  const qs = new URLSearchParams()
+  if (params.page) qs.set('page', String(params.page))
+  const q = qs.toString()
+  const r = await apiFetch<{ ok: boolean; data: { items: PublicacionCultural[]; total: number; pagina: number } }>(`/cultura/mis-publicaciones${q ? `?${q}` : ''}`)
+  return {
+    ...r.data,
+    items: Array.isArray(r.data.items) ? r.data.items.map(normalizarPublicacionCultural) : [],
+  }
+}
+
+/** Actualiza una publicación del comerciante */
+export async function actualizarMiPublicacionVitrina(id: number, datos: Partial<PublicacionCulturalInput> & { activa?: boolean }): Promise<PublicacionCultural> {
+  const r = await apiFetch<{ ok: boolean; data: PublicacionCultural }>(`/cultura/mis-publicaciones/${id}`, { method: 'PATCH', body: datos })
+  return normalizarPublicacionCultural(r.data)
+}
+
+/** Elimina permanentemente una publicación del comerciante */
+export async function eliminarMiPublicacionVitrina(id: number): Promise<void> {
+  await apiFetch(`/cultura/mis-publicaciones/${id}`, { method: 'DELETE' })
+}
+
+// ── Vitrina de video (Público) ──────────────────────────
 
 /**
  * Feed público de publicaciones de comercio ("Vitrina de video"): reseñas

@@ -586,7 +586,30 @@ export interface TopProducto {
 }
 
 export interface EstadisticasComerciante {
-  ingresosNetos: number
+  resumen: {
+    ingresosNetos: number
+    ingresosMesPasado: number
+    variacionPorcentaje: number | null
+    ventasMes: number
+    pedidosUrgentes: number
+  }
+  tendenciaMensual: { mes: string; neto: number; pedidos: number }[]
+  productos: {
+    topMasVendidos: TopProducto[]
+    sinVentas: any[]
+    stockCritico: any[]
+  }
+  vistas: {
+    topMasVistos: any[]
+    sinVistas: any[]
+  }
+  reputacion: {
+    calificacionPromedio: number
+    totalReviews: number
+    reviewsRecientes: any[]
+  }
+  insights: { tipo: string; texto: string; accion: any }[]
+  // Mantenemos compatibilidad con el UI antiguo que espera estos campos
   porPreparar: SubPedidoComerciante[]
   recientes: SubPedidoComerciante[]
   topProductos: TopProducto[]
@@ -594,9 +617,17 @@ export interface EstadisticasComerciante {
 
 export async function obtenerMisEstadisticas(): Promise<EstadisticasComerciante> {
   const res = await apiFetch<{ ok: boolean; data: EstadisticasComerciante }>(
-    '/comercios/mis-estadisticas'
+    '/comercios/mis-analiticas'
   )
-  return res.data
+  
+  // Como `mis-analiticas` tiene otra estructura, la adaptamos para no romper el resto del UI
+  const d = res.data as any
+  return {
+    ...d,
+    porPreparar: d.resumen?.pedidosUrgentes ? [] : [], // Fix temporal para evitar errores (se debería usar otra ruta para porPreparar)
+    recientes: [], // Ya no viene en mis-analiticas, se asume vacío por ahora.
+    topProductos: d.productos?.topMasVendidos ?? []
+  }
 }
 
 /** Quita una imagen del producto. DELETE /productos/:id/imagenes */

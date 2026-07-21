@@ -175,6 +175,10 @@ const handlerSubidaVideoEvento = crearHandlerSubidaVideo("afromercado/eventos-cu
 router.get("/", CulturaController.listarAgenda);
 
 // ── ORGANIZADOR (comercio) ───────────────────────────────────
+router.get(   "/mis-publicaciones",        ...soloComercio, CulturaController.misPublicacionesVitrina);
+router.patch( "/mis-publicaciones/:id",    ...soloComercio, CulturaController.actualizarMiPublicacion);
+router.delete("/mis-publicaciones/:id",    ...soloComercio, CulturaController.eliminarMiPublicacion);
+
 router.get(   "/mis-eventos",              ...soloComercio, CulturaController.misEventos);
 router.post(  "/mis-eventos",              ...soloComercio, CulturaController.crearEvento);
 router.get(   "/mis-eventos/reservas",     ...soloComercio, CulturaController.reservasOrganizador);

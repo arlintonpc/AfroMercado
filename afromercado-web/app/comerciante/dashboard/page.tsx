@@ -24,6 +24,7 @@ import {
 } from '@/components/comerciante/api'
 import { etiquetaUnidad } from '@/components/comerciante/constantes'
 import ChecklistOnboarding from '@/components/comerciante/ChecklistOnboarding'
+import DashboardGraficos from '@/components/comerciante/DashboardGraficos'
 
 interface SlotMetrica {
   id: number
@@ -624,7 +625,7 @@ function DashboardContenido() {
             <MetricCard valor={productos.length} etiqueta="Productos" />
             <MetricCard valor={comercio?.totalVentas ?? 0} etiqueta="Pedidos vendidos" />
             <MetricCard
-              valor={stats ? formatearPrecio(stats.ingresosNetos) : '—'}
+              valor={stats?.resumen ? formatearPrecio(stats.resumen.ingresosNetos) : '—'}
               etiqueta="Ingresos netos"
               acento
             />
@@ -651,6 +652,14 @@ function DashboardContenido() {
           </div>
         </Link>
       </div>
+
+      {/* Gráficos Analíticos */}
+      {!cargando && stats && stats.tendenciaMensual && (
+        <DashboardGraficos 
+          tendenciaMensual={stats.tendenciaMensual} 
+          topProductos={stats.topProductos || []} 
+        />
+      )}
 
       {/* Por preparar */}
       {!cargando && stats && stats.porPreparar.length > 0 && (

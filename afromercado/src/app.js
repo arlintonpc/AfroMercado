@@ -6,6 +6,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const cookieParser = require("cookie-parser");
 const rutas = require("./routes");
 const { manejadorErrores, rutaNoEncontrada } = require("./middlewares/errores");
 // WhatsApp se inicia solo cuando el admin hace clic en "Conectar" — no al arrancar el servidor.
@@ -33,6 +34,7 @@ if (process.env.NODE_ENV === "production" && origenesPermitidos.length === 0) {
 
 // Seguridad y middlewares base
 app.use(helmet());                          // cabeceras de seguridad
+app.use(cookieParser());
 app.use(
   cors({
     origin: origenesPermitidos.length > 0 ? origenesPermitidos : true,

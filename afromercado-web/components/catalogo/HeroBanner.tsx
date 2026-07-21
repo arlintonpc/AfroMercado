@@ -196,7 +196,7 @@ export default function HeroBanner({ productos = [] }: { productos?: Producto[] 
       <div className="absolute inset-0 bg-gradient-to-b from-[#0f2419]/80 via-[#0f2419]/50 to-[#0f2419]/90 z-10" />
 
       {/* ─── Contenido Centrado ─── */}
-      <div className="relative z-20 w-full max-w-5xl mx-auto px-4 flex flex-col items-center text-center mt-8">
+      <div className="relative z-20 w-full max-w-5xl mx-auto px-4 flex flex-col items-center text-center mt-8 pb-24 md:pb-0">
         
         {/* Píldora Superior */}
         <div className="inline-flex items-center gap-2 bg-white/10 border border-[#D4A017]/40 backdrop-blur-md rounded-full px-5 py-2 mb-8 shadow-2xl">

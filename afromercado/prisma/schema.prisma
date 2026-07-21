@@ -405,6 +405,7 @@ model Producto {
   gruposComplemento GrupoComplemento[]
   gruposComplementoAsignados ProductoGrupoComplemento[]
   denuncias        DenunciaProducto[]
+  publicacionesVitrina PublicacionCultural[]
 
   @@index([comercioId, activo])
   @@index([categoriaId, activo])
@@ -2627,6 +2628,7 @@ model PublicacionCultural {
   // negocio, listado aparte en /vitrina, nunca mezclado con el feed personal.
   comercioId            Int?
   moduloOrigen          String?
+  productoId            Int?
   videoPosterUrl        String?
   videoDuracionSegundos Int?
   videoPublicId         String?
@@ -2635,6 +2637,7 @@ model PublicacionCultural {
 
   autor     Usuario                       @relation(fields: [autorId], references: [id])
   comercio  Comercio?                     @relation(fields: [comercioId], references: [id])
+  producto  Producto?                     @relation(fields: [productoId], references: [id], onDelete: SetNull)
   denuncias DenunciaPublicacionCultural[]
   likes     LikePublicacionCultural[]
   vistas    VistaPublicacionCultural[]

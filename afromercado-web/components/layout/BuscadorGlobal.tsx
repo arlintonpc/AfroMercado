@@ -74,7 +74,7 @@ export default function BuscadorGlobal() {
     <>
       <button
         onClick={() => setAbierto(true)}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors text-sm text-gray-500"
+        className="flex items-center w-full gap-2 px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors text-sm text-gray-500"
         aria-label="Búsqueda global"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

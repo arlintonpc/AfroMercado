@@ -3,10 +3,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   images: {
-    // El optimizador de Next no sirve imágenes http://localhost; además, en
-    // producción las imágenes irán a Cloudinary (con su propia optimización).
-    // Para el MVP cargamos las imágenes tal cual (sin el optimizador).
-    unoptimized: true,
+    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       {
         protocol: "https",

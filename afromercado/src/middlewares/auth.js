@@ -8,12 +8,12 @@ const UsuarioRepository = require("../repositories/usuario.repository");
 // Verifica que la petición traiga un token válido
 async function autenticar(req, res, next) {
   try {
-    // Acepta token desde header Authorization o desde query ?token= (solo para SSE/EventSource)
-    let token = null;
+    // Acepta token desde cookie, header Authorization o desde query ?token= (solo para SSE/EventSource)
+    let token = req.cookies?.afromercado_token;
     const header = req.headers.authorization;
-    if (header && header.startsWith("Bearer ")) {
+    if (!token && header && header.startsWith("Bearer ")) {
       token = header.split(" ")[1];
-    } else if (req.query.token) {
+    } else if (!token && req.query.token) {
       token = req.query.token;
     }
     if (!token) {
@@ -54,9 +54,12 @@ function autorizar(...rolesPermitidos) {
 // Intenta autenticar pero no falla si no hay token (req.usuario queda null)
 async function autenticarOpcional(req, res, next) {
   try {
+    let token = req.cookies?.afromercado_token;
     const header = req.headers.authorization;
-    if (!header || !header.startsWith("Bearer ")) return next();
-    const token = header.split(" ")[1];
+    if (!token && header && header.startsWith("Bearer ")) {
+      token = header.split(" ")[1];
+    }
+    if (!token) return next();
     const payload = verificarToken(token);
     const usuario = await UsuarioRepository.buscarPorId(payload.id);
     if (usuario && usuario.activo) {

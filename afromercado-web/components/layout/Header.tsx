@@ -8,6 +8,7 @@ import { useRegion } from '@/context/RegionContext'
 import { apiFetch } from '@/lib/api/client'
 import { obtenerReglasPublicas } from '@/lib/api/config'
 import { DEPARTAMENTOS } from '@/lib/data/colombia'
+import { Utensils, Hotel, Map, Ship, Ticket, Clapperboard, Briefcase, Home, Leaf, Sparkles } from 'lucide-react'
 import CampanaNotificaciones from './CampanaNotificaciones'
 import BuscadorGlobal from './BuscadorGlobal'
 
@@ -167,189 +168,10 @@ export default function Header({ itemsCarrito }: HeaderProps) {
         </div>
 
         {/* Barra de búsqueda — solo desktop */}
-        <form onSubmit={buscar} className="hidden md:flex flex-1 max-w-md mx-8" role="search">
-          <div className="relative w-full" ref={busquedaRef}>
-            <input
-              type="search"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              onFocus={() => {
-                cargarBusquedasRecientes()
-                setMostrarSugerencias(true)
-              }}
-              placeholder="Buscar productos..."
-              aria-label="Buscar productos"
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-[#1A1A1A]/20 bg-white focus:outline-none focus:border-[#D4A017] text-sm"
-            />
-            <button type="submit" aria-label="Buscar" className="absolute left-3 top-1/2 -translate-y-1/2 text-[#1A1A1A]/40 hover:text-[#2D6A4F]">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </button>
+        <div className="hidden md:flex flex-1 min-w-0 max-w-md mx-4 lg:mx-8 justify-center">
+          <BuscadorGlobal />
+        </div>
 
-            {/* Dropdown búsquedas recientes */}
-            {mostrarSugerencias && busquedasRecientes.length > 0 && !busqueda && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.10)] border border-[#1A1A1A]/8 py-1 z-50">
-                <p className="px-3 py-1.5 text-xs font-semibold text-[#1A1A1A]/40 uppercase tracking-wide">
-                  Búsquedas recientes
-                </p>
-                {busquedasRecientes.map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    onClick={() => seleccionarSugerencia(q)}
-                    className="w-full text-left px-3 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/5 flex items-center gap-2"
-                  >
-                    <svg className="w-3.5 h-3.5 text-[#1A1A1A]/30 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="truncate">{q}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </form>
-
-        {/* Navegación tablet — versión comprimida (solo iconos) visible entre md: y lg: */}
-        <nav className="hidden md:flex lg:hidden items-center gap-0.5 mr-2" aria-label="Navegación principal">
-          <Link
-            href="/express"
-            title="Sabores"
-            aria-label="Sabores"
-            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-green-700 hover:bg-green-50 flex items-center justify-center"
-          >
-            🍽️
-          </Link>
-          <Link
-            href="/hoteles"
-            title="Hoteles"
-            aria-label="Hoteles"
-            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
-          >
-            🏨
-          </Link>
-          <Link
-            href="/tours"
-            title="Tours"
-            aria-label="Tours"
-            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
-          >
-            🗺️
-          </Link>
-          <Link
-            href="/transportes"
-            title="Transporte"
-            aria-label="Transporte"
-            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
-          >
-            🛥️
-          </Link>
-          <Link
-            href="/cultura"
-            title="Cultura"
-            aria-label="Cultura"
-            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
-          >
-            🎭
-          </Link>
-          <Link
-            href="/vitrina"
-            title="Vitrina de video"
-            aria-label="Vitrina de video"
-            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
-          >
-            🎬
-          </Link>
-          <Link
-            href="/empleo"
-            title="Empleo"
-            aria-label="Empleo"
-            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
-          >
-            💼
-          </Link>
-          <Link
-            href="/bienes-raices"
-            title="Bienes Raíces"
-            aria-label="Bienes Raíces"
-            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
-          >
-            🏘️
-          </Link>
-          <Link
-            href="/agro"
-            title="Agro"
-            aria-label="Agro"
-            className="min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center justify-center"
-          >
-            🌾
-          </Link>
-        </nav>
-
-        {/* Navegación desktop — versión completa (icono + texto) desde lg: */}
-        <nav className="hidden lg:flex items-center gap-1 mr-3" aria-label="Navegación principal">
-          <Link
-            href="/express"
-            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-green-700 hover:bg-green-50 flex items-center gap-1"
-          >
-            🍽️ Sabores
-          </Link>
-          <Link
-            href="/hoteles"
-            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1"
-          >
-            🏨 Hoteles
-          </Link>
-          <Link
-            href="/tours"
-            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1"
-          >
-            🗺️ Tours
-          </Link>
-          <Link
-            href="/transportes"
-            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1"
-          >
-            🛥️ Transporte
-          </Link>
-          <Link
-            href="/cultura"
-            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1"
-          >
-            🎭 Cultura
-          </Link>
-          <Link
-            href="/vitrina"
-            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1"
-          >
-            🎬 Vitrina
-          </Link>
-          <Link
-            href="/empleo"
-            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1"
-          >
-            💼 Empleo
-          </Link>
-          <Link
-            href="/bienes-raices"
-            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1"
-          >
-            🏘️ Bienes Raíces
-          </Link>
-          <Link
-            href="/agro"
-            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1"
-          >
-            🌾 Agro
-          </Link>
-          <Link
-            href="/temporada"
-            className="min-h-[40px] px-3 rounded-lg text-sm font-semibold text-[#D4A017] hover:bg-[#D4A017]/10 flex items-center"
-          >
-            Temporada
-          </Link>
-        </nav>
 
         {/* Íconos derecha */}
         <div className="flex items-center gap-2">
@@ -526,6 +348,44 @@ export default function Header({ itemsCarrito }: HeaderProps) {
               )}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Fila Inferior: Menú de Navegación Completo (Scrollable en móviles, distribuido en desktop) */}
+      <div className="flex bg-[#2D6A4F]/5 border-t border-black/5">
+        <div className="w-full max-w-6xl mx-auto px-2 md:px-6">
+          <nav className="flex items-center gap-2 lg:justify-between py-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }} aria-label="Navegación principal">
+            <Link href="/express" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-green-700 hover:bg-green-100 flex items-center gap-1.5 transition-colors">
+              <Utensils className="w-4 h-4" /> Sabores
+            </Link>
+            <Link href="/hoteles" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Hotel className="w-4 h-4" /> Hoteles
+            </Link>
+            <Link href="/tours" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Map className="w-4 h-4" /> Tours
+            </Link>
+            <Link href="/transportes" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Ship className="w-4 h-4" /> Transporte
+            </Link>
+            <Link href="/cultura" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Ticket className="w-4 h-4" /> Cultura
+            </Link>
+            <Link href="/vitrina" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Clapperboard className="w-4 h-4" /> Vitrina
+            </Link>
+            <Link href="/empleo" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Briefcase className="w-4 h-4" /> Empleo
+            </Link>
+            <Link href="/bienes-raices" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Home className="w-4 h-4" /> Bienes Raíces
+            </Link>
+            <Link href="/agro" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Leaf className="w-4 h-4" /> Agro
+            </Link>
+            <Link href="/temporada" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#D4A017] hover:bg-[#D4A017]/10 flex items-center gap-1.5 transition-colors">
+              <Sparkles className="w-4 h-4" /> Temporada
+            </Link>
+          </nav>
         </div>
       </div>
     </header>

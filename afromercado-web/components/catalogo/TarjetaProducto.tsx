@@ -26,6 +26,14 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
   const [imgError, setImgError]       = useState(false)
   const [hover, setHover]             = useState(false)
 
+  // Los hooks de arriba deben correr siempre, en el mismo orden, en cada
+  // render (regla de React) — por eso este early-return va DESPUÉS de ellos,
+  // no antes. BannerDisplay inyecta ítems marcados así en la misma lista de
+  // productos; esta tarjeta los ignora y BannerDisplay los renderiza aparte.
+  if ((producto as { esBannerDisplay?: boolean }).esBannerDisplay) {
+    return null
+  }
+
   const disponible = Math.max(0, producto.stock - (producto.stockReservado ?? 0))
   const descuentoPct = producto.oferta
     ? producto.oferta.tipo === 'PORCENTAJE'
@@ -34,7 +42,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
     : 0
   const agotado    = disponible === 0
   const stockBajo  = !agotado && disponible <= 5
-  const tieneVideo = Boolean(producto.videoUrl || producto.comercio.videoUrl)
+  const tieneVideo = Boolean(producto.videoUrl || producto.comercio?.videoUrl)
   const mostrarNacional = !agotado && (producto.alcance === 'NACIONAL' || producto.alcance === 'AMBOS')
 
   const mostrarPlaceholder = !producto.fotoUrl || imgError
@@ -69,7 +77,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         href={href}
         aria-label={`Ver ${producto.nombre}`}
         onClick={() => registrarPatrocinado('clic')}
-        className="relative block w-full aspect-[3/4] overflow-hidden"
+        className="relative block w-full aspect-square overflow-hidden"
       >
         {mostrarPlaceholder ? (
           <div className="absolute inset-0 bg-[#F0EBE3] flex flex-col items-center justify-center px-4 text-center">
@@ -80,7 +88,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
               {producto.nombre}
             </p>
             <p className="text-[#2D6A4F]/50 text-xs mt-2 tracking-wide uppercase">
-              {producto.comercio.municipio}
+              {producto.comercio?.municipio}
             </p>
           </div>
         ) : (
@@ -111,21 +119,21 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
 
         {/* Badge Nacional */}
         {mostrarNacional && (
-          <span className="absolute top-3 right-3 bg-white/80 backdrop-blur text-[#1A1A1A] text-[10px] font-semibold px-2.5 py-1 rounded-full leading-none">
+          <span className="absolute top-3 right-3 bg-white/70 backdrop-blur-md text-[#1A1A1A] text-[10px] font-bold px-2.5 py-1 rounded-full leading-none shadow-sm border border-white/40">
             📦 Nacional
           </span>
         )}
 
         {/* Badge stock bajo */}
         {stockBajo && !esDestacado && !producto.oferta && (
-          <span className="absolute top-3 left-3 bg-[#B7800A] text-white text-[10px] font-bold px-2.5 py-1 rounded-full leading-none">
+          <span className="absolute top-3 left-3 bg-[#B7800A]/80 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-full leading-none shadow-sm border border-white/20">
             Últimas {disponible}
           </span>
         )}
 
         {/* Badge oferta — % descuento */}
         {producto.oferta && !agotado && !esDestacado && (
-          <span className="absolute top-3 left-3 bg-[#2D6A4F] text-white text-[10px] font-bold px-2.5 py-1 rounded-full leading-none">
+          <span className="absolute top-3 left-3 bg-[#2D6A4F]/80 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-full leading-none shadow-sm border border-white/20">
             -{descuentoPct}%
           </span>
         )}
@@ -138,21 +146,21 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
 
         {/* Badge Express */}
         {producto.esExpress && !agotado && (
-          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-[#D4A017] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-[#D4A017]/90 backdrop-blur-md px-2.5 py-1 text-[10px] font-bold text-white shadow-sm border border-white/20">
             ⚡ {producto.tiempoEntregaMin ? `${producto.tiempoEntregaMin} min` : 'Express'}
           </span>
         )}
 
         {/* Badge contacto directo — el vendedor aún no tiene RUT/cuenta
             verificada, se compra coordinando con él directamente. */}
-        {!producto.esExpress && producto.comercio.comprableEnPlataforma === false && !agotado && (
+        {!producto.esExpress && producto.comercio?.comprableEnPlataforma === false && !agotado && (
           <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-[#25D366] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
             🤝 Contacto directo
           </span>
         )}
 
         {tieneVideo && (
-          <span className={`absolute ${producto.esExpress && !agotado ? 'bottom-3 right-3' : 'bottom-3 right-3'} inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur`}>
+          <span className={`absolute ${producto.esExpress && !agotado ? 'bottom-3 right-3' : 'bottom-3 right-3'} inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-md shadow-sm border border-white/20`}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M8 5v14l11-7z" />
             </svg>
@@ -191,21 +199,21 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
       <div className="px-3 py-2">
 
         {/* Comercio */}
-        <p className="truncate text-[#52B788] font-semibold uppercase" style={{ fontSize: 10, lineHeight: '12px', letterSpacing: '0.07em', marginBottom: 2 }}>
+        <p className="truncate text-[#1A1A1A]/50 font-medium" style={{ fontSize: 11, lineHeight: '14px', marginBottom: 3 }}>
           {/* El check ✓ se omite cuando ya se muestra el badge "Vendedor verificado"
               completo debajo (mismo dato, ya comunicado) — evita repetirlo dos veces. */}
           {producto.comercioId
             ? <Link href={`/comercio/${producto.comercioId}`} onClick={e => e.stopPropagation()} className="hover:underline">
-                {producto.comercio.nombre}
-                {producto.comercio.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}
+                {producto.comercio?.nombre}
+                {producto.comercio?.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}
               </Link>
-            : <>{producto.comercio.nombre}{producto.comercio.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}</>
+            : <>{producto.comercio?.nombre}{producto.comercio?.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}</>
           }
         </p>
 
         {mostrarBadgeVerificado && (
           <div className="mb-1.5">
-            <BadgeVendedorVerificado verificado={producto.comercio.verificado} size="sm" mostrarTooltip={false} />
+            <BadgeVendedorVerificado verificado={producto.comercio?.verificado} size="sm" mostrarTooltip={false} />
           </div>
         )}
 
@@ -233,7 +241,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
             <path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z" />
             <circle cx="12" cy="10" r="3" />
           </svg>
-          <span className="truncate">{producto.comercio.municipio}</span>
+          <span className="truncate">{producto.comercio?.municipio}</span>
         </p>
 
         {/* Etiqueta de la oferta */}

@@ -2,314 +2,242 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CampoTexto, CampoArea, CampoSelect } from '@/components/comerciante/Campos'
-import { obtenerMiComercio, type Comercio } from '@/components/comerciante/api'
-import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 import {
-  crearPublicacionCultural,
-  subirFotoPublicacionCultural,
-  subirVideoVitrina,
-  type ModuloOrigenVitrina,
-  type VideoVitrinaSubido,
+  listarMisPublicacionesVitrina,
+  actualizarMiPublicacionVitrina,
+  eliminarMiPublicacionVitrina,
+  type PublicacionCultural,
 } from '@/lib/api/cultura'
+import { Button } from '@/components/ui/Button'
+import { Skeleton } from '@/components/ui/Skeleton'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 
-const MAX_FOTOS = 6
-const MAX_SEGUNDOS_VIDEO = 45
+export default function MisVideosVitrinaPage() {
+  const [publicaciones, setPublicaciones] = useState<PublicacionCultural[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [procesandoId, setProcesando] = useState<number | null>(null)
+  const [aviso, setAviso] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null)
 
-const OPCIONES_MODULO: Array<{ valor: ModuloOrigenVitrina | ''; etiqueta: string }> = [
-  { valor: '', etiqueta: 'Ninguno en particular' },
-  { valor: 'PEDIDO', etiqueta: 'Marketplace (productos)' },
-  { valor: 'EXPRESS', etiqueta: 'Express / Sabores' },
-  { valor: 'HOTEL', etiqueta: 'Hoteles' },
-  { valor: 'TOUR', etiqueta: 'Tours' },
-  { valor: 'TRANSPORTE', etiqueta: 'Transporte' },
-  { valor: 'AGRO', etiqueta: 'Agro' },
-]
+  const [pendienteToggle, setPendienteToggle] = useState<PublicacionCultural | null>(null)
+  const [pendienteEliminar, setPendienteEliminar] = useState<PublicacionCultural | null>(null)
 
-export default function ComercianteVitrinaPage() {
-  const [comercio, setComercio] = useState<Comercio | null>(null)
-  const [cargandoComercio, setCargandoComercio] = useState(true)
-  const [errorComercio, setErrorComercio] = useState<string | null>(null)
-
-  const [titulo, setTitulo] = useState('')
-  const [descripcion, setDescripcion] = useState('')
-  const [moduloOrigen, setModuloOrigen] = useState<ModuloOrigenVitrina | ''>('')
-
-  const [fotoUrls, setFotoUrls] = useState<string[]>([])
-  const [subiendoFotos, setSubiendoFotos] = useState(0)
-  const [video, setVideo] = useState<VideoVitrinaSubido | null>(null)
-  const [videoExternoUrl, setVideoExternoUrl] = useState('')
-  const [subiendoVideo, setSubiendoVideo] = useState(false)
-
-  const [enviando, setEnviando] = useState(false)
-  const [error, setError] = useState('')
-  const [exito, setExito] = useState(false)
-
-  const subiendoAlgo = subiendoFotos > 0 || subiendoVideo
-
-  const cargarComercio = useCallback(async () => {
-    setCargandoComercio(true)
-    setErrorComercio(null)
+  const cargar = useCallback(async () => {
+    setCargando(true)
+    setError(null)
     try {
-      const c = await obtenerMiComercio()
-      setComercio(c)
-      if (!c) setErrorComercio('Todavía no tienes una tienda registrada.')
-    } catch (e) {
-      setErrorComercio(e instanceof Error ? e.message : 'No pudimos cargar los datos de tu tienda.')
+      const res = await listarMisPublicacionesVitrina()
+      setPublicaciones(res.items)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar los videos.')
     } finally {
-      setCargandoComercio(false)
+      setCargando(false)
     }
   }, [])
 
+  useEffect(() => { void cargar() }, [cargar])
+
   useEffect(() => {
-    cargarComercio()
-  }, [cargarComercio])
+    if (!aviso) return
+    const t = setTimeout(() => setAviso(null), 4000)
+    return () => clearTimeout(t)
+  }, [aviso])
 
-  async function seleccionarFotos(e: React.ChangeEvent<HTMLInputElement>) {
-    const archivos = Array.from(e.target.files ?? [])
-    if (archivos.length === 0) return
-    const disponibles = Math.max(0, MAX_FOTOS - fotoUrls.length)
-    const aSubir = archivos.slice(0, disponibles)
-    setSubiendoFotos((n) => n + aSubir.length)
-    for (const archivo of aSubir) {
-      try {
-        const url = await subirFotoPublicacionCultural(archivo)
-        setFotoUrls((prev) => (prev.length < MAX_FOTOS ? [...prev, url] : prev))
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'No pudimos subir una foto.')
-      } finally {
-        setSubiendoFotos((n) => Math.max(0, n - 1))
-      }
-    }
-    e.target.value = ''
-  }
-
-  function quitarFoto(url: string) {
-    setFotoUrls((prev) => prev.filter((u) => u !== url))
-  }
-
-  async function seleccionarVideo(e: React.ChangeEvent<HTMLInputElement>) {
-    const archivo = e.target.files?.[0]
-    if (!archivo) return
-    setSubiendoVideo(true)
-    setError('')
+  async function confirmarToggleActivo() {
+    const p = pendienteToggle
+    if (!p) return
+    setPendienteToggle(null)
+    setProcesando(p.id)
     try {
-      const subido = await subirVideoVitrina(archivo)
-      setVideo(subido)
+      await actualizarMiPublicacionVitrina(p.id, { activa: !p.activa })
+      setPublicaciones(prev => prev.map(x => x.id === p.id ? { ...x, activa: !p.activa } : x))
+      setAviso({ tipo: 'exito', texto: `Video ${!p.activa ? 'habilitado' : 'inhabilitado'}.` })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No pudimos subir el video.')
+      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo actualizar.' })
     } finally {
-      setSubiendoVideo(false)
-      e.target.value = ''
+      setProcesando(null)
     }
   }
 
-  function quitarVideo() {
-    setVideo(null)
-  }
-
-  function limpiarFormulario() {
-    setTitulo('')
-    setDescripcion('')
-    setModuloOrigen('')
-    setFotoUrls([])
-    setVideo(null)
-    setVideoExternoUrl('')
-    setError('')
-  }
-
-  async function publicar() {
-    if (enviando || subiendoAlgo) return
-    if (!comercio) { setError('No pudimos identificar tu tienda. Recarga la página.'); return }
-    if (!titulo.trim()) { setError('Escribe un título para tu publicación.'); return }
-    const departamentoComercio = comercio.departamento
-    if (!departamentoComercio) {
-      setError('Tu tienda no tiene departamento registrado. Actualízalo en "Mi tienda" antes de publicar.')
-      return
-    }
-    const comercioId = comercio.id
-    const municipioComercio = comercio.municipio
-
-    const finalVideoUrl = videoExternoUrl.trim() || video?.url || undefined
-
-    setEnviando(true)
-    setError('')
-    setExito(false)
+  async function confirmarEliminar() {
+    const p = pendienteEliminar
+    if (!p) return
+    setPendienteEliminar(null)
+    setProcesando(p.id)
     try {
-      await crearPublicacionCultural({
-        titulo: titulo.trim(),
-        descripcion: descripcion.trim() || undefined,
-        fotoUrls,
-        videoUrl: finalVideoUrl,
-        videoPosterUrl: video?.posterUrl || undefined,
-        videoDuracionSegundos: video?.duracionSegundos || undefined,
-        videoPublicId: video?.publicId || undefined,
-        departamento: departamentoComercio,
-        municipio: municipioComercio || undefined,
-        comercioId,
-        moduloOrigen: moduloOrigen || undefined,
-      })
-      limpiarFormulario()
-      setExito(true)
-      setTimeout(() => setExito(false), 5000)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No pudimos publicar tu video.')
+      await eliminarMiPublicacionVitrina(p.id)
+      setPublicaciones(prev => prev.filter(x => x.id !== p.id))
+      setAviso({ tipo: 'exito', texto: 'Video eliminado correctamente.' })
+    } catch (err) {
+      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo eliminar el video.' })
     } finally {
-      setEnviando(false)
+      setProcesando(null)
     }
-  }
-
-  if (cargandoComercio) {
-    return (
-      <div className="mx-auto w-full max-w-2xl">
-        <div className="h-40 animate-pulse rounded-2xl bg-[#1A1A1A]/6" />
-      </div>
-    )
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
-      <header className="mb-5">
-        <h1 className="font-serif text-3xl text-[#2D6A4F]">🎥 Vitrina de video</h1>
-        <p className="mt-1 text-[#1A1A1A]/65">
-          Comparte un video corto o fotos de tu negocio — aparece en la Vitrina pública que ven todos los usuarios de Teravia,
-          con un botón directo hacia tu tienda o tu WhatsApp.
-        </p>
-      </header>
-
-      {errorComercio && !comercio ? (
-        <div role="alert" className="rounded-2xl border border-[#C0392B]/20 bg-[#C0392B]/5 p-5 text-center text-[#C0392B]">
-          {errorComercio}
+    <div className="flex flex-col gap-6">
+      {/* Encabezado */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1
+            className="text-3xl text-[#1A1A1A]"
+            style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
+          >
+            Vitrina de Video
+          </h1>
+          <p className="mt-1 text-sm text-[#1A1A1A]/60">
+            Gestiona los videos de tu negocio que aparecen en la vitrina pública.
+          </p>
         </div>
-      ) : (
-        <div className="rounded-2xl border border-[#1A1A1A]/8 bg-white p-5 space-y-4">
-          {exito && (
-            <div className="rounded-xl border border-[#2D6A4F]/20 bg-[#EAF3DE] px-4 py-3 text-sm font-semibold text-[#1B4332]">
-              ¡Publicado! Ya está visible en la{' '}
-              <Link href="/vitrina" className="underline">
-                Vitrina de video
-              </Link>
-              .
+        <Link href="/comerciante/vitrina/nueva">
+          <Button variant="primary" size="sm">+ Subir video</Button>
+        </Link>
+      </div>
+
+      {/* Aviso */}
+      {aviso && (
+        <div className={[
+          'rounded-xl border px-4 py-3 text-sm font-medium',
+          aviso.tipo === 'exito'
+            ? 'border-[#52B788]/40 bg-[#52B788]/10 text-[#2D6A4F]'
+            : 'border-[#C0392B]/30 bg-[#C0392B]/5 text-[#C0392B]',
+        ].join(' ')}>
+          {aviso.texto}
+        </div>
+      )}
+
+      {/* Error */}
+      {error && !cargando && (
+        <div className="rounded-xl border border-[#C0392B]/30 bg-[#C0392B]/5 px-4 py-4 text-sm text-[#C0392B]">
+          {error}
+        </div>
+      )}
+
+      {/* Lista */}
+      <div className="rounded-2xl border border-[#1A1A1A]/5 bg-white shadow-sm overflow-hidden">
+        {cargando ? (
+          <div className="p-5 space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
+          </div>
+        ) : publicaciones.length === 0 ? (
+          <div className="px-6 py-16 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#1A1A1A]/5 text-3xl">
+              🎥
             </div>
-          )}
+            <p className="text-base font-semibold text-[#1A1A1A]/60">Aún no tienes videos en la Vitrina</p>
+            <p className="mt-1 text-sm text-[#1A1A1A]/40">
+              Muestra la calidad de tus productos o servicios con un video corto.
+            </p>
+            <Link href="/comerciante/vitrina/nueva" className="mt-5 inline-block">
+              <Button variant="primary" size="sm">Subir mi primer video</Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="divide-y divide-[#1A1A1A]/5">
+            {publicaciones.map((p) => (
+              <div
+                key={p.id}
+                className={[
+                  'flex items-center gap-4 p-4 transition-colors',
+                  p.activa ? 'hover:bg-[#F8F5F0]/60' : 'bg-[#1A1A1A]/[0.02] opacity-75',
+                ].join(' ')}
+              >
+                {/* Miniatura del video (usamos poster o fallback gris) */}
+                <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-xl bg-gray-200">
+                  {p.videoPosterUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.videoPosterUrl} alt={p.titulo} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-gray-400">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    </div>
+                  )}
+                  {/* Etiqueta de Inactivo */}
+                  {!p.activa && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M1 1l22 22M9.88 9.88a3 3 0 104.24 4.24M10.73 5.08A10.43 10.43 0 0112 5c7 0 10 7 10 7a13.16 13.16 0 01-1.67 2.68M6.61 6.61A13.526 13.526 0 002 12s3 7 10 7a9.74 9.74 0 005.39-1.61" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </div>
+                  )}
+                </div>
 
-          <CampoTexto
-            label="Título"
-            name="titulo"
-            placeholder="Ej: Así es una noche en nuestro hotel"
-            value={titulo}
-            onChange={setTitulo}
-          />
+                {/* Detalles principales */}
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <h3 className="truncate font-semibold text-[#1A1A1A]">{p.titulo}</h3>
+                  <div className="mt-1 flex items-center gap-4 text-xs font-medium text-[#1A1A1A]/50">
+                    <span className="flex items-center gap-1.5" title="Vistas">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      {p.totalVistas || 0}
+                    </span>
+                    <span className="flex items-center gap-1.5" title="Me gusta">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                      {p.totalLikes || 0}
+                    </span>
+                    <span className="flex items-center gap-1.5" title="Comentarios">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      {p.totalComentarios || 0}
+                    </span>
+                    <span className="flex items-center gap-1.5" title="Compartidos">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      {p.totalCompartidos || 0}
+                    </span>
+                  </div>
+                  {p.producto && (
+                    <p className="mt-2 truncate text-xs font-medium text-[#2D6A4F]">
+                      🔗 Producto vinculado: {p.producto.nombre}
+                    </p>
+                  )}
+                </div>
 
-          <CampoArea
-            label="Descripción"
-            name="descripcion"
-            placeholder="Cuéntales a tus clientes qué van a ver…"
-            value={descripcion}
-            onChange={setDescripcion}
-            rows={4}
-            hint="Opcional."
-          />
-
-          <CampoSelect
-            label="Módulo relacionado"
-            name="moduloOrigen"
-            value={moduloOrigen}
-            onChange={(v) => setModuloOrigen(v as ModuloOrigenVitrina | '')}
-            opciones={OPCIONES_MODULO.map((o) => ({ valor: o.valor, etiqueta: o.etiqueta }))}
-            hint="Opcional — ayuda a los usuarios a saber de qué servicio se trata."
-          />
-
-          <div>
-            <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1.5">
-              Fotos <span className="text-[#1A1A1A]/40 font-normal">(opcional, máx. {MAX_FOTOS})</span>
-            </label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {fotoUrls.map((url) => (
-                <div key={url} className="relative w-16 h-16 rounded-lg overflow-hidden border border-[#1A1A1A]/12">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="Foto de la publicación" className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => quitarFoto(url)}
-                    className="absolute top-0 right-0 bg-black/60 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-bl"
+                {/* Acciones */}
+                <div className="flex flex-col items-end gap-2 md:flex-row md:items-center">
+                  <Link href={`/comerciante/vitrina/${p.id}/editar`}>
+                    <Button variant="secondary" size="sm">Editar</Button>
+                  </Link>
+                  <Button
+                    variant={p.activa ? 'secondary' : 'primary'}
+                    size="sm"
+                    onClick={() => setPendienteToggle(p)}
+                    loading={procesandoId === p.id}
+                    disabled={procesandoId !== null}
+                    className={p.activa ? 'text-[#C0392B] hover:text-[#A93226]' : ''}
                   >
-                    ×
+                    {p.activa ? 'Ocultar' : 'Mostrar'}
+                  </Button>
+                  <button
+                    onClick={() => setPendienteEliminar(p)}
+                    className="ml-2 rounded-lg p-1.5 text-[#1A1A1A]/30 transition hover:bg-[#C0392B]/10 hover:text-[#C0392B]"
+                    title="Eliminar publicación"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
                   </button>
                 </div>
-              ))}
-              {subiendoFotos > 0 && Array.from({ length: subiendoFotos }).map((_, i) => (
-                <div key={`subiendo-${i}`} className="w-16 h-16 rounded-lg border border-[#1A1A1A]/12 flex items-center justify-center bg-white">
-                  <div className="w-4 h-4 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />
-                </div>
-              ))}
-            </div>
-            {fotoUrls.length < MAX_FOTOS && (
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={seleccionarFotos}
-                className="text-xs text-[#1A1A1A]/55"
-              />
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1.5">
-              Video corto <span className="text-[#1A1A1A]/40 font-normal">(opcional, máx. {MAX_SEGUNDOS_VIDEO} segundos)</span>
-            </label>
-
-            {video ? (
-              <div className="space-y-2">
-                <ReproductorVideo url={video.url} className="max-w-xs" />
-                <button type="button" onClick={quitarVideo} className="text-xs text-[#C0392B]">
-                  Quitar video
-                </button>
               </div>
-            ) : subiendoVideo ? (
-              <div className="flex items-center gap-2 text-xs text-[#1A1A1A]/45">
-                <div className="w-4 h-4 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />
-                Subiendo video…
-              </div>
-            ) : (
-              <>
-                <input type="file" accept="video/*" onChange={seleccionarVideo} className="text-xs text-[#1A1A1A]/55 mb-2 block w-full" disabled={!!videoExternoUrl} />
-                {!videoExternoUrl && (
-                  <p className="mb-4 text-xs text-[#1A1A1A]/40">
-                    Sube un video de hasta {MAX_SEGUNDOS_VIDEO} segundos y 45MB.
-                  </p>
-                )}
-                
-                <div className="flex items-center gap-4 my-2">
-                  <div className="h-px bg-[#1A1A1A]/10 flex-1"></div>
-                  <span className="text-xs text-[#1A1A1A]/40 font-medium uppercase tracking-wider">o pega un enlace</span>
-                  <div className="h-px bg-[#1A1A1A]/10 flex-1"></div>
-                </div>
-
-                <CampoTexto
-                  label="Enlace del video"
-                  name="videoExternoUrl"
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  value={videoExternoUrl}
-                  onChange={setVideoExternoUrl}
-                  hint="Copia el enlace de un video de YouTube, TikTok, Instagram o Facebook."
-                />
-              </>
-            )}
+            ))}
           </div>
+        )}
+      </div>
 
-          {error && <p role="alert" className="text-sm text-[#C0392B]">{error}</p>}
+      {pendienteToggle && (
+        <ModalConfirmacion
+          titulo={pendienteToggle.activa ? 'Ocultar video' : 'Mostrar video'}
+          mensaje={`¿Seguro que quieres ${pendienteToggle.activa ? 'ocultar' : 'volver a mostrar'} este video en la Vitrina pública?`}
+          onCancelar={() => setPendienteToggle(null)}
+          onConfirmar={confirmarToggleActivo}
+          confirmando={procesandoId === pendienteToggle.id}
+          destructivo={pendienteToggle.activa}
+        />
+      )}
 
-          <button
-            type="button"
-            onClick={publicar}
-            disabled={enviando || subiendoAlgo || !comercio}
-            className="w-full rounded-xl bg-[#2D6A4F] hover:bg-[#245a42] text-white text-sm font-semibold px-4 py-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {enviando ? 'Publicando…' : subiendoAlgo ? 'Subiendo…' : 'Publicar en la Vitrina'}
-          </button>
-        </div>
+      {pendienteEliminar && (
+        <ModalConfirmacion
+          titulo="Eliminar video"
+          mensaje="Esta acción es irreversible y se perderán todos los me gusta, comentarios y visualizaciones del video. ¿Seguro que quieres eliminarlo?"
+          onCancelar={() => setPendienteEliminar(null)}
+          onConfirmar={confirmarEliminar}
+          confirmando={procesandoId === pendienteEliminar.id}
+          destructivo={true}
+        />
       )}
     </div>
   )

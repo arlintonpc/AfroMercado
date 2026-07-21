@@ -24,3 +24,17 @@ export function login(email: string, password: string): Promise<RespuestaAuth> {
     body: { email, password },
   })
 }
+
+export function logoutApi(): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>('/auth/logout', {
+    method: 'POST',
+    auth: false,
+  })
+}
+
+export function yoApi(): Promise<{ ok: boolean; usuario: import('@/types/usuario').Usuario }> {
+  return apiFetch<{ ok: boolean; usuario: import('@/types/usuario').Usuario }>('/auth/yo', {
+    method: 'GET',
+    auth: false,
+  })
+}

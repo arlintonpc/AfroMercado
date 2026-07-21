@@ -327,6 +327,111 @@ async function alertasSinRepartidor() {
   }
 }
 
+// ─── Job 7: Recuperación de Carritos Abandonados ─────────────────────────────────
+
+async function recuperarCarritosAbandonados() {
+  try {
+    const ahora = new Date();
+    // Umbrales de tiempo
+    const hace4h = new Date(ahora.getTime() - 4 * 60 * 60 * 1000);
+    const hace5h = new Date(ahora.getTime() - 5 * 60 * 60 * 1000);
+    const hace48h = new Date(ahora.getTime() - 48 * 60 * 60 * 1000);
+    const hace49h = new Date(ahora.getTime() - 49 * 60 * 60 * 1000);
+
+    // Agrupar los ítems del carrito por usuario para saber la última vez que modificaron CUALQUIER producto de su carrito
+    const agrupados = await prisma.carritoItem.groupBy({
+      by: ['usuarioId'],
+      _max: { updatedAt: true },
+      _count: { _all: true },
+    });
+
+    for (const group of agrupados) {
+      const maxDate = group._max.updatedAt;
+      const uid = group.usuarioId;
+      if (!maxDate) continue;
+
+      const horasDesdeUltimaModificacion = (ahora.getTime() - maxDate.getTime()) / (1000 * 60 * 60);
+
+      // ESTRATEGIA 1: El empujoncito (Entre 4 y 5 horas)
+      if (horasDesdeUltimaModificacion >= 4 && horasDesdeUltimaModificacion <= 5) {
+        // Verificar si ya notificamos hoy
+        const yaNotificado = await prisma.notificacion.findFirst({
+          where: {
+            usuarioId: uid,
+            tipo: "CARRITO_ABANDONADO_4H",
+            createdAt: { gte: new Date(ahora.getTime() - 24 * 60 * 60 * 1000) }
+          }
+        });
+        if (yaNotificado) continue;
+
+        const user = await prisma.usuario.findUnique({ where: { id: uid }, select: { nombre: true, telefono: true } });
+        if (!user) continue;
+
+        await crearNotif(uid, {
+          tipo: "CARRITO_ABANDONADO_4H",
+          titulo: "¡No olvides tus productos! 🛒",
+          mensaje: `Dejaste ${group._count._all} productos esperando en tu carrito.`,
+          url: "/carrito"
+        });
+
+        if (user.telefono) {
+          enviarMensajeWA(user.telefono, `🛒 *¡Hola ${primerNombre(user.nombre)}!*\n\nDejaste ${group._count._all} productos esperando en tu carrito de AfroMercado.\n\n¿Tuviste algún problema? Aquí tienes tu carrito listo para terminar tu compra:\nhttps://afromercado.vercel.app/carrito`)
+            .catch(e => console.error("[CRON] WA carrito 4h:", e.message));
+        }
+      }
+
+      // ESTRATEGIA 2: FOMO + Descuento (Entre 48 y 49 horas)
+      if (horasDesdeUltimaModificacion >= 48 && horasDesdeUltimaModificacion <= 49) {
+        // Evitar spam (no más de 1 cupón de abandono por semana)
+        const yaNotificado = await prisma.notificacion.findFirst({
+          where: {
+            usuarioId: uid,
+            tipo: "CARRITO_ABANDONADO_48H",
+            createdAt: { gte: new Date(ahora.getTime() - 7 * 24 * 60 * 60 * 1000) }
+          }
+        });
+        if (yaNotificado) continue;
+
+        const user = await prisma.usuario.findUnique({ where: { id: uid }, select: { nombre: true, telefono: true } });
+        if (!user) continue;
+
+        // Crear Cupón del 5% válido por 3 días
+        const codigoUnico = `VUELVE${Math.floor(Math.random() * 9000) + 1000}`;
+        const finCupon = new Date(ahora.getTime() + 3 * 24 * 60 * 60 * 1000);
+        
+        await prisma.cupon.create({
+          data: {
+            codigo: codigoUnico,
+            tipo: "PORCENTAJE",
+            valor: 5.0,
+            inicio: ahora,
+            fin: finCupon,
+            distribucion: "ASIGNADO",
+            usosMaximosPorUsuario: 1,
+            asignaciones: {
+              create: { usuarioId: uid }
+            }
+          }
+        });
+
+        await crearNotif(uid, {
+          tipo: "CARRITO_ABANDONADO_48H",
+          titulo: "¡Regalo especial para ti! 🎁",
+          mensaje: `Termina tu compra hoy con 5% OFF usando el código ${codigoUnico}`,
+          url: "/carrito"
+        });
+
+        if (user.telefono) {
+          enviarMensajeWA(user.telefono, `🎁 *¡Te extrañamos, ${primerNombre(user.nombre)}!*\n\nTus productos siguen esperando. Para animarte, te regalamos un *5% de descuento* en toda tu compra.\n\nUsa el código *${codigoUnico}* al pagar.\n(Válido por 72 horas)\n\nTermina tu pedido aquí:\nhttps://afromercado.vercel.app/carrito`)
+            .catch(e => console.error("[CRON] WA carrito 48h:", e.message));
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[CRON] recuperarCarritosAbandonados:", err.message);
+  }
+}
+
 // ─── Arranque ─────────────────────────────────────────────────────────────────
 
 function iniciarCron() {
@@ -340,12 +445,14 @@ function iniciarCron() {
   setInterval(alertasSinRepartidor,      CADA_5_MIN);
   setInterval(recordatoriosRecogida,     CADA_10_MIN);
   setInterval(recordatoriosResena,       CADA_1_HORA);
+  setInterval(recuperarCarritosAbandonados, CADA_1_HORA);
   setInterval(cancelarPedidosExpressExpirados,  60_000); // cada 1 min
   setInterval(cancelarReservasHotelExpiradas,  5 * 60_000); // cada 5 min
 
   cancelarReservasHotelExpiradas(); // ejecutar al arrancar
+  recuperarCarritosAbandonados();
 
-  console.log("[CRON] Jobs iniciados: expiración, recordatorios de pago, alertas de entrega, reseñas, hotel");
+  console.log("[CRON] Jobs iniciados: expiración, recordatorios de pago, alertas de entrega, reseñas, hotel, carritos abandonados");
 }
 
 module.exports = { iniciarCron };

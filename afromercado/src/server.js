@@ -1069,10 +1069,16 @@ async function aplicarMigraciones() {
     `ALTER TABLE "PublicacionCultural" ADD COLUMN IF NOT EXISTS "videoPosterUrl" TEXT`,
     `ALTER TABLE "PublicacionCultural" ADD COLUMN IF NOT EXISTS "videoDuracionSegundos" INTEGER`,
     `ALTER TABLE "PublicacionCultural" ADD COLUMN IF NOT EXISTS "videoPublicId" TEXT`,
+    `ALTER TABLE "PublicacionCultural" ADD COLUMN IF NOT EXISTS "productoId" INTEGER`,
     `CREATE INDEX IF NOT EXISTS "PublicacionCultural_comercioId_activa_createdAt_idx" ON "PublicacionCultural"("comercioId", "activa", "createdAt")`,
     `DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'PublicacionCultural_comercioId_fkey') THEN
         ALTER TABLE "PublicacionCultural" ADD CONSTRAINT "PublicacionCultural_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'PublicacionCultural_productoId_fkey') THEN
+        ALTER TABLE "PublicacionCultural" ADD CONSTRAINT "PublicacionCultural_productoId_fkey" FOREIGN KEY ("productoId") REFERENCES "Producto"("id") ON DELETE SET NULL ON UPDATE CASCADE;
       END IF;
     END $$`,
 

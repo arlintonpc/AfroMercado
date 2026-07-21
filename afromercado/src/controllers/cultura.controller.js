@@ -50,6 +50,24 @@ const CulturaController = {
     } catch (e) { next(e); }
   },
 
+  async misPublicacionesVitrina(req, res, next) {
+    try {
+      res.json({ ok: true, data: await CulturaService.misPublicacionesVitrina(req.usuario.id, req.query) });
+    } catch (e) { next(e); }
+  },
+
+  async actualizarMiPublicacion(req, res, next) {
+    try {
+      res.json({ ok: true, data: await CulturaService.actualizarMiPublicacion(req.usuario.id, Number(req.params.id), req.body) });
+    } catch (e) { next(e); }
+  },
+
+  async eliminarMiPublicacion(req, res, next) {
+    try {
+      res.json({ ok: true, data: await CulturaService.eliminarMiPublicacion(req.usuario.id, Number(req.params.id)) });
+    } catch (e) { next(e); }
+  },
+
   async misEventos(req, res, next) {
     try {
       res.json({ ok: true, data: await CulturaService.misEventos(req.usuario.comercio.id) });

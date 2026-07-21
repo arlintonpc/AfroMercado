@@ -81,6 +81,7 @@ export async function apiFetch<T>(
     response = await fetch(url, {
       ...rest,
       headers: finalHeaders,
+      credentials: 'include',
       body: body !== undefined ? (esFormData ? body : JSON.stringify(body)) : undefined,
     })
   } catch {
