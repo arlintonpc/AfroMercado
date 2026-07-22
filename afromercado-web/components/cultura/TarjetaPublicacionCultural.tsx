@@ -124,16 +124,18 @@ function VideoEnLineaAutoplay({ url }: { url: string }) {
     return <ReproductorVideo url={url} />
   }
 
+  // Proporción 4:5, sin barras negras: igual que Facebook/Instagram, que
+  // recortan el video (object-cover) para llenar un marco fijo en vez de
+  // encogerlo dentro de una caja con espacio vacío a los lados.
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-black">
+    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-black">
       <video
         ref={videoRef}
         src={url}
         muted={silenciado}
         loop
         playsInline
-        className="w-full rounded-2xl bg-black"
-        style={{ maxHeight: 360 }}
+        className="h-full w-full object-cover"
       />
       <button
         type="button"
