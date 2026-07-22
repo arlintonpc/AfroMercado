@@ -14,14 +14,12 @@ import {
   CulturaToolbar,
 } from '@/components/cultura/CulturaUI'
 import TarjetaPublicacionCultural from '@/components/cultura/TarjetaPublicacionCultural'
-import ModalGaleriaHistoria from '@/components/cultura/ModalGaleriaHistoria'
+import ModalTeatroPublicacion from '@/components/cultura/ModalTeatroPublicacion'
 import ModalDenunciarPublicacion from '@/components/cultura/ModalDenunciarPublicacion'
 import BannerDisplay from '@/components/publicidad/BannerDisplay'
 
 interface ItemLightbox {
-  titulo: string
-  fotoUrls: string[]
-  videoUrl?: string | null
+  publicacion: PublicacionCultural
   indiceInicial?: number
 }
 
@@ -290,7 +288,7 @@ export default function VitrinaPage() {
                     key={p.id}
                     publicacion={p}
                     forzarClasica
-                    onAbrir={(pub, indice) => setLightbox({ titulo: pub.titulo, fotoUrls: pub.fotoUrls, videoUrl: pub.videoUrl, indiceInicial: indice })}
+                    onAbrir={(pub, indice) => setLightbox({ publicacion: pub, indiceInicial: indice })}
                     onDenunciar={(id) => setDenunciandoId(id)}
                   />
                 )
@@ -311,10 +309,8 @@ export default function VitrinaPage() {
       </CulturaPageContainer>
 
       {lightbox && (
-        <ModalGaleriaHistoria
-          titulo={lightbox.titulo}
-          fotoUrls={lightbox.fotoUrls}
-          videoUrl={lightbox.videoUrl}
+        <ModalTeatroPublicacion
+          publicacion={lightbox.publicacion}
           indiceInicial={lightbox.indiceInicial}
           onCerrar={() => setLightbox(null)}
         />

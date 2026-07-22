@@ -100,7 +100,7 @@ function FotoCollage({ url, titulo, className = '', overlay, conPlay, onClick }:
  *  se agranda ni se sale de la tarjeta. Un video de plataforma externa
  *  (YouTube, TikTok, etc.) sigue usando el ReproductorVideo genérico de clic
  *  para reproducir, porque esas no se pueden controlar de la misma forma. */
-function VideoEnLineaAutoplay({ url }: { url: string }) {
+export function VideoEnLineaAutoplay({ url, onClick }: { url: string; onClick?: () => void }) {
   const { plataforma } = detectar(url)
   const videoRef = useRef<HTMLVideoElement>(null)
   const [silenciado, setSilenciado] = useState(true)
@@ -128,7 +128,7 @@ function VideoEnLineaAutoplay({ url }: { url: string }) {
   // recortan el video (object-cover) para llenar un marco fijo en vez de
   // encogerlo dentro de una caja con espacio vacío a los lados.
   return (
-    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-black">
+    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-black cursor-pointer" onClick={onClick}>
       <video
         ref={videoRef}
         src={url}
@@ -139,7 +139,7 @@ function VideoEnLineaAutoplay({ url }: { url: string }) {
       />
       <button
         type="button"
-        onClick={() => setSilenciado((v) => !v)}
+        onClick={(e) => { e.stopPropagation(); setSilenciado((v) => !v); }}
         aria-label={silenciado ? 'Activar sonido' : 'Silenciar'}
         className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm"
       >
@@ -166,7 +166,7 @@ function ColageMedia({ fotoUrls, videoUrl, titulo, onAbrir }: ColageMediaProps) 
     if (!conVideo) return null
     return (
       <div className="overflow-hidden rounded-xl">
-        <VideoEnLineaAutoplay url={videoUrl as string} />
+        <VideoEnLineaAutoplay url={videoUrl as string} onClick={() => onAbrir(0)} />
       </div>
     )
   }
@@ -476,7 +476,13 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
               muted={muted}
               loop
               playsInline
-              onClick={togglePlayPausa}
+              onClick={() => {
+                if (window.innerWidth >= 768) {
+                  onAbrir(publicacion, 0)
+                } else {
+                  togglePlayPausa()
+                }
+              }}
               onWaiting={() => setCargandoVideo(true)}
               onPlaying={() => setCargandoVideo(false)}
               onCanPlay={() => setCargandoVideo(false)}
@@ -646,7 +652,18 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
                   <path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2v16z" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-              <button type="button" onClick={() => setComentariosAbierto(true)} className="flex flex-col items-center gap-1 text-white pointer-events-auto" style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.8))' }}>
+              <button 
+                type="button" 
+                onClick={() => {
+                  if (window.innerWidth >= 768) {
+                    onAbrir(publicacion, 0)
+                  } else {
+                    setComentariosAbierto(true)
+                  }
+                }} 
+                className="flex flex-col items-center gap-1 text-white pointer-events-auto" 
+                style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.8))' }}
+              >
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="rgba(0,0,0,0.4)" stroke="white" strokeWidth="1.5">
                   <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>

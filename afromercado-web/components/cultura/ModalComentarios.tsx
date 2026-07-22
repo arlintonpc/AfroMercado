@@ -14,7 +14,8 @@ interface ModalComentariosProps {
   totalComentariosInit?: number
   /** Solo quien publicó puede fijar comentarios en su propia publicación. */
   esPropiaPublicacion?: boolean
-  onClose: () => void
+  inline?: boolean
+  onClose?: () => void
   onComentarioAgregado?: () => void
 }
 
@@ -71,7 +72,7 @@ function FilaComentario({ comentario: c, esRespuesta, puedeFijar, fijando, onRes
   )
 }
 
-export default function ModalComentarios({ publicacionId, onClose, totalComentariosInit, esPropiaPublicacion, onComentarioAgregado }: ModalComentariosProps) {
+export default function ModalComentarios({ publicacionId, onClose, totalComentariosInit, esPropiaPublicacion, inline = false, onComentarioAgregado }: ModalComentariosProps) {
   const { usuario } = useAuth()
   const [comentarios, setComentarios] = useState<ComentarioPublicacionCultural[]>([])
   const [cargando, setCargando] = useState(true)
@@ -103,36 +104,48 @@ export default function ModalComentarios({ publicacionId, onClose, totalComentar
     return () => { montado = false }
   }, [publicacionId])
 
-  const totalConRespuestas = comentarios.reduce((acc, c) => acc + 1 + (c.respuestas?.length ?? 0), 0)
+  const totalConRespuestas = comentarios.reduce((acc, c) => acc + 1 + (c.respuestas?.length || 0), 0)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!texto.trim() || !usuario) return
+    if (!texto.trim() || enviando) return
 
     setEnviando(true)
     try {
-      const nuevo = await crearComentarioPublicacion(publicacionId, texto.trim(), respondiendoA?.id)
-      if (respondiendoA) {
-        setComentarios((prev) =>
-          prev.map((c) => (c.id === respondiendoA.id ? { ...c, respuestas: [...(c.respuestas ?? []), nuevo] } : c))
-        )
-      } else {
-        setComentarios((prev) => [nuevo, ...prev])
-      }
+      const nuevo = await crearComentarioPublicacion(publicacionId, texto, respondiendoA?.id)
+      
+      setComentarios((prev) => {
+        if (respondiendoA) {
+          return prev.map(c => {
+            if (c.id === respondiendoA.id) {
+              return { ...c, respuestas: [...(c.respuestas || []), nuevo] }
+            }
+            return c
+          })
+        } else {
+          const fijados = prev.filter(c => c.fijado)
+          const normales = prev.filter(c => !c.fijado)
+          return [...fijados, nuevo, ...normales]
+        }
+      })
+      
       setTexto('')
       setRespondiendoA(null)
       if (onComentarioAgregado) onComentarioAgregado()
-      if (listRef.current && !respondiendoA) {
-        listRef.current.scrollTo({ top: 0, behavior: 'smooth' })
-      }
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error al publicar comentario')
+      
+      setTimeout(() => {
+        if (listRef.current) {
+          listRef.current.scrollTop = respondiendoA ? listRef.current.scrollHeight : 0
+        }
+      }, 100)
+    } catch {
+      alert('Error al enviar el comentario.')
     } finally {
       setEnviando(false)
     }
   }
 
-  function iniciarRespuesta(c: ComentarioPublicacionCultural) {
+  const iniciarRespuesta = (c: ComentarioPublicacionCultural) => {
     setRespondiendoA({ id: c.id, nombre: c.usuario?.nombre || 'Usuario' })
     inputRef.current?.focus()
   }
@@ -140,12 +153,12 @@ export default function ModalComentarios({ publicacionId, onClose, totalComentar
   async function manejarFijar(c: ComentarioPublicacionCultural) {
     if (fijandoId) return
     setFijandoId(c.id)
-    const anterior = c.fijado ?? false
-    setComentarios((prev) =>
-      prev
-        .map((x) => (x.id === c.id ? { ...x, fijado: !anterior } : x))
-        .sort((a, b) => (b.fijado ? 1 : 0) - (a.fijado ? 1 : 0))
-    )
+    const anterior = c.fijado
+    setComentarios((prev) => prev.map((x) => {
+      if (x.id === c.id) return { ...x, fijado: !anterior }
+      if (!anterior && x.fijado) return { ...x, fijado: false }
+      return x
+    }))
     try {
       await toggleFijarComentario(publicacionId, c.id)
     } catch {
@@ -155,39 +168,35 @@ export default function ModalComentarios({ publicacionId, onClose, totalComentar
     }
   }
 
-  // Prevenir que clics dentro del modal se propaguen y pausen/despausen el video
   const stopPropagation = (e: React.MouseEvent) => e.stopPropagation()
 
-  return (
+  const contenidoInner = (
     <div
-      className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 sm:items-center sm:justify-center"
-      onClick={onClose}
+      className={inline ? "flex h-full w-full flex-col bg-white" : "flex h-[75vh] w-full flex-col overflow-hidden rounded-t-2xl bg-white sm:h-[600px] sm:max-w-md sm:rounded-2xl"}
+      onClick={inline ? undefined : stopPropagation}
     >
-      <div
-        className="flex h-[75vh] w-full flex-col overflow-hidden rounded-t-2xl bg-white sm:h-[600px] sm:max-w-md sm:rounded-2xl"
-        onClick={stopPropagation}
-      >
-        {/* Cabecera */}
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-            Comentarios <span className="text-gray-500 text-sm font-normal">({totalComentariosInit ?? totalConRespuestas})</span>
-          </h3>
+      <div className="flex items-center justify-between border-b px-4 py-3">
+        <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+          Comentarios <span className="text-gray-500 text-sm font-normal">({totalComentariosInit ?? totalConRespuestas})</span>
+        </h3>
+        {!inline && onClose && (
           <button
             onClick={onClose}
             className="rounded-full p-2 text-gray-500 hover:bg-gray-100 transition-colors"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
-        </div>
+        )}
+      </div>
 
-        {/* Lista */}
-        <div ref={listRef} className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-          {cargando ? (
-            <div className="flex h-full items-center justify-center text-gray-500">Cargando...</div>
-          ) : error ? (
-            <div className="text-center text-red-500">{error}</div>
-          ) : comentarios.length === 0 ? (
+      {/* Lista */}
+      <div ref={listRef} className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+        {cargando ? (
+          <div className="flex h-full items-center justify-center text-gray-500">Cargando...</div>
+        ) : error ? (
+          <div className="text-center text-red-500">{error}</div>
+        ) : comentarios.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-gray-500">
               <p>No hay comentarios aún.</p>
               <p className="text-sm">Sé el primero en comentar.</p>
@@ -259,6 +268,16 @@ export default function ModalComentarios({ publicacionId, onClose, totalComentar
           )}
         </div>
       </div>
+  )
+
+  if (inline) return contenidoInner
+
+  return (
+    <div
+      className="fixed inset-0 z-[110] flex flex-col justify-end bg-black/60 sm:items-center sm:justify-center"
+      onClick={onClose}
+    >
+      {contenidoInner}
     </div>
   )
 }
