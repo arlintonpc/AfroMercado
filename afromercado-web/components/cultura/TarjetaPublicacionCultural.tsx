@@ -173,7 +173,7 @@ function ColageMedia({ fotoUrls, videoUrl, titulo, onAbrir }: ColageMediaProps) 
 
   let contenido: ReactNode
   if (total === 1) {
-    contenido = <FotoCollage url={fotoUrls[0]} titulo={titulo} className="aspect-video w-full rounded-xl" conPlay={conVideo} onClick={() => onAbrir(0)} />
+    contenido = <FotoCollage url={fotoUrls[0]} titulo={titulo} className="aspect-[4/5] w-full rounded-xl" conPlay={conVideo} onClick={() => onAbrir(0)} />
   } else if (total === 2) {
     contenido = (
       <div className="grid h-[240px] grid-cols-2 gap-1 overflow-hidden rounded-xl">
