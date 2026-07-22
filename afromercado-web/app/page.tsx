@@ -124,7 +124,7 @@ function SeccionHoteles({ hoteles }: { hoteles: ConfigHotel[] }) {
         </div>
         <div className="relative">
           <div className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
-            {hoteles.slice(0, 6).map(h => {
+            {hoteles.filter(h => h && h.comercio).slice(0, 6).map(h => {
               const habs = h.habitaciones || []
               const desde = habs.length > 0 ? Math.min(...habs.map(hab => Number(hab.precioPorNoche))) : null
               const foto = habs[0]?.fotos[0]
@@ -182,9 +182,9 @@ function SeccionTours({ tours }: { tours: ConfigTour[] }) {
           </div>
           <Link href="/tours" className="text-sm font-bold text-[#2D6A4F] hover:underline whitespace-nowrap bg-[#2D6A4F]/10 px-4 py-2 rounded-full transition-colors hover:bg-[#2D6A4F]/20">Ver todos →</Link>
         </div>
-        <div className="relative">
+        <div className="relative mt-8">
           <div className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
-            {tours.slice(0, 6).map(t => (
+            {tours.filter(t => t && t.comercio).slice(0, 6).map(t => (
               <Link key={t.id} href={`/tours/${t.id}`} className="snap-start flex-shrink-0 w-64 sm:w-72 group block rounded-3xl overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 bg-white border border-gray-100 shadow-sm relative h-80">
                   {/* Foto full */}
                   <div className="absolute inset-0 bg-[#40916C]">
@@ -240,9 +240,9 @@ function SeccionTransporte({ transportes }: { transportes: ConfigTransporte[] })
           </div>
           <Link href="/transportes" className="text-sm font-bold text-[#023E8A] hover:underline whitespace-nowrap bg-[#023E8A]/10 px-4 py-2 rounded-full transition-colors hover:bg-[#023E8A]/20">Ver todos →</Link>
         </div>
-        <div className="relative">
+        <div className="relative mt-8">
           <div className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
-            {transportes.slice(0, 6).map(t => {
+            {transportes.filter(t => t && t.comercio).slice(0, 6).map(t => {
               const precioMin = t.rutas.length > 0 ? Math.min(...t.rutas.map(r => Number(r.precioAsiento))) : null
               return (
                 <Link key={t.id} href={`/transportes/${t.id}`} className="snap-start flex-shrink-0 w-64 sm:w-72 group block rounded-3xl overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 bg-white border border-gray-100 shadow-sm relative h-80">

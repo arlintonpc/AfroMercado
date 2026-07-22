@@ -463,7 +463,7 @@ export default function HotelesPage() {
 
         {vista === 'mapa' && !cargando && (
           <div className="mb-6 rounded-2xl overflow-hidden shadow-md">
-            <MapaHoteles hoteles={cercanos} userLat={userLat} userLon={userLon} />
+            <MapaHoteles hoteles={cercanos.filter((h: any) => h.comercio)} userLat={userLat} userLon={userLon} />
           </div>
         )}
 
@@ -519,7 +519,7 @@ export default function HotelesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {cercanos.map((h: any) => (
+            {cercanos.filter((h: any) => h.comercio || h.esBannerDisplay).map((h: any) => (
               h.esBannerDisplay ? (
                 <div key={h.id} className="col-span-full mt-2 mb-2">
                   <BannerDisplay banner={h} />
