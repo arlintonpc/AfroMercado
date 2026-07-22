@@ -7,11 +7,13 @@ const CulturaRepository = {
     return prisma.publicacionCultural.create({ data });
   },
 
-  async listarPublicaciones({ departamento, page = 1, take = 20, usuarioId } = {}) {
+  async listarPublicaciones({ departamento, municipio, autorId, page = 1, take = 20, usuarioId } = {}) {
     const where = {
       activa: true,
       comercioId: null, // feed personal "Comparte tu Chocó" — nunca mezcla contenido comercial de la vitrina
       ...(departamento ? { departamento: { equals: departamento, mode: "insensitive" } } : {}),
+      ...(municipio ? { municipio: { equals: municipio, mode: "insensitive" } } : {}),
+      ...(autorId ? { autorId: Number(autorId) } : {}),
     };
     const skip = (Math.max(1, Number(page)) - 1) * take;
     const [items, total] = await Promise.all([
@@ -21,7 +23,7 @@ const CulturaRepository = {
         take,
         orderBy: { createdAt: "desc" },
         include: {
-          autor: { select: { id: true, nombre: true } },
+          autor: { select: { id: true, nombre: true, _count: { select: { seguidoresUsuarios: true } } } },
           _count: { select: { likes: true } },
           ...(usuarioId ? { likes: { where: { usuarioId }, select: { id: true } } } : {}),
         },
@@ -37,12 +39,13 @@ const CulturaRepository = {
   // CulturaService.listarVitrina aplique el puntaje heurístico y la
   // paginación en memoria sobre esa ventana. `total` sigue siendo el count()
   // real, sin el límite de la ventana.
-  async listarVitrina({ departamento, modulo, search, page = 1, usuarioId } = {}) {
+  async listarVitrina({ departamento, municipio, modulo, search, page = 1, usuarioId } = {}) {
     const where = {
       activa: true,
       comercioId: { not: null },
       comercio: filtroComercioVisible(),
       ...(departamento ? { departamento: { equals: departamento, mode: "insensitive" } } : {}),
+      ...(municipio ? { municipio: { equals: municipio, mode: "insensitive" } } : {}),
       ...(modulo ? { moduloOrigen: modulo } : {}),
       ...(search ? { titulo: { contains: search, mode: "insensitive" } } : {}),
     };
@@ -52,7 +55,7 @@ const CulturaRepository = {
         take: 200,
         orderBy: { createdAt: "desc" },
         include: {
-          autor: { select: { id: true, nombre: true } },
+          autor: { select: { id: true, nombre: true, _count: { select: { seguidoresUsuarios: true } } } },
           comercio: {
             select: {
               id: true,

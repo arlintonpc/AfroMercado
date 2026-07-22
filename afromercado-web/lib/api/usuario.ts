@@ -10,6 +10,7 @@ export interface DatosActualizarPerfil {
   departamento?: string
   tipoDocumento?: TipoDocumento
   numeroDocumento?: string
+  bio?: string
 }
 
 export async function obtenerPerfil(): Promise<Usuario> {

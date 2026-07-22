@@ -31,6 +31,20 @@ const UsuarioController = {
       next(err);
     }
   },
+
+  async obtenerPerfilPublico(req, res, next) {
+    try {
+      const data = await UsuarioService.obtenerPerfilPublico(Number(req.params.id), req.usuario?.id);
+      res.json({ ok: true, data });
+    } catch (err) { next(err); }
+  },
+
+  async toggleSeguir(req, res, next) {
+    try {
+      const resultado = await UsuarioService.toggleSeguir(req.usuario.id, Number(req.params.id));
+      res.json({ ok: true, ...resultado });
+    } catch (err) { next(err); }
+  },
 };
 
 module.exports = UsuarioController;

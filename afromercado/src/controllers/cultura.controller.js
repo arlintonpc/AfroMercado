@@ -142,16 +142,16 @@ const CulturaController = {
 
   async listarPublicaciones(req, res, next) {
     try {
-      const { departamento, page } = req.query;
-      res.json({ ok: true, data: await CulturaService.listarPublicaciones({ departamento, page, usuarioId: req.usuario?.id }) });
+      const { departamento, municipio, page } = req.query;
+      res.json({ ok: true, data: await CulturaService.listarPublicaciones({ departamento, municipio, page, usuarioId: req.usuario?.id }) });
     } catch (e) { next(e); }
   },
 
   // ── Vitrina de video (v0) ──
   async listarVitrina(req, res, next) {
     try {
-      const { departamento, modulo, search, page } = req.query;
-      const { items, total, pagina } = await CulturaService.listarVitrina({ departamento, modulo, search, page, usuarioId: req.usuario?.id });
+      const { departamento, municipio, modulo, search, page } = req.query;
+      const { items, total, pagina } = await CulturaService.listarVitrina({ departamento, municipio, modulo, search, page, usuarioId: req.usuario?.id });
       res.json({ ok: true, items, total, pagina });
     } catch (e) { next(e); }
   },

@@ -242,7 +242,7 @@ export interface PublicacionCultural {
   municipio?: string | null
   activa?: boolean
   createdAt: string
-  autor?: { id: number; nombre: string }
+  autor?: { id: number; nombre: string; siguiendo?: boolean; totalSeguidores?: number }
   totalLikes: number
   totalComentarios?: number
   totalCompartidos?: number
@@ -325,9 +325,10 @@ export async function crearPublicacionCultural(datos: PublicacionCulturalInput):
   return normalizarPublicacionCultural(r.data)
 }
 
-export async function listarPublicacionesCulturales(params: { departamento?: string; page?: number } = {}): Promise<{ items: PublicacionCultural[]; total: number; pagina: number }> {
+export async function listarPublicacionesCulturales(params: { departamento?: string; municipio?: string; page?: number } = {}): Promise<{ items: PublicacionCultural[]; total: number; pagina: number }> {
   const qs = new URLSearchParams()
   if (params.departamento) qs.set('departamento', params.departamento)
+  if (params.municipio) qs.set('municipio', params.municipio)
   if (params.page) qs.set('page', String(params.page))
   const q = qs.toString()
   const r = await apiFetch<{ ok: boolean; data: { items: PublicacionCultural[]; total: number; pagina: number } }>(`/cultura/publicaciones${q ? `?${q}` : ''}`)
@@ -369,9 +370,10 @@ export async function eliminarMiPublicacionVitrina(id: number): Promise<void> {
  * en video/foto de hoteles, tours, transportes, express, agro y pedidos.
  * Funciona con o sin sesión (con sesión trae `meGusta`/`esFavorito`).
  */
-export async function obtenerVitrina(params: { departamento?: string; modulo?: string; search?: string; page?: number } = {}): Promise<{ items: PublicacionCultural[]; total: number; pagina: number }> {
+export async function obtenerVitrina(params: { departamento?: string; municipio?: string; modulo?: string; search?: string; page?: number } = {}): Promise<{ items: PublicacionCultural[]; total: number; pagina: number }> {
   const qs = new URLSearchParams()
   if (params.departamento) qs.set('departamento', params.departamento)
+  if (params.municipio) qs.set('municipio', params.municipio)
   if (params.modulo) qs.set('modulo', params.modulo)
   if (params.search) qs.set('search', params.search)
   if (params.page) qs.set('page', String(params.page))

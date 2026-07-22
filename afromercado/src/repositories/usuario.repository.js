@@ -39,6 +39,17 @@ const UsuarioRepository = {
       data: datos,
     });
   },
+
+  async buscarPerfilPublico(id) {
+    return prisma.usuario.findUnique({
+      where: { id },
+      select: {
+        id: true, nombre: true, avatarUrl: true, bio: true,
+        municipio: true, departamento: true, activo: true,
+        _count: { select: { seguidoresUsuarios: true, siguiendoUsuarios: true } },
+      },
+    });
+  },
 };
 
 module.exports = UsuarioRepository;

@@ -179,6 +179,7 @@ model Usuario {
 
   municipio          String?
   departamento       String?
+  bio                String?
   tipoDocumento      TipoDocumento?
   numeroDocumento    String?
   autorizacionDatos  Boolean   @default(false)
@@ -234,6 +235,8 @@ model Usuario {
   comerciosSeguidos         SeguidorComercio[]
   vistasPublicacionCultural VistaPublicacionCultural[] @relation("VistasPublicacionUsuario")
   comentariosPublicacionCultural ComentarioPublicacionCultural[]
+  siguiendoUsuarios         SeguidorUsuario[] @relation("SeguidorDe")
+  seguidoresUsuarios        SeguidorUsuario[] @relation("Seguidores")
 }
 
 model Comercio {
@@ -2660,6 +2663,22 @@ model SeguidorComercio {
 
   @@unique([usuarioId, comercioId])
   @@index([comercioId])
+}
+
+// Seguir a otra PERSONA (perfil público, red social territorial) — self-relation
+// sobre Usuario, requiere nombres de relación explícitos porque ambos extremos
+// apuntan al mismo modelo.
+model SeguidorUsuario {
+  id         Int      @id @default(autoincrement())
+  seguidorId Int
+  seguidoId  Int
+  createdAt  DateTime @default(now())
+
+  seguidor Usuario @relation("SeguidorDe", fields: [seguidorId], references: [id], onDelete: Cascade)
+  seguido  Usuario @relation("Seguidores", fields: [seguidoId], references: [id], onDelete: Cascade)
+
+  @@unique([seguidorId, seguidoId])
+  @@index([seguidoId])
 }
 
 model LikePublicacionCultural {

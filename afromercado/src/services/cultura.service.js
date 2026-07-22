@@ -662,15 +662,59 @@ const CulturaService = {
       });
     }
 
+    // Perfil público: avisa a los seguidores de la PERSONA autora de la nueva
+    // publicación, tenga o no comercio asociado. Independiente del bloque de
+    // arriba (que solo notifica a seguidores del comercio).
+    setImmediate(async () => {
+      try {
+        const seguidoresPersona = await prisma.seguidorUsuario.findMany({
+          where: { seguidoId: usuarioId },
+          select: { seguidorId: true },
+        });
+        if (seguidoresPersona.length === 0) return;
+        const autor = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { nombre: true } });
+        for (const seguidor of seguidoresPersona) {
+          await NotificacionService.crearYEnviar({
+            usuarioId: seguidor.seguidorId,
+            tipo: "PERFIL_NUEVA_PUBLICACION",
+            titulo: `${autor?.nombre || "Alguien que sigues"} publicó algo nuevo`,
+            mensaje: publicacion.titulo,
+            url: comercioIdFinal ? "/vitrina" : "/cultura/galeria",
+          });
+        }
+      } catch (e) {
+        console.error("[PERFIL] Error notificando seguidores del autor:", e.message);
+      }
+    });
+
     return publicacion;
   },
 
   async listarPublicaciones(filtros = {}) {
     const resultado = await CulturaRepository.listarPublicaciones(filtros);
+    const usuarioId = filtros.usuarioId;
+
+    let siguiendoAutorSet = new Set();
+    if (usuarioId) {
+      const autorIds = [...new Set(resultado.items.map((p) => p.autor?.id).filter(Boolean))];
+      if (autorIds.length > 0) {
+        const siguiendo = await prisma.seguidorUsuario.findMany({
+          where: { seguidorId: usuarioId, seguidoId: { in: autorIds } },
+          select: { seguidoId: true },
+        });
+        siguiendoAutorSet = new Set(siguiendo.map((s) => s.seguidoId));
+      }
+    }
+
     return {
       ...resultado,
       items: resultado.items.map((p) => {
         const { _count, likes, ...resto } = p;
+        if (resto.autor) {
+          resto.autor.siguiendo = usuarioId ? siguiendoAutorSet.has(resto.autor.id) : false;
+          resto.autor.totalSeguidores = resto.autor._count?.seguidoresUsuarios ?? 0;
+          delete resto.autor._count;
+        }
         return {
           ...resto,
           totalLikes: _count?.likes ?? 0,
@@ -696,12 +740,14 @@ const CulturaService = {
     let favoritosSet = new Set();
     let siguiendoSet = new Set();
     let afinidadModulos = new Set();
+    let siguiendoAutorSet = new Set();
 
     if (usuarioId && resultado.itemsVentana.length > 0) {
       const publicacionIds = resultado.itemsVentana.map((p) => p.id);
       const comercioIds = [...new Set(resultado.itemsVentana.map((p) => p.comercio?.id).filter(Boolean))];
+      const autorIds = [...new Set(resultado.itemsVentana.map((p) => p.autor?.id).filter(Boolean))];
 
-      const [favoritos, seguidores, likesUsuario, favoritosPublicacionesUsuario, vistasUsuario] = await Promise.all([
+      const [favoritos, seguidores, likesUsuario, favoritosPublicacionesUsuario, vistasUsuario, siguiendoAutores] = await Promise.all([
         prisma.favorito.findMany({
           where: { usuarioId, tipoEntidad: "PUBLICACION_CULTURAL", entidadId: { in: publicacionIds } },
           select: { entidadId: true },
@@ -726,10 +772,17 @@ const CulturaService = {
           take: 50,
           orderBy: { createdAt: "desc" },
         }),
+        autorIds.length
+          ? prisma.seguidorUsuario.findMany({
+              where: { seguidorId: usuarioId, seguidoId: { in: autorIds } },
+              select: { seguidoId: true },
+            })
+          : Promise.resolve([]),
       ]);
 
       favoritosSet = new Set(favoritos.map((f) => f.entidadId));
       siguiendoSet = new Set(seguidores.map((s) => s.comercioId));
+      siguiendoAutorSet = new Set(siguiendoAutores.map((s) => s.seguidoId));
 
       const idsInteractuados = [
         ...new Set([
@@ -755,6 +808,11 @@ const CulturaService = {
         resto.comercio.totalSeguidores = resto.comercio._count?.seguidores ?? 0;
         delete resto.comercio._count;
       }
+      if (resto.autor) {
+        resto.autor.siguiendo = usuarioId ? siguiendoAutorSet.has(resto.autor.id) : false;
+        resto.autor.totalSeguidores = resto.autor._count?.seguidoresUsuarios ?? 0;
+        delete resto.autor._count;
+      }
       return {
         ...resto,
         totalLikes: _count?.likes ?? 0,
@@ -773,6 +831,7 @@ const CulturaService = {
       const diasDesdeCreacion = (Date.now() - new Date(item.createdAt).getTime()) / 86400000;
       const puntaje =
         (item.comercio?.siguiendo ? 40 : 0) +
+        (item.autor?.siguiendo ? 20 : 0) +
         (afinidadModulos.has(item.moduloOrigen) ? 15 : 0) +
         Math.min(item.totalLikes, 20) +
         Math.max(0, 10 - diasDesdeCreacion);

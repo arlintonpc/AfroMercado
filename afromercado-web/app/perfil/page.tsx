@@ -49,6 +49,7 @@ export default function PerfilPage() {
   const [telefono, setTelefono] = useState('')
   const [departamento, setDepartamento] = useState('')
   const [municipio, setMunicipio] = useState('')
+  const [bio, setBio] = useState('')
   const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento | ''>('')
   const [numeroDocumento, setNumeroDocumento] = useState('')
 
@@ -80,6 +81,7 @@ export default function PerfilPage() {
         setTelefono(p.telefono ?? '')
         setDepartamento((p as any).departamento ?? '')
         setMunicipio(p.municipio ?? '')
+        setBio(p.bio ?? '')
         setTipoDocumento((p.tipoDocumento as TipoDocumento) ?? '')
         setNumeroDocumento(p.numeroDocumento ?? '')
       })
@@ -115,6 +117,7 @@ export default function PerfilPage() {
         municipio: municipio.trim() || undefined,
         tipoDocumento: tipoDocumento || undefined,
         numeroDocumento: numeroDocumento.trim() || undefined,
+        bio: bio.trim() || undefined,
       } as any)
       setPerfil(actualizado)
       actualizarUsuario(actualizado)
@@ -134,6 +137,7 @@ export default function PerfilPage() {
     setTelefono(perfil.telefono ?? '')
     setDepartamento((perfil as any).departamento ?? '')
     setMunicipio(perfil.municipio ?? '')
+    setBio(perfil.bio ?? '')
     setTipoDocumento((perfil.tipoDocumento as TipoDocumento) ?? '')
     setNumeroDocumento(perfil.numeroDocumento ?? '')
     setError(null)
@@ -361,6 +365,20 @@ export default function PerfilPage() {
                   maxLength={80}
                   className="w-full h-11 px-4 rounded-xl border border-[#1A1A1A]/15 bg-white text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] transition-colors"
                 />
+              </div>
+
+              {/* Bio */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-[#1A1A1A]">Biografía</label>
+                <textarea
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value.slice(0, 280))}
+                  placeholder="Cuéntanos un poco sobre ti…"
+                  maxLength={280}
+                  rows={3}
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#1A1A1A]/15 bg-white text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] transition-colors resize-none"
+                />
+                <span className="text-xs text-[#1A1A1A]/40 text-right">{bio.length}/280</span>
               </div>
 
               {/* Tipo de documento */}

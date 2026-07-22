@@ -1695,6 +1695,29 @@ async function aplicarMigraciones() {
     `ALTER TYPE "ModuloAnuncio" ADD VALUE IF NOT EXISTS 'TRANSPORTE'`,
     `ALTER TYPE "ModuloAnuncio" ADD VALUE IF NOT EXISTS 'CULTURA'`,
     `ALTER TYPE "ModuloAnuncio" ADD VALUE IF NOT EXISTS 'BIENES_RAICES'`,
+    // ── Seguir a otra persona / bio de perfil (red social territorial) ──
+    `ALTER TABLE "Usuario" ADD COLUMN IF NOT EXISTS "bio" TEXT`,
+    `CREATE TABLE IF NOT EXISTS "SeguidorUsuario" (
+      "id"         SERIAL NOT NULL,
+      "seguidorId" INTEGER NOT NULL,
+      "seguidoId"  INTEGER NOT NULL,
+      "createdAt"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "SeguidorUsuario_pkey" PRIMARY KEY ("id")
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "SeguidorUsuario_seguidorId_seguidoId_key" ON "SeguidorUsuario"("seguidorId", "seguidoId")`,
+    `CREATE INDEX IF NOT EXISTS "SeguidorUsuario_seguidoId_idx" ON "SeguidorUsuario"("seguidoId")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'SeguidorUsuario_seguidorId_fkey') THEN
+        ALTER TABLE "SeguidorUsuario" ADD CONSTRAINT "SeguidorUsuario_seguidorId_fkey"
+          FOREIGN KEY ("seguidorId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'SeguidorUsuario_seguidoId_fkey') THEN
+        ALTER TABLE "SeguidorUsuario" ADD CONSTRAINT "SeguidorUsuario_seguidoId_fkey"
+          FOREIGN KEY ("seguidoId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$`,
   ];
   for (const sql of migraciones) {
     try {

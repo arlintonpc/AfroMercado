@@ -8,6 +8,7 @@ import { useVitrinaAudio } from '@/context/VitrinaAudioContext'
 import { toggleLikePublicacion, toggleFavoritoPublicacionCultural, registrarVistaPublicacion, registrarCompartidoPublicacion, type PublicacionCultural } from '@/lib/api/cultura'
 import ModalComentarios from './ModalComentarios'
 import { toggleSeguirComercio } from '@/lib/api/comercios'
+import { toggleSeguirUsuario } from '@/lib/api/usuarios'
 import ReproductorVideo, { detectar } from '@/components/comerciante/ReproductorVideo'
 import { ModalCompartir } from './ModalCompartir'
 
@@ -214,7 +215,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
   const [esFavorito, setEsFavorito] = useState(publicacion.esFavorito ?? false)
   const [enVueloFavorito, setEnVueloFavorito] = useState(false)
 
-  const [siguiendo, setSiguiendo] = useState(comercio?.siguiendo ?? false)
+  const [siguiendo, setSiguiendo] = useState(comercio?.siguiendo ?? publicacion.autor?.siguiendo ?? false)
   const [enVueloSeguir, setEnVueloSeguir] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -265,7 +266,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
   }
 
   async function manejarSeguir() {
-    if (!comercio) return
+    if (!comercio && !publicacion.autor) return
     if (!autenticado) {
       router.push(`/ingresar?redirect=${encodeURIComponent(rutaRedirect)}`)
       return
@@ -275,7 +276,9 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
     setSiguiendo(!anterior)
     setEnVueloSeguir(true)
     try {
-      const r = await toggleSeguirComercio(comercio.id)
+      const r = comercio
+        ? await toggleSeguirComercio(comercio.id)
+        : await toggleSeguirUsuario(publicacion.autor!.id)
       setSiguiendo(r.siguiendo)
     } catch {
       setSiguiendo(anterior)
@@ -333,7 +336,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
           pararConteoVista()
         }
       },
-      { threshold: 0.3 }
+      { threshold: 0.7 }
     )
     observer.observe(video)
     return () => {
@@ -401,7 +404,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
   if (comercio && publicacion.videoUrl) {
     const directo = esVideoDirecto(publicacion.videoUrl)
     return (
-      <article className="relative mx-auto aspect-[9/16] max-h-[720px] w-full overflow-hidden rounded-2xl bg-black shadow-lg">
+      <article className="relative mx-auto h-full md:aspect-[9/16] md:max-h-[720px] w-full overflow-hidden md:rounded-2xl bg-black shadow-lg">
         {directo ? (
           <>
             <video
@@ -492,7 +495,14 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="truncate text-sm font-semibold text-white" style={{ textShadow: '0px 1px 3px rgba(0,0,0,0.8)' }}>
-                  {publicacion.esAnuncio ? '⭐' : '🏪'} {nombreMostrado}
+                  {publicacion.esAnuncio ? '⭐' : comercio ? '🏪' : '👤'}{' '}
+                  {!comercio && publicacion.autor ? (
+                    <Link href={`/persona/${publicacion.autor.id}`} className="hover:underline">
+                      {nombreMostrado}
+                    </Link>
+                  ) : (
+                    nombreMostrado
+                  )}
                 </p>
                 {!publicacion.esAnuncio && (
                   <button
@@ -511,7 +521,13 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
                 )}
               </div>
               <p className="truncate text-xs text-white/90" style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.8)' }}>
-                {publicacion.esAnuncio ? 'Anuncio' : (comercio?.totalSeguidores != null ? `${comercio.totalSeguidores} ${comercio.totalSeguidores === 1 ? 'seguidor' : 'seguidores'} • ${ubicacion}` : ubicacion)}
+                {publicacion.esAnuncio
+                  ? 'Anuncio'
+                  : comercio?.totalSeguidores != null
+                    ? `${comercio.totalSeguidores} ${comercio.totalSeguidores === 1 ? 'seguidor' : 'seguidores'} • ${ubicacion}`
+                    : !comercio && publicacion.autor?.totalSeguidores != null
+                      ? `${publicacion.autor.totalSeguidores} ${publicacion.autor.totalSeguidores === 1 ? 'seguidor' : 'seguidores'} • ${ubicacion}`
+                      : ubicacion}
               </p>
             </div>
           </div>
@@ -700,9 +716,15 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
             <div className="flex items-center gap-2">
               <p className="truncate text-sm font-semibold text-[#1A1A1A]">
                 {comercio && <span className="mr-1" aria-hidden="true">🏪</span>}
-                {nombreMostrado}
+                {!comercio && publicacion.autor ? (
+                  <Link href={`/persona/${publicacion.autor.id}`} className="hover:underline">
+                    {nombreMostrado}
+                  </Link>
+                ) : (
+                  nombreMostrado
+                )}
               </p>
-              {comercio && (
+              {(comercio || publicacion.autor) && (
                 <button
                   type="button"
                   onClick={manejarSeguir}

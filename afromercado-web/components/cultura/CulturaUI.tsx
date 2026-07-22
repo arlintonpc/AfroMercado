@@ -5,17 +5,42 @@ import type { ReactNode } from 'react'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 
-export function CulturaShell({ children }: { children: ReactNode }) {
+export function CulturaShell({ 
+  children,
+  modoTeatro = false
+}: { 
+  children: ReactNode
+  modoTeatro?: boolean
+}) {
+  // En móvil el video ocupa toda la pantalla (estilo Reels/TikTok) y ahí sí
+  // tiene sentido un fondo oscuro. En escritorio el video queda centrado en
+  // una tarjeta, así que el resto de la página usa el mismo fondo crema de
+  // marca que el resto del sitio — si no, toda la pantalla se ve negra y dejas
+  // de sentir que estás en Teravia.
+  const layoutClass = modoTeatro
+    ? 'flex h-[100dvh] md:h-screen overflow-hidden flex-col bg-[#0f2419] md:bg-[radial-gradient(circle_at_top_left,_rgba(45,106,79,0.11),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(212,160,23,0.12),_transparent_24%),linear-gradient(180deg,_#F8F5F0_0%,_#F4EDE2_54%,_#F8F5F0_100%)] text-white md:text-[#1A1A1A]'
+    : 'flex min-h-screen flex-col bg-[radial-gradient(circle_at_top_left,_rgba(45,106,79,0.11),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(212,160,23,0.12),_transparent_24%),linear-gradient(180deg,_#F8F5F0_0%,_#F4EDE2_54%,_#F8F5F0_100%)] text-[#1A1A1A]'
+
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(circle_at_top_left,_rgba(45,106,79,0.11),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(212,160,23,0.12),_transparent_24%),linear-gradient(180deg,_#F8F5F0_0%,_#F4EDE2_54%,_#F8F5F0_100%)] text-[#1A1A1A]">
-      <Header />
-      <main className="relative flex-1 overflow-hidden">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[linear-gradient(180deg,rgba(255,255,255,0.55),transparent)]" />
-        <div className="pointer-events-none absolute -left-24 top-24 h-64 w-64 rounded-full bg-[#2D6A4F]/5 blur-3xl" />
-        <div className="pointer-events-none absolute right-0 top-48 h-72 w-72 rounded-full bg-[#D4A017]/8 blur-3xl" />
+    <div className={layoutClass}>
+      {modoTeatro ? (
+        <div className="hidden md:block bg-white dark:bg-[#1A1A1A]">
+          <Header />
+        </div>
+      ) : (
+        <Header />
+      )}
+      <main className="relative flex-1 overflow-hidden flex flex-col">
+        {!modoTeatro && (
+          <>
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[linear-gradient(180deg,rgba(255,255,255,0.55),transparent)]" />
+            <div className="pointer-events-none absolute -left-24 top-24 h-64 w-64 rounded-full bg-[#2D6A4F]/5 blur-3xl" />
+            <div className="pointer-events-none absolute right-0 top-48 h-72 w-72 rounded-full bg-[#D4A017]/8 blur-3xl" />
+          </>
+        )}
         {children}
       </main>
-      <Footer />
+      {!modoTeatro && <Footer />}
     </div>
   )
 }

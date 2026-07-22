@@ -3,11 +3,25 @@ const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
 const { Router } = require("express");
-const { autenticar } = require("../middlewares/auth");
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
+const { autenticar, autenticarOpcional } = require("../middlewares/auth");
 const UsuarioController = require("../controllers/usuario.controller");
 const UsuarioRepository = require("../repositories/usuario.repository");
 
 const router = Router();
+
+// Límite anti-spam para seguir/dejar de seguir personas — mismo patrón que
+// publicacionLimiter en cultura.routes.js.
+const seguirUsuarioLimiter = rateLimit({
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 300,
+  keyGenerator: (req) => (req.usuario?.id ? `usuario:${req.usuario.id}` : `ip:${ipKeyGenerator(req.ip)}`),
+  skip: () => process.env.NODE_ENV !== "production",
+  message: { ok: false, error: "Demasiadas acciones de seguir/dejar de seguir. Intenta más tarde." },
+});
 
 // ── Multer para avatares ──────────────────────────────────────
 const DIR_AVATARES = path.join(__dirname, "..", "..", "uploads", "avatares");
@@ -52,5 +66,9 @@ router.post(
     }
   }
 );
+
+// ── Seguir personas + perfil público ─────────────────────────
+router.get("/:id/perfil", autenticarOpcional, UsuarioController.obtenerPerfilPublico);
+router.post("/:id/seguir/toggle", autenticar, seguirUsuarioLimiter, UsuarioController.toggleSeguir);
 
 module.exports = router;

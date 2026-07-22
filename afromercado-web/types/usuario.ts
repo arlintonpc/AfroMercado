@@ -8,6 +8,7 @@ export interface Usuario {
   email: string
   telefono?: string | null
   avatarUrl?: string | null
+  bio?: string | null
   municipio?: string | null
   departamento?: string | null
   rol: RolUsuario
