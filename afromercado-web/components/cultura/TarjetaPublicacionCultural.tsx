@@ -766,7 +766,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
             // eslint-disable-next-line @next/next/no-img-element
             <img src={comercio.logoUrl} alt={comercio.nombre} className="h-12 w-12 flex-shrink-0 rounded-full object-cover ring-2 ring-[#D4A017]/25" />
           ) : (
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#1B4332] text-base font-bold text-white ring-2 ring-[#D4A017]/25">
+            <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-base font-bold text-white ring-2 ring-[#D4A017]/25 ${publicacion.esAnuncio ? 'bg-[#9B7300]' : 'bg-[#1B4332]'}`}>
               {inicial}
             </div>
           )}
