@@ -239,35 +239,37 @@ export default function ComercianteVitrinaPage() {
             <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1.5">
               Fotos <span className="text-[#1A1A1A]/40 font-normal">(opcional, máx. {MAX_FOTOS})</span>
             </label>
-            <div className="flex flex-wrap gap-2 mb-2">
+            <div className="flex flex-wrap gap-2">
               {fotoUrls.map((url) => (
-                <div key={url} className="relative w-16 h-16 rounded-lg overflow-hidden border border-[#1A1A1A]/12">
+                <div key={url} className="relative w-20 h-20 rounded-xl overflow-hidden border border-[#1A1A1A]/12">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt="Foto de la publicación" className="w-full h-full object-cover" />
                   <button
                     type="button"
                     onClick={() => quitarFoto(url)}
-                    className="absolute top-0 right-0 bg-black/60 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-bl"
+                    className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white hover:bg-black/75"
                   >
                     ×
                   </button>
                 </div>
               ))}
               {subiendoFotos > 0 && Array.from({ length: subiendoFotos }).map((_, i) => (
-                <div key={`subiendo-${i}`} className="w-16 h-16 rounded-lg border border-[#1A1A1A]/12 flex items-center justify-center bg-white">
+                <div key={`subiendo-${i}`} className="flex h-20 w-20 items-center justify-center rounded-xl border border-[#1A1A1A]/12 bg-white">
                   <div className="w-4 h-4 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />
                 </div>
               ))}
+              {fotoUrls.length < MAX_FOTOS && (
+                <label className="flex h-20 w-20 flex-shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-[#2D6A4F]/30 bg-[#EAF3DE]/40 text-[#2D6A4F] transition hover:border-[#2D6A4F]/60 hover:bg-[#EAF3DE]/70">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="3" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-[10px] font-semibold">Subir foto</span>
+                  <input type="file" accept="image/*" multiple onChange={seleccionarFotos} className="hidden" />
+                </label>
+              )}
             </div>
-            {fotoUrls.length < MAX_FOTOS && (
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={seleccionarFotos}
-                className="text-xs text-[#1A1A1A]/55"
-              />
-            )}
           </div>
 
           <div>
@@ -283,20 +285,27 @@ export default function ComercianteVitrinaPage() {
                 </button>
               </div>
             ) : subiendoVideo ? (
-              <div className="flex items-center gap-2 text-xs text-[#1A1A1A]/45">
+              <div className="flex h-32 items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#1A1A1A]/12 bg-white text-sm text-[#1A1A1A]/50">
                 <div className="w-4 h-4 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />
                 Subiendo video…
               </div>
             ) : (
               <>
-                <input type="file" accept="video/*" onChange={seleccionarVideo} className="text-xs text-[#1A1A1A]/55 mb-2 block w-full" disabled={!!videoExternoUrl} />
-                {!videoExternoUrl && (
-                  <p className="mb-4 text-xs text-[#1A1A1A]/40">
-                    Sube un video de hasta {MAX_SEGUNDOS_VIDEO} segundos y 45MB.
-                  </p>
-                )}
-                
-                <div className="flex items-center gap-4 my-2">
+                <label className={`flex h-32 flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed transition ${
+                  videoExternoUrl
+                    ? 'cursor-not-allowed border-[#1A1A1A]/10 bg-[#1A1A1A]/3 text-[#1A1A1A]/30'
+                    : 'cursor-pointer border-[#2D6A4F]/30 bg-[#EAF3DE]/40 text-[#2D6A4F] hover:border-[#2D6A4F]/60 hover:bg-[#EAF3DE]/70'
+                }`}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                    <rect x="2" y="5" width="15" height="14" rx="3" />
+                    <path d="M22 8.5l-5 3.5 5 3.5v-7z" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-sm font-semibold">Subir video</span>
+                  <span className="text-xs opacity-70">hasta {MAX_SEGUNDOS_VIDEO}s y 45MB</span>
+                  <input type="file" accept="video/*" onChange={seleccionarVideo} className="hidden" disabled={!!videoExternoUrl} />
+                </label>
+
+                <div className="flex items-center gap-4 my-3">
                   <div className="h-px bg-[#1A1A1A]/10 flex-1"></div>
                   <span className="text-xs text-[#1A1A1A]/40 font-medium uppercase tracking-wider">o pega un enlace</span>
                   <div className="h-px bg-[#1A1A1A]/10 flex-1"></div>

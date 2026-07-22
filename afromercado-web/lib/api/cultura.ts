@@ -222,6 +222,7 @@ export interface ComercioVitrina {
   whatsapp?: string | null
   whatsappVisible?: boolean
   comprableEnPlataforma?: boolean
+  verificado?: boolean
   /** Solo presente para publicaciones consultadas con sesión iniciada. */
   siguiendo?: boolean
   totalSeguidores?: number

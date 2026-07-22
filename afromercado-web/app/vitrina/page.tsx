@@ -1,10 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useAuth } from '@/context/AuthContext'
 import { obtenerVitrina, type PublicacionCultural } from '@/lib/api/cultura'
 import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
-import { VitrinaAudioProvider } from '@/context/VitrinaAudioContext'
 import {
   CulturaHero,
   CulturaPageContainer,
@@ -26,6 +26,9 @@ interface ItemLightbox {
 }
 
 export default function VitrinaPage() {
+  const { usuario } = useAuth()
+  const esComerciante = usuario?.rol === 'COMERCIANTE'
+
   const [departamento, setDepartamento] = useState('')
   const [municipio, setMunicipio] = useState('')
   const [modulo, setModulo] = useState('')
@@ -52,21 +55,20 @@ export default function VitrinaPage() {
         municipio: municipio || undefined,
         modulo: modulo || undefined,
         search: search || undefined,
-        page: 1
+        page: 1,
       })
       let items = r.items
       if (typeof window !== 'undefined') {
         const videoId = new URLSearchParams(window.location.search).get('video')
         if (videoId) {
           const id = Number(videoId)
-          const index = items.findIndex(i => i.id === id)
+          const index = items.findIndex((i) => i.id === id)
           if (index > 0) {
             const target = items[index]
             items = [target, ...items.slice(0, index), ...items.slice(index + 1)]
           }
         }
       }
-      
       setPublicaciones(items)
       setTotal(r.total)
       setPagina(1)
@@ -90,7 +92,7 @@ export default function VitrinaPage() {
         municipio: municipio || undefined,
         modulo: modulo || undefined,
         search: search || undefined,
-        page: siguiente
+        page: siguiente,
       })
       setPublicaciones((prev) => [...prev, ...r.items])
       setTotal(r.total)
@@ -108,20 +110,99 @@ export default function VitrinaPage() {
 
   const hayMas = publicaciones.length < total
 
+  // Barra de comerciantes (estilo historias de Facebook): una tarjeta por
+  // comercio único entre las publicaciones ya cargadas, con la foto o el
+  // poster de su publicación más reciente como fondo.
+  const comerciantes = useMemo(() => {
+    const vistos = new Set<number>()
+    const lista: { id: number; nombre: string; logoUrl?: string | null; fondoUrl?: string | null }[] = []
+    for (const p of publicaciones) {
+      const c = p.comercio
+      if (c && !vistos.has(c.id)) {
+        vistos.add(c.id)
+        lista.push({ id: c.id, nombre: c.nombre, logoUrl: c.logoUrl, fondoUrl: p.fotoUrls?.[0] || p.videoPosterUrl || null })
+      }
+    }
+    return lista
+  }, [publicaciones])
+
   return (
-    <CulturaShell modoTeatro={true}>
-      <div className="md:mx-auto md:w-full md:max-w-4xl md:px-4 sm:px-6 lg:px-8 h-full flex flex-col">
-        
-        {/* Filtros solo en Desktop */}
-        <div className="hidden md:block py-4 mb-2">
+    <CulturaShell>
+      <CulturaPageContainer className="space-y-6">
+        <CulturaHero
+          eyebrow="Vitrina"
+          title="Descubre tu territorio"
+          description="Fotos, videos y novedades de hoteles, tours, transporte, comida y más — contado por los mismos comercios de tu región."
+        />
+
+        {mensajeConfirmacion && (
+          <div className="rounded-2xl border border-[#2D6A4F]/18 bg-[#EAF3DE]/70 px-4 py-3 text-sm font-semibold text-[#1B4332]">
+            {mensajeConfirmacion}
+          </div>
+        )}
+
+        {comerciantes.length > 0 && (
+          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1" style={{ scrollbarWidth: 'none' }}>
+            {comerciantes.map((c) => (
+              <Link
+                key={c.id}
+                href={`/comercio/${c.id}`}
+                className="group relative h-44 w-28 flex-shrink-0 overflow-hidden rounded-2xl bg-[#1B4332] shadow-sm"
+              >
+                {c.fondoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={c.fondoUrl}
+                    alt={c.nombre}
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#2D6A4F] to-[#1B4332]" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/20" />
+
+                {c.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={c.logoUrl}
+                    alt=""
+                    className="absolute left-2 top-2 h-9 w-9 rounded-full border-2 border-[#D4A017] object-cover"
+                  />
+                ) : (
+                  <div className="absolute left-2 top-2 flex h-9 w-9 items-center justify-center rounded-full border-2 border-[#D4A017] bg-[#1B4332] text-sm font-bold text-white">
+                    {c.nombre[0]?.toUpperCase() || '?'}
+                  </div>
+                )}
+
+                <span className="absolute inset-x-2 bottom-2 line-clamp-2 text-xs font-semibold leading-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.7)]">
+                  {c.nombre}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {esComerciante && (
+          <Link
+            href="/comerciante/vitrina/nueva"
+            className="flex items-center gap-3 rounded-2xl border border-[#1A1A1A]/8 bg-white px-4 py-3 shadow-sm transition hover:border-[#2D6A4F]/30 hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#1B4332] text-lg">
+              🎥
+            </div>
+            <span className="text-sm font-medium text-[#1A1A1A]/50">¿Qué quieres compartir hoy?</span>
+          </Link>
+        )}
+
+        <CulturaToolbar>
           <form
             onSubmit={(e) => {
               e.preventDefault()
               setSearch(searchInput)
             }}
-            className="flex items-center gap-3 w-full max-w-2xl mx-auto"
+            className="flex flex-wrap items-center gap-3 w-full"
           >
-            <div className="flex flex-1 items-center rounded-full border border-[#1A1A1A]/12 bg-white px-4 py-2.5 transition focus-within:border-[#2D6A4F] focus-within:ring-2 focus-within:ring-[#2D6A4F]/15">
+            <div className="flex flex-1 min-w-[200px] items-center rounded-full border border-[#1A1A1A]/12 bg-white px-4 py-2.5 transition focus-within:border-[#2D6A4F] focus-within:ring-2 focus-within:ring-[#2D6A4F]/15">
               <span className="mr-2 text-[#1A1A1A]/40">🔍</span>
               <input
                 type="text"
@@ -173,96 +254,61 @@ export default function VitrinaPage() {
               ))}
             </select>
           </form>
-        </div>
+        </CulturaToolbar>
 
         {cargando ? (
-          <div className="px-4 md:px-0 mt-20 md:mt-0">
-            <CulturaSkeletonGrid />
-          </div>
+          <CulturaSkeletonGrid />
         ) : error ? (
-          <div className="px-4 md:px-0 mt-20 md:mt-0">
-            <CulturaStateCard
-              tone="error"
-              icon="⚠️"
-              title="No pudimos cargar la vitrina"
-              description={error}
-              action={
-                <button
-                  onClick={cargar}
-                  className="rounded-full bg-[#1B4332] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#245a42]"
-                >
-                  Reintentar
-                </button>
-              }
-            />
-          </div>
+          <CulturaStateCard
+            tone="error"
+            icon="⚠️"
+            title="No pudimos cargar la vitrina"
+            description={error}
+            action={
+              <button
+                onClick={cargar}
+                className="rounded-full bg-[#1B4332] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#245a42]"
+              >
+                Reintentar
+              </button>
+            }
+          />
         ) : publicaciones.length === 0 ? (
-          <div className="px-4 md:px-0 mt-20 md:mt-0">
-            <CulturaStateCard
-              icon="🎬"
-              title="Todavía no hay publicaciones"
-              description={`Los comercios aún no han compartido videos o fotos${departamento ? ` en ${departamento}` : ''}. Vuelve pronto.`}
-            />
-          </div>
+          <CulturaStateCard
+            icon="🎬"
+            title="Todavía no hay publicaciones"
+            description={`Los comercios aún no han compartido videos o fotos${departamento ? ` en ${departamento}` : ''}. Vuelve pronto.`}
+          />
         ) : (
-          <VitrinaAudioProvider>
-            <div 
-              className="flex-1 flex flex-col w-full h-full overflow-y-scroll snap-y snap-mandatory bg-black md:bg-transparent"
-              style={{ scrollbarWidth: 'none' }}
-              onScroll={(e) => {
-                const target = e.target as HTMLDivElement;
-                if (hayMas && !cargandoMas && target.scrollHeight - target.scrollTop <= target.clientHeight * 2) {
-                  cargarMas();
-                }
-              }}
-            >
-              {/* Botón flotante para regresar en móvil */}
-              <div className="md:hidden fixed top-0 inset-x-0 p-4 z-50 flex items-center justify-between pointer-events-none">
-                <Link href="/" className="flex items-center justify-center w-10 h-10 rounded-full bg-black/30 backdrop-blur-md text-white hover:bg-black/50 pointer-events-auto">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-                </Link>
-                <div className="flex flex-col text-right drop-shadow-md">
-                  <span className="text-white font-bold text-sm">Vitrina</span>
-                  <span className="text-white/80 text-[10px] uppercase tracking-wider">{departamento || 'Colombia'}</span>
-                </div>
-              </div>
-
-              {publicaciones.map((p: any) => (
-                <div key={p.id} id={`video-${p.id}`} className="w-full h-full md:py-6 flex flex-col justify-center snap-start snap-always shrink-0 relative">
-                  {p.esBannerDisplay ? (
-                    <div className="h-full flex items-center justify-center p-4">
-                      <BannerDisplay banner={p} />
-                    </div>
-                  ) : (
-                    <TarjetaPublicacionCultural
-                      publicacion={p}
-                      onAbrir={(pub, indice) => setLightbox({ titulo: pub.titulo, fotoUrls: pub.fotoUrls, videoUrl: pub.videoUrl, indiceInicial: indice })}
-                      onDenunciar={(id) => setDenunciandoId(id)}
-                    />
-                  )}
-                </div>
-              ))}
-              
-              {/* Infinite Scroll Loader Trigger */}
-              {hayMas && (
-                <div className="w-full h-32 md:h-20 shrink-0 flex items-center justify-center snap-start">
-                  {cargandoMas ? (
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white md:border-[#1B4332]"></div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={cargarMas}
-                      className="md:hidden text-white/50 text-sm"
-                    >
-                      Desliza para ver más
-                    </button>
-                  )}
-                </div>
+          <div className="flex flex-col gap-4">
+            <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
+              {publicaciones.map((p: any) =>
+                p.esBannerDisplay ? (
+                  <BannerDisplay key={p.id} banner={p} />
+                ) : (
+                  <TarjetaPublicacionCultural
+                    key={p.id}
+                    publicacion={p}
+                    forzarClasica
+                    onAbrir={(pub, indice) => setLightbox({ titulo: pub.titulo, fotoUrls: pub.fotoUrls, videoUrl: pub.videoUrl, indiceInicial: indice })}
+                    onDenunciar={(id) => setDenunciandoId(id)}
+                  />
+                )
               )}
             </div>
-          </VitrinaAudioProvider>
+            {hayMas && (
+              <button
+                type="button"
+                onClick={cargarMas}
+                disabled={cargandoMas}
+                className="self-center rounded-xl border border-[#1A1A1A]/15 bg-white px-6 py-3 text-sm font-bold text-[#1B4332] hover:bg-gray-50 shadow-sm disabled:opacity-50"
+              >
+                {cargandoMas ? 'Cargando…' : 'Cargar más historias'}
+              </button>
+            )}
+          </div>
         )}
-      </div>
+      </CulturaPageContainer>
 
       {lightbox && (
         <ModalGaleriaHistoria

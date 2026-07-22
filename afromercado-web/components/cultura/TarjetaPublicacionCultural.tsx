@@ -95,6 +95,58 @@ function FotoCollage({ url, titulo, className = '', overlay, conPlay, onClick }:
   )
 }
 
+/** Video propio (Cloudinary/mp4) en la tarjeta clásica: se reproduce solo,
+ *  silenciado, mientras está a la vista (igual que Facebook/LinkedIn) — no
+ *  se agranda ni se sale de la tarjeta. Un video de plataforma externa
+ *  (YouTube, TikTok, etc.) sigue usando el ReproductorVideo genérico de clic
+ *  para reproducir, porque esas no se pueden controlar de la misma forma. */
+function VideoEnLineaAutoplay({ url }: { url: string }) {
+  const { plataforma } = detectar(url)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [silenciado, setSilenciado] = useState(true)
+
+  useEffect(() => {
+    if (plataforma !== 'directo') return
+    const video = videoRef.current
+    if (!video) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) video.play().catch(() => {})
+        else video.pause()
+      },
+      { threshold: 0.6 }
+    )
+    observer.observe(video)
+    return () => observer.disconnect()
+  }, [plataforma])
+
+  if (plataforma !== 'directo') {
+    return <ReproductorVideo url={url} />
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-black">
+      <video
+        ref={videoRef}
+        src={url}
+        muted={silenciado}
+        loop
+        playsInline
+        className="w-full rounded-2xl bg-black"
+        style={{ maxHeight: 360 }}
+      />
+      <button
+        type="button"
+        onClick={() => setSilenciado((v) => !v)}
+        aria-label={silenciado ? 'Activar sonido' : 'Silenciar'}
+        className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm"
+      >
+        <IconoAltavoz silenciado={silenciado} />
+      </button>
+    </div>
+  )
+}
+
 interface ColageMediaProps {
   fotoUrls: string[]
   videoUrl?: string | null
@@ -112,7 +164,7 @@ function ColageMedia({ fotoUrls, videoUrl, titulo, onAbrir }: ColageMediaProps) 
     if (!conVideo) return null
     return (
       <div className="overflow-hidden rounded-xl">
-        <ReproductorVideo url={videoUrl as string} />
+        <VideoEnLineaAutoplay url={videoUrl as string} />
       </div>
     )
   }
@@ -181,9 +233,13 @@ interface TarjetaPublicacionCulturalProps {
   publicacion: PublicacionCultural
   onAbrir: (publicacion: PublicacionCultural, indice: number) => void
   onDenunciar: (publicacionId: number) => void
+  /** Fuerza la tarjeta clásica (texto siempre visible arriba, media abajo)
+   *  aunque haya comercio+video — usado por /vitrina para que se pueda leer
+   *  todo sin necesidad de reproducir el video primero. */
+  forzarClasica?: boolean
 }
 
-export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDenunciar }: TarjetaPublicacionCulturalProps) {
+export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDenunciar, forzarClasica }: TarjetaPublicacionCulturalProps) {
   const { autenticado } = useAuth()
   const router = useRouter()
   const { muted, toggleMuted } = useVitrinaAudio()
@@ -401,7 +457,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
   // Cuadro inmersivo (formato Reels/TikTok): solo para publicaciones de la
   // Vitrina de video que traen un video propio — las de fotos siguen usando
   // el collage clásico de abajo, y "Comparte tu Territorio" no cambia.
-  if (comercio && publicacion.videoUrl) {
+  if (!forzarClasica && comercio && publicacion.videoUrl) {
     const directo = esVideoDirecto(publicacion.videoUrl)
     return (
       <article className="relative mx-auto h-full md:aspect-[9/16] md:max-h-[720px] w-full overflow-hidden md:rounded-2xl bg-black shadow-lg">
@@ -701,21 +757,20 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
   }
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-[#1A1A1A]/8 bg-white shadow-sm">
+    <article className="overflow-hidden rounded-3xl border border-[#1A1A1A]/8 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
       <div className="flex items-start justify-between gap-2 p-4">
         <div className="flex min-w-0 items-center gap-3">
           {comercio?.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={comercio.logoUrl} alt={comercio.nombre} className="h-10 w-10 flex-shrink-0 rounded-full object-cover" />
+            <img src={comercio.logoUrl} alt={comercio.nombre} className="h-12 w-12 flex-shrink-0 rounded-full object-cover ring-2 ring-[#D4A017]/25" />
           ) : (
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#1B4332] text-sm font-bold text-white">
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#1B4332] text-base font-bold text-white ring-2 ring-[#D4A017]/25">
               {inicial}
             </div>
           )}
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <p className="truncate text-sm font-semibold text-[#1A1A1A]">
-                {comercio && <span className="mr-1" aria-hidden="true">🏪</span>}
                 {!comercio && publicacion.autor ? (
                   <Link href={`/persona/${publicacion.autor.id}`} className="hover:underline">
                     {nombreMostrado}
@@ -724,6 +779,13 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
                   nombreMostrado
                 )}
               </p>
+              {comercio?.verificado && (
+                <span title="Comercio verificado" className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-[#2D6A4F]">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5">
+                    <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+              )}
               {(comercio || publicacion.autor) && (
                 <button
                   type="button"
@@ -795,7 +857,8 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
           type="button"
           onClick={manejarLike}
           aria-pressed={meGusta}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition hover:bg-[#F8F5F0] ${
+          aria-label="Me gusta"
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition hover:bg-[#F8F5F0] ${
             meGusta ? 'text-[#C0392B]' : 'text-[#1A1A1A]/65'
           }`}
         >
@@ -809,7 +872,19 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
           >
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Me gusta{totalLikes > 0 ? ` · ${totalLikes}` : ''}
+          {totalLikes > 0 && totalLikes}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setComentariosAbierto(true)}
+          aria-label="Comentarios"
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-[#1A1A1A]/65 transition hover:bg-[#F8F5F0]"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {totalComentarios > 0 && totalComentarios}
         </button>
 
         {comercio && (
@@ -817,7 +892,8 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
             type="button"
             onClick={manejarGuardar}
             aria-pressed={esFavorito}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition hover:bg-[#F8F5F0] ${
+            aria-label="Guardar"
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition hover:bg-[#F8F5F0] ${
               esFavorito ? 'text-[#D4A017]' : 'text-[#1A1A1A]/65'
             }`}
           >
@@ -831,7 +907,6 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
             >
               <path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2v16z" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            {esFavorito ? 'Guardado' : 'Guardar'}
           </button>
         )}
 
@@ -840,12 +915,13 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
             type="button"
             onClick={() => setCompartirAbierto((v) => !v)}
             aria-expanded={compartirAbierto}
-            className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#1A1A1A]/65 transition hover:bg-[#F8F5F0]"
+            aria-label="Compartir"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-[#1A1A1A]/65 transition hover:bg-[#F8F5F0]"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Compartir
+            {totalCompartidos > 0 && totalCompartidos}
           </button>
 
           </div>
@@ -877,9 +953,18 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
         </div>
       )}
 
-      <ModalCompartir 
-        abierto={compartirAbierto} 
-        onClose={() => setCompartirAbierto(false)} 
+      {comentariosAbierto && (
+        <ModalComentarios
+          publicacionId={publicacion.id}
+          totalComentariosInit={totalComentarios}
+          onClose={() => setComentariosAbierto(false)}
+          onComentarioAgregado={() => setTotalComentarios((prev) => prev + 1)}
+        />
+      )}
+
+      <ModalCompartir
+        abierto={compartirAbierto}
+        onClose={() => setCompartirAbierto(false)}
         url={urlGaleria} 
         titulo={publicacion.titulo} 
         onCompartir={reportarCompartido} 
