@@ -844,38 +844,39 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
       </div>
 
       {(publicacion.fotoUrls.length > 0 || publicacion.videoUrl) && (
-        <div className="pb-3 sm:px-4">
+        <div className="relative pb-3 sm:px-4">
           <ColageMedia
             fotoUrls={publicacion.fotoUrls}
             videoUrl={publicacion.videoUrl}
             titulo={publicacion.titulo}
             onAbrir={(indice) => onAbrir(publicacion, indice)}
           />
-        </div>
-      )}
 
-      {publicacion.producto && (
-        <div className="px-4 pb-3">
-          <Link
-            href={publicacion.producto.esExpress ? `/express/${publicacion.producto.comercioId}` : `/producto/${publicacion.producto.id}`}
-            className="group flex items-center gap-3 rounded-2xl border border-[#1A1A1A]/10 bg-[#F8F5F0] p-2 pr-3 transition hover:border-[#2D6A4F]/30 hover:bg-[#EAF3DE]/60"
-          >
-            {publicacion.producto.fotoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={publicacion.producto.fotoUrl} alt={publicacion.producto.nombre} className="h-12 w-12 flex-shrink-0 rounded-xl object-cover" />
-            ) : (
-              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-[#1A1A1A]/5 text-xl">📦</div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-[#1A1A1A]">{publicacion.producto.nombre}</p>
-              <p className="text-sm font-black text-[#2D6A4F]">
-                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(Number(publicacion.producto.precio))}
-              </p>
-            </div>
-            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#2D6A4F]/10 text-[#2D6A4F] transition-colors group-hover:bg-[#2D6A4F]/20">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </div>
-          </Link>
+          {publicacion.producto && (
+            <Link
+              href={publicacion.producto.esExpress ? `/express/${publicacion.producto.comercioId}` : `/producto/${publicacion.producto.id}`}
+              className="group absolute bottom-3 left-3 z-10 flex max-w-[85%] items-center gap-2.5 rounded-2xl border border-white/10 bg-[#161616]/95 p-1.5 pr-3 shadow-2xl backdrop-blur-md transition hover:bg-[#1f1f1f]"
+            >
+              {publicacion.producto.fotoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={publicacion.producto.fotoUrl} alt={publicacion.producto.nombre} className="h-11 w-11 flex-shrink-0 rounded-xl object-cover" />
+              ) : (
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg">📦</div>
+              )}
+              <div className="min-w-0">
+                {publicacion.esAnuncio && (
+                  <p className="text-[9px] font-bold tracking-widest text-[#52B788] uppercase">DESTACADO</p>
+                )}
+                <p className="truncate text-sm font-bold text-white leading-tight">{publicacion.producto.nombre}</p>
+                <p className="text-[13px] font-black text-[#D4A017] leading-tight">
+                  {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(Number(publicacion.producto.precio))}
+                </p>
+              </div>
+              <div className="ml-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#52B788]/10 text-[#52B788] transition-colors group-hover:bg-[#52B788]/20">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </div>
+            </Link>
+          )}
         </div>
       )}
 
