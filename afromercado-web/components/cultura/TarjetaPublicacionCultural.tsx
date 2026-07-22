@@ -696,7 +696,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
             </Link>
           )}
 
-          <p className="pr-14 font-serif text-base font-semibold text-white pointer-events-auto" style={{ textShadow: '0px 1px 3px rgba(0,0,0,0.8)' }}>{publicacion.titulo}</p>
+          <p className="pr-14 font-serif text-lg text-white pointer-events-auto" style={{ textShadow: '0px 1px 3px rgba(0,0,0,0.8)' }}>{publicacion.titulo}</p>
           {publicacion.descripcion && (
             <p className="mt-1 line-clamp-2 pr-14 text-sm text-white/95 pointer-events-auto" style={{ textShadow: '0px 1px 3px rgba(0,0,0,0.8)' }}>{publicacion.descripcion}</p>
           )}
@@ -835,7 +835,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
       </div>
 
       <div className="px-4 pb-3">
-        <p className="font-serif text-base font-semibold text-[#1A1A1A]">{publicacion.titulo}</p>
+        <p className="font-serif text-lg text-[#1A1A1A]">{publicacion.titulo}</p>
         {publicacion.descripcion && (
           <p className="mt-1 whitespace-pre-line text-sm text-[#1A1A1A]/75">{publicacion.descripcion}</p>
         )}
