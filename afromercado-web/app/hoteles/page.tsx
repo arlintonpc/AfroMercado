@@ -51,10 +51,11 @@ function SkeletonCard() {
 }
 
 function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat: number | null; userLon: number | null }) {
-  const desde = hotel.habitaciones.length > 0
-    ? Math.min(...hotel.habitaciones.map(h => Number(h.precioPorNoche)))
+  const habitaciones = hotel.habitaciones || []
+  const desde = habitaciones.length > 0
+    ? Math.min(...habitaciones.map(h => Number(h.precioPorNoche)))
     : null
-  const tiposDistintos = new Set(hotel.habitaciones.map(h => h.tipoAlojamiento ?? 'HABITACION'))
+  const tiposDistintos = new Set(habitaciones.map(h => h.tipoAlojamiento ?? 'HABITACION'))
   const tipoUnico = tiposDistintos.size === 1 ? [...tiposDistintos][0] as TipoAlojamiento : null
   const badgeTipo = tipoUnico && tipoUnico !== 'HABITACION'
     ? TIPOS_ALOJAMIENTO.find(t => t.value === tipoUnico)
@@ -62,7 +63,7 @@ function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat
   const dist = userLat && userLon && hotel.comercio.latitud && hotel.comercio.longitud
     ? distanciaKm(userLat, userLon, hotel.comercio.latitud, hotel.comercio.longitud)
     : null
-  const foto = hotel.habitaciones.find(h => h.fotos.length > 0)?.fotos[0] ?? null
+  const foto = habitaciones.find(h => h.fotos && h.fotos.length > 0)?.fotos[0] ?? null
   const rating = Number(hotel.comercio.calificacion)
   const reviews = Number(hotel.comercio.totalReviews)
   const inicial = hotel.comercio.nombre.charAt(0).toUpperCase()
@@ -90,7 +91,7 @@ function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat
         {badgeTipo && (
           <span className="bg-white/10 backdrop-blur-md text-white text-[9px] sm:text-[10px] font-bold px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border border-white/20 shadow-sm">{badgeTipo.icono} {badgeTipo.label}</span>
         )}
-        {hotel.habitaciones.length === 1 && (
+        {habitaciones.length === 1 && (
           <span className="bg-red-500/90 backdrop-blur-sm text-white text-[9px] sm:text-[10px] font-bold px-2 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-sm">🔥 Última unidad</span>
         )}
       </div>
@@ -136,9 +137,9 @@ function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat
               <span className="text-[9px] sm:text-[11px] text-white/50 font-medium">Sin reseñas</span>
             )}
           </div>
-          {hotel.servicios.length > 0 && (
+          {(hotel.servicios || []).length > 0 && (
             <div className="flex gap-1 sm:gap-1.5 flex-shrink-0">
-              {hotel.servicios.slice(0, 3).map(s => (
+              {(hotel.servicios || []).slice(0, 3).map(s => (
                 <span key={s} className="text-[10px] sm:text-xs bg-white/10 backdrop-blur-md w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border border-white/10 shadow-sm" title={s}>{SERVICIOS_ICONOS[s] ?? '✓'}</span>
               ))}
             </div>
