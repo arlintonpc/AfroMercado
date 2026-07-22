@@ -121,8 +121,12 @@ export function NotificacionProvider({ children }: { children: React.ReactNode }
       idsNoLeidasRef.current = new Set()
     }
 
-    const url = `${API_URL}/notificaciones/stream?token=${encodeURIComponent(token)}`
-    const esActual = new EventSource(url)
+    // withCredentials: EventSource no manda cookies cross-origin por defecto.
+    // La sesión ya no vive en un JWT accesible desde JS (cookie httpOnly desde
+    // la migración a cookies) — sin esto, /notificaciones/stream siempre
+    // respondía 401 y el navegador reintentaba en un loop silencioso.
+    const url = `${API_URL}/notificaciones/stream`
+    const esActual = new EventSource(url, { withCredentials: true })
     esRef.current = esActual
 
     esActual.addEventListener('notificacion', (e) => {

@@ -7,7 +7,6 @@ import { crearReviewExpress, subirFotoReviewExpress } from '@/lib/api/review'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
-import { obtenerToken } from '@/lib/api/client'
 import ModalReportarProblema from '@/components/disputas/ModalReportarProblema'
 import EstrellaRating from '@/components/ui/EstrellaRating'
 import { Toast, useToast } from '@/components/ui/Toast'
@@ -390,12 +389,12 @@ export default function MisPedidosExpressPage() {
     cargar()
   }, [autenticado, cargandoAuth, router])
 
+  // withCredentials porque la sesión vive en cookie httpOnly, EventSource no
+  // la manda sola en peticiones cross-origin.
   useEffect(() => {
     if (!autenticado) return
-    const token = obtenerToken()
-    if (!token) return
     const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
-    const es = new EventSource(`${API}/notificaciones/stream?token=${encodeURIComponent(token)}`)
+    const es = new EventSource(`${API}/notificaciones/stream`, { withCredentials: true })
     sseRef.current = es
     es.addEventListener('notificacion', (e) => {
       try {

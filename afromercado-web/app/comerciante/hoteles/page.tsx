@@ -18,7 +18,6 @@ import {
   TIPOS_ALOJAMIENTO, TIPOS_ALOJAMIENTO_UNIDAD_UNICA,
 } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
-import { obtenerToken } from '@/lib/api/client'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import type { VideoMetaCaptura, VideoEstado } from '@/components/comerciante/api'
 import { Switch } from '@/components/ui'
@@ -947,12 +946,11 @@ export default function ComercianteHotelesPage() {
     }
   }, [cfg, formFisica.habitacionTipoId])
 
-  // SSE para nuevas reservas
+  // SSE para nuevas reservas — withCredentials porque la sesión vive en
+  // cookie httpOnly, EventSource no la manda sola en peticiones cross-origin.
   useEffect(() => {
-    const token = obtenerToken()
-    if (!token) return
     const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
-    const es = new EventSource(`${API}/notificaciones/stream?token=${encodeURIComponent(token)}`)
+    const es = new EventSource(`${API}/notificaciones/stream`, { withCredentials: true })
     es.addEventListener('notificacion', (e) => {
       try {
         const notif = JSON.parse((e as MessageEvent).data)

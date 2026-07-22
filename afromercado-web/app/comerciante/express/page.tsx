@@ -14,7 +14,6 @@ import {
   type MenuSeccion, type MenuComercioExpress, type CuponExpress, type EstadisticasExpress,
 } from '@/lib/api/express'
 import { formatearPrecio } from '@/lib/formatearPrecio'
-import { obtenerToken } from '@/lib/api/client'
 import { obtenerMiComercio, crearProducto, actualizarProducto, subirImagenesProducto, quitarImagenProducto, fotoPrincipalProducto } from '@/components/comerciante/api'
 import { Switch } from '@/components/ui'
 import { MUNICIPIOS_POR_DEPARTAMENTO } from '@/components/comerciante/constantes'
@@ -366,12 +365,12 @@ export default function ExpressComerciante() {
     return () => clearInterval(interval)
   }, [cargar])
 
-  // SSE: recarga inmediata cuando llega notificación de nuevo pedido
+  // SSE: recarga inmediata cuando llega notificación de nuevo pedido —
+  // withCredentials porque la sesión vive en cookie httpOnly, EventSource
+  // no la manda sola en peticiones cross-origin.
   useEffect(() => {
-    const token = obtenerToken()
-    if (!token) return
     const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
-    const es = new EventSource(`${API}/notificaciones/stream?token=${encodeURIComponent(token)}`)
+    const es = new EventSource(`${API}/notificaciones/stream`, { withCredentials: true })
     es.addEventListener('notificacion', (e) => {
       try {
         const notif = JSON.parse((e as MessageEvent).data)
