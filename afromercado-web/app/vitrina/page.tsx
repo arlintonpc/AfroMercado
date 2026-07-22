@@ -281,7 +281,7 @@ export default function VitrinaPage() {
           />
         ) : (
           <div className="flex flex-col gap-4">
-            <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
+            <div className="-mx-4 flex w-auto flex-col gap-0 sm:mx-auto sm:w-full sm:max-w-xl sm:gap-4">
               {publicaciones.map((p: any) =>
                 p.esBannerDisplay ? (
                   <BannerDisplay key={p.id} banner={p} />

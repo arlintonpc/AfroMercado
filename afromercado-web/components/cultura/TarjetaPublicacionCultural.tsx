@@ -757,7 +757,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
   }
 
   return (
-    <article className="overflow-hidden rounded-3xl border border-[#1A1A1A]/8 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+    <article className="overflow-hidden border-y border-[#1A1A1A]/8 bg-white transition-all duration-200 sm:rounded-3xl sm:border-x sm:shadow-sm sm:hover:-translate-y-0.5 sm:hover:shadow-md">
       <div className="flex items-start justify-between gap-2 p-4">
         <div className="flex min-w-0 items-center gap-3">
           {comercio?.logoUrl ? (
@@ -842,7 +842,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
       </div>
 
       {(publicacion.fotoUrls.length > 0 || publicacion.videoUrl) && (
-        <div className="px-4 pb-3">
+        <div className="pb-3 sm:px-4">
           <ColageMedia
             fotoUrls={publicacion.fotoUrls}
             videoUrl={publicacion.videoUrl}
