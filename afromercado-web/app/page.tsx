@@ -125,8 +125,9 @@ function SeccionHoteles({ hoteles }: { hoteles: ConfigHotel[] }) {
         <div className="relative">
           <div className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
             {hoteles.slice(0, 6).map(h => {
-              const desde = h.habitaciones.length > 0 ? Math.min(...h.habitaciones.map(hab => Number(hab.precioPorNoche))) : null
-              const foto = h.habitaciones[0]?.fotos[0]
+              const habs = h.habitaciones || []
+              const desde = habs.length > 0 ? Math.min(...habs.map(hab => Number(hab.precioPorNoche))) : null
+              const foto = habs[0]?.fotos[0]
               return (
                 <Link key={h.id} href={`/hoteles/${h.id}`} className="snap-start flex-shrink-0 w-64 sm:w-72 group block rounded-3xl overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 bg-white border border-gray-100 shadow-sm relative h-80">
                   {/* Foto full */}
