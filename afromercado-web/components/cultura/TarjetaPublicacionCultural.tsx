@@ -854,6 +854,31 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
         </div>
       )}
 
+      {publicacion.producto && (
+        <div className="px-4 pb-3">
+          <Link
+            href={publicacion.producto.esExpress ? `/express/${publicacion.producto.comercioId}` : `/producto/${publicacion.producto.id}`}
+            className="group flex items-center gap-3 rounded-2xl border border-[#1A1A1A]/10 bg-[#F8F5F0] p-2 pr-3 transition hover:border-[#2D6A4F]/30 hover:bg-[#EAF3DE]/60"
+          >
+            {publicacion.producto.fotoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={publicacion.producto.fotoUrl} alt={publicacion.producto.nombre} className="h-12 w-12 flex-shrink-0 rounded-xl object-cover" />
+            ) : (
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-[#1A1A1A]/5 text-xl">📦</div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-[#1A1A1A]">{publicacion.producto.nombre}</p>
+              <p className="text-sm font-black text-[#2D6A4F]">
+                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(Number(publicacion.producto.precio))}
+              </p>
+            </div>
+            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#2D6A4F]/10 text-[#2D6A4F] transition-colors group-hover:bg-[#2D6A4F]/20">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </div>
+          </Link>
+        </div>
+      )}
+
       <div className="flex items-center gap-1 border-t border-[#1A1A1A]/8 px-2 py-1.5">
         <button
           type="button"
