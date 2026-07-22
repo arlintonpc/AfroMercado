@@ -242,9 +242,12 @@ interface TarjetaPublicacionCulturalProps {
 }
 
 export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDenunciar, forzarClasica }: TarjetaPublicacionCulturalProps) {
-  const { autenticado } = useAuth()
+  const { autenticado, usuario } = useAuth()
   const router = useRouter()
   const { muted, toggleMuted } = useVitrinaAudio()
+  // usuario.id llega como number en runtime pese a estar tipado como string
+  // (inconsistencia preexistente en types/usuario.ts) — comparar como string.
+  const esPropiaPublicacion = !!usuario && String(usuario.id) === String(publicacion.autor?.id ?? '')
 
   // Publicaciones de la Vitrina de video (comerciantes) traen `comercio`; las
   // de "Comparte tu Territorio" (vecinos) nunca lo traen — este único campo
@@ -743,6 +746,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
           <ModalComentarios
             publicacionId={publicacion.id}
             totalComentariosInit={totalComentarios}
+            esPropiaPublicacion={esPropiaPublicacion}
             onClose={() => setComentariosAbierto(false)}
             onComentarioAgregado={() => setTotalComentarios(prev => prev + 1)}
           />
@@ -985,6 +989,7 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
         <ModalComentarios
           publicacionId={publicacion.id}
           totalComentariosInit={totalComentarios}
+          esPropiaPublicacion={esPropiaPublicacion}
           onClose={() => setComentariosAbierto(false)}
           onComentarioAgregado={() => setTotalComentarios((prev) => prev + 1)}
         />

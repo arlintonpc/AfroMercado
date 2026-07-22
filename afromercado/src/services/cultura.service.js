@@ -1010,41 +1010,106 @@ const CulturaService = {
     return { ok: true };
   },
 
+  // Comentarios en hilos: solo un nivel de anidación (como Facebook/Instagram
+  // clásico, no hilos infinitos) — se listan los comentarios raíz (fijados
+  // primero, luego más recientes) y se les adjuntan sus respuestas en una
+  // segunda consulta batched, sin N+1.
   async listarComentarios(publicacionId, { page = 1, limit = 20 } = {}) {
     const offset = (Math.max(1, Number(page)) - 1) * Number(limit);
-    const where = { publicacionCulturalId: publicacionId };
-    
+    const where = { publicacionCulturalId: publicacionId, respuestaAId: null };
+
     const [items, total] = await Promise.all([
       prisma.comentarioPublicacionCultural.findMany({
         where,
         take: Number(limit),
         skip: offset,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ fijado: "desc" }, { createdAt: "desc" }],
         include: { usuario: { select: { id: true, nombre: true, avatarUrl: true } } },
       }),
-      prisma.comentarioPublicacionCultural.count({ where }),
+      prisma.comentarioPublicacionCultural.count({ where: { publicacionCulturalId: publicacionId } }),
     ]);
-    
-    return { items, total, pagina: Number(page) };
+
+    const raizIds = items.map((c) => c.id);
+    const respuestas = raizIds.length
+      ? await prisma.comentarioPublicacionCultural.findMany({
+          where: { respuestaAId: { in: raizIds } },
+          orderBy: { createdAt: "asc" },
+          include: { usuario: { select: { id: true, nombre: true, avatarUrl: true } } },
+        })
+      : [];
+
+    const respuestasPorPadre = new Map();
+    for (const r of respuestas) {
+      if (!respuestasPorPadre.has(r.respuestaAId)) respuestasPorPadre.set(r.respuestaAId, []);
+      respuestasPorPadre.get(r.respuestaAId).push(r);
+    }
+
+    const itemsConRespuestas = items.map((c) => ({ ...c, respuestas: respuestasPorPadre.get(c.id) ?? [] }));
+
+    return { items: itemsConRespuestas, total, pagina: Number(page) };
   },
 
-  async crearComentario(usuarioId, publicacionId, { texto }) {
+  async crearComentario(usuarioId, publicacionId, { texto, respuestaAId }) {
     const textoValidado = textoLimpio(texto, 1000);
     if (!textoValidado) throw new ErrorValidacion("El comentario no puede estar vacío");
-    
+
     const publicacion = await CulturaRepository.buscarPublicacionPorId(publicacionId);
     if (!publicacion || !publicacion.activa) throw new ErrorNoEncontrado("Publicación no encontrada");
-    
+
+    let respuestaAIdFinal = null;
+    if (respuestaAId) {
+      const padre = await prisma.comentarioPublicacionCultural.findUnique({
+        where: { id: Number(respuestaAId) },
+        select: { id: true, publicacionCulturalId: true, respuestaAId: true },
+      });
+      if (!padre || padre.publicacionCulturalId !== publicacionId) {
+        throw new ErrorValidacion("El comentario al que respondes no existe.");
+      }
+      // Si responden a una respuesta, se aplana al comentario raíz (mismo
+      // límite de un nivel de anidación que usan Facebook/Instagram).
+      respuestaAIdFinal = padre.respuestaAId ?? padre.id;
+    }
+
     const comentario = await prisma.comentarioPublicacionCultural.create({
       data: {
         publicacionCulturalId: publicacionId,
         usuarioId,
         texto: textoValidado,
+        respuestaAId: respuestaAIdFinal,
       },
       include: { usuario: { select: { id: true, nombre: true, avatarUrl: true } } },
     });
-    
+
     return comentario;
+  },
+
+  // Fijar/desfijar un comentario — solo quien publicó la publicación puede
+  // hacerlo (autorId, igual sea publicación personal o de vitrina de un
+  // comercio, ya que crearPublicacion siempre guarda al usuario que publicó).
+  async toggleFijarComentario(usuarioId, publicacionId, comentarioId) {
+    const publicacion = await CulturaRepository.buscarPublicacionPorId(publicacionId);
+    if (!publicacion) throw new ErrorNoEncontrado("Publicación no encontrada");
+    if (publicacion.autorId !== usuarioId) {
+      throw new ErrorProhibido("Solo quien publicó puede fijar comentarios.");
+    }
+
+    const comentario = await prisma.comentarioPublicacionCultural.findUnique({
+      where: { id: comentarioId },
+      select: { id: true, publicacionCulturalId: true, fijado: true, respuestaAId: true },
+    });
+    if (!comentario || comentario.publicacionCulturalId !== publicacionId) {
+      throw new ErrorNoEncontrado("Comentario no encontrado");
+    }
+    if (comentario.respuestaAId) {
+      throw new ErrorValidacion("Solo se pueden fijar comentarios de primer nivel.");
+    }
+
+    const actualizado = await prisma.comentarioPublicacionCultural.update({
+      where: { id: comentarioId },
+      data: { fijado: !comentario.fijado },
+    });
+
+    return { fijado: actualizado.fijado };
   },
 
   // ── FAVORITOS CULTURA ───────────────────────────────────────────

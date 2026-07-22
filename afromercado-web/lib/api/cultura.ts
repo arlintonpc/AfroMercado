@@ -507,8 +507,12 @@ export interface ComentarioPublicacionCultural {
   publicacionCulturalId: number
   usuarioId: number
   texto: string
+  respuestaAId?: number | null
+  fijado?: boolean
   createdAt: string
   usuario?: { id: number; nombre: string; avatarUrl?: string | null }
+  /** Solo poblado en los comentarios raíz que devuelve listarComentarios. */
+  respuestas?: ComentarioPublicacionCultural[]
 }
 
 export async function registrarCompartidoPublicacion(id: number) {
@@ -525,9 +529,16 @@ export async function listarComentariosPublicacion(id: number, params?: { page?:
   ).then((r) => r.data)
 }
 
-export async function crearComentarioPublicacion(id: number, texto: string) {
+export async function crearComentarioPublicacion(id: number, texto: string, respuestaAId?: number) {
   return apiFetch<{ ok: boolean; data: ComentarioPublicacionCultural }>(`/cultura/publicaciones/${id}/comentarios`, {
     method: "POST",
-    body: { texto },
+    body: respuestaAId ? { texto, respuestaAId } : { texto },
   }).then((r) => r.data)
+}
+
+export async function toggleFijarComentario(publicacionId: number, comentarioId: number) {
+  return apiFetch<{ ok: boolean; fijado: boolean }>(`/cultura/publicaciones/${publicacionId}/comentarios/${comentarioId}/fijar`, {
+    method: "POST",
+    body: {},
+  })
 }

@@ -2795,10 +2795,15 @@ model ComentarioPublicacionCultural {
   publicacionCulturalId Int
   usuarioId             Int
   texto                 String
+  respuestaAId          Int?
+  fijado                Boolean  @default(false)
   createdAt             DateTime @default(now())
 
-  publicacion           PublicacionCultural @relation(fields: [publicacionCulturalId], references: [id], onDelete: Cascade)
-  usuario               Usuario             @relation(fields: [usuarioId], references: [id])
+  publicacion           PublicacionCultural             @relation(fields: [publicacionCulturalId], references: [id], onDelete: Cascade)
+  usuario               Usuario                         @relation(fields: [usuarioId], references: [id])
+  respuestaA            ComentarioPublicacionCultural?  @relation("RespuestasComentario", fields: [respuestaAId], references: [id], onDelete: Cascade)
+  respuestas            ComentarioPublicacionCultural[] @relation("RespuestasComentario")
 
   @@index([publicacionCulturalId, createdAt])
+  @@index([respuestaAId])
 }

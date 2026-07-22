@@ -1718,6 +1718,16 @@ async function aplicarMigraciones() {
           FOREIGN KEY ("seguidoId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
       END IF;
     END $$`,
+    // ── Comentarios en hilos (respuestas + fijar) — Vitrina red social ──
+    `ALTER TABLE "ComentarioPublicacionCultural" ADD COLUMN IF NOT EXISTS "respuestaAId" INTEGER`,
+    `ALTER TABLE "ComentarioPublicacionCultural" ADD COLUMN IF NOT EXISTS "fijado" BOOLEAN NOT NULL DEFAULT false`,
+    `CREATE INDEX IF NOT EXISTS "ComentarioPublicacionCultural_respuestaAId_idx" ON "ComentarioPublicacionCultural"("respuestaAId")`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'ComentarioPublicacionCultural_respuestaAId_fkey') THEN
+        ALTER TABLE "ComentarioPublicacionCultural" ADD CONSTRAINT "ComentarioPublicacionCultural_respuestaAId_fkey"
+          FOREIGN KEY ("respuestaAId") REFERENCES "ComentarioPublicacionCultural"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$`,
   ];
   for (const sql of migraciones) {
     try {

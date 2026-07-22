@@ -219,6 +219,13 @@ const CulturaController = {
     } catch (e) { next(e); }
   },
 
+  async toggleFijarComentario(req, res, next) {
+    try {
+      const data = await CulturaService.toggleFijarComentario(req.usuario.id, Number(req.params.id), Number(req.params.comentarioId));
+      res.json({ ok: true, ...data });
+    } catch (e) { next(e); }
+  },
+
   // ── Favoritos Cultura ──
   async toggleFavorito(req, res, next) {
     try {

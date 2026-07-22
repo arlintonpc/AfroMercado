@@ -216,6 +216,7 @@ router.post("/publicaciones/:id/vista",           autenticarOpcional, CulturaCon
 router.post("/publicaciones/:id/compartir",       autenticarOpcional, CulturaController.registrarCompartido);
 router.get("/publicaciones/:id/comentarios",      autenticarOpcional, CulturaController.listarComentarios);
 router.post("/publicaciones/:id/comentarios",     ...soloAuth, comentarioLimiter, CulturaController.crearComentario);
+router.post("/publicaciones/:id/comentarios/:comentarioId/fijar", ...soloAuth, CulturaController.toggleFijarComentario);
 
 // ── VITRINA DE VIDEO (v0) — publicaciones de comercio ──────────
 // Antes de "/:id" para evitar ambigüedad de rutas.
