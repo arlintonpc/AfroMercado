@@ -814,10 +814,8 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
                   type="button"
                   onClick={manejarSeguir}
                   disabled={enVueloSeguir}
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide transition-all ${
-                    siguiendo
-                      ? 'bg-[#1A1A1A]/10 text-[#1A1A1A]/70 border border-[#1A1A1A]/20'
-                      : 'bg-[#2D6A4F] text-white hover:bg-[#245a42]'
+                  className={`px-1 py-0.5 text-xs font-bold transition-all hover:underline ${
+                    siguiendo ? 'text-gray-500' : 'text-[#2D6A4F]'
                   }`}
                   style={{ minHeight: 'auto' }}
                 >
@@ -857,8 +855,8 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
         </div>
       </div>
 
-      <div className="px-4 pb-3">
-        <p className="font-serif text-lg text-[#1A1A1A]">{publicacion.titulo}</p>
+      <div className="px-4 pb-4">
+        <p className="text-[15px] font-semibold text-[#1A1A1A]">{publicacion.titulo}</p>
         {publicacion.descripcion && (
           <p className="mt-1 whitespace-pre-line text-sm text-[#1A1A1A]/75">{publicacion.descripcion}</p>
         )}
@@ -901,99 +899,100 @@ export default function TarjetaPublicacionCultural({ publicacion, onAbrir, onDen
         </div>
       )}
 
-      <div className="flex items-center gap-1 border-t border-[#1A1A1A]/8 px-2 py-1.5">
-        <button
-          type="button"
-          onClick={manejarLike}
-          aria-pressed={meGusta}
-          aria-label="Me gusta"
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition hover:bg-[#F8F5F0] ${
-            meGusta ? 'text-[#C0392B]' : 'text-[#1A1A1A]/65'
-          }`}
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill={meGusta ? '#C0392B' : 'none'}
-            stroke={meGusta ? '#C0392B' : 'currentColor'}
-            strokeWidth="2"
-          >
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          {totalLikes > 0 && totalLikes}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setComentariosAbierto(true)}
-          aria-label="Comentarios"
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-[#1A1A1A]/65 transition hover:bg-[#F8F5F0]"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          {totalComentarios > 0 && totalComentarios}
-        </button>
-
-        {comercio && (
+      <div className="flex items-center justify-between border-t border-[#1A1A1A]/8 px-4 py-3">
+        <div className="flex items-center gap-6">
           <button
             type="button"
-            onClick={manejarGuardar}
-            aria-pressed={esFavorito}
-            aria-label="Guardar"
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition hover:bg-[#F8F5F0] ${
-              esFavorito ? 'text-[#D4A017]' : 'text-[#1A1A1A]/65'
+            onClick={manejarLike}
+            aria-pressed={meGusta}
+            aria-label="Me gusta"
+            className={`flex items-center gap-1.5 text-sm font-semibold transition hover:opacity-70 ${
+              meGusta ? 'text-[#C0392B]' : 'text-[#1A1A1A]/70'
             }`}
           >
             <svg
-              width="18"
-              height="18"
+              width="22"
+              height="22"
               viewBox="0 0 24 24"
-              fill={esFavorito ? '#D4A017' : 'none'}
-              stroke={esFavorito ? '#D4A017' : 'currentColor'}
-              strokeWidth="2"
+              fill={meGusta ? '#C0392B' : 'none'}
+              stroke={meGusta ? '#C0392B' : 'currentColor'}
+              strokeWidth="2.2"
             >
-              <path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2v16z" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
+            <span className="mt-0.5">{totalLikes > 0 ? totalLikes : ''}</span>
           </button>
-        )}
 
-        <div ref={compartirRef} className="relative flex-1">
           <button
             type="button"
-            onClick={() => setCompartirAbierto((v) => !v)}
-            aria-expanded={compartirAbierto}
-            aria-label="Compartir"
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-[#1A1A1A]/65 transition hover:bg-[#F8F5F0]"
+            onClick={() => setComentariosAbierto(true)}
+            aria-label="Comentarios"
+            className="flex items-center gap-1.5 text-sm font-semibold text-[#1A1A1A]/70 transition hover:opacity-70"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round" />
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            {totalCompartidos > 0 && totalCompartidos}
+            <span className="mt-0.5">{totalComentarios > 0 ? totalComentarios : ''}</span>
           </button>
+        </div>
 
+        <div className="flex items-center gap-4">
+          {comercio && (
+            <button
+              type="button"
+              onClick={manejarGuardar}
+              aria-pressed={esFavorito}
+              aria-label="Guardar"
+              className={`transition hover:opacity-70 ${
+                esFavorito ? 'text-[#D4A017]' : 'text-[#1A1A1A]/70'
+              }`}
+            >
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill={esFavorito ? '#D4A017' : 'none'}
+                stroke={esFavorito ? '#D4A017' : 'currentColor'}
+                strokeWidth="2.2"
+              >
+                <path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2v16z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
+
+          <div ref={compartirRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setCompartirAbierto((v) => !v)}
+              aria-expanded={compartirAbierto}
+              aria-label="Compartir"
+              className="text-[#1A1A1A]/70 transition hover:opacity-70"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
           </div>
+        </div>
       </div>
 
-      {/* Botón de acción dinámico — solo en tarjetas de la Vitrina de video (comercio). */}
       {comercio && (comercio.comprableEnPlataforma !== false || enlaceWaComercio) && (
         <div className="border-t border-[#1A1A1A]/8 px-4 py-3">
           {comercio.comprableEnPlataforma !== false ? (
             <Link
               href={`/comercio/${comercio.id}`}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2D6A4F] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#245a42]"
+              className="flex w-full items-center justify-center rounded-xl border-2 border-[#2D6A4F]/15 bg-[#2D6A4F]/5 px-4 py-2 text-[15px] font-bold text-[#2D6A4F] transition-all hover:bg-[#2D6A4F]/10 hover:border-[#2D6A4F]/25"
             >
-              Ver comercio
+              Ver perfil comercial
             </Link>
           ) : (
             <a
               href={enlaceWaComercio as string}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1ebe5a]"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[#25D366]/20 bg-[#25D366]/5 px-4 py-2 text-[15px] font-bold text-[#1F9D4D] transition-all hover:bg-[#25D366]/10 hover:border-[#25D366]/30"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.32 4.96L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm0 18.15h-.01c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 01-1.26-4.38c0-4.54 3.7-8.24 8.26-8.24 2.2 0 4.27.86 5.83 2.42a8.18 8.18 0 012.42 5.83c0 4.55-3.7 8.23-8.25 8.23z" />
               </svg>
               Contactar por WhatsApp
