@@ -982,7 +982,7 @@ function MenuExpressContent() {
                 </h2>
               ) : null
             })()}
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               {productosFiltrados.map(p => {
                 const sec = secciones.find(s => s.id === tabActiva)
                 const Tarjeta = sec?.vistaCompacta ? TarjetaProductoCompacta : TarjetaProducto
@@ -998,7 +998,7 @@ function MenuExpressContent() {
                 <h2 className="font-bold text-[#1A1A1A] text-base mb-3 pb-1 border-b border-[#E8DCC8]">
                   {seccion.icono} {seccion.nombre}
                 </h2>
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   {prods.map(p => {
                     const Tarjeta = seccion.vistaCompacta ? TarjetaProductoCompacta : TarjetaProducto
                     return <Tarjeta key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} cerrado={!menu.abiertoAhora} />
@@ -1009,7 +1009,7 @@ function MenuExpressContent() {
             {sinSeccion.length > 0 && (
               <section>
                 <h2 className="font-bold text-[#1A1A1A] text-base mb-3 pb-1 border-b border-[#E8DCC8]">Otros</h2>
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   {sinSeccion.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} cerrado={!menu.abiertoAhora} />)}
                 </div>
               </section>
@@ -1027,7 +1027,7 @@ function MenuExpressContent() {
             return Object.entries(porCategoria).map(([cat, prods]) => (
               <section key={cat}>
                 <h2 className="font-bold text-[#1A1A1A] text-base mb-3 pb-1 border-b border-[#E8DCC8]">{cat}</h2>
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   {prods.map(p => <TarjetaProducto key={p.id} p={p} cantidadItem={cantidadItem} agregar={agregar} quitar={quitar} cerrado={!menu.abiertoAhora} />)}
                 </div>
               </section>
