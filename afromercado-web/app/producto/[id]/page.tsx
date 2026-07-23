@@ -373,7 +373,7 @@ export default function PaginaProducto({
         </div>
 
         {/* CONTENIDO PRINCIPAL: imagen + info */}
-        <div className="max-w-6xl mx-auto w-full px-4 md:px-6 py-4">
+        <div className="max-w-7xl mx-auto w-full px-4 md:px-6 py-4">
           <div className="md:grid md:grid-cols-2 md:gap-10 lg:gap-16">
 
             {/* ——— GALERÍA ——— */}
@@ -412,7 +412,7 @@ export default function PaginaProducto({
               {/* 2. Nombre + favorito */}
               <div className="flex items-start gap-3">
                 <h1
-                  className="flex-1 text-3xl md:text-4xl text-[#1A1A1A] leading-tight"
+                  className="flex-1 text-3xl md:text-[2.75rem] text-[#1B4332] leading-[1.1] tracking-tight font-medium"
                   style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
                 >
                   {producto.nombre}
@@ -421,7 +421,7 @@ export default function PaginaProducto({
                   <button
                     onClick={() => toggleFav(Number(producto.id))}
                     aria-label={esFavorito(Number(producto.id)) ? 'Quitar de favoritos' : 'Guardar en favoritos'}
-                    className="mt-1 w-11 h-11 flex items-center justify-center rounded-xl border border-[#1A1A1A]/15 bg-white hover:border-[#2D6A4F] transition-colors shrink-0"
+                    className="mt-1 w-12 h-12 flex items-center justify-center rounded-[1rem] border border-[#1A1A1A]/10 bg-white shadow-sm hover:shadow-md hover:border-[#1B4332]/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all shrink-0"
                   >
                     <svg viewBox="0 0 24 24" className="w-5 h-5" fill={esFavorito(Number(producto.id)) ? '#2D6A4F' : 'none'} stroke={esFavorito(Number(producto.id)) ? '#2D6A4F' : '#1A1A1A'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -457,12 +457,12 @@ export default function PaginaProducto({
                     <p className="mt-2 text-sm text-[#1A1A1A]/40 line-through">
                       {formatearPrecio(producto.precio)}
                     </p>
-                    <p className="text-4xl font-bold text-[#2D6A4F]">{formatearPrecio(precioActual)}</p>
+                    <p className="text-[2.5rem] font-bold text-[#1B4332] leading-none tracking-tight">{formatearPrecio(precioActual)}</p>
                   </>
                 ) : (
-                  <p className="text-4xl font-bold text-[#1A1A1A]">{formatearPrecio(producto.precio)}</p>
+                  <p className="text-[2.5rem] font-bold text-[#1B4332] leading-none tracking-tight">{formatearPrecio(producto.precio)}</p>
                 )}
-                <p className="text-sm text-[#1A1A1A]/40 mt-0.5">por {producto.unidad}</p>
+                <p className="text-sm text-[#1A1A1A]/50 mt-1 font-medium">por {producto.unidad}</p>
               </div>
 
               {/* 5. Separador */}
@@ -471,24 +471,24 @@ export default function PaginaProducto({
               {/* 6. Selector cantidad */}
               <div className="flex items-center gap-4">
                 <span className="text-sm font-medium text-[#1A1A1A]/70">Cantidad</span>
-                <div className="flex items-center gap-0">
+                <div className="flex items-center bg-[#F8F5F0] rounded-2xl p-1 border border-[#1A1A1A]/5 shadow-inner">
                   <button
                     onClick={decrementar}
                     disabled={cantidad <= 1}
-                    className="w-10 h-10 rounded-l-xl border border-[#1A1A1A]/15 bg-white flex items-center justify-center text-[#1A1A1A] disabled:opacity-30 hover:bg-[#F8F5F0] transition-colors"
+                    className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-[#1A1A1A] disabled:opacity-30 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all"
                     aria-label="Reducir cantidad"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <path d="M5 12h14" />
                     </svg>
                   </button>
-                  <span className="w-12 h-10 border-t border-b border-[#1A1A1A]/15 bg-white flex items-center justify-center font-semibold text-[#1A1A1A]">
+                  <span className="w-14 h-10 flex items-center justify-center font-bold text-lg text-[#1A1A1A]">
                     {cantidad}
                   </span>
                   <button
                     onClick={incrementar}
                     disabled={cantidad >= disponible}
-                    className="w-10 h-10 rounded-r-xl border border-[#1A1A1A]/15 bg-white flex items-center justify-center text-[#1A1A1A] disabled:opacity-30 hover:bg-[#F8F5F0] transition-colors"
+                    className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-[#1A1A1A] disabled:opacity-30 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all"
                     aria-label="Aumentar cantidad"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -511,7 +511,7 @@ export default function PaginaProducto({
                   {expressAbierto ? (
                     <Link
                       href={`/express/${producto.comercioId}`}
-                      className="w-full min-h-[56px] font-bold text-base rounded-2xl bg-[#D4A017] hover:bg-[#c09315] text-[#1A1A1A] hover:shadow-lg hover:shadow-[#D4A017]/30 transition-all duration-200 flex items-center justify-center gap-2"
+                      className="w-full min-h-[56px] font-bold text-[1.05rem] rounded-[1.25rem] bg-[#D4A017] hover:bg-[#c09315] text-[#1A1A1A] shadow-lg shadow-[#D4A017]/30 hover:shadow-xl hover:shadow-[#D4A017]/40 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2"
                     >
                       ⚡ Pedir ahora
                       {producto.tiempoEntregaMin && (
@@ -528,7 +528,7 @@ export default function PaginaProducto({
                   ) : (
                     <Link
                       href={`/express/${producto.comercioId}`}
-                      className="w-full min-h-[56px] font-bold text-base rounded-2xl bg-[#D4A017] hover:bg-[#c09315] text-[#1A1A1A] hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+                      className="w-full min-h-[56px] font-bold text-[1.05rem] rounded-[1.25rem] bg-[#D4A017] hover:bg-[#c09315] text-[#1A1A1A] shadow-lg shadow-[#D4A017]/30 hover:shadow-xl hover:shadow-[#D4A017]/40 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2"
                     >
                       ⚡ Ver menú Express
                     </Link>
@@ -540,7 +540,7 @@ export default function PaginaProducto({
                     href={enlaceWa}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full min-h-[56px] font-bold text-base rounded-2xl bg-[#25D366] hover:bg-[#1ebe5a] text-white transition-colors duration-200 flex items-center justify-center gap-2"
+                    className="w-full min-h-[56px] font-bold text-[1.05rem] rounded-[1.25rem] bg-[#25D366] hover:bg-[#1ebe5a] text-white shadow-lg shadow-[#25D366]/30 hover:shadow-xl hover:shadow-[#25D366]/40 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2"
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
@@ -557,11 +557,11 @@ export default function PaginaProducto({
                   onClick={handleAgregar}
                   disabled={agregando || disponible <= 0}
                   aria-busy={agregando}
-                  className={`w-full min-h-[56px] font-bold text-base rounded-2xl transition-all duration-200 flex items-center justify-center gap-2 ${
+                  className={`w-full min-h-[56px] font-bold text-[1.05rem] rounded-[1.25rem] transition-all duration-200 flex items-center justify-center gap-2 ${
                     agregado
-                      ? 'bg-[#2D6A4F] text-white'
-                      : 'bg-[#D4A017] hover:bg-[#c09315] text-[#1A1A1A] hover:shadow-lg hover:shadow-[#D4A017]/30'
-                  } disabled:opacity-60 disabled:cursor-not-allowed`}
+                      ? 'bg-[#1B4332] text-white shadow-lg shadow-[#1B4332]/30'
+                      : 'bg-[#D4A017] hover:bg-[#c09315] text-[#1A1A1A] shadow-lg shadow-[#D4A017]/30 hover:shadow-xl hover:shadow-[#D4A017]/40 hover:-translate-y-0.5 active:translate-y-0 active:scale-95'
+                  } disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:active:scale-100 disabled:hover:shadow-none`}
                 >
                   {agregado ? (
                     <>
@@ -643,8 +643,8 @@ export default function PaginaProducto({
         )}
 
         {/* ——— SECCIÓN "EL PRODUCTOR" ——— */}
-        <section className="max-w-6xl mx-auto w-full px-4 md:px-6 py-6">
-          <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 flex flex-col gap-4">
+        <section className="max-w-7xl mx-auto w-full px-4 md:px-6 py-6">
+          <div className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-[#1A1A1A]/5 shadow-2xl shadow-[#1B4332]/5 p-8 flex flex-col gap-6">
 
             {/* Encabezado sección */}
             <h2 className="text-lg font-bold text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
@@ -770,8 +770,8 @@ export default function PaginaProducto({
         </section>
 
         {/* ——— MÁS DE ESTA TIENDA ——— */}
-        {(cargandoTienda || masDeTienda.length > 0) && producto.comercioId && (
-          <section className="max-w-6xl mx-auto w-full px-4 md:px-6 py-4">
+        {masDeTienda.length > 0 && (
+          <section className="max-w-7xl mx-auto w-full px-4 md:px-6 py-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
                 Más de {producto.comercio.nombre}
@@ -803,8 +803,8 @@ export default function PaginaProducto({
         )}
 
         {/* ——— DETALLES DEL PRODUCTO (Acordeón) ——— */}
-        <section className="max-w-6xl mx-auto w-full px-4 md:px-6 py-2">
-          <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 px-6">
+        <section className="max-w-7xl mx-auto w-full px-4 md:px-6 py-2">
+          <div className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-[#1A1A1A]/5 shadow-2xl shadow-[#1B4332]/5 px-8 py-2">
 
             <Acordeon titulo="Descripción">
               {producto.descripcion
