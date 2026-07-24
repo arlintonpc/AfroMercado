@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import Header from '@/components/layout/Header'
@@ -11,8 +11,7 @@ import FiltrosHorizontales from '@/components/catalogo/FiltrosHorizontales'
 import TarjetaProducto from '@/components/catalogo/TarjetaProducto'
 import BannerDisplay from '@/components/publicidad/BannerDisplay'
 import { SkeletonCard, EmptyState } from '@/components/ui'
-import { listarProductos, listarCategorias } from '@/lib/api/productos'
-import { API_URL, apiFetch } from '@/lib/api/client'
+import { apiFetch } from '@/lib/api/client'
 import { useAuth } from '@/context/AuthContext'
 import { useRegion } from '@/context/RegionContext'
 import { mapearProductos, type ProductoCrudo } from '@/lib/mapearProducto'
@@ -20,11 +19,12 @@ import { formatearPrecio } from '@/lib/formatearPrecio'
 import { precioVigente } from '@/lib/precioProducto'
 import { registrarEventoPatrocinado } from '@/lib/publicidadTracking'
 import { optimizarImagenPequena } from '@/lib/cloudinary'
-import { listarHoteles, type ConfigHotel } from '@/lib/api/hotel'
-import { listarTours, type ConfigTour } from '@/lib/api/tour'
-import { listarTransportes, type ConfigTransporte } from '@/lib/api/transporte'
+import { useInicioQuery } from '@/hooks/useInicioQuery'
+import { useProductosHomeQuery } from '@/hooks/useProductosHomeQuery'
 import type { Producto } from '@/types/producto'
-import type { Categoria } from '@/types/categoria'
+import type { ConfigHotel } from '@/lib/api/hotel'
+import type { ConfigTour } from '@/lib/api/tour'
+import type { ConfigTransporte } from '@/lib/api/transporte'
 
 /* ─── Utilidad: tiempo restante hasta fin de oferta ─── */
 function tiempoRestante(fin: string): string {
@@ -49,61 +49,6 @@ const CATEGORIAS = [
   { emoji: '🛥️', nombre: 'Transporte', slug: '', fondo: 'bg-[#E8F0FF]', texto: 'text-[#023E8A]', proximamente: false, href: '/transportes' },
   { emoji: '💼', nombre: 'Empleo', slug: '', fondo: 'bg-[#EAF6F6]', texto: 'text-[#0F6B72]', proximamente: false, href: '/empleo' },
 ]
-
-interface VisibilidadActiva {
-  tipo?: 'HOME_DESTACADO' | 'CATALOGO' | string
-  etiqueta?: string | null
-  producto?: ProductoCrudo | null
-}
-
-const PRODUCTOS_POR_PAGINA = 24
-
-function visibilidadConProducto(
-  v: VisibilidadActiva,
-): v is VisibilidadActiva & { producto: ProductoCrudo } {
-  return Boolean(v.producto)
-}
-
-interface VisibilidadesInicio {
-  home: Producto[]
-  homeEtiquetas: Map<string, string>
-  catalogoEtiquetas: Map<string, string>
-}
-
-async function obtenerVisibilidadesInicio(departamento?: string | null): Promise<VisibilidadesInicio> {
-  const qs = departamento ? `?departamento=${encodeURIComponent(departamento)}` : ''
-  const r = await fetch(`${API_URL}/productos/destacados${qs}`)
-  if (!r.ok) throw new Error('No se pudieron cargar los productos destacados.')
-
-  const j = await r.json()
-  const visibilidades: VisibilidadActiva[] = Array.isArray(j.items) ? j.items : []
-  const homeVisibilidades = visibilidades.filter(
-    (v): v is VisibilidadActiva & { producto: ProductoCrudo } => (
-      v.tipo === 'HOME_DESTACADO' && visibilidadConProducto(v)
-    ),
-  )
-  const catalogoVisibilidades = visibilidades.filter(
-    (v): v is VisibilidadActiva & { producto: ProductoCrudo } => (
-      v.tipo === 'CATALOGO' && visibilidadConProducto(v)
-    ),
-  )
-
-  return {
-    home: mapearProductos(homeVisibilidades.map(v => v.producto)),
-    homeEtiquetas: new Map(
-      homeVisibilidades.map(v => [
-        String(v.producto.id),
-        v.etiqueta?.trim() || 'Patrocinado',
-      ] as [string, string]),
-    ),
-    catalogoEtiquetas: new Map(
-      catalogoVisibilidades.map(v => [
-        String(v.producto.id),
-        v.etiqueta?.trim() || 'Patrocinado',
-      ] as [string, string]),
-    ),
-  }
-}
 
 /* ─── Componente SeccionHoteles ──────────────────────────────────── */
 function SeccionHoteles({ hoteles }: { hoteles: ConfigHotel[] }) {
@@ -538,105 +483,38 @@ export default function Home() {
   const { regionActiva, elegirRegion } = useRegion()
   const [filtroActivo, setFiltroActivo] = useState<string>('todos')
   const [recomendados, setRecomendados] = useState<Producto[]>([])
-  const [cargando, setCargando] = useState<boolean>(true)
-  const [error, setError] = useState<string | null>(null)
-  const [productos, setProductos] = useState<Producto[]>([])
-  const [categorias, setCategorias] = useState<Categoria[]>([])
-  const [destacados, setDestacados] = useState<Producto[]>([])
-  const [destHome, setDestHome] = useState<Producto[]>([])
-  const [destHomeEtiquetas, setDestHomeEtiquetas] = useState<Map<string, string>>(new Map())
+  const { data: inicioData } = useInicioQuery(regionActiva)
+  const {
+    productos,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: cargando,
+    isError,
+    error,
+    fetchNextPage,
+    refetch,
+  } = useProductosHomeQuery({
+    departamento: regionActiva,
+    categoriaId: filtroActivo,
+  })
+
+  const categorias = inicioData?.categorias ?? []
+  const hoteles = inicioData?.hoteles ?? []
+  const tours = inicioData?.tours ?? []
+  const transportes = inicioData?.transportes ?? []
+  const destacados = inicioData?.destHome?.length
+    ? inicioData.destHome
+    : productos.filter((p) => Boolean(p.fotoUrl)).slice(0, 8)
+  const destHome = inicioData?.destHome ?? []
+  const destHomeEtiquetas = useMemo(
+    () => inicioData?.destHomeEtiquetas ?? new Map<string, string>(),
+    [inicioData?.destHomeEtiquetas],
+  )
   // Map: productoId (string) -> etiqueta del sello publicitario.
-  const [destCatalogo, setDestCatalogo] = useState<Map<string, string>>(new Map())
-  const [hoteles, setHoteles] = useState<ConfigHotel[]>([])
-  const [tours, setTours] = useState<ConfigTour[]>([])
-  const [transportes, setTransportes] = useState<ConfigTransporte[]>([])
-  const [paginaActual, setPaginaActual] = useState(1)
-  const [hayMas, setHayMas] = useState(false)
-  const [cargandoMas, setCargandoMas] = useState(false)
-
-  /** Carga productos según el filtro de categoría activo, respetando la región activa. */
-  const cargarProductos = useCallback(async (filtro: string) => {
-    setCargando(true)
-    setError(null)
-    setPaginaActual(1)
-    try {
-      const categoriaId = filtro === 'todos' ? undefined : filtro
-      const resultado = await listarProductos({ categoriaId, departamento: regionActiva ?? undefined, porPagina: PRODUCTOS_POR_PAGINA, pagina: 1 })
-      setProductos(mapearProductos(resultado.items))
-      setHayMas(resultado.pagina < resultado.paginas)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudieron cargar los productos.')
-      setProductos([])
-      setHayMas(false)
-    } finally {
-      setCargando(false)
-    }
-  }, [regionActiva])
-
-  // Carga inicial: el catálogo no espera a los bloques secundarios.
-  // Se repite cuando cambia la región activa (el usuario elige otra región o "todo el país").
-  useEffect(() => {
-    let cancelado = false
-    const departamento = regionActiva ?? undefined
-
-    setCargando(true)
-    setError(null)
-
-    listarProductos({ departamento, porPagina: PRODUCTOS_POR_PAGINA, pagina: 1 })
-      .then((resultado) => {
-        if (!cancelado) {
-          const productosMapeados = mapearProductos(resultado.items)
-          setProductos(productosMapeados)
-          setDestacados(productosMapeados)
-          setHayMas(resultado.pagina < resultado.paginas)
-        }
-      })
-      .catch((e) => {
-        if (!cancelado) {
-          setError(e instanceof Error ? e.message : 'No se pudieron cargar los productos.')
-          setProductos([])
-          setDestacados([])
-          setHayMas(false)
-        }
-      })
-      .finally(() => { if (!cancelado) setCargando(false) })
-
-    listarCategorias()
-      .then(cats => { if (!cancelado) setCategorias(cats) })
-      .catch(() => { if (!cancelado) setCategorias([]) })
-
-    listarHoteles({ departamento })
-      .then(hotelesData => { if (!cancelado) setHoteles(hotelesData) })
-      .catch(() => { if (!cancelado) setHoteles([]) })
-
-    listarTours({ departamento })
-      .then(toursData => { if (!cancelado) setTours(toursData) })
-      .catch(() => { if (!cancelado) setTours([]) })
-
-    listarTransportes({ departamento })
-      .then(transportesData => { if (!cancelado) setTransportes(transportesData) })
-      .catch(() => { if (!cancelado) setTransportes([]) })
-
-    obtenerVisibilidadesInicio(departamento)
-      .then((visibilidades) => {
-        if (!cancelado) {
-          setDestHome(visibilidades.home)
-          setDestHomeEtiquetas(visibilidades.homeEtiquetas)
-          setDestCatalogo(visibilidades.catalogoEtiquetas)
-        }
-      })
-      .catch(() => {
-        if (!cancelado) {
-          setDestHome([])
-          setDestHomeEtiquetas(new Map())
-          setDestCatalogo(new Map())
-        }
-      })
-
-    return () => {
-      cancelado = true
-    }
-  }, [regionActiva])
+  const destCatalogo = useMemo(
+    () => inicioData?.destCatalogo ?? new Map<string, string>(),
+    [inicioData?.destCatalogo],
+  )
 
   // Recomendaciones personalizadas (solo usuarios autenticados)
   useEffect(() => {
@@ -651,23 +529,10 @@ export default function Home() {
 
   function handleFiltroChange(filtro: string) {
     setFiltroActivo(filtro)
-    cargarProductos(filtro)
   }
 
-  async function cargarMas() {
-    setCargandoMas(true)
-    try {
-      const nuevaPagina = paginaActual + 1
-      const categoriaId = filtroActivo === 'todos' ? undefined : filtroActivo
-      const resultado = await listarProductos({ categoriaId, departamento: regionActiva ?? undefined, porPagina: PRODUCTOS_POR_PAGINA, pagina: nuevaPagina })
-      setProductos(prev => [...prev, ...mapearProductos(resultado.items)])
-      setPaginaActual(nuevaPagina)
-      setHayMas(resultado.pagina < resultado.paginas)
-    } catch {
-      // no bloquea si falla
-    } finally {
-      setCargandoMas(false)
-    }
+  const reintentarCarga = () => {
+    refetch().catch(() => {})
   }
 
   return (
@@ -798,11 +663,11 @@ export default function Home() {
           />
 
           {/* Estado: error */}
-          {error && !cargando && (
+          {isError && !cargando && (
             <EmptyState
               titulo="No pudimos cargar los productos"
-              descripcion={error}
-              onReintentar={() => cargarProductos(filtroActivo)}
+              descripcion={error instanceof Error ? error.message : 'No se pudieron cargar los productos.'}
+              onReintentar={reintentarCarga}
             />
           )}
 
@@ -816,16 +681,16 @@ export default function Home() {
           )}
 
           {/* Estado: vacío */}
-          {!cargando && !error && productos.length === 0 && (
+          {!cargando && !isError && productos.length === 0 && (
             <EmptyState
               titulo="Aún no hay productos"
               descripcion="Pronto encontrarás aquí los productos de todo el país. Vuelve a intentarlo en un momento."
-              onReintentar={() => cargarProductos(filtroActivo)}
+              onReintentar={reintentarCarga}
             />
           )}
 
           {/* Grid — destacados intercalados: 1 pagado cada 4 orgánicos */}
-          {!cargando && !error && productos.length > 0 && (
+          {!cargando && !isError && productos.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {(() => {
                 const MAX_PATROCINADOS_PCT = 0.15
@@ -851,14 +716,14 @@ export default function Home() {
           )}
 
           {/* Botón cargar más */}
-          {!cargando && !error && hayMas && (
+          {!cargando && !isError && hasNextPage && (
             <div className="flex justify-center mt-8">
               <button
-                onClick={cargarMas}
-                disabled={cargandoMas}
+                onClick={() => fetchNextPage().catch(() => {})}
+                disabled={isFetchingNextPage}
                 className="px-8 py-3 bg-[#2D6A4F] text-white font-semibold rounded-2xl hover:bg-[#1B4332] disabled:opacity-50 transition-colors"
               >
-                {cargandoMas ? 'Cargando…' : 'Ver más productos'}
+                {isFetchingNextPage ? 'Cargando…' : 'Ver más productos'}
               </button>
             </div>
           )}

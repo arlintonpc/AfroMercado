@@ -368,14 +368,18 @@ const CulturaService = {
   async actualizarMiPublicacion(usuarioId, id, datos) {
     const comercio = await prisma.comercio.findUnique({ where: { usuarioId } });
     if (!comercio) throw new ErrorValidacion("No tienes un comercio asociado");
-    
-    // Solo permitimos editar campos básicos (titulo, descripcion, moduloOrigen, productoId, activa)
+
     const data = limpiarUndefined({
-      titulo: textoLimpio(datos.titulo, 160),
-      descripcion: textoLimpio(datos.descripcion, 6000),
+      titulo: datos.titulo !== undefined ? textoLimpio(datos.titulo, 160) : undefined,
+      descripcion: datos.descripcion !== undefined ? textoLimpio(datos.descripcion, 6000) : undefined,
       moduloOrigen: datos.moduloOrigen && MODULOS_ORIGEN_VITRINA_VALIDOS.includes(datos.moduloOrigen) ? datos.moduloOrigen : undefined,
       productoId: numeroONull(datos.productoId),
       activa: boolOpcional(datos.activa),
+      fotoUrls: Array.isArray(datos.fotoUrls) ? datos.fotoUrls : undefined,
+      videoUrl: datos.videoUrl ? String(datos.videoUrl).trim() : undefined,
+      videoPosterUrl: datos.videoPosterUrl ? String(datos.videoPosterUrl).trim() : undefined,
+      departamento: datos.departamento ? textoLimpio(datos.departamento, 100) : undefined,
+      municipio: datos.municipio ? textoLimpio(datos.municipio, 100) : undefined,
     });
 
     try {
