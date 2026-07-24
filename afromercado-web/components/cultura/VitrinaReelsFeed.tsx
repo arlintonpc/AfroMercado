@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { PublicacionCultural } from '@/lib/api/cultura'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import { detectar } from '@/components/comerciante/ReproductorVideo'
 
 export interface VitrinaReelsFeedProps {
   publicaciones: PublicacionCultural[]
@@ -108,15 +109,41 @@ export default function VitrinaReelsFeed({
               key={pub.id}
               className="h-screen w-full snap-start relative flex items-center justify-center bg-black overflow-hidden"
             >
-              {/* Video Player */}
-              <video
-                src={pub.videoUrl!}
-                className="w-full h-full object-cover"
-                autoPlay={esActivo}
-                loop
-                muted
-                playsInline
-              />
+              {/* Video Player — video directo (Cloudinary/mp4) reproduce inline;
+                  links de YouTube/Facebook/Instagram/TikTok/Vimeo necesitan
+                  iframe embed, un <video src> no puede reproducirlos. */}
+              {(() => {
+                const { plataforma, embedUrl } = detectar(pub.videoUrl!)
+                if (plataforma === 'directo') {
+                  return (
+                    <video
+                      src={pub.videoUrl!}
+                      className="w-full h-full object-cover"
+                      autoPlay={esActivo}
+                      loop
+                      muted
+                      playsInline
+                    />
+                  )
+                }
+                if (embedUrl) {
+                  return (
+                    <iframe
+                      src={esActivo ? embedUrl : undefined}
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      frameBorder="0"
+                      title={pub.titulo}
+                    />
+                  )
+                }
+                return (
+                  <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+                    <span className="text-white/40 text-sm font-medium">Video no disponible para reproducir aquí</span>
+                  </div>
+                )
+              })()}
 
               {/* Gradient Overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/40 pointer-events-none" />
