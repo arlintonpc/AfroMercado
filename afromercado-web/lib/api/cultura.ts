@@ -247,6 +247,7 @@ export interface PublicacionCultural {
   totalLikes: number
   totalComentarios?: number
   totalCompartidos?: number
+  totalGuardados?: number
   meGusta: boolean
   /** Solo presente para publicaciones consultadas con sesión iniciada. */
   esFavorito?: boolean
@@ -311,6 +312,7 @@ export function normalizarPublicacionCultural(publicacion: PublicacionCultural):
     totalLikes: publicacion.totalLikes ?? 0,
     totalComentarios: publicacion.totalComentarios ?? 0,
     totalCompartidos: publicacion.totalCompartidos ?? 0,
+    totalGuardados: publicacion.totalGuardados ?? 0,
     totalVistas: publicacion.totalVistas ?? 0,
     meGusta: publicacion.meGusta ?? false,
     esFavorito: publicacion.esFavorito ?? false,

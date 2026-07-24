@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { obtenerVitrina, type PublicacionCultural } from '@/lib/api/cultura'
@@ -24,6 +24,12 @@ interface ItemLightbox {
   indiceInicial?: number
 }
 
+interface ItemVitrina extends PublicacionCultural {
+  esBannerDisplay?: boolean
+  subtitulo?: string | null
+  mediaUrl?: string | null
+}
+
 type PestañaVitrina = 'EXPLORAR' | 'SIGUIENDO' | 'GUARDADOS'
 
 export default function VitrinaPage() {
@@ -37,7 +43,7 @@ export default function VitrinaPage() {
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
 
-  const [publicaciones, setPublicaciones] = useState<PublicacionCultural[]>([])
+  const [publicaciones, setPublicaciones] = useState<ItemVitrina[]>([])
   const [total, setTotal] = useState(0)
   const [pagina, setPagina] = useState(1)
   const [cargando, setCargando] = useState(true)
@@ -49,6 +55,7 @@ export default function VitrinaPage() {
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null)
   const [reelsVideoInicialId, setReelsVideoInicialId] = useState<number | null>(null)
   const [modoReels, setModoReels] = useState(false)
+  const enlaceProcesado = useRef<string | null>(null)
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -74,6 +81,26 @@ export default function VitrinaPage() {
   useEffect(() => {
     cargar()
   }, [cargar])
+
+  // Los enlaces compartidos deben abrir exactamente la foto o el video elegido.
+  // Se conserva ?video= como compatibilidad con enlaces compartidos anteriormente.
+  useEffect(() => {
+    if (cargando) return
+    const parametros = new URLSearchParams(window.location.search)
+    const parametro = parametros.get('publicacion') ?? parametros.get('video')
+    if (!parametro || enlaceProcesado.current === parametro) return
+    const id = Number(parametro)
+    const publicacion = publicaciones.find((p) => p.id === id)
+    if (!publicacion) return
+
+    enlaceProcesado.current = parametro
+    if (publicacion.videoUrl) {
+      setReelsVideoInicialId(publicacion.id)
+      setModoReels(true)
+    } else {
+      setLightbox({ publicacion, indiceInicial: 0 })
+    }
+  }, [cargando, publicaciones])
 
   // Filtrado según la pestaña activa (Explorar, Siguiendo, Guardados)
   const publicacionesFiltradas = useMemo(() => {
@@ -337,9 +364,21 @@ export default function VitrinaPage() {
         ) : (
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-6 max-w-xl mx-auto w-full">
-              {publicacionesFiltradas.map((p: any) =>
+              {publicacionesFiltradas.map((p) =>
                 p.esBannerDisplay ? (
-                  <BannerDisplay key={p.id} banner={p} />
+                  <BannerDisplay
+                    key={p.id}
+                    banner={{
+                      id: String(p.id),
+                      esBannerDisplay: true,
+                      titulo: p.titulo,
+                      subtitulo: p.subtitulo,
+                      mediaUrl: p.mediaUrl,
+                      urlDestino: p.urlDestino,
+                      ctaTexto: p.ctaTexto,
+                      etiqueta: p.etiqueta,
+                    }}
+                  />
                 ) : (
                   <TerritoryPostCard
                     key={p.id}

@@ -1,19 +1,17 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
   toggleLikePublicacion,
   toggleFavoritoPublicacionCultural,
-  registrarVistaPublicacion,
   registrarCompartidoPublicacion,
   type PublicacionCultural,
 } from '@/lib/api/cultura'
 import ModalComentarios from './ModalComentarios'
 import { ModalCompartir } from './ModalCompartir'
-import InsigniasTerritoriales from '@/components/ui/InsigniasTerritoriales'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
 function fechaCorta(iso: string): string {
@@ -46,7 +44,6 @@ export default function TerritoryPostCard({
   const [likes, setLikes] = useState(publicacion.totalLikes ?? 0)
   const [meGusta, setMeGusta] = useState(publicacion.meGusta ?? false)
   const [esFavorito, setEsFavorito] = useState(publicacion.esFavorito ?? false)
-  const [siguiendo, setSiguiendo] = useState(publicacion.comercio?.siguiendo ?? false)
   const [textoExpandido, setTextoExpandido] = useState(false)
   const [modalComentarios, setModalComentarios] = useState(false)
   const [modalCompartir, setModalCompartir] = useState(false)
@@ -322,7 +319,7 @@ export default function TerritoryPostCard({
         <ModalCompartir
           abierto={modalCompartir}
           onClose={() => setModalCompartir(false)}
-          url={typeof window !== 'undefined' ? `${window.location.origin}/vitrina?video=${publicacion.id}` : ''}
+          url={typeof window !== 'undefined' ? `${window.location.origin}/vitrina?publicacion=${publicacion.id}` : ''}
           titulo={publicacion.titulo || publicacion.descripcion || 'Teravia'}
           onCompartir={() => registrarCompartidoPublicacion(publicacion.id)}
         />

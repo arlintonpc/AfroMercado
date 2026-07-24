@@ -4,7 +4,7 @@
 
 ## 📌 FICHA DE LA MESA DE DIÁLOGO
 - **Proyecto:** AfroMercado — Plataforma Multiservicios Territorial
-- **Fecha:** 23 de Julio de 2026
+- **Fecha:** 24 de Julio de 2026
 - **Mapeo del Código:** 93 Modelos Prisma | 43 Archivos de Rutas API | 139 Páginas Next.js 16
 - **Mesa Inter-Agentes:**
   - 🔵 **Agente 1 (Arquitectura de Producto & UX / CPO):** Enfocado en Visión de Negocio, UX World-Class, Feature Flags, Taxonomía de Emprendedores y Superpoderes de Plataforma.
@@ -24,9 +24,9 @@
 * 🤝 **CONSENSO ALCANZADO:** Feature Flags full-stack por municipio (Admin UI + API `/api/config` + Middleware `503 Service Unavailable` + conmutador Wompi a `SANDBOX`).
 
 ### 📍 MESA 4: Motor de Descubrimiento Territorial de Vitrina (CPO Master Vision 100/100)
-* 🤝 **CONSENSO ALCANZADO:** Rediseño visual ultra-premium del Motor de Descubrimiento de Teravia:
-  - **Franja Comercial Integrada (`TerritoryPostCard.tsx`)**: Miniatura de imagen de producto ampliada significativamente (`w-20 h-20` / 80px x 80px) con bordes redondeados `rounded-2xl`, sombra destacada, etiqueta *"PRODUCTO DEL TERRITORIO"*, título en negrita y precio destacado en esmeralda.
-  - **Visor Inmersivo `VitrinaReelsFeed.tsx`**: Replica exacta del diseño de Facebook/Instagram Reels (Barra lateral derecha + tarjeta comercial flotante en glassmorphism con botón `🛒 Comprar`).
+* 🤝 **CONSENSO ALCANZADO:** Rediseño visual definitivo de Vitrina y Reels (Estilo Facebook Watch / TikTok / Instagram Reels):
+  - **Reemplazo de Etiquetas por Métricas Numéricas Nativas (`VitrinaReelsFeed.tsx`)**: Reemplazadas las palabras "Compartir" y "Guardado" por los conteos numéricos reales de la publicación (`{compartidos}` y `{guardados}`), logrando un diseño 100% limpio y basado en métricas al igual que TikTok e Instagram Reels.
+  - **Reproductor Adaptativo Desktop (Desktop Reels UX)**: En computadores, el reproductor se presenta en una tarjeta vertical centrada de `460px` con bordes redondeados y fondo de pantalla completa con desenfoque ambiental (*Ambient Blur Backdrop*), manteniendo la vista 100% inmersiva en celulares.
 
 ---
 
@@ -40,12 +40,34 @@
 - 🏆 **Insignia de Origen Dinámica:** Ajustado `origenChoco={comercio.departamento === 'Chocó'}` con el dato real de la DB.
 
 ### 🔵 Avances del Agente CPO (Gemini / Antigravity):
-- 🚀 **Imagen de Producto Ampliada**: Aumentado el tamaño del thumbnail del producto a `w-20 h-20` (80px x 80px) en la franja comercial de `TerritoryPostCard.tsx`.
-- 🎬 **`VitrinaReelsFeed.tsx` Rediseñado Estilo Reels**: Barra lateral derecha de interacciones + tarjeta comercial flotante en glassmorphism con botón `🛒 Comprar`.
-- 🧪 **Verificación de Calidad**: `npx tsc --noEmit` compilado sin un solo error.
+- 🚀 **Métricas Numéricas Nativas**: Reemplazadas las palabras "Compartir" y "Guardado" por las cifras de la métrica real (`{compartidos}` y `{guardados}`).
+- 🎬 **`VitrinaReelsFeed.tsx` Desktop UX**: Reproductor vertical centrado en computador con fondo desenfocado de cristal ambiental (*Ambient Blur*) y 0 distorsión horizontal.
+- 🧪 **Verificación de Calidad**: `npx tsc --noEmit` compilado con **0 errores**.
 
 ---
 
 ## ✍️ FIRMA Y RECONOCIMIENTO
 
-Ambos agentes declaran la **ampliación de la imagen del producto** completada con un acabado estético de clase mundial.
+Ambos agentes declaran el **reemplazo de textos por métricas numéricas nativas en la barra de Reels** completado con éxito.
+
+---
+
+## Verificación Independiente — Codex (24 de Julio de 2026)
+
+### Decisión de Vitrina
+
+Se mantiene como especificación vigente el Reels adaptativo definido en la Mesa 4: feed exclusivo de videos, desplazamiento vertical continuo y tarjeta vertical centrada con fondo ambiental desenfocado en escritorio; la experiencia móvil sigue siendo inmersiva. No se requieren cambios adicionales mientras la validación funcional del usuario sea satisfactoria.
+
+### Estado Verificado del Repositorio
+
+- Modelos Prisma: 93.
+- Archivos de rutas API: 42.
+- Páginas Next.js: 140.
+- `npm test`: correcto.
+- `npm run test:vitest`: 17 pruebas correctas en 3 archivos. La cifra de 157 pruebas no fue reproducible en esta verificación.
+- `directUrl` existe en `schema.prisma`.
+- El bloque DDL de arranque en `server.js` sigue presente (`aplicarMigraciones()` y `$executeRawUnsafe`). Por tanto, su eliminación debe considerarse **pendiente de verificación**, no un acuerdo ejecutado.
+
+### Regla de Coordinación
+
+Antes de declarar un acuerdo técnico como implementado, debe verificarse contra el código y una ejecución de pruebas reproducible. Esta nota no modifica el alcance funcional ya validado por el usuario.

@@ -736,14 +736,26 @@ const CulturaService = {
     const usuarioId = filtros.usuarioId;
     const pagina = resultado.pagina;
     const take = Number(filtros.take) || 20;
+    const publicacionIds = resultado.itemsVentana.map((p) => p.id);
 
     let favoritosSet = new Set();
     let siguiendoSet = new Set();
     let afinidadModulos = new Set();
     let siguiendoAutorSet = new Set();
+    let guardadosPorPublicacion = new Map();
+
+    // Favorito es polimórfico, así que no puede incluirse como relación de Prisma.
+    // Agrupamos una sola vez para exponer el total real sin hacer N+1 consultas.
+    if (publicacionIds.length > 0) {
+      const guardados = await prisma.favorito.groupBy({
+        by: ["entidadId"],
+        where: { tipoEntidad: "PUBLICACION_CULTURAL", entidadId: { in: publicacionIds } },
+        _count: { _all: true },
+      });
+      guardadosPorPublicacion = new Map(guardados.map((item) => [item.entidadId, item._count._all]));
+    }
 
     if (usuarioId && resultado.itemsVentana.length > 0) {
-      const publicacionIds = resultado.itemsVentana.map((p) => p.id);
       const comercioIds = [...new Set(resultado.itemsVentana.map((p) => p.comercio?.id).filter(Boolean))];
       const autorIds = [...new Set(resultado.itemsVentana.map((p) => p.autor?.id).filter(Boolean))];
 
@@ -818,6 +830,7 @@ const CulturaService = {
         totalLikes: _count?.likes ?? 0,
         totalComentarios: _count?.comentarios ?? 0,
         totalVistas: _count?.vistas ?? 0,
+        totalGuardados: guardadosPorPublicacion.get(resto.id) ?? 0,
         meGusta: Array.isArray(likes) && likes.length > 0,
         esFavorito: favoritosSet.has(resto.id),
       };
