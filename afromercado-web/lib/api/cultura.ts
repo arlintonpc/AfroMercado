@@ -422,9 +422,11 @@ export async function subirVideoVitrina(
   const fd = new FormData()
   fd.append('video', file)
   if (recorte?.inicioSegundos !== undefined) {
+    fd.append('recorteInicioSegundos', String(recorte.inicioSegundos))
     fd.append('inicioSegundos', String(recorte.inicioSegundos))
   }
   if (recorte?.finSegundos !== undefined) {
+    fd.append('recorteFinSegundos', String(recorte.finSegundos))
     fd.append('finSegundos', String(recorte.finSegundos))
   }
   const r = await apiFetch<{ ok: boolean; url: string; posterUrl?: string; duracionSegundos?: number; publicId?: string }>(

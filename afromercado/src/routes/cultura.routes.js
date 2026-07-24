@@ -134,7 +134,7 @@ const _uploadVideoPublicacion = crearUploadVideo({
   dir: DIR_VIDEOS_PUBLICACIONES,
   prefijo: "publicacion-cultura-video",
   fieldName: "video",
-  maxFileSize: 45 * 1024 * 1024, // 45 MB — menor que los 100MB de Tour: video vertical corto no lo necesita
+  maxFileSize: 200 * 1024 * 1024, // 200 MB — permite subir videos mas largos (ej. 11-15 mins) para recortar fragmentos de 45s
 });
 function uploadVideoPublicacion(req, res, next) {
   _uploadVideoPublicacion(req, res, (err) => { if (err) return next(err); next(); });

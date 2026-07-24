@@ -77,14 +77,14 @@ function redondearSegundos(valor) {
 
 function extraerVideoMeta(body = {}) {
   return {
-    durationSeconds: aNumero(body.duracionSegundos),
-    width: aNumero(body.ancho),
-    height: aNumero(body.alto),
+    durationSeconds: aNumero(body.duracionSegundos ?? body.durationSeconds),
+    width: aNumero(body.ancho ?? body.width),
+    height: aNumero(body.alto ?? body.height),
     bytes: aNumero(body.bytes),
     mimeType: typeof body.mimeType === "string" ? body.mimeType.trim() || null : null,
     format: typeof body.formato === "string" ? body.formato.trim() || null : null,
-    trimStartSeconds: aNumero(body.recorteInicioSegundos),
-    trimEndSeconds: aNumero(body.recorteFinSegundos),
+    trimStartSeconds: aNumero(body.recorteInicioSegundos ?? body.inicioSegundos ?? body.startOffset ?? body.trimStartSeconds),
+    trimEndSeconds: aNumero(body.recorteFinSegundos ?? body.finSegundos ?? body.endOffset ?? body.trimEndSeconds),
   };
 }
 
