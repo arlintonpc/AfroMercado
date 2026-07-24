@@ -5,6 +5,7 @@ import { useState } from 'react'
 interface Props {
   url: string
   className?: string
+  autoPlay?: boolean
 }
 
 export type Plataforma = 'youtube' | 'facebook' | 'instagram' | 'tiktok' | 'vimeo' | 'directo'
@@ -79,14 +80,15 @@ function BotонPlay() {
   )
 }
 
-export default function ReproductorVideo({ url, className = '' }: Props) {
+export default function ReproductorVideo({ url, className = '', autoPlay = false }: Props) {
   const [activado, setActivado] = useState(false)
   const { plataforma, embedUrl, videoId, esVertical } = detectar(url)
 
   // Videos directos de Cloudinary u otros: usar <video> nativa, sin lazy loading necesario
   if (plataforma === 'directo') {
     return (
-      <video src={url} controls playsInline className={`w-full rounded-2xl bg-black ${className}`}
+      <video src={url} controls playsInline autoPlay={autoPlay} muted={autoPlay} loop={autoPlay}
+        className={`w-full rounded-2xl bg-black ${className}`}
         style={{ maxHeight: 360 }} />
     )
   }

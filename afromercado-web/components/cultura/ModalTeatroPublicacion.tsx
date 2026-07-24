@@ -130,22 +130,22 @@ export default function ModalTeatroPublicacion({ publicacion, indiceInicial = 0,
             <button onClick={() => setMostrarComentariosMovil(true)} className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-black/60 transition">
               <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
             </button>
-            <span className="text-white text-xs font-semibold drop-shadow-md">{publicacion.comentarios ?? 0}</span>
+            <span className="text-white text-xs font-semibold drop-shadow-md">{publicacion.totalComentarios ?? 0}</span>
           </div>
         </div>
-        
+
         {/* Info del autor en móvil */}
         <div className="absolute bottom-6 left-4 z-30 md:hidden max-w-[70%] drop-shadow-lg">
           <div className="flex items-center gap-2 mb-2">
-            {publicacion.autor?.comercio?.logoUrl ? (
+            {publicacion.comercio?.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={publicacion.autor.comercio.logoUrl} className="w-10 h-10 rounded-full border-2 border-white object-cover" alt="" />
+              <img src={publicacion.comercio.logoUrl} className="w-10 h-10 rounded-full border-2 border-white object-cover" alt="" />
             ) : (
               <div className="w-10 h-10 flex items-center justify-center rounded-full bg-[#1B4332] text-white border-2 border-white font-bold">
-                {publicacion.autor?.nombre?.charAt(0) || '?'}
+                {(publicacion.comercio?.nombre || publicacion.autor?.nombre)?.charAt(0) || '?'}
               </div>
             )}
-            <span className="text-white font-semibold">{publicacion.autor?.comercio?.nombre || publicacion.autor?.nombre}</span>
+            <span className="text-white font-semibold">{publicacion.comercio?.nombre || publicacion.autor?.nombre}</span>
           </div>
           <p className="text-white text-sm line-clamp-2">{publicacion.titulo}</p>
         </div>
@@ -165,17 +165,17 @@ export default function ModalTeatroPublicacion({ publicacion, indiceInicial = 0,
         {/* Cabecera Info */}
         <div className="flex items-start p-4 border-b">
           <div className="flex items-center gap-3">
-             {publicacion.autor?.comercio?.logoUrl ? (
+             {publicacion.comercio?.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={publicacion.autor.comercio.logoUrl} className="w-12 h-12 rounded-full border border-[#D4A017] object-cover" alt="" />
+              <img src={publicacion.comercio.logoUrl} className="w-12 h-12 rounded-full border border-[#D4A017] object-cover" alt="" />
             ) : (
               <div className="w-12 h-12 flex items-center justify-center rounded-full bg-[#1B4332] text-white font-bold text-lg">
-                {publicacion.autor?.nombre?.charAt(0) || '?'}
+                {(publicacion.comercio?.nombre || publicacion.autor?.nombre)?.charAt(0) || '?'}
               </div>
             )}
             <div>
-              <Link href={publicacion.autor?.comercio ? `/comercios/${publicacion.autor.comercio.id}` : '#'} className="font-bold text-gray-900 hover:underline">
-                {publicacion.autor?.comercio?.nombre || publicacion.autor?.nombre}
+              <Link href={publicacion.comercio ? `/comercio/${publicacion.comercio.id}` : '#'} className="font-bold text-gray-900 hover:underline">
+                {publicacion.comercio?.nombre || publicacion.autor?.nombre}
               </Link>
               {publicacion.esAnuncio && (
                 <div className="flex items-center gap-1 text-xs font-semibold text-[#D4A017] mt-0.5">
@@ -196,7 +196,7 @@ export default function ModalTeatroPublicacion({ publicacion, indiceInicial = 0,
         <div className="flex-1 overflow-hidden relative">
           <ModalComentarios 
             publicacionId={publicacion.id} 
-            totalComentariosInit={publicacion.comentarios}
+            totalComentariosInit={publicacion.totalComentarios}
             esPropiaPublicacion={esPropiaPublicacion}
             inline={true}
           />
@@ -208,7 +208,7 @@ export default function ModalTeatroPublicacion({ publicacion, indiceInicial = 0,
         <div className="md:hidden">
           <ModalComentarios 
             publicacionId={publicacion.id} 
-            totalComentariosInit={publicacion.comentarios}
+            totalComentariosInit={publicacion.totalComentarios}
             esPropiaPublicacion={esPropiaPublicacion}
             onClose={() => setMostrarComentariosMovil(false)}
             inline={false}
