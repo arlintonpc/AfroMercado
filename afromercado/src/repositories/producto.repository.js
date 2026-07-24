@@ -9,6 +9,7 @@ function includeProductoPublico(ahora = new Date()) {
         id: true,
         nombre: true,
         municipio: true,
+        departamento: true,
         descripcion: true,
         historia: true,
         whatsapp: true,

@@ -1,15 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import ModalDenunciarBase from '@/components/ui/ModalDenunciarBase'
 import { denunciarOferta, type MotivoDenunciaEmpleo, type DenunciaOfertaEmpleo } from '@/lib/api/empleo'
 
-const MOTIVOS: { valor: MotivoDenunciaEmpleo; etiqueta: string }[] = [
-  { valor: 'OFERTA_FALSA', etiqueta: 'Es una oferta falsa' },
-  { valor: 'EXPLOTACION_LABORAL', etiqueta: 'Parece explotación laboral' },
-  { valor: 'DISCRIMINATORIA', etiqueta: 'Es discriminatoria' },
-  { valor: 'ESTAFA_DINERO', etiqueta: 'Piden dinero o es una estafa' },
-  { valor: 'CONTENIDO_INAPROPIADO', etiqueta: 'Contenido inapropiado' },
-  { valor: 'OTRO', etiqueta: 'Otro motivo' },
+const MOTIVOS: { value: string; label: string }[] = [
+  { value: 'OFERTA_FALSA', label: 'Es una oferta falsa' },
+  { value: 'EXPLOTACION_LABORAL', label: 'Parece explotación laboral' },
+  { value: 'DISCRIMINATORIA', label: 'Es discriminatoria' },
+  { value: 'ESTAFA_DINERO', label: 'Piden dinero o es una estafa' },
+  { value: 'CONTENIDO_INAPROPIADO', label: 'Contenido inapropiado' },
+  { value: 'OTRO', label: 'Otro motivo' },
 ]
 
 interface ModalDenunciarOfertaProps {
@@ -23,122 +23,22 @@ export default function ModalDenunciarOferta({
   onCerrar,
   onExito,
 }: ModalDenunciarOfertaProps) {
-  const [motivo, setMotivo] = useState<MotivoDenunciaEmpleo | ''>('')
-  const [descripcion, setDescripcion] = useState('')
-  const [enviando, setEnviando] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [exito, setExito] = useState(false)
-
-  async function handleEnviar() {
-    if (!motivo) { setError('Selecciona el motivo de tu denuncia'); return }
-
-    setEnviando(true)
-    setError(null)
-    try {
-      const denuncia = await denunciarOferta(ofertaId, {
-        motivo,
-        descripcion: descripcion.trim() || undefined,
-      })
-      setExito(true)
-      onExito(denuncia)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo enviar la denuncia')
-    } finally {
-      setEnviando(false)
-    }
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1A1A1A]/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-[#1A1A1A]">Denunciar esta oferta</h3>
-            <button
-              onClick={onCerrar}
-              className="text-[#1A1A1A]/40 hover:text-[#1A1A1A] transition-colors"
-              aria-label="Cerrar"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
-
-          {exito ? (
-            <div className="text-center py-6">
-              <div className="w-12 h-12 rounded-full bg-[#52B788]/15 flex items-center justify-center mx-auto mb-3">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5">
-                  <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <p className="font-semibold text-[#1A1A1A] mb-1">Denuncia enviada</p>
-              <p className="text-sm text-[#1A1A1A]/55 mb-5">
-                Un administrador revisará esta oferta. Gracias por ayudarnos a cuidar la comunidad.
-              </p>
-              <button
-                type="button"
-                onClick={onCerrar}
-                className="w-full rounded-xl bg-[#2D6A4F] hover:bg-[#245a42] text-white text-sm font-semibold px-4 py-2.5 transition-colors"
-              >
-                Cerrar
-              </button>
-            </div>
-          ) : (
-            <>
-              <p className="text-sm text-[#1A1A1A]/55 mb-4">
-                Cuéntanos qué está mal con esta oferta. Un administrador la revisará antes de tomar una decisión.
-              </p>
-
-              <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1.5">Motivo</label>
-              <select
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value as MotivoDenunciaEmpleo)}
-                className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2.5 text-sm text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 mb-3"
-              >
-                <option value="">Selecciona un motivo</option>
-                {MOTIVOS.map((m) => (
-                  <option key={m.valor} value={m.valor}>{m.etiqueta}</option>
-                ))}
-              </select>
-
-              <label className="block text-sm font-medium text-[#1A1A1A]/70 mb-1.5">
-                Descripción <span className="text-[#1A1A1A]/40 font-normal">(opcional)</span>
-              </label>
-              <textarea
-                className="w-full rounded-xl border border-[#1A1A1A]/12 bg-[#F8F5F0] px-3 py-2 text-sm text-[#1A1A1A] placeholder-[#1A1A1A]/35 resize-none focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 mb-3"
-                rows={4}
-                placeholder="Cuéntanos con el mayor detalle posible qué encontraste sospechoso"
-                value={descripcion}
-                onChange={(e) => setDescripcion(e.target.value)}
-                maxLength={1000}
-              />
-
-              {error && (
-                <p className="text-xs text-[#C0392B] mb-3">{error}</p>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={onCerrar}
-                  className="flex-1 rounded-xl border border-[#1A1A1A]/12 px-4 py-2 text-sm font-semibold text-[#1A1A1A]/60 hover:bg-[#1A1A1A]/5 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleEnviar}
-                  disabled={enviando}
-                  className="flex-1 rounded-xl bg-[#2D6A4F] hover:bg-[#245a42] text-white text-sm font-semibold px-4 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {enviando ? 'Enviando…' : 'Enviar denuncia'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+    <ModalDenunciarBase<DenunciaOfertaEmpleo>
+      idBase="oferta"
+      variante="select"
+      titulo="Denunciar esta oferta"
+      subtitulo="Cuéntanos qué está mal con esta oferta. Un administrador la revisará antes de tomar una decisión."
+      mensajeExito="Un administrador revisará esta oferta. Gracias por ayudarnos a cuidar la comunidad."
+      motivos={MOTIVOS}
+      onCerrar={onCerrar}
+      onExito={onExito}
+      onEnviar={(motivo, descripcion) =>
+        denunciarOferta(ofertaId, {
+          motivo: motivo as MotivoDenunciaEmpleo,
+          descripcion,
+        })
+      }
+    />
   )
 }

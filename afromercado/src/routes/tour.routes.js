@@ -2,10 +2,12 @@ const express = require("express");
 const multer  = require("multer");
 const path    = require("path");
 const { autenticar, autorizar } = require("../middlewares/auth");
+const { verificarModuloActivo } = require("../middlewares/moduloActivo");
 const TourController   = require("../controllers/tour.controller");
 const ReviewController = require("../controllers/review.controller");
 
 const router = express.Router();
+router.use(verificarModuloActivo("flag_modulo_tours"));
 
 const _upload = multer({
   storage: multer.diskStorage({

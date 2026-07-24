@@ -17,6 +17,14 @@ const REGLAS_PUBLICAS = [
   "legal_direccion",
   "legal_email",
   "legal_telefono",
+  "flag_modulo_express",
+  "flag_modulo_hoteles",
+  "flag_modulo_tours",
+  "flag_modulo_transportes",
+  "flag_modulo_inmuebles",
+  "flag_modulo_empleo",
+  "flag_modulo_vitrina_reels",
+  "flag_plataforma_wompi_real",
 ];
 
 function upsert(clave, valor) {
@@ -67,6 +75,33 @@ const ConfigController = {
       ops.push(upsert("hero.intervaloSegundos", String(intervalo)));
       await Promise.all(ops);
       res.json({ ok: true });
+    } catch (err) { next(err); }
+  },
+
+  // GET /config → Listar todas las configuraciones (Admin)
+  async listarTodasGet(req, res, next) {
+    try {
+      const rows = await prisma.config.findMany({
+        orderBy: { clave: "asc" },
+      });
+      res.json({ ok: true, data: rows });
+    } catch (err) { next(err); }
+  },
+
+  // PUT /config/:clave → Actualizar o crear una clave de configuración (Admin)
+  async actualizarClavePut(req, res, next) {
+    try {
+      const { clave } = req.params;
+      const { valor, descripcion } = req.body;
+      if (valor === undefined || valor === null) {
+        return res.status(400).json({ error: "El campo valor es requerido" });
+      }
+      const item = await prisma.config.upsert({
+        where: { clave },
+        create: { clave, valor: String(valor), descripcion: descripcion ?? null },
+        update: { valor: String(valor), ...(descripcion !== undefined ? { descripcion } : {}) },
+      });
+      res.json({ ok: true, data: item });
     } catch (err) { next(err); }
   },
 };

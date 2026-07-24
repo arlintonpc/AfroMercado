@@ -8,7 +8,8 @@
     "dev": "nodemon src/server.js",
     "build": "prisma generate",
     "postinstall": "prisma generate",
-    "test": "node tests/comision.test.js && node tests/producto.service.test.js && node tests/pago-repartidor.test.js && node tests/pago-digital.service.test.js && node tests/hotel.service.test.js && node tests/tour.service.test.js && node tests/transporte.service.test.js && node tests/disputa.service.test.js && node tests/cultura.service.test.js",
+    "test": "node tests/comision.test.js && node tests/producto.service.test.js && node tests/pago-repartidor.test.js && node tests/pago-digital.service.test.js && node tests/hotel.service.test.js && node tests/tour.service.test.js && node tests/transporte.service.test.js && node tests/disputa.service.test.js && node tests/cultura.service.test.js && node tests/cache.test.js && node tests/config.test.js",
+    "test:vitest": "vitest run",
     "test:e2e": "node tests/e2e-flujo.js && node tests/e2e-comerciante.js && node tests/e2e-comprobante.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -45,6 +46,8 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "nodemon": "^3.0.0"
+    "nodemon": "^3.0.0",
+    "supertest": "^7.0.0",
+    "vitest": "^2.1.9"
   }
 }

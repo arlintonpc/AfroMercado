@@ -17,6 +17,10 @@ function normalizarProveedor(nombre) {
 
 async function normalizarProveedorConfigurado(nombre) {
   if (nombre) return normalizarProveedor(nombre);
+  const flagWompiReal = await ConfigRepository.obtener("flag_plataforma_wompi_real");
+  if (flagWompiReal === "false") {
+    return "SANDBOX";
+  }
   const configurado = await ConfigRepository.obtener(CONFIG_PROVIDER_KEY);
   return normalizarProveedor(configurado);
 }

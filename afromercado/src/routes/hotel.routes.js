@@ -2,10 +2,12 @@ const express = require("express");
 const multer  = require("multer");
 const path    = require("path");
 const { autenticar, autorizar } = require("../middlewares/auth");
+const { verificarModuloActivo } = require("../middlewares/moduloActivo");
 const HotelController  = require("../controllers/hotel.controller");
 const ReviewController = require("../controllers/review.controller");
 
 const router = express.Router();
+router.use(verificarModuloActivo("flag_modulo_hoteles"));
 
 const soloAuth     = [autenticar];
 const soloComercio = [autenticar, autorizar("COMERCIANTE")];

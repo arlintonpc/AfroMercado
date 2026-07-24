@@ -1,9 +1,11 @@
 const express = require("express");
 const { autenticar, autorizar } = require("../middlewares/auth");
+const { verificarModuloActivo } = require("../middlewares/moduloActivo");
 const ExpressController = require("../controllers/express.controller");
 const ReviewController  = require("../controllers/review.controller");
 
 const router = express.Router();
+router.use(verificarModuloActivo("flag_modulo_express"));
 
 const soloAuth       = [autenticar];
 const soloComercio   = [autenticar, autorizar("COMERCIANTE")];

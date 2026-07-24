@@ -24,6 +24,14 @@ export interface ReglasPublicas {
   legalDireccion: string
   legalEmail: string
   legalTelefono: string
+  flagModuloExpress: boolean
+  flagModuloHoteles: boolean
+  flagModuloTours: boolean
+  flagModuloTransportes: boolean
+  flagModuloInmuebles: boolean
+  flagModuloEmpleo: boolean
+  flagModuloVitrinaReels: boolean
+  flagPlataformaWompiReal: boolean
 }
 
 export async function obtenerReglasPublicas(): Promise<ReglasPublicas> {
@@ -44,5 +52,13 @@ export async function obtenerReglasPublicas(): Promise<ReglasPublicas> {
     legalDireccion: d['legal_direccion'] ?? '',
     legalEmail: d['legal_email'] ?? '',
     legalTelefono: d['legal_telefono'] ?? '',
+    flagModuloExpress: d['flag_modulo_express'] !== 'false',
+    flagModuloHoteles: d['flag_modulo_hoteles'] !== 'false',
+    flagModuloTours: d['flag_modulo_tours'] !== 'false',
+    flagModuloTransportes: d['flag_modulo_transportes'] !== 'false',
+    flagModuloInmuebles: d['flag_modulo_inmuebles'] !== 'false',
+    flagModuloEmpleo: d['flag_modulo_empleo'] !== 'false',
+    flagModuloVitrinaReels: d['flag_modulo_vitrina_reels'] !== 'false',
+    flagPlataformaWompiReal: d['flag_plataforma_wompi_real'] !== 'false',
   }
 }

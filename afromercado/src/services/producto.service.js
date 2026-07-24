@@ -9,6 +9,7 @@ const AdminService = require("./admin.service");
 const NotificacionService = require("./notificacion.service");
 const { enviarMensajeWA } = require("../utils/whatsapp");
 const prisma = require("../config/prisma");
+const cache = require("../utils/cache");
 
 const UNIDADES_VALIDAS = ["KG", "UNIDAD", "LITRO", "PAQUETE", "DOCENA", "MANOJO", "ANIMAL"];
 const ALCANCES_VALIDOS = ["LOCAL", "NACIONAL", "AMBOS"];
@@ -75,7 +76,7 @@ const ProductoService = {
       throw new ErrorValidacion("El stock mínimo debe ser un número entero mayor o igual a cero");
     }
 
-    return ProductoRepository.crear({
+    const nuevoProducto = await ProductoRepository.crear({
       comercioId: comercio.id,
       nombre: nombre.trim(),
       descripcion: descripcion?.trim(),
@@ -92,55 +93,58 @@ const ProductoService = {
       esExpress: esExpress === true || esExpress === 'true',
       ...(tiempoEntregaMin ? { tiempoEntregaMin: parseInt(tiempoEntregaMin) } : {}),
     });
+    cache.invalidatePrefix("productos:");
+    return nuevoProducto;
   },
 
   async listar(filtros) {
-    const resultado = await ProductoRepository.listar(filtros);
-    let items = resultado.items.map(mapearComercioPublico);
+    const cacheKey = `productos:listar:${JSON.stringify(filtros || {})}`;
+    return cache.getOrSet(cacheKey, 60000, async () => {
+      const resultado = await ProductoRepository.listar(filtros);
+      let items = resultado.items.map(mapearComercioPublico);
 
-    // Inyectar Banners Publicitarios (Red de Display Cruzada)
-    // Usamos el módulo 'VITRINA' (que también cubre 'AGRO' ya que comparten la misma base de productos)
-    const banners = await prisma.anuncioUbicacion.findMany({
-      where: { 
-        modulo: 'VITRINA', 
-        formato: 'BANNER', 
-        activa: true,
-        campana: { estado: 'ACTIVA' }
-      },
-      include: { campana: true },
+      const banners = await prisma.anuncioUbicacion.findMany({
+        where: { 
+          modulo: 'VITRINA', 
+          formato: 'BANNER', 
+          activa: true,
+          campana: { estado: 'ACTIVA' }
+        },
+        include: { campana: true },
+      });
+
+      const shuffledBanners = banners.sort(() => 0.5 - Math.random()).slice(0, 2);
+      let itemsHibridos = [...items];
+
+      if (shuffledBanners[0] && itemsHibridos.length >= 3) {
+        itemsHibridos.splice(3, 0, {
+          id: `banner-${shuffledBanners[0].id}`,
+          esBannerDisplay: true,
+          titulo: shuffledBanners[0].titulo,
+          subtitulo: shuffledBanners[0].subtitulo,
+          mediaUrl: shuffledBanners[0].mediaUrl,
+          urlDestino: shuffledBanners[0].urlDestino,
+          ctaTexto: shuffledBanners[0].ctaTexto,
+          etiqueta: shuffledBanners[0].etiqueta,
+        });
+      }
+
+      if (shuffledBanners[1] && itemsHibridos.length >= 7) {
+        itemsHibridos.splice(7, 0, {
+          id: `banner-${shuffledBanners[1].id}`,
+          esBannerDisplay: true,
+          titulo: shuffledBanners[1].titulo,
+          subtitulo: shuffledBanners[1].subtitulo,
+          mediaUrl: shuffledBanners[1].mediaUrl,
+          urlDestino: shuffledBanners[1].urlDestino,
+          ctaTexto: shuffledBanners[1].ctaTexto,
+          etiqueta: shuffledBanners[1].etiqueta,
+        });
+      }
+
+      resultado.items = itemsHibridos;
+      return resultado;
     });
-
-    const shuffledBanners = banners.sort(() => 0.5 - Math.random()).slice(0, 2);
-    let itemsHibridos = [...items];
-
-    if (shuffledBanners[0] && itemsHibridos.length >= 3) {
-      itemsHibridos.splice(3, 0, {
-        id: `banner-${shuffledBanners[0].id}`,
-        esBannerDisplay: true,
-        titulo: shuffledBanners[0].titulo,
-        subtitulo: shuffledBanners[0].subtitulo,
-        mediaUrl: shuffledBanners[0].mediaUrl,
-        urlDestino: shuffledBanners[0].urlDestino,
-        ctaTexto: shuffledBanners[0].ctaTexto,
-        etiqueta: shuffledBanners[0].etiqueta,
-      });
-    }
-
-    if (shuffledBanners[1] && itemsHibridos.length >= 7) {
-      itemsHibridos.splice(7, 0, {
-        id: `banner-${shuffledBanners[1].id}`,
-        esBannerDisplay: true,
-        titulo: shuffledBanners[1].titulo,
-        subtitulo: shuffledBanners[1].subtitulo,
-        mediaUrl: shuffledBanners[1].mediaUrl,
-        urlDestino: shuffledBanners[1].urlDestino,
-        ctaTexto: shuffledBanners[1].ctaTexto,
-        etiqueta: shuffledBanners[1].etiqueta,
-      });
-    }
-
-    resultado.items = itemsHibridos;
-    return resultado;
   },
 
   async obtenerPorId(id) {

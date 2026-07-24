@@ -13,20 +13,24 @@ import {
   CulturaStateCard,
   CulturaToolbar,
 } from '@/components/cultura/CulturaUI'
-import TarjetaPublicacionCultural from '@/components/cultura/TarjetaPublicacionCultural'
+import TerritoryPostCard from '@/components/cultura/TerritoryPostCard'
 import ModalTeatroPublicacion from '@/components/cultura/ModalTeatroPublicacion'
 import ModalDenunciarPublicacion from '@/components/cultura/ModalDenunciarPublicacion'
 import BannerDisplay from '@/components/publicidad/BannerDisplay'
+import VitrinaReelsFeed from '@/components/cultura/VitrinaReelsFeed'
 
 interface ItemLightbox {
   publicacion: PublicacionCultural
   indiceInicial?: number
 }
 
+type PestañaVitrina = 'EXPLORAR' | 'SIGUIENDO' | 'GUARDADOS'
+
 export default function VitrinaPage() {
   const { usuario } = useAuth()
   const esComerciante = usuario?.rol === 'COMERCIANTE'
 
+  const [pestaña, setPestaña] = useState<PestañaVitrina>('EXPLORAR')
   const [departamento, setDepartamento] = useState('')
   const [municipio, setMunicipio] = useState('')
   const [modulo, setModulo] = useState('')
@@ -43,6 +47,8 @@ export default function VitrinaPage() {
   const [lightbox, setLightbox] = useState<ItemLightbox | null>(null)
   const [denunciandoId, setDenunciandoId] = useState<number | null>(null)
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null)
+  const [reelsVideoInicialId, setReelsVideoInicialId] = useState<number | null>(null)
+  const [modoReels, setModoReels] = useState(false)
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -55,19 +61,7 @@ export default function VitrinaPage() {
         search: search || undefined,
         page: 1,
       })
-      let items = r.items
-      if (typeof window !== 'undefined') {
-        const videoId = new URLSearchParams(window.location.search).get('video')
-        if (videoId) {
-          const id = Number(videoId)
-          const index = items.findIndex((i) => i.id === id)
-          if (index > 0) {
-            const target = items[index]
-            items = [target, ...items.slice(0, index), ...items.slice(index + 1)]
-          }
-        }
-      }
-      setPublicaciones(items)
+      setPublicaciones(r.items)
       setTotal(r.total)
       setPagina(1)
     } catch (e) {
@@ -80,6 +74,17 @@ export default function VitrinaPage() {
   useEffect(() => {
     cargar()
   }, [cargar])
+
+  // Filtrado según la pestaña activa (Explorar, Siguiendo, Guardados)
+  const publicacionesFiltradas = useMemo(() => {
+    if (pestaña === 'SIGUIENDO') {
+      return publicaciones.filter((p) => p.comercio?.siguiendo)
+    }
+    if (pestaña === 'GUARDADOS') {
+      return publicaciones.filter((p) => p.esFavorito)
+    }
+    return publicaciones
+  }, [pestaña, publicaciones])
 
   async function cargarMas() {
     setCargandoMas(true)
@@ -108,9 +113,6 @@ export default function VitrinaPage() {
 
   const hayMas = publicaciones.length < total
 
-  // Barra de comerciantes (estilo historias de Facebook): una tarjeta por
-  // comercio único entre las publicaciones ya cargadas, con la foto o el
-  // poster de su publicación más reciente como fondo.
   const comerciantes = useMemo(() => {
     const vistos = new Set<number>()
     const lista: { id: number; nombre: string; logoUrl?: string | null; fondoUrl?: string | null }[] = []
@@ -130,8 +132,57 @@ export default function VitrinaPage() {
         <CulturaHero
           eyebrow="Vitrina"
           title="Descubre tu territorio"
-          description="Fotos, videos y novedades de hoteles, tours, transporte, comida y más — contado por los mismos comercios de tu región."
+          description="La Vitrina Digital de la Economía Territorial — conecta todo lo que un territorio produce, ofrece y vive."
+          actions={
+            <button
+              onClick={() => {
+                const primerVideo = publicaciones.find((p) => !!p.videoUrl)
+                setReelsVideoInicialId(primerVideo?.id || null)
+                setModoReels(true)
+              }}
+              className="inline-flex items-center gap-2 bg-[#D4A017] hover:bg-[#b88a14] text-[#1B4332] font-extrabold text-sm px-5 py-2.5 rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              Vitrina Videos 🎬
+            </button>
+          }
         />
+
+        {/* Pestañas Principales de Descubrimiento */}
+        <div className="flex items-center justify-center gap-2 p-1.5 bg-gray-200/60 rounded-full max-w-md mx-auto">
+          <button
+            onClick={() => setPestaña('EXPLORAR')}
+            className={`flex-1 py-2 px-4 rounded-full text-xs font-bold transition-all ${
+              pestaña === 'EXPLORAR'
+                ? 'bg-[#1B4332] text-white shadow-md'
+                : 'text-gray-700 hover:text-black'
+            }`}
+          >
+            🧭 Explorar
+          </button>
+          <button
+            onClick={() => setPestaña('SIGUIENDO')}
+            className={`flex-1 py-2 px-4 rounded-full text-xs font-bold transition-all ${
+              pestaña === 'SIGUIENDO'
+                ? 'bg-[#1B4332] text-white shadow-md'
+                : 'text-gray-700 hover:text-black'
+            }`}
+          >
+            ✨ Siguiendo
+          </button>
+          <button
+            onClick={() => setPestaña('GUARDADOS')}
+            className={`flex-1 py-2 px-4 rounded-full text-xs font-bold transition-all ${
+              pestaña === 'GUARDADOS'
+                ? 'bg-[#1B4332] text-white shadow-md'
+                : 'text-gray-700 hover:text-black'
+            }`}
+          >
+            🔖 Guardados
+          </button>
+        </div>
 
         {mensajeConfirmacion && (
           <div className="rounded-2xl border border-[#2D6A4F]/18 bg-[#EAF3DE]/70 px-4 py-3 text-sm font-semibold text-[#1B4332]">
@@ -148,7 +199,7 @@ export default function VitrinaPage() {
                 className="group relative h-44 w-28 flex-shrink-0 overflow-hidden rounded-2xl bg-[#1B4332] shadow-sm"
               >
                 {c.fondoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+                  /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={c.fondoUrl}
                     alt={c.nombre}
@@ -160,7 +211,7 @@ export default function VitrinaPage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/20" />
 
                 {c.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+                  /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={c.logoUrl}
                     alt=""
@@ -188,7 +239,7 @@ export default function VitrinaPage() {
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#1B4332] text-lg">
               🎥
             </div>
-            <span className="text-sm font-medium text-[#1A1A1A]/50">¿Qué quieres compartir hoy?</span>
+            <span className="text-sm font-medium text-[#1A1A1A]/50">¿Qué quieres compartir hoy de tu oferta?</span>
           </Link>
         )}
 
@@ -204,7 +255,7 @@ export default function VitrinaPage() {
               <span className="mr-2 text-[#1A1A1A]/40">🔍</span>
               <input
                 type="text"
-                placeholder="Buscar lugares, negocios o títulos..."
+                placeholder="Buscar productos, experiencias o comercios..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="w-full bg-transparent text-sm outline-none text-[#1A1A1A] placeholder:text-[#1A1A1A]/40"
@@ -271,37 +322,46 @@ export default function VitrinaPage() {
               </button>
             }
           />
-        ) : publicaciones.length === 0 ? (
+        ) : publicacionesFiltradas.length === 0 ? (
           <CulturaStateCard
             icon="🎬"
-            title="Todavía no hay publicaciones"
-            description={`Los comercios aún no han compartido videos o fotos${departamento ? ` en ${departamento}` : ''}. Vuelve pronto.`}
+            title="No hay publicaciones en esta sección"
+            description={
+              pestaña === 'SIGUIENDO'
+                ? 'Sigue a tus comercios favoritos para ver sus novedades aquí.'
+                : pestaña === 'GUARDADOS'
+                ? 'Guarda publicaciones de tu interés para verlas más tarde.'
+                : `Los comercios aún no han publicado en ${departamento || 'esta ubicación'}.`
+            }
           />
         ) : (
           <div className="flex flex-col gap-4">
-            <div className="-mx-4 flex w-auto flex-col gap-0 sm:mx-auto sm:w-full sm:max-w-xl sm:gap-4">
-              {publicaciones.map((p: any) =>
+            <div className="flex flex-col gap-6 max-w-xl mx-auto w-full">
+              {publicacionesFiltradas.map((p: any) =>
                 p.esBannerDisplay ? (
                   <BannerDisplay key={p.id} banner={p} />
                 ) : (
-                  <TarjetaPublicacionCultural
+                  <TerritoryPostCard
                     key={p.id}
                     publicacion={p}
-                    forzarClasica
-                    onAbrir={(pub, indice) => setLightbox({ publicacion: pub, indiceInicial: indice })}
+                    onAbrirFoto={(pub, index) => setLightbox({ publicacion: pub, indiceInicial: index })}
+                    onAbrirVideoReels={(id) => {
+                      setReelsVideoInicialId(id)
+                      setModoReels(true)
+                    }}
                     onDenunciar={(id) => setDenunciandoId(id)}
                   />
                 )
               )}
             </div>
-            {hayMas && (
+            {hayMas && pestaña === 'EXPLORAR' && (
               <button
                 type="button"
                 onClick={cargarMas}
                 disabled={cargandoMas}
-                className="self-center rounded-xl border border-[#1A1A1A]/15 bg-white px-6 py-3 text-sm font-bold text-[#1B4332] hover:bg-gray-50 shadow-sm disabled:opacity-50"
+                className="self-center rounded-xl border border-[#1A1A1A]/15 bg-white px-6 py-3 text-sm font-bold text-[#1B4332] hover:bg-gray-50 shadow-sm disabled:opacity-50 mt-4"
               >
-                {cargandoMas ? 'Cargando…' : 'Cargar más historias'}
+                {cargandoMas ? 'Cargando…' : 'Cargar más ofertas del territorio'}
               </button>
             )}
           </div>
@@ -321,6 +381,17 @@ export default function VitrinaPage() {
           publicacionId={denunciandoId}
           onCerrar={() => setDenunciandoId(null)}
           onExito={handleDenunciaExito}
+        />
+      )}
+
+      {modoReels && (
+        <VitrinaReelsFeed
+          publicaciones={publicaciones}
+          publicacionInicialId={reelsVideoInicialId || undefined}
+          onCerrar={() => {
+            setModoReels(false)
+            setReelsVideoInicialId(null)
+          }}
         />
       )}
     </CulturaShell>

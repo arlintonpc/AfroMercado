@@ -192,15 +192,26 @@ export default function PaginaConfig() {
         >
           ← Panel admin
         </Link>
-        <h1
-          className="mt-1 text-3xl text-[#1A1A1A]"
-          style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
-        >
-          Configuración global
-        </h1>
-        <p className="mt-0.5 text-sm text-[#1A1A1A]/50">
-          Parámetros del sistema. Los cambios tienen efecto inmediato.
-        </p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1
+              className="mt-1 text-3xl text-[#1A1A1A]"
+              style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
+            >
+              Configuración global
+            </h1>
+            <p className="mt-0.5 text-sm text-[#1A1A1A]/50">
+              Parámetros del sistema. Los cambios tienen efecto inmediato.
+            </p>
+          </div>
+
+          <Link
+            href="/admin/config/feature-flags"
+            className="inline-flex items-center gap-2 bg-[#1B4332] hover:bg-[#2D6A4F] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all"
+          >
+            <span>⚙️ Feature Flags por Municipio</span>
+          </Link>
+        </div>
       </div>
 
       {/* Cuerpo */}

@@ -129,6 +129,42 @@ const DEFAULTS = {
     desc: "Muestra el botón de contacto por WhatsApp en la tienda.",
   },
 
+  // ── Feature Flags (conmutador de módulos por Admin) ────────
+  // Todas por defecto "true": una clave sin fila en Config nunca apaga
+  // un módulo por accidente — solo se desactiva con una escritura explícita.
+  flag_modulo_express: {
+    valor: "true", tipo: "bool", grupo: "Feature Flags",
+    etiqueta: "Módulo Express (Sabores)", desc: "Apaga pedidos de comida/restaurantes en toda la plataforma.",
+  },
+  flag_modulo_hoteles: {
+    valor: "true", tipo: "bool", grupo: "Feature Flags",
+    etiqueta: "Módulo Hoteles", desc: "Apaga reservas de alojamiento en toda la plataforma.",
+  },
+  flag_modulo_tours: {
+    valor: "true", tipo: "bool", grupo: "Feature Flags",
+    etiqueta: "Módulo Tours", desc: "Apaga reservas de experiencias/tours en toda la plataforma.",
+  },
+  flag_modulo_transportes: {
+    valor: "true", tipo: "bool", grupo: "Feature Flags",
+    etiqueta: "Módulo Transporte", desc: "Apaga reservas de transporte en toda la plataforma.",
+  },
+  flag_modulo_inmuebles: {
+    valor: "true", tipo: "bool", grupo: "Feature Flags",
+    etiqueta: "Módulo Bienes Raíces", desc: "Apaga la vitrina de inmuebles en toda la plataforma.",
+  },
+  flag_modulo_empleo: {
+    valor: "true", tipo: "bool", grupo: "Feature Flags",
+    etiqueta: "Módulo Empleo", desc: "Apaga la bolsa de empleo en toda la plataforma.",
+  },
+  flag_modulo_vitrina_reels: {
+    valor: "true", tipo: "bool", grupo: "Feature Flags",
+    etiqueta: "Vitrina modo Reels", desc: "Muestra u oculta el enlace/toggle de Vitrina en modo Reels.",
+  },
+  flag_plataforma_wompi_real: {
+    valor: "true", tipo: "bool", grupo: "Feature Flags",
+    etiqueta: "Wompi en producción", desc: "Activa cobros reales vía Wompi.",
+  },
+
   // ── Marca ─────────────────────────────────────────────────
   logo_url: {
     valor: "",

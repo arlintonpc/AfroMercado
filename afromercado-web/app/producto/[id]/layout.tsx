@@ -101,6 +101,8 @@ interface ProductoJsonLdData {
   videoPosterUrl?: string | null
   comercio?:  { nombre?: string }
   categoria?: { nombre?: string; slug?: string } | null
+  stock?:           number | string
+  stockReservado?:  number | string
 }
 
 async function fetchProductoParaJsonLd(id: string): Promise<ProductoJsonLdData | null> {
@@ -131,6 +133,7 @@ export default async function ProductoLayout({
     ? (typeof imagenRaw === 'string' ? imagenRaw : imagenRaw.url ?? null)
     : p?.videoPosterUrl ?? p?.fotoUrl ?? null
 
+  const disponible = p ? Number(p.stock ?? 0) - Number(p.stockReservado ?? 0) : 0
   const jsonLd = p?.nombre ? {
     '@context': 'https://schema.org',
     '@graph': [
@@ -145,7 +148,7 @@ export default async function ProductoLayout({
           '@type': 'Offer',
           price: p.precio !== undefined ? Number(p.precio) : undefined,
           priceCurrency: 'COP',
-          availability: 'https://schema.org/InStock',
+          availability: disponible > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
           url: `${SITE}/producto/${id}`,
         },
         ...(p.comercio?.nombre ? {

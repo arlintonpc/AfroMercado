@@ -20,6 +20,8 @@ import { Toast, useToast } from '@/components/ui/Toast'
 import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 import BadgeTurismoComunitario from '@/components/ui/BadgeTurismoComunitario'
 import { urlComoLlegar } from '@/lib/comoLlegar'
+import { SkeletonHero, SkeletonGrid } from '@/components/ui/SkeletonLoader'
+import InsigniasTerritoriales from '@/components/ui/InsigniasTerritoriales'
 
 const MapaHoteles = dynamic(() => import('@/components/hoteles/MapaHoteles'), { ssr: false })
 
@@ -440,7 +442,7 @@ function WidgetReserva({ hotel, habitaciones, habIdx, fechaEntrada, fechaSalida,
   habIdx: number; fechaEntrada: string; fechaSalida: string
   onFechaEntrada: (v: string) => void; onFechaSalida: (v: string) => void; onHabIdx: (i: number) => void
   onReservar: (h: HabitacionTipo) => void
-  autenticado: boolean; router: any
+  autenticado: boolean; router: { push: (url: string) => void }
 }) {
   const hab = habitaciones[habIdx]
   const noches = Math.max(1, Math.ceil((new Date(fechaSalida).getTime() - new Date(fechaEntrada).getTime()) / 86400000))
@@ -644,7 +646,7 @@ function FormReserva({ hotel, habitacion, fechaEntradaInicial, fechaSalidaInicia
         return
       }
       onSuccess(reservaCreada)
-    } catch (e: any) { setError(e.message) } finally { setCargando(false) }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error al crear reserva') } finally { setCargando(false) }
   }
 
   const opcionesPago: { id: ModoPago; icon: string; titulo: string; desc: string }[] = [
@@ -1112,8 +1114,8 @@ export default function HotelDetallePage() {
   const [lightbox, setLightbox]   = useState<{ fotos: string[]; idx: number } | null>(null)
   const [similares, setSimilares] = useState<ConfigHotel[]>([])
   const [widgetHabIdx, setWidgetHabIdx] = useState(0)
-  const [fechaEntrada, setFechaEntrada] = useState(new Date().toISOString().split('T')[0])
-  const [fechaSalida,  setFechaSalida]  = useState(new Date(Date.now() + 86400000).toISOString().split('T')[0])
+  const [fechaEntrada, setFechaEntrada] = useState(() => new Date().toISOString().split('T')[0])
+  const [fechaSalida,  setFechaSalida]  = useState(() => new Date(Date.now() + 86400000).toISOString().split('T')[0])
   const { mostrar: mostrarToast, toastProps } = useToast()
 
   function abrirReserva(h: HabitacionTipo) {
@@ -1193,10 +1195,10 @@ export default function HotelDetallePage() {
   }, [autenticado, hotel])
 
   if (cargando) return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
-      <div className="text-center">
-        <div className="w-10 h-10 border-[3px] border-[#1B4332] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-sm text-gray-400">Cargando…</p>
+    <div className="min-h-screen bg-[#FAF8F5]">
+      <SkeletonHero />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <SkeletonGrid count={6} />
       </div>
     </div>
   )
@@ -1302,6 +1304,11 @@ export default function HotelDetallePage() {
                       verificadoEtnico={!!hotel.comercio.verificadoEtnico}
                       rntVerificado={!!hotel.rntVerificado}
                       size="sm"
+                    />
+                    <InsigniasTerritoriales
+                      verificado={!!hotel.rntVerificado || !!hotel.comercio.verificadoEtnico}
+                      origenChoco={hotel.comercio.departamento === 'Chocó'}
+                      tamaño="sm"
                     />
                   </div>
                 </div>

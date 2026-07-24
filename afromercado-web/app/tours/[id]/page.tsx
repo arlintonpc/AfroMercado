@@ -11,6 +11,7 @@ import { Toast, useToast } from '@/components/ui/Toast'
 import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 import BadgeTurismoComunitario from '@/components/ui/BadgeTurismoComunitario'
 import { urlComoLlegar } from '@/lib/comoLlegar'
+import { SkeletonHero, SkeletonGrid } from '@/components/ui/SkeletonLoader'
 
 const SERVICIOS_LABELS: Record<string, { icon: string; label: string }> = {
   transporte:  { icon: '🚐', label: 'Transporte incluido' },
@@ -343,9 +344,10 @@ function SeccionRutas({ lugares, onOpenFotos }: { lugares: TourLugar[]; onOpenFo
 
 /* ── Widget reserva lateral ─────────────────────────────── */
 function WidgetReservaTour({ tour, onReservar, autenticado, router }: {
-  tour: ConfigTour; onReservar: () => void; autenticado: boolean; router: any
+  tour: ConfigTour; onReservar: () => void; autenticado: boolean; router: { push: (url: string) => void }
 }) {
-  const [fecha, setFecha]      = useState(new Date(Date.now() + 86400000).toISOString().split('T')[0])
+  const [fechaMinima] = useState(() => new Date(Date.now() + 86400000).toISOString().split('T')[0])
+  const [fecha, setFecha]      = useState(fechaMinima)
   const [participantes, setP]  = useState(1)
   const [disponibilidad, setD] = useState<{ disponibles: number; maxParticipantes: number } | null>(null)
   const [errorDisp, setErrorDisp] = useState<string | null>(null)
@@ -369,7 +371,7 @@ function WidgetReservaTour({ tour, onReservar, autenticado, router }: {
 
       <div className="mb-3">
         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Fecha</label>
-        <input type="date" min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+        <input type="date" min={fechaMinima}
           value={fecha} onChange={e => setFecha(e.target.value)}
           className="w-full border border-gray-200 rounded-2xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#1B4332] bg-white" />
       </div>
@@ -429,7 +431,7 @@ function WidgetReservaTour({ tour, onReservar, autenticado, router }: {
 /* ── Modal de reserva ───────────────────────────────────── */
 function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClose: () => void; onSuccess: () => void }) {
   const { usuario } = useAuth()
-  const manana = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+  const [manana] = useState(() => new Date(Date.now() + 86400000).toISOString().split('T')[0])
 
   const [fecha, setFecha]           = useState(manana)
   const [participantes, setP]       = useState(1)
@@ -456,8 +458,8 @@ function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClo
     try {
       const v = await validarCuponTour(codigoCupon.trim(), tour.id, participantes)
       setCuponAplicado(v)
-    } catch (e: any) {
-      setErrorCupon(e?.message ?? 'Cupón inválido'); setCuponAplicado(null)
+    } catch (e: unknown) {
+      setErrorCupon(e instanceof Error ? e.message : 'Cupón inválido'); setCuponAplicado(null)
     } finally { setValidandoCupon(false) }
   }
 
@@ -475,7 +477,7 @@ function FormReservaTour({ tour, onClose, onSuccess }: { tour: ConfigTour; onClo
     try {
       await crearReservaTour({ configTourId: tour.id, fechaTour: fecha, participantes, metodoPago, notasCliente: notas || undefined, nombreContacto: nombre.trim(), telefonoContacto: telefono.trim(), codigoCupon: cuponAplicado ? codigoCupon.trim() : undefined })
       onSuccess()
-    } catch (e: any) { setError(e.message) } finally { setCargando(false) }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error al crear reserva') } finally { setCargando(false) }
   }
 
   return (
@@ -637,10 +639,10 @@ export default function TourDetallePage() {
   }
 
   if (cargando) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5]">
-      <div className="text-center">
-        <div className="w-10 h-10 border-[3px] border-[#1B4332] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-sm text-gray-400">Cargando…</p>
+    <div className="min-h-screen bg-[#FAF8F5]">
+      <SkeletonHero />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <SkeletonGrid count={6} />
       </div>
     </div>
   )
@@ -655,7 +657,7 @@ export default function TourDetallePage() {
     </div>
   )
 
-  const tieneVideo = !!(tour as any).videoUrl
+  const tieneVideo = !!(tour as ConfigTour & { videoUrl?: string }).videoUrl
   const lugares = tour.lugares ?? []
 
   return (
@@ -791,7 +793,7 @@ export default function TourDetallePage() {
             <section>
               <p className="text-xs font-black tracking-[0.2em] uppercase text-[#D4A017] mb-3">Video del tour</p>
               <div className="overflow-hidden rounded-3xl bg-black shadow-xl">
-                <ReproductorVideo url={(tour as any).videoUrl} />
+                <ReproductorVideo url={(tour as ConfigTour & { videoUrl?: string }).videoUrl!} />
               </div>
             </section>
           )}

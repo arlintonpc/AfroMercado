@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
-import { obtenerAlianzaPorCodigo, type AlianzaPublica, type ModuloAlianza, type SocioAlianzaPublico } from '@/lib/api/alianzas'
+import { obtenerAlianzaPorCodigo, type AlianzaPublica, type ModuloAlianza, type SocioAlianzaPublico } from '@/lib/api/alianza'
 
 const ICONO_MODULO: Record<ModuloAlianza, string> = {
   EXPRESS: '🍽️',

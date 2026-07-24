@@ -10,8 +10,8 @@ import {
   actualizarDireccion,
   eliminarDireccion,
   marcarDireccionPrincipal,
-} from '@/lib/api/direcciones'
-import type { Direccion, CrearDireccionInput } from '@/lib/api/direcciones'
+} from '@/lib/api/direccion'
+import type { Direccion, CrearDireccionInput } from '@/types/direccion'
 import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
 

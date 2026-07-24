@@ -2,12 +2,14 @@ const express = require("express");
 const multer  = require("multer");
 const path    = require("path");
 const { autenticar, autorizar } = require("../middlewares/auth");
+const { verificarModuloActivo } = require("../middlewares/moduloActivo");
 const TransporteController = require("../controllers/transporte.controller");
 const ReviewController     = require("../controllers/review.controller");
 const TransporteService    = require("../services/transporte.service");
 const prisma               = require("../config/prisma");
 
 const router = express.Router();
+router.use(verificarModuloActivo("flag_modulo_transportes"));
 const soloAuth     = [autenticar];
 const soloComercio = [autenticar, autorizar("COMERCIANTE")];
 const soloAdmin    = [autenticar, autorizar("ADMIN")];

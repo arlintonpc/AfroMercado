@@ -3,9 +3,11 @@ const fs = require("fs");
 const multer = require("multer");
 const express = require("express");
 const { autenticar, autorizar } = require("../middlewares/auth");
+const { verificarModuloActivo } = require("../middlewares/moduloActivo");
 const InmuebleController = require("../controllers/inmueble.controller");
 
 const router = express.Router();
+router.use(verificarModuloActivo("flag_modulo_inmuebles"));
 const soloAdmin = [autenticar, autorizar("ADMIN")];
 
 // ── Multer para fotos del inmueble (imagen) ─────────────────────

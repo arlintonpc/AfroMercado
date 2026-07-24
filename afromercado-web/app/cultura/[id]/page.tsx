@@ -14,7 +14,7 @@ import {
   type EntradaCultural,
   type ReservaCultural,
 } from '@/lib/api/cultura'
-import { listarAlianzasPorRegion, type AlianzaResumen } from '@/lib/api/alianzas'
+import { listarAlianzasPorRegion, type AlianzaResumen } from '@/lib/api/alianza'
 import SeccionReviewsCultura from '@/components/cultura/SeccionReviewsCultura'
 import BotonFavoritoCultura from '@/components/cultura/BotonFavoritoCultura'
 import ModalGaleriaHistoria from '@/components/cultura/ModalGaleriaHistoria'

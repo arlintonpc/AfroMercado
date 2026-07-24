@@ -1,0 +1,68 @@
+name: AfroMercado CI
+
+on:
+  push:
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  backend-test-and-lint:
+    name: Backend Lint & Tests (Node.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: afromercado
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: afromercado/package-lock.json
+
+      - name: Install Backend Dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run ESLint
+        run: npm run lint --if-present
+
+      - name: Run Backend Tests (suite legacy)
+        run: npm test --if-present
+
+      - name: Run Backend Tests (Vitest)
+        run: npm run test:vitest --if-present
+
+  frontend-lint:
+    name: Frontend Lint, Type Check & Build (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: afromercado-web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: afromercado-web/package-lock.json
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Type Check TypeScript
+        run: npx tsc --noEmit
+
+      - name: Build (verifica que el proyecto compile de verdad)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001/api

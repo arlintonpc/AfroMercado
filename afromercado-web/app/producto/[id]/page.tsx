@@ -21,6 +21,7 @@ import { useCarrito } from '@/context/CarritoContext'
 import { useFavoritos } from '@/context/FavoritoContext'
 import BadgeProductorCertificado from '@/components/ui/BadgeProductorCertificado'
 import BadgeVendedorVerificado from '@/components/ui/BadgeVendedorVerificado'
+import InsigniasTerritoriales from '@/components/ui/InsigniasTerritoriales'
 import { useAuth } from '@/context/AuthContext'
 import { apiFetch } from '@/lib/api/client'
 import { obtenerMenuComercioExpress, type MenuComercioExpress } from '@/lib/api/express'
@@ -418,6 +419,11 @@ export default function PaginaProducto({
                         ? <BadgeVendedorVerificado verificado size="md" />
                         : <BadgeProductorCertificado size="md" variante="base" />
                     )}
+                    <InsigniasTerritoriales
+                      verificado={!!producto.comercio.verificado}
+                      origenChoco={producto.comercio.departamento === 'Chocó'}
+                      tamaño="sm"
+                    />
                     {producto.comercio.verificadoEtnico && (
                       <BadgeProductorCertificado size="md" variante="etnico" />
                     )}

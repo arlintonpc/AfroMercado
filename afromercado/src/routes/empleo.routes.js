@@ -3,10 +3,12 @@ const fs = require("fs");
 const multer = require("multer");
 const express = require("express");
 const { autenticar, autorizar } = require("../middlewares/auth");
+const { verificarModuloActivo } = require("../middlewares/moduloActivo");
 const EmpleoController = require("../controllers/empleo.controller");
 const { subirACloudinary } = require("../utils/cloudinary");
 
 const router = express.Router();
+router.use(verificarModuloActivo("flag_modulo_empleo"));
 const soloAdmin = [autenticar, autorizar("ADMIN")];
 
 // ── Multer para el CV adjunto (PDF) ────────────────────────────

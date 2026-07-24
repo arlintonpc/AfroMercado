@@ -30,13 +30,17 @@ export default function Header({ itemsCarrito }: HeaderProps) {
   const [busquedasRecientes, setBusquedasRecientes] = useState<string[]>([])
   const [mostrarSugerencias, setMostrarSugerencias] = useState(false)
   const [logoUrl, setLogoUrl] = useState('')
+  const [reglas, setReglas] = useState<import('@/lib/api/config').ReglasPublicas | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const regionRef = useRef<HTMLDivElement>(null)
   const busquedaRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     obtenerReglasPublicas()
-      .then((r) => setLogoUrl(r.logoUrl))
+      .then((r) => {
+        setLogoUrl(r.logoUrl)
+        setReglas(r)
+      })
       .catch(() => {})
   }, [])
 
@@ -355,30 +359,44 @@ export default function Header({ itemsCarrito }: HeaderProps) {
       <div className="flex bg-[#2D6A4F]/5 border-t border-black/5">
         <div className="w-full max-w-6xl mx-auto px-2 md:px-6">
           <nav className="flex items-center gap-2 lg:justify-between py-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }} aria-label="Navegación principal">
-            <Link href="/express" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-green-700 hover:bg-green-100 flex items-center gap-1.5 transition-colors">
-              <Utensils className="w-4 h-4" /> Sabores
-            </Link>
-            <Link href="/hoteles" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
-              <Hotel className="w-4 h-4" /> Hoteles
-            </Link>
-            <Link href="/tours" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
-              <Map className="w-4 h-4" /> Tours
-            </Link>
-            <Link href="/transportes" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
-              <Ship className="w-4 h-4" /> Transporte
-            </Link>
+            {(!reglas || reglas.flagModuloExpress) && (
+              <Link href="/express" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+                <Utensils className="w-4 h-4" /> Sabores
+              </Link>
+            )}
+            {(!reglas || reglas.flagModuloHoteles) && (
+              <Link href="/hoteles" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+                <Hotel className="w-4 h-4" /> Hoteles
+              </Link>
+            )}
+            {(!reglas || reglas.flagModuloTours) && (
+              <Link href="/tours" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+                <Map className="w-4 h-4" /> Tours
+              </Link>
+            )}
+            {(!reglas || reglas.flagModuloTransportes) && (
+              <Link href="/transportes" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+                <Ship className="w-4 h-4" /> Transporte
+              </Link>
+            )}
             <Link href="/cultura" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
               <Ticket className="w-4 h-4" /> Cultura
             </Link>
-            <Link href="/vitrina" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
-              <Clapperboard className="w-4 h-4" /> Vitrina
-            </Link>
-            <Link href="/empleo" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
-              <Briefcase className="w-4 h-4" /> Empleo
-            </Link>
-            <Link href="/bienes-raices" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
-              <Home className="w-4 h-4" /> Bienes Raíces
-            </Link>
+            {(!reglas || reglas.flagModuloVitrinaReels) && (
+              <Link href="/vitrina" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+                <Clapperboard className="w-4 h-4" /> Vitrina
+              </Link>
+            )}
+            {(!reglas || reglas.flagModuloEmpleo) && (
+              <Link href="/empleo" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+                <Briefcase className="w-4 h-4" /> Empleo
+              </Link>
+            )}
+            {(!reglas || reglas.flagModuloInmuebles) && (
+              <Link href="/bienes-raices" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+                <Home className="w-4 h-4" /> Bienes Raíces
+              </Link>
+            )}
             <Link href="/agro" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
               <Leaf className="w-4 h-4" /> Agro
             </Link>

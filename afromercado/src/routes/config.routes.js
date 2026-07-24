@@ -13,4 +13,10 @@ router.get("/publicas", ConfigController.publicasGet);
 // Solo admin — cambia modo e intervalo
 router.put("/hero", autenticar, autorizar("ADMIN"), ConfigController.heroPut);
 
+// Solo admin — listar todas las configuraciones
+router.get("/", autenticar, autorizar("ADMIN"), ConfigController.listarTodasGet);
+
+// Solo admin — crear o actualizar clave de configuración
+router.put("/:clave", autenticar, autorizar("ADMIN"), ConfigController.actualizarClavePut);
+
 module.exports = router;

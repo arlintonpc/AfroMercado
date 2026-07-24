@@ -24,6 +24,7 @@ interface ComercioCrudo {
   id?: number | string
   nombre?: string
   municipio?: string
+  departamento?: string
   descripcion?: string
   historia?: string
   whatsapp?: string | null
@@ -135,6 +136,7 @@ export function mapearProducto(crudo: any): Producto {
     comercio: {
       nombre: comercio.nombre ?? '',
       municipio: comercio.municipio ?? '',
+      departamento: comercio.departamento,
       verificado: comercio.verificado ?? false,
       totalVentas: aNumero(comercio.totalVentas),
       calificacion: aNumero(comercio.calificacion),
