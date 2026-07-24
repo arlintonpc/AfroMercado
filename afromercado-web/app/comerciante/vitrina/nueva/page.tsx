@@ -127,7 +127,9 @@ export default function ComercianteVitrinaPage() {
       setVideo(subido)
       setArchivoParaRecortar(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No pudimos subir el video.')
+      const msg = err instanceof Error ? err.message : 'No pudimos subir el video.'
+      setError(msg)
+      throw new Error(msg)
     } finally {
       setSubiendoVideo(false)
     }
