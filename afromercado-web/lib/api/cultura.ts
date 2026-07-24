@@ -415,9 +415,18 @@ export interface VideoVitrinaSubido {
  * Mismo endpoint que `subirVideoPublicacionCultural`, pero devuelve también la
  * miniatura y duración generadas por el backend, que la Vitrina sí necesita.
  */
-export async function subirVideoVitrina(file: File): Promise<VideoVitrinaSubido> {
+export async function subirVideoVitrina(
+  file: File,
+  recorte?: { inicioSegundos?: number; finSegundos?: number }
+): Promise<VideoVitrinaSubido> {
   const fd = new FormData()
   fd.append('video', file)
+  if (recorte?.inicioSegundos !== undefined) {
+    fd.append('inicioSegundos', String(recorte.inicioSegundos))
+  }
+  if (recorte?.finSegundos !== undefined) {
+    fd.append('finSegundos', String(recorte.finSegundos))
+  }
   const r = await apiFetch<{ ok: boolean; url: string; posterUrl?: string; duracionSegundos?: number; publicId?: string }>(
     '/cultura/publicaciones/video',
     { method: 'POST', body: fd },

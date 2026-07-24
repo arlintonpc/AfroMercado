@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { CampoTexto, CampoArea, CampoSelect } from '@/components/comerciante/Campos'
 import { obtenerMiComercio, listarMisProductos, type Comercio, type ProductoComerciante } from '@/components/comerciante/api'
 import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
+import RecortadorVideoModal from '@/components/comerciante/RecortadorVideoModal'
 import {
   crearPublicacionCultural,
   subirFotoPublicacionCultural,
@@ -44,6 +45,7 @@ export default function ComercianteVitrinaPage() {
   const [video, setVideo] = useState<VideoVitrinaSubido | null>(null)
   const [videoExternoUrl, setVideoExternoUrl] = useState('')
   const [subiendoVideo, setSubiendoVideo] = useState(false)
+  const [archivoParaRecortar, setArchivoParaRecortar] = useState<File | null>(null)
 
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
@@ -99,16 +101,35 @@ export default function ComercianteVitrinaPage() {
   async function seleccionarVideo(e: React.ChangeEvent<HTMLInputElement>) {
     const archivo = e.target.files?.[0]
     if (!archivo) return
+
+    const tempVideo = document.createElement('video')
+    tempVideo.preload = 'metadata'
+    tempVideo.src = URL.createObjectURL(archivo)
+    tempVideo.onloadedmetadata = () => {
+      URL.revokeObjectURL(tempVideo.src)
+      if (tempVideo.duration > MAX_SEGUNDOS_VIDEO) {
+        setArchivoParaRecortar(archivo)
+      } else {
+        ejecutarSubidaVideo(archivo)
+      }
+    }
+    tempVideo.onerror = () => {
+      ejecutarSubidaVideo(archivo)
+    }
+    e.target.value = ''
+  }
+
+  async function ejecutarSubidaVideo(archivo: File, recorte?: { inicioSegundos: number; finSegundos: number }) {
     setSubiendoVideo(true)
     setError('')
     try {
-      const subido = await subirVideoVitrina(archivo)
+      const subido = await subirVideoVitrina(archivo, recorte)
       setVideo(subido)
+      setArchivoParaRecortar(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No pudimos subir el video.')
     } finally {
       setSubiendoVideo(false)
-      e.target.value = ''
     }
   }
 
@@ -334,6 +355,15 @@ export default function ComercianteVitrinaPage() {
             {enviando ? 'Publicando…' : subiendoAlgo ? 'Subiendo…' : 'Publicar en la Vitrina'}
           </button>
         </div>
+      )}
+
+      {archivoParaRecortar && (
+        <RecortadorVideoModal
+          archivo={archivoParaRecortar}
+          duracionMaxima={MAX_SEGUNDOS_VIDEO}
+          onConfirmar={(recorte) => ejecutarSubidaVideo(archivoParaRecortar, recorte)}
+          onCancelar={() => setArchivoParaRecortar(null)}
+        />
       )}
     </div>
   )

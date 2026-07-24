@@ -16,6 +16,9 @@ import {
 import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
+import RecortadorVideoModal from '@/components/comerciante/RecortadorVideoModal'
+
+const MAX_SEGUNDOS_VIDEO = 45
 
 const OPCIONES_MODULO: Array<{ valor: ModuloOrigenVitrina | ''; etiqueta: string }> = [
   { valor: '', etiqueta: 'Ninguno en particular' },
@@ -52,6 +55,7 @@ export default function EditarVitrinaPage() {
   const [videoUrl, setVideoUrl] = useState('')
   const [subiendoFotos, setSubiendoFotos] = useState(0)
   const [subiendoVideo, setSubiendoVideo] = useState(false)
+  const [archivoParaRecortar, setArchivoParaRecortar] = useState<File | null>(null)
 
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
@@ -133,16 +137,35 @@ export default function EditarVitrinaPage() {
   async function seleccionarVideo(e: React.ChangeEvent<HTMLInputElement>) {
     const archivo = e.target.files?.[0]
     if (!archivo) return
+
+    const tempVideo = document.createElement('video')
+    tempVideo.preload = 'metadata'
+    tempVideo.src = URL.createObjectURL(archivo)
+    tempVideo.onloadedmetadata = () => {
+      URL.revokeObjectURL(tempVideo.src)
+      if (tempVideo.duration > MAX_SEGUNDOS_VIDEO) {
+        setArchivoParaRecortar(archivo)
+      } else {
+        ejecutarSubidaVideo(archivo)
+      }
+    }
+    tempVideo.onerror = () => {
+      ejecutarSubidaVideo(archivo)
+    }
+    e.target.value = ''
+  }
+
+  async function ejecutarSubidaVideo(archivo: File, recorte?: { inicioSegundos: number; finSegundos: number }) {
     setSubiendoVideo(true)
     setError('')
     try {
-      const subido = await subirVideoVitrina(archivo)
+      const subido = await subirVideoVitrina(archivo, recorte)
       setVideoUrl(subido.url)
+      setArchivoParaRecortar(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No pudimos subir el video.')
     } finally {
       setSubiendoVideo(false)
-      e.target.value = ''
     }
   }
 
@@ -386,6 +409,15 @@ export default function EditarVitrinaPage() {
           </Button>
         </div>
       </div>
+
+      {archivoParaRecortar && (
+        <RecortadorVideoModal
+          archivo={archivoParaRecortar}
+          duracionMaxima={MAX_SEGUNDOS_VIDEO}
+          onConfirmar={(recorte) => ejecutarSubidaVideo(archivoParaRecortar, recorte)}
+          onCancelar={() => setArchivoParaRecortar(null)}
+        />
+      )}
     </div>
   )
 }

@@ -7,7 +7,7 @@
 - **Fecha:** 24 de Julio de 2026
 - **Mapeo del Código:** 93 Modelos Prisma | 43 Archivos de Rutas API | 140 Páginas Next.js 16
 - **Mesa Tri-Agente:**
-  - 🔵 **Agente 1 (Arquitectura de Producto & UX / CPO — Gemini):** Visión de Negocio, Motor de Descubrimiento, UX World-Class, Edición Completa de Publicaciones de Comercio, Open Graph Social Previews y Superpoderes de Plataforma.
+  - 🔵 **Agente 1 (Arquitectura de Producto & UX / CPO — Gemini):** Visión de Negocio, Recortador de Video Interactivo (Trimmer 45s), Motor de Descubrimiento, UX World-Class, Edición Completa de Publicaciones, Open Graph Social Previews y Superpoderes de Plataforma.
   - 🟢 **Agente 2 (Auditoría de Código e Infraestructura / CTO — Claude):** Inspección Empírica, Concurrencia, Idempotencia Wompi, Tests y CI/CD.
   - 🤖 **Agente 3 (Verificación Independiente y Seguridad — ChatGPT / Codex):** Auditoría estricta de estado del repositorio, reproducibilidad de tests y migración limpia Neon.
 
@@ -33,17 +33,13 @@
 ### 📍 MESA 5: Vistas Previas Dinámicas para Redes Sociales y WhatsApp (Open Graph / Twitter Cards)
 * 🤝 **CONSENSO ALCANZADO:**
   - **Visualización Rica en WhatsApp / Redes Sociales**: Implementación de `generateMetadata({ searchParams })` en `app/vitrina/layout.tsx` y en el backend (`GET /cultura/publicaciones/:id`).
-  - **Vista previa de imágenes/videos**: Al compartir enlaces como `https://afro-mercado.vercel.app/vitrina?publicacion=6`, WhatsApp scrapea dinámicamente la fotografía/miniatura real del post (`og:image` de 1200x630px), el título del contenido (*"SAN ONOFRE — Pescado y Patacón"*) y la descripción regional, en lugar de mostrar metadatos estáticos o imágenes genéricas.
+  - **Vista previa de imágenes/videos**: Al compartir enlaces como `https://afro-mercado.vercel.app/vitrina?publicacion=6`, WhatsApp scrapea dinámicamente la fotografía/miniatura real del post (`og:image` de 1200x630px), el título del contenido (*"SAN ONOFRE — Pescado y Patacón"*) y la descripción regional.
 
-### 📍 MESA 6: Edición Completa de Publicaciones de Comercio en Vitrina
+### 📍 MESA 6: Recortador de Video Interactivo (Trimmer de 45 Segundos)
 * 🤝 **CONSENSO ALCANZADO:**
-  - **Habilitación Full-Stack de Edición (`app/comerciante/vitrina/[id]/editar/page.tsx`)**: Eliminadas las restricciones que impedían modificar archivos multimedia.
-  - **Campos Habilitados**: Los comerciantes ahora pueden actualizar libremente:
-    1. **Video de la publicación**: Reemplazar archivo de video o actualizar enlace directo.
-    2. **Fotografías / Miniatura**: Subir nuevas fotos o modificar la galería.
-    3. **Ubicación Territorial**: Cambiar Departamento y Municipio de la oferta.
-    4. **Información General & Producto**: Título, descripción, módulo y producto asociado.
-  - **Soporte Backend (`CulturaService.actualizarMiPublicacion`)**: Actualizados los saneadores para recibir `fotoUrls`, `videoUrl`, `videoPosterUrl`, `departamento` y `municipio`.
+  - **`RecortadorVideoModal.tsx`**: Cuando el comerciante selecciona un video que excede la duración estándar (45 segundos), el sistema abre un modal de recorte de alta precisión.
+  - **Controles de Inicio y Fin**: Permite seleccionar el segundo exacto de inicio (`inicioSegundos`) y fin (`finSegundos`) en una barra deslizante interactiva con vista previa en tiempo real.
+  - **Procesamiento backend + Cloudinary**: Envía los timestamps de recorte al servidor para recortar el video en la nube (`so_X,eo_Y`), asegurando que solo se publique el fragmento elegido de hasta 45 segundos.
 
 ---
 
@@ -56,13 +52,13 @@
 - ✅ Auditoría estricta de archivos (93 modelos, 42 rutas API, 140 páginas Next.js, 17 tests Vitest pasados).
 
 ### 🔵 Gemini (CPO):
-- 🚀 Motor de Descubrimiento Territorial implementado (`TerritoryPostCard.tsx` + `VitrinaReelsFeed.tsx` + Pestañas *Explorar*, *Siguiendo*, *Guardados* + Métricas numéricas nativas).
+- 🚀 Motor de Descubrimiento Territorial implementado (`TerritoryPostCard.tsx` + `VitrinaReelsFeed.tsx`).
 - 📲 **Open Graph & WhatsApp Dynamic Previews**: Creada la ruta backend `GET /cultura/publicaciones/:id` y `generateMetadata` dinámico en `app/vitrina/layout.tsx`.
-- ✏️ **Edición Completa de Vitrina**: Habilitada la edición de fotos, video, ubicación territorial e información general en el panel del comerciante.
+- ✂️ **Recortador de Video Interactivo**: Creado `RecortadorVideoModal.tsx` e integrado en la creación (`/vitrina/nueva`) y edición (`/vitrina/[id]/editar`) de publicaciones.
 - 🧪 **Verificación de Calidad**: `npx tsc --noEmit` compilado con **0 errores**.
 
 ---
 
 ## ✍️ DECLARACIÓN FINAL DE CONSENSO TRI-AGENTE
 
-Los 3 agentes (CPO, CTO y Codex) declaran el módulo de **edición completa de publicaciones para comerciantes** verificado, probado y listo para producción.
+Los 3 agentes (CPO, CTO y Codex) declaran la funcionalidad de **recorte de video interactivo para comerciantes** completamente lista y desplegada.
