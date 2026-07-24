@@ -16,13 +16,14 @@ export default function RecortadorVideoModal({
   onCancelar,
 }: RecortadorVideoModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [videoUrl, setVideoUrl] = useState<string>('')
+  const [videoUrl, setVideoUrl] = useState<string>(() => (archivo ? URL.createObjectURL(archivo) : ''))
   const [duracionTotal, setDuracionTotal] = useState<number>(0)
 
   const [inicio, setInicio] = useState<number>(0)
   const [fin, setFin] = useState<number>(duracionMaxima)
 
   useEffect(() => {
+    if (!archivo) return
     const url = URL.createObjectURL(archivo)
     setVideoUrl(url)
     return () => {
@@ -95,13 +96,17 @@ export default function RecortadorVideoModal({
 
         {/* Reproductor de Vista Previa */}
         <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden border border-white/15 shadow-inner flex items-center justify-center">
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            onLoadedMetadata={handleLoadedMetadata}
-            controls
-            className="w-full h-full object-contain"
-          />
+          {videoUrl ? (
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              onLoadedMetadata={handleLoadedMetadata}
+              controls
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <div className="text-xs text-gray-400">Cargando vista previa de video...</div>
+          )}
         </div>
 
         {/* Controles del Trimmer */}
