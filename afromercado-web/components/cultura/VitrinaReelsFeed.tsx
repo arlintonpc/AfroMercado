@@ -23,6 +23,120 @@ export interface VitrinaReelsFeedProps {
   onCerrar?: () => void
 }
 
+function ReelVideoPlayer({
+  videoUrl,
+  titulo,
+  esActivo,
+  silenciado,
+  onToggleSilenciado,
+}: {
+  videoUrl: string
+  titulo: string
+  esActivo: boolean
+  silenciado: boolean
+  onToggleSilenciado: () => void
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [pausado, setPausado] = useState(false)
+  const [animandoIcono, setAnimandoIcono] = useState<'PLAY' | 'PAUSE' | null>(null)
+
+  useEffect(() => {
+    if (videoRef.current) {
+      if (esActivo) {
+        if (videoRef.current.paused) {
+          const p = videoRef.current.play()
+          if (p !== undefined) {
+            p.catch(() => {})
+          }
+        }
+        setPausado(false)
+      } else {
+        videoRef.current.pause()
+      }
+    }
+  }, [esActivo])
+
+  function togglePlayPause() {
+    if (!videoRef.current) return
+    if (videoRef.current.paused) {
+      const p = videoRef.current.play()
+      if (p !== undefined) p.catch(() => {})
+      setPausado(false)
+      setAnimandoIcono('PLAY')
+    } else {
+      videoRef.current.pause()
+      setPausado(true)
+      setAnimandoIcono('PAUSE')
+    }
+    setTimeout(() => setAnimandoIcono(null), 800)
+  }
+
+  const { plataforma, embedUrl } = detectar(videoUrl)
+
+  return (
+    <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
+      {plataforma === 'directo' ? (
+        <div className="relative w-full h-full cursor-pointer select-none" onClick={togglePlayPause}>
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            className="w-full h-full object-cover"
+            autoPlay={esActivo}
+            loop
+            muted={silenciado}
+            playsInline
+          />
+
+          {/* Animación flotante Play/Pausa al tocar */}
+          {animandoIcono && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 animate-in zoom-in-50 fade-out-80 duration-500">
+              <div className="w-20 h-20 rounded-full bg-black/60 backdrop-blur-md border border-white/30 flex items-center justify-center text-white text-3xl shadow-2xl">
+                {animandoIcono === 'PLAY' ? '▶️' : '⏸️'}
+              </div>
+            </div>
+          )}
+
+          {/* Indicador persistente si el video está pausado */}
+          {pausado && !animandoIcono && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+              <div className="w-16 h-16 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white text-2xl shadow-xl">
+                ▶️
+              </div>
+            </div>
+          )}
+        </div>
+      ) : embedUrl ? (
+        <iframe
+          src={esActivo ? embedUrl : undefined}
+          className="w-full h-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          frameBorder="0"
+          title={titulo}
+        />
+      ) : (
+        <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+          <span className="text-white/40 text-sm font-medium">Video no disponible para reproducir aquí</span>
+        </div>
+      )}
+
+      {/* Botón Flotante de Audio (Sonido 🔊 / Silenciado 🔇) */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleSilenciado()
+        }}
+        aria-label={silenciado ? 'Activar sonido' : 'Silenciar'}
+        className="absolute top-16 md:top-6 right-4 z-30 px-3.5 py-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/20 text-white text-xs font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-lg"
+      >
+        <span>{silenciado ? '🔇' : '🔊'}</span>
+        <span>{silenciado ? 'Sin sonido' : 'Sonido ON'}</span>
+      </button>
+    </div>
+  )
+}
+
 export default function VitrinaReelsFeed({
   publicaciones,
   publicacionInicialId,
@@ -50,6 +164,7 @@ export default function VitrinaReelsFeed({
   const [seguidoresPorId, setSeguidoresPorId] = useState<Record<number, number>>({})
   const [comentando, setComentando] = useState<PublicacionCultural | null>(null)
   const [compartiendo, setCompartiendo] = useState<PublicacionCultural | null>(null)
+  const [silenciadoGlobal, setSilenciadoGlobal] = useState<boolean>(true)
 
   // Scroll automático al índice inicial en montaje
   useEffect(() => {
@@ -235,39 +350,14 @@ export default function VitrinaReelsFeed({
 
               {/* Contenedor Principal del Reproductor (Full screen en móvil, Tarjeta vertical 460px centrada en Computador) */}
               <div className="relative w-full h-full md:max-w-[460px] md:h-[94vh] md:rounded-3xl md:border md:border-white/20 md:shadow-2xl overflow-hidden flex items-center justify-center bg-black z-10 my-auto">
-                {/* Video Player */}
-                {(() => {
-                  const { plataforma, embedUrl } = detectar(pub.videoUrl!)
-                  if (plataforma === 'directo') {
-                    return (
-                      <video
-                        src={pub.videoUrl!}
-                        className="w-full h-full object-cover"
-                        autoPlay={esActivo}
-                        loop
-                        muted
-                        playsInline
-                      />
-                    )
-                  }
-                  if (embedUrl) {
-                    return (
-                      <iframe
-                        src={esActivo ? embedUrl : undefined}
-                        className="w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        frameBorder="0"
-                        title={pub.titulo}
-                      />
-                    )
-                  }
-                  return (
-                    <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-                      <span className="text-white/40 text-sm font-medium">Video no disponible para reproducir aquí</span>
-                    </div>
-                  )
-                })()}
+                {/* Video Player Interactivo (Tap Play/Pause + Audio Toggle) */}
+                <ReelVideoPlayer
+                  videoUrl={pub.videoUrl!}
+                  titulo={pub.titulo}
+                  esActivo={esActivo}
+                  silenciado={silenciadoGlobal}
+                  onToggleSilenciado={() => setSilenciadoGlobal((s) => !s)}
+                />
 
                 {/* Gradient Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/40 pointer-events-none" />
