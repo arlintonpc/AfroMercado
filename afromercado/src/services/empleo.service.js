@@ -144,8 +144,8 @@ const EmpleoService = {
 
   async actualizarOferta(usuarioId, ofertaId, datos) {
     const oferta = await this._obtenerPropia(usuarioId, ofertaId);
-    if (oferta.estado !== "BORRADOR") {
-      throw new ErrorValidacion("Solo puedes editar el contenido mientras la oferta está en borrador");
+    if (oferta.estado === "CERRADA") {
+      throw new ErrorValidacion("No puedes editar una oferta cerrada — reabre una nueva si quieres publicarla de nuevo");
     }
     validarDatosOferta({ ...oferta, ...datos });
     const campos = {};
@@ -158,6 +158,18 @@ const EmpleoService = {
     if (datos.vacantes !== undefined) campos.vacantes = Number(datos.vacantes);
     if (datos.fechaCierre !== undefined) campos.fechaCierre = datos.fechaCierre ? new Date(datos.fechaCierre) : null;
     if (datos.preguntas !== undefined) campos.preguntas = normalizarPreguntas(datos.preguntas);
+
+    // Editar contenido después de publicada es el mismo riesgo de confianza que
+    // al crearla (bait-and-switch) — si el comercio no está verificado, la
+    // edición vuelve a pasar por moderación antes de seguir visible al público.
+    // Mientras está en BORRADOR nunca ha sido pública, así que no aplica.
+    if (oferta.estado !== "BORRADOR") {
+      const comercio = await ComercioRepository.buscarPorUsuarioId(usuarioId);
+      const autoAprobar = !!comercio?.verificado && (await Reglas.bool("empleo_auto_aprobar_comercio_verificado"));
+      campos.estadoModeracion = autoAprobar ? "APROBADA" : "PENDIENTE";
+      campos.motivoRechazoModeracion = null;
+    }
+
     return EmpleoRepository.actualizarOferta(ofertaId, campos);
   },
 

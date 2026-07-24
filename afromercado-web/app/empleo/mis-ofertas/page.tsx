@@ -207,6 +207,11 @@ function TarjetaOferta({ oferta, onCambiado }: { oferta: OfertaEmpleo; onCambiad
     return (
       <div className="flex flex-col gap-2">
         <p className="text-sm font-semibold text-[#1A1A1A]">Editando: {oferta.titulo}</p>
+        {oferta.estado !== 'BORRADOR' && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            Ya está publicada — si tu comercio no está verificado, guardar cambios la enviará de nuevo a revisión antes de que vuelva a verse públicamente.
+          </p>
+        )}
         <FormularioOferta
           valoresIniciales={ofertaAValoresIniciales(oferta)}
           onGuardar={guardarEdicion}
@@ -241,14 +246,9 @@ function TarjetaOferta({ oferta, onCambiado }: { oferta: OfertaEmpleo; onCambiad
 
       <div className="flex flex-wrap gap-2 mt-3">
         {oferta.estado === 'BORRADOR' && (
-          <>
-            <button onClick={() => cambiar('PUBLICADA')} disabled={procesando} className="rounded-lg bg-[#2D6A4F] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#245a42] disabled:opacity-50">
-              Publicar
-            </button>
-            <button onClick={() => setEditando(true)} disabled={procesando} className="rounded-lg border border-[#1A1A1A]/15 px-3 py-1.5 text-xs font-semibold text-[#1A1A1A]/60 hover:bg-[#F8F5F0] disabled:opacity-50">
-              Editar
-            </button>
-          </>
+          <button onClick={() => cambiar('PUBLICADA')} disabled={procesando} className="rounded-lg bg-[#2D6A4F] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#245a42] disabled:opacity-50">
+            Publicar
+          </button>
         )}
         {oferta.estado === 'PUBLICADA' && (
           <>
@@ -261,8 +261,18 @@ function TarjetaOferta({ oferta, onCambiado }: { oferta: OfertaEmpleo; onCambiad
           </>
         )}
         {oferta.estado === 'PAUSADA' && (
-          <button onClick={() => cambiar('PUBLICADA')} disabled={procesando} className="rounded-lg bg-[#2D6A4F] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#245a42] disabled:opacity-50">
-            Reanudar
+          <>
+            <button onClick={() => cambiar('PUBLICADA')} disabled={procesando} className="rounded-lg bg-[#2D6A4F] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#245a42] disabled:opacity-50">
+              Reanudar
+            </button>
+            <button onClick={() => cambiar('CERRADA')} disabled={procesando} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">
+              Cerrar
+            </button>
+          </>
+        )}
+        {oferta.estado !== 'CERRADA' && (
+          <button onClick={() => setEditando(true)} disabled={procesando} className="rounded-lg border border-[#1A1A1A]/15 px-3 py-1.5 text-xs font-semibold text-[#1A1A1A]/60 hover:bg-[#F8F5F0] disabled:opacity-50">
+            Editar
           </button>
         )}
         <button onClick={() => setExpandido(!expandido)} className="rounded-lg border border-[#1A1A1A]/15 px-3 py-1.5 text-xs font-semibold text-[#1A1A1A]/60 hover:bg-[#F8F5F0]">
