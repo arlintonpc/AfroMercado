@@ -147,6 +147,12 @@ const CulturaController = {
     } catch (e) { next(e); }
   },
 
+  async obtenerPublicacion(req, res, next) {
+    try {
+      res.json({ ok: true, data: await CulturaService.obtenerPublicacion(Number(req.params.id)) });
+    } catch (e) { next(e); }
+  },
+
   // ── Vitrina de video (v0) ──
   async listarVitrina(req, res, next) {
     try {

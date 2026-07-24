@@ -44,6 +44,7 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
   const info = ESTADO_INFO[reserva.estado] ?? { label: reserva.estado, color: 'bg-gray-100 text-gray-600', paso: -1 }
   const activa = !['CHECKOUT', 'CANCELADA', 'RECHAZADA'].includes(reserva.estado)
   const [cancelando, setCancelando]   = useState(false)
+  const [ahoraMs] = useState(() => Date.now())
   const [politica, setPolitica]       = useState<PoliticaCancelacionInfo | null>(null)
   const [modalCancelar, setModalCancelar] = useState(false)
   const [cargandoPolitica, setCargandoPolitica] = useState(false)
@@ -52,7 +53,7 @@ function TarjetaReserva({ reserva, onCancelado }: { reserva: ReservaHotel; onCan
   const [modalReportar, setModalReportar] = useState(false)
 
   const puedeCheckin = reserva.estado === 'CONFIRMADA' && !reserva.checkinOnlineAt
-  const diasParaEntrada = Math.ceil((new Date(reserva.fechaEntrada).getTime() - Date.now()) / 86400000)
+  const diasParaEntrada = Math.ceil((new Date(reserva.fechaEntrada).getTime() - ahoraMs) / 86400000)
   const mostrarCheckin = puedeCheckin && diasParaEntrada <= 7
 
   async function iniciarCheckin() {

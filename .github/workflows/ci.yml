@@ -30,6 +30,9 @@ jobs:
       - name: Generar Prisma Client
         run: npx prisma generate
 
+      - name: Ejecutar Lint Backend
+        run: npm run lint
+
       - name: Ejecutar Pruebas Vitest (Aisladas & Concurrencia)
         run: npm run test:vitest
 

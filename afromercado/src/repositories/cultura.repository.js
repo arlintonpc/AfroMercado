@@ -86,7 +86,14 @@ const CulturaRepository = {
   },
 
   async buscarPublicacionPorId(id) {
-    return prisma.publicacionCultural.findUnique({ where: { id } });
+    return prisma.publicacionCultural.findUnique({
+      where: { id },
+      include: {
+        comercio: { select: { id: true, nombre: true, departamento: true, municipio: true, logoUrl: true } },
+        autor: { select: { id: true, nombre: true } },
+        producto: { select: { id: true, nombre: true, precio: true, fotoUrl: true } },
+      },
+    });
   },
 
   async ocultarPublicacion(id) {

@@ -1641,7 +1641,7 @@ export default function ComercianteHotelesPage() {
                     <div className="text-sm space-y-0.5 mb-3">
                       <p className="text-gray-600">🛏️ {res.habitacionTipo?.nombre} · {noches} noche{noches !== 1 ? 's' : ''}</p>
                       <p className="text-gray-600">👤 {res.huespedes} huésped{res.huespedes !== 1 ? 'es' : ''} · 📱 {res.telefonoHuesped}</p>
-                      {res.notasCliente && <p className="text-gray-400 italic text-xs">"{res.notasCliente}"</p>}
+                      {res.notasCliente && <p className="text-gray-400 italic text-xs">&quot;{res.notasCliente}&quot;</p>}
                     </div>
 
                     <div className="mb-3 rounded-2xl border border-gray-100 bg-[#FAFAF8] p-3">
@@ -2191,7 +2191,7 @@ export default function ComercianteHotelesPage() {
             {/* Métodos de pago aceptados */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-2">Métodos de pago aceptados</label>
-              <p className="text-xs text-gray-400 mb-3">Desactiva "Pagar al llegar" si no quieres arriesgarte a no-shows sin pago.</p>
+              <p className="text-xs text-gray-400 mb-3">Desactiva &quot;Pagar al llegar&quot; si no quieres arriesgarte a no-shows sin pago.</p>
               <div className="space-y-2">
                 {[
                   { key: 'permitePagarAlLlegar', label: 'Pagar al llegar', desc: 'Efectivo, Nequi o transferencia al check-in' },

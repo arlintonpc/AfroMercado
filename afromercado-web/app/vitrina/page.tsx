@@ -114,6 +114,18 @@ export default function VitrinaPage() {
     try {
       const siguiente = pagina + 1
       const r = await obtenerVitrina({
+        departamento: departamento || undefined,
+        municipio: municipio || undefined,
+        modulo: modulo || undefined,
+        search: search || undefined,
+        page: siguiente,
+      })
+      setPublicacionesExtra((prev) => [...prev, ...r.items])
+      setPagina(siguiente)
+    } finally {
+      setCargandoMas(false)
+    }
+  }
 
   function handleDenunciaExito() {
     setDenunciandoId(null)
@@ -325,7 +337,7 @@ export default function VitrinaPage() {
             description={error}
             action={
               <button
-                onClick={cargar}
+                onClick={() => cargar()}
                 className="rounded-full bg-[#1B4332] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#245a42]"
               >
                 Reintentar
@@ -347,7 +359,7 @@ export default function VitrinaPage() {
         ) : (
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-6 max-w-xl mx-auto w-full">
-              {publicacionesFiltradas.map((p) =>
+              {publicacionesFiltradas.map((p: any) =>
                 p.esBannerDisplay ? (
                   <BannerDisplay
                     key={p.id}

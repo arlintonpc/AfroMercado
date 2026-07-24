@@ -321,7 +321,7 @@ export default function CulturaPage() {
             title="No pudimos cargar la agenda"
             description={error}
             action={
-              <button onClick={cargar} className="rounded-full bg-[#1B4332] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#245a42]">
+              <button onClick={() => cargar()} className="rounded-full bg-[#1B4332] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#245a42]">
                 Reintentar
               </button>
             }

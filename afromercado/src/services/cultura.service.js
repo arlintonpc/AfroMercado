@@ -1159,6 +1159,12 @@ const CulturaService = {
     });
     return { esFavorito: !!existe };
   },
+
+  async obtenerPublicacion(id) {
+    const pub = await CulturaRepository.buscarPublicacionPorId(id);
+    if (!pub || !pub.activa) throw new ErrorNoEncontrado("Publicación no encontrada");
+    return pub;
+  },
 };
 
 module.exports = CulturaService;

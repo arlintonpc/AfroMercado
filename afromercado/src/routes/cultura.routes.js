@@ -207,6 +207,7 @@ router.get("/galeria", ReviewController.galeriaCultura);
 // Cualquier usuario autenticado publica; control solo reactivo vía denuncias.
 router.post("/publicaciones",               ...soloAuth, publicacionLimiter, CulturaController.crearPublicacion);
 router.get(  "/publicaciones",                            autenticarOpcional, CulturaController.listarPublicaciones);
+router.get(  "/publicaciones/:id",                        autenticarOpcional, CulturaController.obtenerPublicacion);
 router.post("/publicaciones/foto",          ...soloAuth, publicacionLimiter, uploadFotoPublicacion.single("foto"), handlerSubidaFotoPublicacion);
 router.post("/publicaciones/video",         ...soloAuth, publicacionLimiter, uploadVideoPublicacion, handlerSubidaVideoPublicacion);
 router.post("/publicaciones/:id/denunciar", ...soloAuth, CulturaController.denunciarPublicacion);

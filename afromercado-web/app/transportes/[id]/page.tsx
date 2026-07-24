@@ -18,6 +18,12 @@ const DIAS_LABEL: Record<string, string> = {
   viernes: 'Vi', sabado: 'Sá', domingo: 'Do',
 }
 
+function obtenerFechaManana() {
+  const fecha = new Date()
+  fecha.setDate(fecha.getDate() + 1)
+  return fecha.toISOString().split('T')[0]
+}
+
 /* ── Lightbox ──────────────────────────────────────────── */
 function Lightbox({ fotos, inicial, onClose }: { fotos: string[]; inicial: number; onClose: () => void }) {
   const [idx, setIdx] = useState(inicial)
@@ -253,7 +259,7 @@ function FormReservaTransporte({ transporte, ruta, onClose, onSuccess }: {
   transporte: ConfigTransporte; ruta: RutaTransporte; onClose: () => void; onSuccess: () => void
 }) {
   const { usuario } = useAuth()
-  const manana = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+  const [manana] = useState(() => obtenerFechaManana())
 
   const [fecha, setFecha]           = useState(manana)
   const [asientos, setAsientos]     = useState(1)

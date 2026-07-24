@@ -178,7 +178,7 @@ export default function BuscadorGlobal() {
               {resultados && total === 0 && q.length >= 2 && !cargando && (
                 <div className="py-12 text-center text-gray-400">
                   <p className="text-3xl mb-2">🔍</p>
-                  <p className="text-sm">Sin resultados para "{q}"</p>
+                  <p className="text-sm">Sin resultados para &quot;{q}&quot;</p>
                   <p className="text-xs mt-1 text-gray-300">Intenta con otro término</p>
                 </div>
               )}

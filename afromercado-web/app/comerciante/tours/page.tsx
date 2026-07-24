@@ -22,6 +22,12 @@ const SERVICIOS_OPCIONES = [
 const IDIOMAS_OPCIONES = ['Español', 'English', 'Français', 'Português', 'Deutsch']
 const IMAGEN_MAX_BYTES = 8 * 1024 * 1024
 
+function obtenerFechaISO(offsetDias = 0) {
+  const fecha = new Date()
+  fecha.setDate(fecha.getDate() + offsetDias)
+  return fecha.toISOString().split('T')[0]
+}
+
 const ESTADO_COLOR: Record<string, string> = {
   PENDIENTE:  'bg-amber-100 text-amber-700',
   CONFIRMADA: 'bg-green-100 text-green-700',
@@ -59,12 +65,12 @@ export default function ComercianteTourPage() {
   const [cargandoStats, setCargandoStats] = useState(false)
   const [desdeFiltro, setDesdeFiltro] = useState('')
   const [hastaFiltro, setHastaFiltro] = useState('')
-  const [nuevoCupon, setNuevoCupon]       = useState({
+  const [nuevoCupon, setNuevoCupon]       = useState(() => ({
     codigo: '', tipo: 'PORCENTAJE' as 'PORCENTAJE' | 'VALOR_FIJO',
     valor: '', minimoPersonas: '', usosMaximos: '',
-    inicio: new Date().toISOString().split('T')[0],
-    fin: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-  })
+    inicio: obtenerFechaISO(),
+    fin: obtenerFechaISO(30),
+  }))
   const [guardandoCupon, setGuardandoCupon] = useState(false)
   const [errorCupon, setErrorCupon]         = useState('')
   const [pendienteEliminarLugar, setPendienteEliminarLugar] = useState<TourLugar | null>(null)

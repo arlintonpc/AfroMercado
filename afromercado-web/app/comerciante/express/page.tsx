@@ -79,6 +79,12 @@ type Pestana = 'activos' | 'config' | 'historial' | 'menu' | 'cupones' | 'estadi
 
 type PlatoExpress = MenuComercioExpress['productos'][0]
 
+function obtenerFechaISO(offsetDias = 0) {
+  const fecha = new Date()
+  fecha.setDate(fecha.getDate() + offsetDias)
+  return fecha.toISOString().split('T')[0]
+}
+
 /** Crear/editar un plato de Express sin salir del panel — antes había que ir a "Mis productos". */
 function FormPlato({
   plato, onGuardado, onCerrar,
@@ -274,12 +280,12 @@ export default function ExpressComerciante() {
   const [cargandoStats, setCargandoStats] = useState(false)
   const [desdeFiltro, setDesdeFiltro] = useState('')
   const [hastaFiltro, setHastaFiltro] = useState('')
-  const [nuevoCupon, setNuevoCupon]     = useState({
+  const [nuevoCupon, setNuevoCupon]     = useState(() => ({
     codigo: '', tipo: 'PORCENTAJE' as 'PORCENTAJE' | 'VALOR_FIJO',
     valor: '', minimoSubtotal: '', usosMaximos: '',
-    inicio: new Date().toISOString().split('T')[0],
-    fin: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-  })
+    inicio: obtenerFechaISO(),
+    fin: obtenerFechaISO(30),
+  }))
   const [guardandoCupon, setGuardandoCupon] = useState(false)
   const [errorCupon, setErrorCupon]         = useState('')
   const [pendienteEliminarSeccion, setPendienteEliminarSeccion] = useState<MenuSeccion | null>(null)
@@ -1408,7 +1414,7 @@ export default function ExpressComerciante() {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
             />
             {Number(editConfig.costoEnvioBase ?? 3000) === 0 && (
-              <p className="text-[11px] text-green-700 mt-1">Se mostrará "Envío gratis" a tus clientes.</p>
+              <p className="text-[11px] text-green-700 mt-1">Se mostrará &quot;Envío gratis&quot; a tus clientes.</p>
             )}
           </div>
 
@@ -1666,8 +1672,9 @@ function TarjetaPedido({
   onAvanzar: (id: number) => void
   onActivarPlataforma: (id: number) => void
 }) {
+  const [ahoraMs] = useState(() => Date.now())
   const expiresIn = pedido.estado === 'PENDIENTE'
-    ? Math.max(0, Math.round((new Date(pedido.expiresAt).getTime() - Date.now()) / 1000))
+    ? Math.max(0, Math.round((new Date(pedido.expiresAt).getTime() - ahoraMs) / 1000))
     : null
 
   const nombreCliente = (() => {
