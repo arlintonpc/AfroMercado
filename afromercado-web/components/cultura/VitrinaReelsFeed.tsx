@@ -87,11 +87,19 @@ function ReelVideoPlayer({
             playsInline
           />
 
-          {/* Animación flotante Play/Pausa al tocar */}
+          {/* Animación flotante Play/Pausa al tocar (Glassmorphism & Brand Colors) */}
           {animandoIcono && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 animate-in zoom-in-50 fade-out-80 duration-500">
-              <div className="w-20 h-20 rounded-full bg-black/60 backdrop-blur-md border border-white/30 flex items-center justify-center text-white text-3xl shadow-2xl">
-                {animandoIcono === 'PLAY' ? '▶️' : '⏸️'}
+              <div className="w-20 h-20 rounded-full bg-[#1B4332]/75 backdrop-blur-md border border-[#D4A017]/40 flex items-center justify-center text-white shadow-2xl">
+                {animandoIcono === 'PLAY' ? (
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="ml-1">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                ) : (
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                  </svg>
+                )}
               </div>
             </div>
           )}
@@ -99,8 +107,10 @@ function ReelVideoPlayer({
           {/* Indicador persistente si el video está pausado */}
           {pausado && !animandoIcono && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-              <div className="w-16 h-16 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white text-2xl shadow-xl">
-                ▶️
+              <div className="w-16 h-16 rounded-full bg-[#1B4332]/70 backdrop-blur-md border border-[#D4A017]/40 flex items-center justify-center text-white shadow-xl">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" className="ml-1">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
               </div>
             </div>
           )}
@@ -120,7 +130,7 @@ function ReelVideoPlayer({
         </div>
       )}
 
-      {/* Botón Flotante de Audio (Sonido 🔊 / Silenciado 🔇) */}
+      {/* Botón Flotante de Audio (Estilo Premium Teravia: Verde Oscuro + Dorado + SVG Vectorial) */}
       <button
         type="button"
         onClick={(e) => {
@@ -128,10 +138,27 @@ function ReelVideoPlayer({
           onToggleSilenciado()
         }}
         aria-label={silenciado ? 'Activar sonido' : 'Silenciar'}
-        className="absolute top-16 md:top-6 right-4 z-30 px-3.5 py-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/20 text-white text-xs font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-lg"
+        className="absolute top-16 md:top-6 right-4 z-30 px-4 py-2 rounded-full bg-[#1B4332]/80 hover:bg-[#2D6A4F] backdrop-blur-md border border-[#D4A017]/40 text-white text-xs font-extrabold transition-all hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer shadow-xl"
       >
-        <span>{silenciado ? '🔇' : '🔊'}</span>
-        <span>{silenciado ? 'Sin sonido' : 'Sonido ON'}</span>
+        {silenciado ? (
+          <>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 5L6 9H2v6h4l5 4V5z" />
+              <line x1="23" y1="9" x2="17" y2="15" />
+              <line x1="17" y1="9" x2="23" y2="15" />
+            </svg>
+            <span>Sin sonido</span>
+          </>
+        ) : (
+          <>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#D4A017]">
+              <path d="M11 5L6 9H2v6h4l5 4V5z" />
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+            </svg>
+            <span className="text-[#D4A017]">Sonido ON</span>
+          </>
+        )}
       </button>
     </div>
   )
