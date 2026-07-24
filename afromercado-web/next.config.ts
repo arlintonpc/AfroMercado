@@ -27,6 +27,12 @@ const nextConfig: NextConfig = {
         hostname: "*.onrender.com",
         pathname: "/**",
       },
+      {
+        // Fotos de stock genéricas usadas para sembrar contenido de demostración
+        protocol: "https",
+        hostname: "picsum.photos",
+        pathname: "/**",
+      },
     ],
   },
 };
