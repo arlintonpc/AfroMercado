@@ -7,6 +7,7 @@ const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 const { autenticar, autenticarOpcional } = require("../middlewares/auth");
 const UsuarioController = require("../controllers/usuario.controller");
 const UsuarioRepository = require("../repositories/usuario.repository");
+const { subirACloudinary } = require("../utils/cloudinary");
 
 const router = Router();
 
@@ -52,17 +53,25 @@ router.post(
   autenticar,
   uploadAvatar.single("avatar"),
   async (req, res, next) => {
+    let mantenerLocal = false;
+    const filePath = req.file?.path;
     try {
       if (!req.file) {
         return res.status(400).json({ ok: false, mensaje: "No se recibió imagen." });
       }
+      const subida = await subirACloudinary(req.file.path, "afromercado/avatares");
+      mantenerLocal = !subida?.secureUrl;
       const base = `${req.protocol}://${req.get("host")}`;
-      const avatarUrl = `${base}/uploads/avatares/${req.file.filename}`;
+      const avatarUrl = subida?.secureUrl ?? `${base}/uploads/avatares/${req.file.filename}`;
       const actualizado = await UsuarioRepository.actualizar(req.usuario.id, { avatarUrl });
       const { passwordHash, deletedAt, ...publico } = actualizado;
       res.json({ ok: true, data: publico });
     } catch (err) {
       next(err);
+    } finally {
+      if (filePath && !mantenerLocal) {
+        fs.unlink(filePath, () => {});
+      }
     }
   }
 );

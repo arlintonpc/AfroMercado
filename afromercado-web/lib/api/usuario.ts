@@ -27,21 +27,12 @@ export async function actualizarPerfil(datos: DatosActualizarPerfil): Promise<Us
 }
 
 export async function subirAvatar(archivo: File): Promise<Usuario> {
-  const token =
-    typeof window !== 'undefined' ? window.localStorage.getItem(TOKEN_KEY) : null
-
   const form = new FormData()
   form.append('avatar', archivo)
 
-  const res = await fetch(`${API_URL}/usuario/yo/avatar`, {
+  const res = await apiFetch<{ ok: boolean; data: Usuario }>('/usuario/yo/avatar', {
     method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form,
   })
-
-  const json = await res.json()
-  if (!res.ok || !json.ok) {
-    throw new Error(json.mensaje ?? json.error ?? 'Error al subir el avatar.')
-  }
-  return json.data as Usuario
+  return res.data
 }

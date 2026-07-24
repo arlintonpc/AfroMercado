@@ -26,6 +26,7 @@ import {
 import { obtenerReglasPublicas } from '@/lib/api/config'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import PanelDeclaracionTerritorial from '@/components/comerciante/PanelDeclaracionTerritorial'
+import { subirAvatar } from '@/lib/api/usuario'
 
 const BANCOS_DISPERSION = [
   { valor: 'BANCOLOMBIA', etiqueta: 'Bancolombia' },
@@ -262,6 +263,27 @@ export default function PerfilComerciantePage() {
   const [errorDoc, setErrorDoc] = useState<string | null>(null)
   const inputDocFrenteRef = useRef<HTMLInputElement>(null)
   const inputDocReversoRef = useRef<HTMLInputElement>(null)
+  const inputLogoRef = useRef<HTMLInputElement>(null)
+  const [subiendoLogo, setSubiendoLogo] = useState(false)
+
+  async function handleSubirLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0]
+    if (!archivo) return
+    setSubiendoLogo(true)
+    setAviso(null)
+    try {
+      const usuarioActualizado = await subirAvatar(archivo)
+      if (usuarioActualizado.avatarUrl) {
+        setLogoUrl(usuarioActualizado.avatarUrl)
+        setAviso({ tipo: 'exito', texto: 'Foto/Logo subido correctamente. Haz clic en "Guardar cambios" para guardarlo.' })
+      }
+    } catch (err) {
+      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'Error al subir la imagen.' })
+    } finally {
+      setSubiendoLogo(false)
+      if (inputLogoRef.current) inputLogoRef.current.value = ''
+    }
+  }
 
   // RUT y Cámara de Comercio — requisito mínimo para aprobación
   const [rut, setRut] = useState('')
@@ -779,14 +801,47 @@ export default function PerfilComerciantePage() {
           hint="Opcional. Para que los compradores te escriban directo."
         />
 
-        <CampoTexto
-          label="URL de tu logo"
-          name="logoUrl"
-          placeholder="https://…"
-          value={logoUrl}
-          onChange={setLogoUrl}
-          hint="Opcional. Enlace directo a la imagen de tu logo."
-        />
+        <div className="space-y-2 bg-[#F7F5F2] p-4 rounded-2xl border border-[#1A1A1A]/10">
+          <label className="block text-xs font-bold text-[#1A1A1A]">Foto o Logo de tu Negocio</label>
+          <div className="flex items-center gap-4">
+            {logoUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={logoUrl} alt="Logo de la tienda" className="w-16 h-16 rounded-2xl object-cover border border-[#2D6A4F]/30 shadow-md flex-shrink-0" />
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-[#2D6A4F]/10 border border-[#2D6A4F]/20 flex items-center justify-center text-[#2D6A4F] font-bold text-2xl flex-shrink-0">
+                🏪
+              </div>
+            )}
+            <div className="flex-1 space-y-1.5 min-w-0">
+              <button
+                type="button"
+                onClick={() => inputLogoRef.current?.click()}
+                disabled={subiendoLogo}
+                className="px-4 py-2 rounded-xl bg-[#2D6A4F] hover:bg-[#1B4332] text-white text-xs font-extrabold transition flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+              >
+                <span>📷</span>
+                <span>{subiendoLogo ? 'Subiendo imagen...' : logoUrl ? 'Cambiar foto de logo' : 'Subir foto de logo'}</span>
+              </button>
+              <input
+                ref={inputLogoRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleSubirLogoFile}
+              />
+              <p className="text-[11px] text-[#1A1A1A]/60">Puedes seleccionar una foto desde tu galería o computador, o pegar la URL abajo.</p>
+            </div>
+          </div>
+
+          <CampoTexto
+            label="O enlace directo URL de tu logo"
+            name="logoUrl"
+            placeholder="https://…"
+            value={logoUrl}
+            onChange={setLogoUrl}
+            hint="Opcional. Enlace directo a la imagen de tu logo."
+          />
+        </div>
 
         <CampoTexto
           label="RUT"
