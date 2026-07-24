@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { obtenerVitrina, type PublicacionCultural } from '@/lib/api/cultura'
+import { useVitrinaQuery } from '@/hooks/useCulturaQuery'
 import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 import {
   CulturaHero,
@@ -43,12 +44,26 @@ export default function VitrinaPage() {
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
 
-  const [publicaciones, setPublicaciones] = useState<ItemVitrina[]>([])
-  const [total, setTotal] = useState(0)
+  const { data: vitrinaData, isLoading: cargando, error: queryError, refetch: cargar } = useVitrinaQuery({
+    departamento: departamento || undefined,
+    municipio: municipio || undefined,
+    modulo: modulo || undefined,
+    search: search || undefined,
+    page: 1,
+  })
+
+  const [publicacionesExtra, setPublicacionesExtra] = useState<ItemVitrina[]>([])
   const [pagina, setPagina] = useState(1)
-  const [cargando, setCargando] = useState(true)
   const [cargandoMas, setCargandoMas] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+
+  const publicaciones = useMemo(() => {
+    const base = vitrinaData?.items || []
+    if (pagina === 1) return base
+    return [...base, ...publicacionesExtra]
+  }, [vitrinaData, publicacionesExtra, pagina])
+
+  const total = vitrinaData?.total ?? 0
+  const error = queryError ? (queryError instanceof Error ? queryError.message : 'No pudimos cargar la vitrina.') : null
 
   const [lightbox, setLightbox] = useState<ItemLightbox | null>(null)
   const [denunciandoId, setDenunciandoId] = useState<number | null>(null)
@@ -57,30 +72,11 @@ export default function VitrinaPage() {
   const [modoReels, setModoReels] = useState(false)
   const enlaceProcesado = useRef<string | null>(null)
 
-  const cargar = useCallback(async () => {
-    setCargando(true)
-    setError(null)
-    try {
-      const r = await obtenerVitrina({
-        departamento: departamento || undefined,
-        municipio: municipio || undefined,
-        modulo: modulo || undefined,
-        search: search || undefined,
-        page: 1,
-      })
-      setPublicaciones(r.items)
-      setTotal(r.total)
-      setPagina(1)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No pudimos cargar la vitrina.')
-    } finally {
-      setCargando(false)
-    }
-  }, [departamento, municipio, modulo, search])
-
+  // Reset extra cuando cambian los filtros
   useEffect(() => {
-    cargar()
-  }, [cargar])
+    setPublicacionesExtra([])
+    setPagina(1)
+  }, [departamento, municipio, modulo, search])
 
   // Los enlaces compartidos deben abrir exactamente la foto o el video elegido.
   // Se conserva ?video= como compatibilidad con enlaces compartidos anteriormente.
@@ -118,19 +114,6 @@ export default function VitrinaPage() {
     try {
       const siguiente = pagina + 1
       const r = await obtenerVitrina({
-        departamento: departamento || undefined,
-        municipio: municipio || undefined,
-        modulo: modulo || undefined,
-        search: search || undefined,
-        page: siguiente,
-      })
-      setPublicaciones((prev) => [...prev, ...r.items])
-      setTotal(r.total)
-      setPagina(siguiente)
-    } finally {
-      setCargandoMas(false)
-    }
-  }
 
   function handleDenunciaExito() {
     setDenunciandoId(null)

@@ -1,9 +1,8 @@
-'use client'
-
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { listarAgenda, misFavoritosCultura, precioDesde, type EventoCultural } from '@/lib/api/cultura'
+import { misFavoritosCultura, precioDesde, type EventoCultural } from '@/lib/api/cultura'
+import { useAgendaCulturaQuery, useMisFavoritosCulturaQuery } from '@/hooks/useCulturaQuery'
 import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 import { CATEGORIAS_CULTURA } from '@/lib/data/culturaCategorias'
 import { useAuth } from '@/context/AuthContext'
@@ -66,9 +65,6 @@ function calcularRangoFecha(tipo: FiltroFecha): { fechaDesde?: string; fechaHast
 
 export default function CulturaPage() {
   const { autenticado } = useAuth()
-  const [eventos, setEventos] = useState<EventoCultural[]>([])
-  const [cargando, setCargando] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   const [departamento, setDepartamento] = useState('')
   const [municipio, setMunicipio] = useState('')
@@ -80,39 +76,33 @@ export default function CulturaPage() {
   const [vista, setVista] = useState<Vista>('grid')
   const [favoritosIds, setFavoritosIds] = useState<Set<number>>(new Set())
 
-  const cargar = useCallback(async () => {
-    setCargando(true)
-    setError(null)
-    try {
-      const { fechaDesde, fechaHasta } = calcularRangoFecha(filtroFecha)
-      setEventos(
-        await listarAgenda({
-          departamento: departamento || undefined,
-          municipio: municipio || undefined,
-          categoria: categoria || undefined,
-          search: busquedaDebounced || undefined,
-          patrimonio: soloPatrimonio || undefined,
-          fechaDesde,
-          fechaHasta,
-        })
-      )
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No pudimos cargar la agenda cultural.')
-    } finally {
-      setCargando(false)
+  const { fechaDesde, fechaHasta } = useMemo(() => calcularRangoFecha(filtroFecha), [filtroFecha])
+
+  const {
+    data: eventosData,
+    isLoading: cargando,
+    error: queryError,
+    refetch: cargar,
+  } = useAgendaCulturaQuery({
+    departamento: departamento || undefined,
+    municipio: municipio || undefined,
+    categoria: categoria || undefined,
+    search: busquedaDebounced || undefined,
+    patrimonio: soloPatrimonio || undefined,
+    fechaDesde,
+    fechaHasta,
+  })
+
+  const eventos = eventosData || []
+  const error = queryError ? (queryError instanceof Error ? queryError.message : 'No pudimos cargar la agenda cultural.') : null
+
+  const { data: favsData } = useMisFavoritosCulturaQuery(autenticado)
+
+  useEffect(() => {
+    if (favsData) {
+      setFavoritosIds(new Set(favsData.map((f) => f.id)))
     }
-  }, [departamento, municipio, categoria, soloPatrimonio, filtroFecha, busquedaDebounced])
-
-  useEffect(() => {
-    cargar()
-  }, [cargar])
-
-  useEffect(() => {
-    if (!autenticado) { setFavoritosIds(new Set()); return }
-    misFavoritosCultura()
-      .then((favs) => setFavoritosIds(new Set(favs.map((f) => f.id))))
-      .catch(() => {})
-  }, [autenticado])
+  }, [favsData])
 
   function manejarCambioDepartamento(valor: string) {
     setDepartamento(valor)
