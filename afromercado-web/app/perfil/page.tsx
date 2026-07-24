@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { obtenerPerfil, actualizarPerfil, subirAvatar } from '@/lib/api/usuario'
-import { apiFetch } from '@/lib/api/client'
+import { apiFetch, normalizarUrlMedia } from '@/lib/api/client'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import type { Usuario, TipoDocumento } from '@/types/usuario'
 import { DEPARTAMENTOS as DEPARTAMENTOS_COLOMBIA } from '@/lib/data/colombia'
@@ -202,24 +202,26 @@ export default function PerfilPage() {
               aria-label="Cambiar foto de perfil"
               title="Cambiar foto de perfil"
             >
-              {perfil.avatarUrl ? (
-                // Los avatares pueden estar alojados en proveedores externos configurables.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={perfil.avatarUrl}
-                  alt={perfil.nombre}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="w-full h-full flex items-center justify-center bg-[#2D6A4F] text-white text-2xl font-bold">
-                  {subiendoAvatar ? (
-                    <svg className="animate-spin" width="20" height="20" viewBox="0 0 18 18" fill="none">
-                      <circle cx="9" cy="9" r="7" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
-                      <path d="M9 2a7 7 0 0 1 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                  ) : inicial}
-                </span>
-              )}
+              {(() => {
+                const avatarFinal = normalizarUrlMedia(perfil.avatarUrl)
+                return avatarFinal ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={avatarFinal}
+                    alt={perfil.nombre}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="w-full h-full flex items-center justify-center bg-[#2D6A4F] text-white text-2xl font-bold">
+                    {subiendoAvatar ? (
+                      <svg className="animate-spin" width="20" height="20" viewBox="0 0 18 18" fill="none">
+                        <circle cx="9" cy="9" r="7" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+                        <path d="M9 2a7 7 0 0 1 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    ) : inicial}
+                  </span>
+                )
+              })()}
               {/* Overlay al hover */}
               <span className="absolute inset-0 flex items-center justify-center bg-[#1A1A1A]/40 opacity-0 group-hover:opacity-100 transition-opacity">
                 {subiendoAvatar ? (

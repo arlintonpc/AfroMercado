@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCarrito } from '@/context/CarritoContext'
 import { useAuth } from '@/context/AuthContext'
 import { useRegion } from '@/context/RegionContext'
-import { apiFetch } from '@/lib/api/client'
+import { apiFetch, normalizarUrlMedia } from '@/lib/api/client'
 import { obtenerReglasPublicas } from '@/lib/api/config'
 import { DEPARTAMENTOS } from '@/lib/data/colombia'
 import { Utensils, Hotel, Map, Ship, Ticket, Clapperboard, Briefcase, Home, Leaf, Sparkles } from 'lucide-react'
@@ -216,18 +216,22 @@ export default function Header({ itemsCarrito }: HeaderProps) {
           ) : (
             <div className="relative" ref={menuRef}>
               <button
-                onClick={() => setMenuAbierto((v) => !v)}
+                type="button"
+                onClick={() => setMenuAbierto(!menuAbierto)}
                 className="flex items-center gap-1.5 min-h-[44px] px-3 rounded-lg text-sm font-semibold text-[#1A1A1A] hover:bg-[#2D6A4F]/10"
                 aria-haspopup="menu"
                 aria-expanded={menuAbierto}
               >
-                {usuario?.avatarUrl ? (
-                  <img src={usuario.avatarUrl} alt={usuario.nombre} className="w-7 h-7 rounded-full object-cover" />
-                ) : (
-                  <span className="flex items-center justify-center w-7 h-7 rounded-full bg-[#2D6A4F] text-white text-xs font-bold uppercase">
-                    {(usuario?.nombre ?? '?').charAt(0)}
-                  </span>
-                )}
+                {(() => {
+                  const avatarUrlFinal = normalizarUrlMedia(usuario?.avatarUrl)
+                  return avatarUrlFinal ? (
+                    <img src={avatarUrlFinal} alt={usuario?.nombre} className="w-7 h-7 rounded-full object-cover border border-[#2D6A4F]/30" />
+                  ) : (
+                    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-[#2D6A4F] text-white text-xs font-bold uppercase">
+                      {(usuario?.nombre ?? '?').charAt(0)}
+                    </span>
+                  )
+                })()}
                 <span className="hidden sm:inline max-w-[120px] truncate">
                   {usuario?.nombre}
                 </span>

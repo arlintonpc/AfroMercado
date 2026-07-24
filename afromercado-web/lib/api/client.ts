@@ -32,6 +32,21 @@ export function obtenerToken(): string | null {
 }
 
 /**
+ * Normaliza cualquier URL de imagen/media (ej. avatares, fotos local o Cloudinary).
+ * Convierte rutas relativas como '/uploads/avatares/...' en URLs absolutas del backend.
+ */
+export function normalizarUrlMedia(url?: string | null): string | null {
+  if (!url) return null
+  const u = url.trim()
+  if (!u) return null
+  if (u.startsWith('http://') || u.startsWith('https://') || u.startsWith('data:')) {
+    return u
+  }
+  const baseBackend = API_URL.replace(/\/api\/?$/, '')
+  return `${baseBackend}${u.startsWith('/') ? '' : '/'}${u}`
+}
+
+/**
  * Extrae un mensaje de error legible del cuerpo de la respuesta.
  * El backend devuelve { error: string }; admitimos también { message }.
  */
