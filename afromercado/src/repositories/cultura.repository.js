@@ -23,7 +23,7 @@ const CulturaRepository = {
         take,
         orderBy: { createdAt: "desc" },
         include: {
-          autor: { select: { id: true, nombre: true, _count: { select: { seguidoresUsuarios: true } } } },
+          autor: { select: { id: true, nombre: true, avatarUrl: true, _count: { select: { seguidoresUsuarios: true } } } },
           _count: { select: { likes: true } },
           ...(usuarioId ? { likes: { where: { usuarioId }, select: { id: true } } } : {}),
         },
@@ -55,7 +55,7 @@ const CulturaRepository = {
         take: 200,
         orderBy: { createdAt: "desc" },
         include: {
-          autor: { select: { id: true, nombre: true, _count: { select: { seguidoresUsuarios: true } } } },
+          autor: { select: { id: true, nombre: true, avatarUrl: true, _count: { select: { seguidoresUsuarios: true } } } },
           comercio: {
             select: {
               id: true,
@@ -90,7 +90,7 @@ const CulturaRepository = {
       where: { id },
       include: {
         comercio: { select: { id: true, nombre: true, departamento: true, municipio: true, logoUrl: true } },
-        autor: { select: { id: true, nombre: true } },
+        autor: { select: { id: true, nombre: true, avatarUrl: true } },
         producto: { select: { id: true, nombre: true, precio: true, fotoUrl: true } },
       },
     });

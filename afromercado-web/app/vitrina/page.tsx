@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { obtenerVitrina, type PublicacionCultural } from '@/lib/api/cultura'
+import { normalizarUrlMedia } from '@/lib/api/client'
 import { useVitrinaQuery } from '@/hooks/useCulturaQuery'
 import { DEPARTAMENTOS, municipiosDe } from '@/lib/data/colombia'
 import {
@@ -142,7 +143,7 @@ export default function VitrinaPage() {
       const c = p.comercio
       if (c && !vistos.has(c.id)) {
         vistos.add(c.id)
-        lista.push({ id: c.id, nombre: c.nombre, logoUrl: c.logoUrl, fondoUrl: p.fotoUrls?.[0] || p.videoPosterUrl || null })
+        lista.push({ id: c.id, nombre: c.nombre, logoUrl: c.logoUrl || (c as any).usuario?.avatarUrl || p.autor?.avatarUrl || null, fondoUrl: p.fotoUrls?.[0] || p.videoPosterUrl || null })
       }
     }
     return lista
@@ -232,18 +233,21 @@ export default function VitrinaPage() {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/20" />
 
-                {c.logoUrl ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={c.logoUrl}
-                    alt=""
-                    className="absolute left-2 top-2 h-9 w-9 rounded-full border-2 border-[#D4A017] object-cover"
-                  />
-                ) : (
-                  <div className="absolute left-2 top-2 flex h-9 w-9 items-center justify-center rounded-full border-2 border-[#D4A017] bg-[#1B4332] text-sm font-bold text-white">
-                    {c.nombre[0]?.toUpperCase() || '?'}
-                  </div>
-                )}
+                {(() => {
+                  const logoFinal = normalizarUrlMedia(c.logoUrl)
+                  return logoFinal ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={logoFinal}
+                      alt={c.nombre}
+                      className="absolute left-2 top-2 h-9 w-9 rounded-full border-2 border-[#D4A017] object-cover"
+                    />
+                  ) : (
+                    <div className="absolute left-2 top-2 flex h-9 w-9 items-center justify-center rounded-full border-2 border-[#D4A017] bg-[#1B4332] text-sm font-bold text-white">
+                      {c.nombre[0]?.toUpperCase() || '?'}
+                    </div>
+                  )
+                })()}
 
                 <span className="absolute inset-x-2 bottom-2 line-clamp-2 text-xs font-semibold leading-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.7)]">
                   {c.nombre}
@@ -258,8 +262,16 @@ export default function VitrinaPage() {
             href="/comerciante/vitrina/nueva"
             className="flex items-center gap-3 rounded-2xl border border-[#1A1A1A]/8 bg-white px-4 py-3 shadow-sm transition hover:border-[#2D6A4F]/30 hover:shadow-md"
           >
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#1B4332] text-lg">
-              🎥
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#1B4332] text-lg overflow-hidden border border-[#D4A017]">
+              {(() => {
+                const avatarCrear = normalizarUrlMedia(usuario?.avatarUrl || (usuario as any)?.comercio?.logoUrl)
+                return avatarCrear ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={avatarCrear} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  '🎥'
+                )
+              })()}
             </div>
             <span className="text-sm font-medium text-[#1A1A1A]/50">¿Qué quieres compartir hoy de tu oferta?</span>
           </Link>

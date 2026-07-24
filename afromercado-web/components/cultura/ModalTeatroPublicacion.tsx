@@ -12,6 +12,7 @@ import {
   PublicacionCultural,
 } from '@/lib/api/cultura'
 import { useAuth } from '@/context/AuthContext'
+import { normalizarUrlMedia } from '@/lib/api/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toggleSeguirComercio } from '@/lib/api/comercios'
@@ -227,14 +228,17 @@ export default function ModalTeatroPublicacion({ publicacion, indiceInicial = 0,
         {/* Info del autor en móvil */}
         <div className="absolute bottom-6 left-4 z-30 md:hidden max-w-[70%] drop-shadow-lg">
           <div className="flex items-center gap-2 mb-2">
-            {publicacion.comercio?.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={publicacion.comercio.logoUrl} className="w-10 h-10 rounded-full border-2 border-white object-cover" alt="" />
-            ) : (
-              <div className="w-10 h-10 flex items-center justify-center rounded-full bg-[#1B4332] text-white border-2 border-white font-bold">
-                {(publicacion.comercio?.nombre || publicacion.autor?.nombre)?.charAt(0) || '?'}
-              </div>
-            )}
+            {(() => {
+              const avatarFinal = normalizarUrlMedia(publicacion.comercio?.logoUrl || publicacion.autor?.avatarUrl)
+              return avatarFinal ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarFinal} className="w-10 h-10 rounded-full border-2 border-white object-cover" alt="" />
+              ) : (
+                <div className="w-10 h-10 flex items-center justify-center rounded-full bg-[#1B4332] text-white border-2 border-white font-bold">
+                  {(publicacion.comercio?.nombre || publicacion.autor?.nombre)?.charAt(0) || '?'}
+                </div>
+              )
+            })()}
             <span className="text-white font-semibold">{publicacion.comercio?.nombre || publicacion.autor?.nombre}</span>
             {(publicacion.comercio || publicacion.autor) && (
               <button type="button" onClick={handleToggleSeguir} className="rounded-full border border-white/50 bg-black/30 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">
@@ -261,14 +265,17 @@ export default function ModalTeatroPublicacion({ publicacion, indiceInicial = 0,
         {/* Cabecera Info */}
         <div className="flex items-start p-4 border-b">
           <div className="flex items-center gap-3">
-             {publicacion.comercio?.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={publicacion.comercio.logoUrl} className="w-12 h-12 rounded-full border border-[#D4A017] object-cover" alt="" />
-            ) : (
-              <div className="w-12 h-12 flex items-center justify-center rounded-full bg-[#1B4332] text-white font-bold text-lg">
-                {(publicacion.comercio?.nombre || publicacion.autor?.nombre)?.charAt(0) || '?'}
-              </div>
-            )}
+            {(() => {
+              const avatarFinal = normalizarUrlMedia(publicacion.comercio?.logoUrl || publicacion.autor?.avatarUrl)
+              return avatarFinal ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarFinal} className="w-12 h-12 rounded-full border border-[#D4A017] object-cover" alt="" />
+              ) : (
+                <div className="w-12 h-12 flex items-center justify-center rounded-full bg-[#1B4332] text-white font-bold text-lg">
+                  {(publicacion.comercio?.nombre || publicacion.autor?.nombre)?.charAt(0) || '?'}
+                </div>
+              )
+            })()}
             <div>
               <Link href={publicacion.comercio ? `/comercio/${publicacion.comercio.id}` : '#'} className="font-bold text-gray-900 hover:underline">
                 {publicacion.comercio?.nombre || publicacion.autor?.nombre}

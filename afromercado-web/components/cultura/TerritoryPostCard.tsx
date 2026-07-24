@@ -13,6 +13,7 @@ import {
 import ModalComentarios from './ModalComentarios'
 import { ModalCompartir } from './ModalCompartir'
 import { formatearPrecio } from '@/lib/formatearPrecio'
+import { normalizarUrlMedia } from '@/lib/api/client'
 
 function fechaCorta(iso: string): string {
   const fecha = new Date(iso)
@@ -103,16 +104,19 @@ export default function TerritoryPostCard({
             href={publicacion.comercio ? `/comercio/${publicacion.comercio.id}` : '#'}
             className="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 bg-[#1B4332] border-2 border-[#D4A017] flex items-center justify-center font-bold text-white shadow-sm"
           >
-            {publicacion.comercio?.logoUrl ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={publicacion.comercio.logoUrl}
-                alt={publicacion.comercio.nombre}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span>{publicacion.comercio?.nombre?.[0] || publicacion.autor?.nombre?.[0] || 'T'}</span>
-            )}
+            {(() => {
+              const avatarFinal = normalizarUrlMedia(publicacion.comercio?.logoUrl || publicacion.autor?.avatarUrl)
+              return avatarFinal ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={avatarFinal}
+                  alt={publicacion.comercio?.nombre || publicacion.autor?.nombre || ''}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span>{publicacion.comercio?.nombre?.[0] || publicacion.autor?.nombre?.[0] || 'T'}</span>
+              )
+            })()}
           </Link>
 
           <div className="min-w-0">

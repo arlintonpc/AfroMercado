@@ -243,7 +243,7 @@ export interface PublicacionCultural {
   municipio?: string | null
   activa?: boolean
   createdAt: string
-  autor?: { id: number; nombre: string; siguiendo?: boolean; totalSeguidores?: number }
+  autor?: { id: number; nombre: string; avatarUrl?: string | null; siguiendo?: boolean; totalSeguidores?: number }
   totalLikes: number
   totalComentarios?: number
   totalCompartidos?: number
