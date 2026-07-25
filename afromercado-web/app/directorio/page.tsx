@@ -14,15 +14,18 @@ const ETIQUETA_TIPO: Record<string, string> = {
   OTRA: 'Otra organización territorial',
 }
 
+import { normalizarUrlMedia } from '@/lib/api/client'
+
 function TarjetaComercio({ c }: { c: ComercioDirectorio }) {
   const rating = Number(c.calificacion)
   const categorias = Array.from(new Set(c.productos.map(p => p.categoria?.nombre).filter(Boolean)))
+  const logoFinal = normalizarUrlMedia(c.logoUrl)
 
   return (
     <Link href={`/directorio/${c.id}`} className="block bg-white rounded-2xl border border-[#E8DCC8] p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all">
       <div className="flex items-start gap-3">
-        {c.logoUrl ? (
-          <img src={c.logoUrl} alt={c.nombre} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
+        {logoFinal ? (
+          <img src={logoFinal} alt={c.nombre} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
         ) : (
           <div className="w-14 h-14 rounded-xl bg-[#F0EBE3] flex items-center justify-center text-xl font-bold text-[#2D6A4F] flex-shrink-0">
             {c.nombre.charAt(0).toUpperCase()}

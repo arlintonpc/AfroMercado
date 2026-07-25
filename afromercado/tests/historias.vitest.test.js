@@ -61,6 +61,35 @@ describe("Pruebas: Historias Efímeras 24h (Servicio y Expiración)", () => {
       .rejects.toThrow("ID de historia no válido");
   });
 
+  it("registrarVistaHistoria() no cuenta una historia vencida", async () => {
+    const originalBuscar = CulturaRepository.buscarHistoriaPorId;
+    CulturaRepository.buscarHistoriaPorId = async () => ({ id: 10, expiraAt: new Date(Date.now() - 1000) });
+
+    try {
+      await expect(CulturaService.registrarVistaHistoria(10, 2, "session_123"))
+        .rejects.toThrow("Historia no encontrada o vencida");
+    } finally {
+      CulturaRepository.buscarHistoriaPorId = originalBuscar;
+    }
+  });
+
+  it("registrarVistaHistoria() registra solo historias activas", async () => {
+    const originalBuscar = CulturaRepository.buscarHistoriaPorId;
+    const originalRegistrar = CulturaRepository.registrarVistaHistoria;
+    let vista = null;
+    CulturaRepository.buscarHistoriaPorId = async () => ({ id: 10, expiraAt: new Date(Date.now() + 60_000) });
+    CulturaRepository.registrarVistaHistoria = async (datos) => { vista = datos; };
+
+    try {
+      await expect(CulturaService.registrarVistaHistoria(10, 2, "session_123"))
+        .resolves.toEqual({ ok: true });
+      expect(vista).toEqual({ historiaId: 10, usuarioId: 2, sesionId: "session_123" });
+    } finally {
+      CulturaRepository.buscarHistoriaPorId = originalBuscar;
+      CulturaRepository.registrarVistaHistoria = originalRegistrar;
+    }
+  });
+
   it("eliminarHistoria() rechaza si la historia no existe", async () => {
     const usuario = { id: 10, rol: "COMPRADOR" };
     const originalBuscar = CulturaRepository.buscarHistoriaPorId;

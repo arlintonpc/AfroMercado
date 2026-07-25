@@ -12,6 +12,7 @@ import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
 import BadgeTurismoComunitario from '@/components/ui/BadgeTurismoComunitario'
 import { urlComoLlegar } from '@/lib/comoLlegar'
 import { SkeletonHero, SkeletonGrid } from '@/components/ui/SkeletonLoader'
+import { normalizarUrlMedia } from '@/lib/api/client'
 
 const SERVICIOS_LABELS: Record<string, { icon: string; label: string }> = {
   transporte:  { icon: '🚐', label: 'Transporte incluido' },
@@ -754,13 +755,16 @@ export default function TourDetallePage() {
 
           {/* Operador */}
           <section className="flex items-center gap-4 bg-white rounded-3xl p-5 border border-gray-100">
-            {tour.comercio.logoUrl ? (
-              <img src={tour.comercio.logoUrl} alt={tour.comercio.nombre} className="w-14 h-14 rounded-2xl object-cover flex-shrink-0 bg-gray-100" />
-            ) : (
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-black text-xl">{tour.comercio.nombre.charAt(0)}</span>
-              </div>
-            )}
+            {(() => {
+              const logoFinal = normalizarUrlMedia(tour.comercio.logoUrl)
+              return logoFinal ? (
+                <img src={logoFinal} alt={tour.comercio.nombre} className="w-14 h-14 rounded-2xl object-cover flex-shrink-0 bg-gray-100" />
+              ) : (
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-black text-xl">{tour.comercio.nombre.charAt(0)}</span>
+                </div>
+              )
+            })()}
             <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Operado por</p>
               <div className="flex items-center gap-2 flex-wrap">

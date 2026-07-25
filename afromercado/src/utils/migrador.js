@@ -253,31 +253,56 @@ const STATEMENTS = [
   `ALTER TABLE "ComentarioPublicacionCultural" ADD COLUMN IF NOT EXISTS "respuestaAId" INTEGER`,
   `ALTER TABLE "ComentarioPublicacionCultural" ADD COLUMN IF NOT EXISTS "fijado" BOOLEAN NOT NULL DEFAULT false`,
 
-  `CREATE TABLE IF NOT EXISTS "historias_efimeras" (
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoMediaHistoria') THEN
+      CREATE TYPE "TipoMediaHistoria" AS ENUM ('FOTO', 'VIDEO');
+    END IF;
+  END $$`,
+  // Los nombres deben coincidir con los modelos Prisma. La primera versión
+  // creó tablas snake_case, por lo que el cliente no podía consultar historias.
+  `CREATE TABLE IF NOT EXISTS "HistoriaEfimera" (
     "id" SERIAL PRIMARY KEY,
     "autorId" INTEGER NOT NULL,
     "comercioId" INTEGER,
     "mediaUrl" TEXT NOT NULL,
-    "mediaTipo" TEXT NOT NULL DEFAULT 'FOTO',
+    "mediaTipo" "TipoMediaHistoria" NOT NULL DEFAULT 'FOTO',
     "duracionSegundos" INTEGER NOT NULL DEFAULT 5,
     "texto" TEXT,
     "fondoColor" TEXT DEFAULT '#1B4332',
     "vistasCount" INTEGER NOT NULL DEFAULT 0,
     "expiraAt" TIMESTAMP(3) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "historias_efimeras_autorId_fkey" FOREIGN KEY ("autorId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "historias_efimeras_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "HistoriaEfimera_autorId_fkey" FOREIGN KEY ("autorId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "HistoriaEfimera_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE CASCADE ON UPDATE CASCADE
   )`,
+  `ALTER TABLE "HistoriaEfimera" ALTER COLUMN "mediaTipo" DROP DEFAULT`,
+  `ALTER TABLE "HistoriaEfimera" ALTER COLUMN "mediaTipo" TYPE "TipoMediaHistoria" USING "mediaTipo"::"TipoMediaHistoria"`,
+  `ALTER TABLE "HistoriaEfimera" ALTER COLUMN "mediaTipo" SET DEFAULT 'FOTO'::"TipoMediaHistoria"`,
 
-  `CREATE TABLE IF NOT EXISTS "historias_efimeras_vistas" (
+  `CREATE TABLE IF NOT EXISTS "VistaHistoriaEfimera" (
     "id" SERIAL PRIMARY KEY,
     "historiaId" INTEGER NOT NULL,
     "usuarioId" INTEGER,
     "sesionId" TEXT,
-    "vistoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "historias_efimeras_vistas_historiaId_fkey" FOREIGN KEY ("historiaId") REFERENCES "historias_efimeras"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "historias_efimeras_vistas_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "VistaHistoriaEfimera_historiaId_fkey" FOREIGN KEY ("historiaId") REFERENCES "HistoriaEfimera"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "VistaHistoriaEfimera_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE
   )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "VistaHistoriaEfimera_historiaId_usuarioId_key" ON "VistaHistoriaEfimera"("historiaId", "usuarioId")`,
+  `CREATE INDEX IF NOT EXISTS "HistoriaEfimera_expiraAt_createdAt_idx" ON "HistoriaEfimera"("expiraAt", "createdAt")`,
+  `CREATE INDEX IF NOT EXISTS "HistoriaEfimera_comercioId_expiraAt_idx" ON "HistoriaEfimera"("comercioId", "expiraAt")`,
+  `CREATE INDEX IF NOT EXISTS "HistoriaEfimera_autorId_expiraAt_idx" ON "HistoriaEfimera"("autorId", "expiraAt")`,
+  `CREATE INDEX IF NOT EXISTS "VistaHistoriaEfimera_historiaId_createdAt_idx" ON "VistaHistoriaEfimera"("historiaId", "createdAt")`,
+  // Conserva contenido publicado con la primera migración, si existe.
+  `DO $$ BEGIN
+    IF to_regclass('public.historias_efimeras') IS NOT NULL THEN
+      INSERT INTO "HistoriaEfimera" ("id", "autorId", "comercioId", "mediaUrl", "mediaTipo", "duracionSegundos", "texto", "fondoColor", "vistasCount", "expiraAt", "createdAt")
+      SELECT "id", "autorId", "comercioId", "mediaUrl", "mediaTipo", "duracionSegundos", "texto", "fondoColor", "vistasCount", "expiraAt", "createdAt"
+      FROM "historias_efimeras"
+      ON CONFLICT ("id") DO NOTHING;
+    END IF;
+  END $$`,
+  `SELECT setval(pg_get_serial_sequence('"HistoriaEfimera"', 'id'), COALESCE((SELECT MAX("id") FROM "HistoriaEfimera"), 1), true)`,
 ];
 
 async function asegurarTablaLog() {

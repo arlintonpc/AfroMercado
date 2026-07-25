@@ -1209,6 +1209,10 @@ const CulturaService = {
   async registrarVistaHistoria(historiaId, usuarioId, sesionId) {
     const id = Number(historiaId);
     if (!id) throw new ErrorValidacion("ID de historia no válido");
+    const historia = await CulturaRepository.buscarHistoriaPorId(id);
+    if (!historia || historia.expiraAt <= new Date()) {
+      throw new ErrorNoEncontrado("Historia no encontrada o vencida");
+    }
     await CulturaRepository.registrarVistaHistoria({ historiaId: id, usuarioId, sesionId });
     return { ok: true };
   },

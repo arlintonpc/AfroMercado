@@ -29,12 +29,15 @@ export default function VisorHistoriasModal({
   const [historiaIdx, setHistoriaIdx] = useState(0)
 
   const [pausado, setPausado] = useState(false)
+  const [silenciado, setSilenciado] = useState(true)
   const [progresoMs, setProgresoMs] = useState(0)
 
   const [mensajeRespuesta, setMensajeRespuesta] = useState('')
   const [mensajeEnviado, setMensajeEnviado] = useState(false)
 
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const vistasRegistradas = useRef(new Set<number>())
 
   const grupoActual = grupos[grupoIdx]
   const historiaActual: HistoriaEfimera | undefined = grupoActual?.historias[historiaIdx]
@@ -43,7 +46,8 @@ export default function VisorHistoriasModal({
 
   // Registrar vista de la historia actual
   useEffect(() => {
-    if (historiaActual && !historiaActual.visto) {
+    if (historiaActual && !historiaActual.visto && !vistasRegistradas.current.has(historiaActual.id)) {
+      vistasRegistradas.current.add(historiaActual.id)
       registrarVistaHistoria(historiaActual.id).catch(() => {})
     }
   }, [historiaActual])
@@ -51,7 +55,20 @@ export default function VisorHistoriasModal({
   // Reset del progreso al cambiar de historia
   useEffect(() => {
     setProgresoMs(0)
+    setPausado(false)
   }, [grupoIdx, historiaIdx])
+
+  // Los navegadores permiten autoplay solamente sin sonido. El usuario puede
+  // activar audio después mediante un gesto explícito.
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || historiaActual?.mediaTipo !== 'VIDEO') return
+    if (pausado) {
+      video.pause()
+      return
+    }
+    video.play().catch(() => setPausado(true))
+  }, [historiaActual?.id, historiaActual?.mediaTipo, pausado, silenciado])
 
   const avanzarHistoria = useCallback(() => {
     if (!grupoActual) return
@@ -117,8 +134,7 @@ export default function VisorHistoriasModal({
   const esDuenio =
     Boolean(
       usuario &&
-        (Number(usuario.id) === Number(historiaActual.autorId) ||
-          (historiaActual.comercioId != null && Number((usuario as any).comercio?.id) === Number(historiaActual.comercioId)))
+        Number(usuario.id) === Number(historiaActual.autorId)
     )
 
   async function handleEliminar() {
@@ -136,7 +152,8 @@ export default function VisorHistoriasModal({
     e.preventDefault()
     if (!mensajeRespuesta.trim() || !historiaActual) return
 
-    const whatsapp = grupoActual.comercioId ? grupoActual.historias[0]?.comercio?.whatsapp : null
+    const comercio = grupoActual.historias[0]?.comercio
+    const whatsapp = comercio?.whatsappVisible ? comercio.whatsapp : null
     if (whatsapp) {
       const num = whatsapp.replace(/\D/g, '')
       const text = encodeURIComponent(`Hola ${grupoActual.nombre}, vi tu historia "${historiaActual.texto || ''}": ${mensajeRespuesta}`)
@@ -226,6 +243,16 @@ export default function VisorHistoriasModal({
             </div>
 
             <div className="flex items-center gap-2">
+              {historiaActual.mediaTipo === 'VIDEO' && (
+                <button
+                  type="button"
+                  onClick={() => setSilenciado((actual) => !actual)}
+                  className="rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-black/80"
+                  aria-label={silenciado ? 'Activar sonido' : 'Silenciar video'}
+                >
+                  {silenciado ? 'Sonido' : 'Silenciar'}
+                </button>
+              )}
               {esDuenio && (
                 <button
                   type="button"
@@ -251,12 +278,14 @@ export default function VisorHistoriasModal({
         <div className="relative w-full h-full flex items-center justify-center bg-black">
           {historiaActual.mediaTipo === 'VIDEO' ? (
             <video
+              ref={videoRef}
               src={historiaActual.mediaUrl}
               className="w-full h-full object-cover"
               autoPlay
               loop
-              muted={false}
+              muted={silenciado}
               playsInline
+              onEnded={avanzarHistoria}
             />
           ) : (
             /* eslint-disable-next-line @next/next/no-img-element */

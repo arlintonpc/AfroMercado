@@ -171,7 +171,7 @@ const CulturaRepository = {
       data,
       include: {
         autor: { select: { id: true, nombre: true, avatarUrl: true } },
-        comercio: { select: { id: true, nombre: true, logoUrl: true, departamento: true, municipio: true } },
+        comercio: { select: { id: true, nombre: true, logoUrl: true, whatsapp: true, whatsappVisible: true, departamento: true, municipio: true } },
       },
     });
   },
@@ -188,10 +188,13 @@ const CulturaRepository = {
 
   async listarHistoriasActivas({ usuarioId, departamento, municipio }) {
     const ahora = new Date();
+    const comercio = {
+      ...(departamento ? { departamento: { equals: departamento, mode: "insensitive" } } : {}),
+      ...(municipio ? { municipio: { equals: municipio, mode: "insensitive" } } : {}),
+    };
     const where = {
       expiraAt: { gt: ahora },
-      ...(departamento ? { comercio: { departamento: { equals: departamento, mode: "insensitive" } } } : {}),
-      ...(municipio ? { comercio: { municipio: { equals: municipio, mode: "insensitive" } } } : {}),
+      ...(Object.keys(comercio).length > 0 ? { comercio } : {}),
     };
 
     const historias = await prisma.historiaEfimera.findMany({
@@ -199,7 +202,7 @@ const CulturaRepository = {
       orderBy: { createdAt: "asc" },
       include: {
         autor: { select: { id: true, nombre: true, avatarUrl: true } },
-        comercio: { select: { id: true, nombre: true, logoUrl: true, departamento: true, municipio: true } },
+        comercio: { select: { id: true, nombre: true, logoUrl: true, whatsapp: true, whatsappVisible: true, departamento: true, municipio: true } },
         ...(usuarioId ? { vistas: { where: { usuarioId }, select: { id: true } } } : {}),
       },
     });
@@ -235,31 +238,20 @@ const CulturaRepository = {
   },
 
   async registrarVistaHistoria({ historiaId, usuarioId, sesionId }) {
-    if (usuarioId) {
-      const existe = await prisma.vistaHistoriaEfimera.findUnique({
-        where: { historiaId_usuarioId: { historiaId, usuarioId } },
-      });
-      if (!existe) {
-        await prisma.$transaction([
-          prisma.vistaHistoriaEfimera.create({
-            data: { historiaId, usuarioId, sesionId },
-          }),
-          prisma.historiaEfimera.update({
-            where: { id: historiaId },
-            data: { vistasCount: { increment: 1 } },
-          }),
-        ]);
-      }
-    } else {
+    // La ruta exige autenticación: el índice único evita contar a un usuario
+    // más de una vez y este bloque absorbe carreras entre pestañas/dispositivos.
+    try {
       await prisma.$transaction([
         prisma.vistaHistoriaEfimera.create({
-          data: { historiaId, usuarioId: null, sesionId },
+          data: { historiaId, usuarioId, sesionId },
         }),
         prisma.historiaEfimera.update({
           where: { id: historiaId },
           data: { vistasCount: { increment: 1 } },
         }),
       ]);
+    } catch (error) {
+      if (error?.code !== "P2002") throw error;
     }
   },
 

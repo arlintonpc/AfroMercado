@@ -1,16 +1,11 @@
 const prisma = require("../config/prisma");
 
 const EmpleoRepository = {
-  // ── Ofertas ──────────────────────────────────────────────────
-  async crearOferta(data) {
-    return prisma.ofertaEmpleo.create({ data });
-  },
-
-  async buscarOfertaPorId(id) {
+  // ── Ofertas ───────────────────────────────────────────�  async buscarOfertaPorId(id) {
     return prisma.ofertaEmpleo.findUnique({
       where: { id },
       include: {
-        publicadoPor: { select: { id: true, nombre: true } },
+        publicadoPor: { select: { id: true, nombre: true, avatarUrl: true } },
         comercio: { select: { id: true, nombre: true, verificado: true, logoUrl: true } },
       },
     });
@@ -53,7 +48,7 @@ const EmpleoRepository = {
         take,
         orderBy: { createdAt: "desc" },
         include: {
-          publicadoPor: { select: { id: true, nombre: true } },
+          publicadoPor: { select: { id: true, nombre: true, avatarUrl: true } },
           comercio: { select: { id: true, nombre: true, verificado: true, logoUrl: true } },
         },
       }),
@@ -74,7 +69,7 @@ const EmpleoRepository = {
     return prisma.ofertaEmpleo.findMany({
       where: { estadoModeracion: "PENDIENTE", deletedAt: null },
       orderBy: { createdAt: "asc" },
-      include: { publicadoPor: { select: { id: true, nombre: true, email: true } } },
+      include: { publicadoPor: { select: { id: true, nombre: true, email: true, avatarUrl: true } } },
     });
   },
 
@@ -115,6 +110,11 @@ const EmpleoRepository = {
     if (favs.length === 0) return [];
     const ofertas = await prisma.ofertaEmpleo.findMany({
       where: { id: { in: favs.map((f) => f.entidadId) } },
+      include: {
+        publicadoPor: { select: { id: true, nombre: true, avatarUrl: true } },
+        comercio: { select: { id: true, nombre: true, verificado: true, logoUrl: true } },
+      },
+    }); f.entidadId) } },
       include: {
         publicadoPor: { select: { id: true, nombre: true } },
         comercio: { select: { id: true, nombre: true, verificado: true, logoUrl: true } },

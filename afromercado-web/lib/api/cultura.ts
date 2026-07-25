@@ -574,7 +574,7 @@ export interface HistoriaEfimera {
   createdAt: string
   visto?: boolean
   autor?: { id: number; nombre: string; avatarUrl?: string | null }
-  comercio?: { id: number; nombre: string; logoUrl?: string | null; whatsapp?: string | null; departamento?: string; municipio?: string } | null
+  comercio?: { id: number; nombre: string; logoUrl?: string | null; whatsapp?: string | null; whatsappVisible?: boolean; departamento?: string; municipio?: string } | null
 }
 
 export interface GrupoHistoria {

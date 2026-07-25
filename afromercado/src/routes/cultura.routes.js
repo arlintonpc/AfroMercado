@@ -224,7 +224,9 @@ router.get(   "/historias",            autenticarOpcional, CulturaController.lis
 router.post(  "/historias",            ...soloAuth, publicacionLimiter, CulturaController.crearHistoria);
 router.post(  "/historias/foto",       ...soloAuth, publicacionLimiter, uploadFotoPublicacion.single("foto"), handlerSubidaFotoPublicacion);
 router.post(  "/historias/video",      ...soloAuth, publicacionLimiter, uploadVideoPublicacion, handlerSubidaVideoPublicacion);
-router.post(  "/historias/:id/vistas", autenticarOpcional, CulturaController.registrarVistaHistoria);
+// Las vistas se cuentan una sola vez por usuario autenticado. Esto protege
+// las métricas de historias frente a repeticiones anónimas automatizadas.
+router.post(  "/historias/:id/vistas", ...soloAuth, CulturaController.registrarVistaHistoria);
 router.delete("/historias/:id",        ...soloAuth, CulturaController.eliminarHistoria);
 
 // ── VITRINA DE VIDEO (v0) — publicaciones de comercio ──────────

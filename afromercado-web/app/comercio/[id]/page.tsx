@@ -14,6 +14,8 @@ import type { Producto } from '@/types/producto'
 import { listarReviewsTienda, type ReviewTienda } from '@/lib/api/reviewsTienda'
 import { useAuth } from '@/context/AuthContext'
 import { iniciarConversacion } from '@/lib/api/chat'
+import { normalizarUrlMedia } from '@/lib/api/client'
+import ModalAvatarLightbox from '@/components/ui/ModalAvatarLightbox'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')
 
@@ -71,34 +73,50 @@ function Estrellas({ valor }: { valor: number }) {
 // ── Cabecera del comercio ─────────────────────────────────────
 
 function CabeceraComercio({ c, onChatear }: { c: ComercioPublico; onChatear?: () => void }) {
+  const [modalLogoAbierto, setModalLogoAbierto] = useState(false)
   const cal = Number(c.calificacion)
   const mensajeWa = `Hola, vi tu tienda "${c.nombre}" en Teravia y me gustaría hacer un pedido.`
   const waUrl = c.whatsapp && c.whatsappVisible
     ? `https://wa.me/${c.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(mensajeWa)}`
     : null
 
+  const logoFinal = normalizarUrlMedia(c.logoUrl)
+
   return (
-    <section className="bg-white rounded-2xl border border-[#1A1A1A]/5 p-6 shadow-sm">
-      <div className="flex items-start gap-4">
-        {/* Logo o inicial */}
-        {c.logoUrl ? (
-          // La URL proviene del comercio y puede usar un host externo no conocido en build.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={c.logoUrl}
-            alt={c.nombre}
-            className="w-16 h-16 rounded-2xl object-cover flex-shrink-0"
-          />
-        ) : (
-          <div className="w-16 h-16 rounded-2xl bg-[#52B788]/20 flex items-center justify-center flex-shrink-0">
-            <span
-              className="text-2xl font-bold text-[#2D6A4F]"
-              style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
-            >
-              {c.nombre.charAt(0).toUpperCase()}
+    <>
+      <section className="bg-white rounded-2xl border border-[#1A1A1A]/5 p-6 shadow-sm">
+        <div className="flex items-start gap-4">
+          {/* Logo o inicial con click para ver en HD */}
+          <button
+            type="button"
+            onClick={() => setModalLogoAbierto(true)}
+            className="group relative w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/50 shadow-sm"
+            aria-label={`Ver logo de ${c.nombre} en HD`}
+            title="Haz clic para ver el logo en HD"
+          >
+            {logoFinal ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={logoFinal}
+                alt={c.nombre}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-[#52B788]/20 flex items-center justify-center">
+                <span
+                  className="text-2xl font-bold text-[#2D6A4F]"
+                  style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}
+                >
+                  {c.nombre.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
+            <span className="absolute inset-0 bg-[#1A1A1A]/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </span>
-          </div>
-        )}
+          </button>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -203,7 +221,16 @@ function CabeceraComercio({ c, onChatear }: { c: ComercioPublico; onChatear?: ()
           mimeType={c.videoMimeType}
         />
       )}
+
+      <ModalAvatarLightbox
+        isOpen={modalLogoAbierto}
+        onClose={() => setModalLogoAbierto(false)}
+        src={logoFinal}
+        nombre={c.nombre}
+        subtitulo={`${c.municipio}, ${c.departamento}`}
+      />
     </section>
+  </>
   )
 }
 

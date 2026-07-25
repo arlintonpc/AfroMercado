@@ -11,7 +11,7 @@ import {
   type PostulacionEmpleo,
   type EstadoPostulacionEmpleo,
 } from '@/lib/api/empleo'
-
+import { normalizarUrlMedia } from '@/lib/api/client'
 export const TIPO_LABEL: Record<TipoContratoEmpleo, string> = {
   TIEMPO_COMPLETO: 'Tiempo completo',
   MEDIO_TIEMPO: 'Medio tiempo',
@@ -221,12 +221,15 @@ export default function TarjetaOfertaEmpleo({
           {!tieneImagen && (
             <Link href={`/empleo/${oferta.id}`} className="shrink-0">
               <div className={`w-14 h-14 overflow-hidden flex items-center justify-center shadow-sm ${esServicio ? 'rounded-full bg-gradient-to-br from-[#D4A017] to-[#9C6F0F]' : 'rounded-xl bg-gradient-to-br from-[#2D6A4F] to-[#1B4332]'}`}>
-                {oferta.comercio?.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={oferta.comercio.logoUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-white text-xl font-bold">{nombreOrganizador.charAt(0).toUpperCase()}</span>
-                )}
+                {(() => {
+                  const avatarFinal = normalizarUrlMedia(oferta.comercio?.logoUrl || oferta.publicadoPor?.avatarUrl)
+                  return avatarFinal ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={avatarFinal} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-white text-xl font-bold">{nombreOrganizador.charAt(0).toUpperCase()}</span>
+                  )
+                })()}
               </div>
             </Link>
           )}

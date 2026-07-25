@@ -73,7 +73,7 @@ export interface OfertaEmpleo {
   imagenUrl: string | null
   preguntas: PreguntaOferta[]
   createdAt: string
-  publicadoPor?: { id: number; nombre: string }
+  publicadoPor?: { id: number; nombre: string; avatarUrl?: string | null }
   comercio?: { id: number; nombre: string; verificado: boolean; logoUrl: string | null } | null
   _count?: { postulaciones: number }
   anuncioActivo?: boolean

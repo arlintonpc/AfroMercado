@@ -11,6 +11,7 @@ import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import { Toast, useToast } from '@/components/ui/Toast'
 import { urlComoLlegar } from '@/lib/comoLlegar'
+import { normalizarUrlMedia } from '@/lib/api/client'
 
 const TIPO_ICONO: Record<string, string> = { LANCHA: '🛥️', BOTE: '⛵', CHALUPA: '🚤', CANOA: '🛶' }
 const DIAS_LABEL: Record<string, string> = {
@@ -616,14 +617,17 @@ export default function TransporteDetallePage() {
             <div className="py-6 border-b border-gray-100">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Operador</h2>
               <div className="flex items-center gap-4 bg-gray-50 rounded-2xl p-4">
-                {transporte.comercio.logoUrl ? (
-                  <img src={transporte.comercio.logoUrl} alt={transporte.comercio.nombre}
-                    className="w-14 h-14 rounded-xl object-cover border border-gray-200 flex-shrink-0" />
-                ) : (
-                  <div className="w-14 h-14 rounded-xl bg-[#1B4332] flex items-center justify-center flex-shrink-0 text-white text-xl font-black">
-                    {transporte.comercio.nombre[0]}
-                  </div>
-                )}
+                {(() => {
+                  const logoFinal = normalizarUrlMedia(transporte.comercio.logoUrl)
+                  return logoFinal ? (
+                    <img src={logoFinal} alt={transporte.comercio.nombre}
+                      className="w-14 h-14 rounded-xl object-cover border border-gray-200 flex-shrink-0" />
+                  ) : (
+                    <div className="w-14 h-14 rounded-xl bg-[#1B4332] flex items-center justify-center flex-shrink-0 text-white text-xl font-black">
+                      {transporte.comercio.nombre[0]}
+                    </div>
+                  )
+                })()}
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-gray-900">{transporte.comercio.nombre}</p>
                   <p className="text-sm text-gray-500 mt-0.5">{transporte.comercio.municipio}{transporte.comercio.departamento ? `, ${transporte.comercio.departamento}` : ''}</p>

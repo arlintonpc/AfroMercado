@@ -16,7 +16,7 @@ export default function HistoriasCarrusel() {
   const [modalCrearAbierto, setModalCrearAbierto] = useState(false)
   const [grupoVisorIndex, setGrupoVisorIndex] = useState<number | null>(null)
 
-  const cargar = useEffect(() => {
+  useEffect(() => {
     let unmounted = false
     listarHistorias()
       .then((res) => {
@@ -39,7 +39,7 @@ export default function HistoriasCarrusel() {
       .finally(() => setCargando(false))
   }
 
-  const avatarUsuario = normalizarUrlMedia(usuario?.avatarUrl || (usuario as any)?.comercio?.logoUrl)
+  const avatarUsuario = normalizarUrlMedia(usuario?.avatarUrl)
 
   return (
     <>

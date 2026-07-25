@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { listarHoteles, type ConfigHotel, type TipoAlojamiento, TIPOS_ALOJAMIENTO } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { optimizarImagenPequena } from '@/lib/cloudinary'
+import { normalizarUrlMedia } from '@/lib/api/client'
 import BannerDisplay from '@/components/publicidad/BannerDisplay'
 
 const MapaHoteles = dynamic(() => import('@/components/hoteles/MapaHoteles'), { ssr: false })
@@ -119,11 +120,14 @@ function TarjetaHotel({ hotel, userLat, userLon }: { hotel: ConfigHotel; userLat
         <div className="flex items-center justify-between border-t border-white/20 pt-2 sm:pt-4">
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-inner">
-              {hotel.comercio.logoUrl ? (
-                <img src={hotel.comercio.logoUrl} alt={hotel.comercio.nombre} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-white text-sm font-bold">{inicial}</span>
-              )}
+              {(() => {
+                const logoFinal = normalizarUrlMedia(hotel.comercio.logoUrl)
+                return logoFinal ? (
+                  <img src={logoFinal} alt={hotel.comercio.nombre} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-white text-sm font-bold">{inicial}</span>
+                )
+              })()}
             </div>
             {reviews > 0 ? (
               <div className="flex flex-col">
