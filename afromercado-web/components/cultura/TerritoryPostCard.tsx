@@ -96,7 +96,7 @@ export default function TerritoryPostCard({
   }
 
   return (
-    <article className="bg-white rounded-3xl border border-[#1A1A1A]/8 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col">
+    <article className="bg-white rounded-none border-x-0 border-y border-[#1A1A1A]/8 shadow-none transition-all overflow-hidden flex flex-col sm:rounded-3xl sm:border sm:shadow-sm sm:hover:shadow-md">
       {/* 1. Header estilo Facebook / Teravia */}
       <div className="p-4 md:p-5 flex items-center justify-between gap-3 border-b border-gray-100/60">
         <div className="flex items-center gap-3 min-w-0">

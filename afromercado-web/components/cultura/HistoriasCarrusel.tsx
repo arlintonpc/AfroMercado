@@ -30,28 +30,28 @@ export default function HistoriasCarrusel() {
 
   return (
     <>
-      <section aria-label="Historias" className="rounded-2xl bg-white border border-[#1A1A1A]/6 p-2.5 sm:p-3 shadow-sm">
-        <div className="flex gap-2.5 overflow-x-auto px-0.5 pb-0.5 scrollbar-none select-none">
+      <section aria-label="Historias" className="rounded-none border-y border-x-0 -mx-4 bg-white border-[#1A1A1A]/6 p-2.5 shadow-sm sm:mx-0 sm:rounded-2xl sm:border sm:p-3">
+        <div className="flex gap-3 overflow-x-auto px-0.5 pb-0.5 scrollbar-none select-none">
           {usuario?.rol === 'COMERCIANTE' && (
             <button
               type="button"
               onClick={() => setModalCrearAbierto(true)}
-              className="group relative h-36 w-24 flex-shrink-0 overflow-hidden rounded-xl border border-[#D4A017]/30 bg-[#F8F5F0] text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:shadow-[#D4A017]/10"
+              className="group relative h-44 w-28 flex-shrink-0 overflow-hidden rounded-xl border border-[#D4A017]/30 bg-[#F8F5F0] text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:shadow-[#D4A017]/10"
             >
-              <div className="h-[96px] overflow-hidden bg-[#1B4332] relative">
+              <div className="h-[120px] overflow-hidden bg-[#1B4332] relative">
                 {avatarUsuario ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img src={avatarUsuario} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-110" />
                 ) : <div className="h-full w-full bg-gradient-to-br from-[#2D6A4F] to-[#1B4332]" />}
                 <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
               </div>
-              <span className="absolute left-1/2 top-[80px] grid h-7 w-7 -translate-x-1/2 place-items-center rounded-full border-2 border-white bg-gradient-to-tr from-[#2D6A4F] via-[#D4A017] to-[#F4C842] text-sm font-bold text-white shadow-md transition-transform duration-300 group-hover:scale-110">+</span>
+              <span className="absolute left-1/2 top-[100px] grid h-7 w-7 -translate-x-1/2 place-items-center rounded-full border-2 border-white bg-gradient-to-tr from-[#2D6A4F] via-[#D4A017] to-[#F4C842] text-sm font-bold text-white shadow-md transition-transform duration-300 group-hover:scale-110">+</span>
               <span className="block px-1 pt-2.5 text-center text-[10px] font-bold leading-tight text-[#1A1A1A]">Crear historia</span>
             </button>
           )}
 
           {cargando
-            ? Array.from({ length: 5 }).map((_, indice) => <div key={indice} className="h-36 w-24 flex-shrink-0 animate-pulse rounded-xl bg-[#1B4332]/10" />)
+            ? Array.from({ length: 5 }).map((_, indice) => <div key={indice} className="h-44 w-28 flex-shrink-0 animate-pulse rounded-xl bg-[#1B4332]/10" />)
             : grupos.map((grupo, indice) => {
                 const portada = grupo.historias[0]
                 const avatar = normalizarUrlMedia(grupo.avatarUrl)
@@ -60,7 +60,7 @@ export default function HistoriasCarrusel() {
                     key={grupo.id}
                     type="button"
                     onClick={() => setGrupoVisorIndex(indice)}
-                    className="group relative h-36 w-24 flex-shrink-0 overflow-hidden rounded-xl bg-[#1B4332] text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#2D6A4F]/20"
+                    className="group relative h-44 w-28 flex-shrink-0 overflow-hidden rounded-xl bg-[#1B4332] text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#2D6A4F]/20"
                     aria-label={`Ver historias de ${grupo.nombre}`}
                   >
                     {portada?.mediaTipo === 'VIDEO' ? (
