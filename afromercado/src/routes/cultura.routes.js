@@ -221,9 +221,9 @@ router.post("/publicaciones/:id/comentarios/:comentarioId/fijar", ...soloAuth, C
 
 // ── HISTORIAS EFÍMERAS 24H ─────────────────────────────────────
 router.get(   "/historias",            autenticarOpcional, CulturaController.listarHistorias);
-router.post(  "/historias",            ...soloAuth, publicacionLimiter, CulturaController.crearHistoria);
-router.post(  "/historias/foto",       ...soloAuth, publicacionLimiter, uploadFotoPublicacion.single("foto"), handlerSubidaFotoPublicacion);
-router.post(  "/historias/video",      ...soloAuth, publicacionLimiter, uploadVideoPublicacion, handlerSubidaVideoPublicacion);
+router.post(  "/historias",            ...soloComercio, publicacionLimiter, CulturaController.crearHistoria);
+router.post(  "/historias/foto",       ...soloComercio, publicacionLimiter, uploadFotoPublicacion.single("foto"), handlerSubidaFotoPublicacion);
+router.post(  "/historias/video",      ...soloComercio, publicacionLimiter, uploadVideoPublicacion, handlerSubidaVideoPublicacion);
 // Las vistas se cuentan una sola vez por usuario autenticado. Esto protege
 // las métricas de historias frente a repeticiones anónimas automatizadas.
 router.post(  "/historias/:id/vistas", ...soloAuth, CulturaController.registrarVistaHistoria);

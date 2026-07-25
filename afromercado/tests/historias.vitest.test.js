@@ -10,13 +10,19 @@ describe("Pruebas: Historias Efímeras 24h (Servicio y Expiración)", () => {
   });
 
   it("crearHistoria() rechaza si no se provee foto o video", async () => {
-    const usuario = { id: 10, nombre: "Test User" };
+    const usuario = { id: 10, nombre: "Test User", rol: "COMERCIANTE", comercio: { id: 4 } };
     await expect(CulturaService.crearHistoria(usuario, { mediaUrl: "" }))
       .rejects.toThrow("La historia debe contener una imagen o video");
   });
 
+  it("crearHistoria() rechaza cuentas que no representan una tienda", async () => {
+    const usuario = { id: 10, nombre: "Test User", rol: "COMPRADOR", comercio: null };
+    await expect(CulturaService.crearHistoria(usuario, { mediaUrl: "http://example.com/foto.jpg" }))
+      .rejects.toThrow("Solo una tienda registrada puede publicar historias");
+  });
+
   it("crearHistoria() calcula expiraAt a 24 horas exactas en el futuro", async () => {
-    const usuario = { id: 10, nombre: "Test User" };
+    const usuario = { id: 10, nombre: "Test User", rol: "COMERCIANTE", comercio: { id: 4 } };
     const datos = {
       mediaUrl: "http://cloudinary.com/foto_test.jpg",
       mediaTipo: "FOTO",
@@ -40,6 +46,7 @@ describe("Pruebas: Historias Efímeras 24h (Servicio y Expiración)", () => {
     const originalCrear = CulturaRepository.crearHistoria;
     CulturaRepository.crearHistoria = async (d) => {
       expect(d.autorId).toBe(usuario.id);
+      expect(d.comercioId).toBe(usuario.comercio.id);
       expect(d.mediaUrl).toBe(datos.mediaUrl);
       const diffHoras = (d.expiraAt.getTime() - Date.now()) / (1000 * 60 * 60);
       expect(diffHoras).toBeGreaterThan(23.9);

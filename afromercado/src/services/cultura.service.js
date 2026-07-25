@@ -1173,6 +1173,9 @@ const CulturaService = {
   // ── Historias Efímeras 24h ───────────────────────────────────
   async crearHistoria(usuario, datos = {}) {
     if (!usuario?.id) throw new ErrorProhibido("Debes iniciar sesión para publicar una historia");
+    if (usuario.rol !== "COMERCIANTE" || !usuario.comercio?.id) {
+      throw new ErrorProhibido("Solo una tienda registrada puede publicar historias");
+    }
 
     const mediaUrl = textoLimpio(datos.mediaUrl, 2048);
     if (!mediaUrl) throw new ErrorValidacion("La historia debe contener una imagen o video");
@@ -1182,17 +1185,11 @@ const CulturaService = {
     const texto = textoLimpio(datos.texto, 300);
     const fondoColor = textoLimpio(datos.fondoColor, 30) || "#1B4332";
 
-    // Si el usuario es comerciante y envía `esComercio: true`, asociamos la historia a su comercio
-    let comercioId = null;
-    if (datos.esComercio && usuario.comercio?.id) {
-      comercioId = usuario.comercio.id;
-    }
-
     const expiraAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas exactas
 
     return CulturaRepository.crearHistoria({
       autorId: usuario.id,
-      comercioId,
+      comercioId: usuario.comercio.id,
       mediaUrl,
       mediaTipo,
       duracionSegundos,

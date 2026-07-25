@@ -175,33 +175,33 @@ export default function VitrinaPage() {
         />
 
         {/* Pestañas Principales de Descubrimiento */}
-        <div className="flex items-center justify-center gap-2 p-1.5 bg-gray-200/60 rounded-full max-w-md mx-auto">
+        <div className="flex items-center justify-center gap-1.5 p-1.5 bg-white border border-[#1A1A1A]/8 rounded-full max-w-md mx-auto shadow-sm">
           <button
             onClick={() => setPestaña('EXPLORAR')}
-            className={`flex-1 py-2 px-4 rounded-full text-xs font-bold transition-all ${
+            className={`flex-1 py-2.5 px-4 rounded-full text-xs font-bold transition-all duration-300 ${
               pestaña === 'EXPLORAR'
-                ? 'bg-[#1B4332] text-white shadow-md'
-                : 'text-gray-700 hover:text-black'
+                ? 'bg-gradient-to-r from-[#1B4332] to-[#2D6A4F] text-white shadow-md shadow-[#2D6A4F]/20'
+                : 'text-[#1A1A1A]/70 hover:text-[#1B4332] hover:bg-[#F8F5F0]'
             }`}
           >
             🧭 Explorar
           </button>
           <button
             onClick={() => setPestaña('SIGUIENDO')}
-            className={`flex-1 py-2 px-4 rounded-full text-xs font-bold transition-all ${
+            className={`flex-1 py-2.5 px-4 rounded-full text-xs font-bold transition-all duration-300 ${
               pestaña === 'SIGUIENDO'
-                ? 'bg-[#1B4332] text-white shadow-md'
-                : 'text-gray-700 hover:text-black'
+                ? 'bg-gradient-to-r from-[#1B4332] to-[#2D6A4F] text-white shadow-md shadow-[#2D6A4F]/20'
+                : 'text-[#1A1A1A]/70 hover:text-[#1B4332] hover:bg-[#F8F5F0]'
             }`}
           >
             ✨ Siguiendo
           </button>
           <button
             onClick={() => setPestaña('GUARDADOS')}
-            className={`flex-1 py-2 px-4 rounded-full text-xs font-bold transition-all ${
+            className={`flex-1 py-2.5 px-4 rounded-full text-xs font-bold transition-all duration-300 ${
               pestaña === 'GUARDADOS'
-                ? 'bg-[#1B4332] text-white shadow-md'
-                : 'text-gray-700 hover:text-black'
+                ? 'bg-gradient-to-r from-[#1B4332] to-[#2D6A4F] text-white shadow-md shadow-[#2D6A4F]/20'
+                : 'text-[#1A1A1A]/70 hover:text-[#1B4332] hover:bg-[#F8F5F0]'
             }`}
           >
             🔖 Guardados
@@ -217,67 +217,36 @@ export default function VitrinaPage() {
         {/* Carrusel de Historias Efímeras (24h) — Estilo Facebook / WhatsApp / IG */}
         <HistoriasCarrusel />
 
-        {comerciantes.length > 0 && (
-          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1" style={{ scrollbarWidth: 'none' }}>
-            {comerciantes.map((c) => (
-              <Link
-                key={c.id}
-                href={`/comercio/${c.id}`}
-                className="group relative h-44 w-28 flex-shrink-0 overflow-hidden rounded-2xl bg-[#1B4332] shadow-sm"
-              >
-                {c.fondoUrl ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={c.fondoUrl}
-                    alt={c.nombre}
-                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#2D6A4F] to-[#1B4332]" />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/20" />
-
-                {(() => {
-                  const logoFinal = normalizarUrlMedia(c.logoUrl)
-                  return logoFinal ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={logoFinal}
-                      alt={c.nombre}
-                      className="absolute left-2 top-2 h-9 w-9 rounded-full border-2 border-[#D4A017] object-cover"
-                    />
-                  ) : (
-                    <div className="absolute left-2 top-2 flex h-9 w-9 items-center justify-center rounded-full border-2 border-[#D4A017] bg-[#1B4332] text-sm font-bold text-white">
-                      {c.nombre[0]?.toUpperCase() || '?'}
-                    </div>
-                  )
-                })()}
-
-                <span className="absolute inset-x-2 bottom-2 line-clamp-2 text-xs font-semibold leading-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.7)]">
-                  {c.nombre}
-                </span>
-              </Link>
-            ))}
-          </div>
-        )}
-
         {esComerciante && (
           <Link
             href="/comerciante/vitrina/nueva"
-            className="flex items-center gap-3 rounded-2xl border border-[#1A1A1A]/8 bg-white px-4 py-3 shadow-sm transition hover:border-[#2D6A4F]/30 hover:shadow-md"
+            className="flex items-center justify-between rounded-2xl border border-[#1A1A1A]/8 bg-white px-5 py-3.5 shadow-sm transition-all duration-300 hover:border-[#2D6A4F]/30 hover:shadow-md"
           >
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#1B4332] text-lg overflow-hidden border border-[#D4A017]">
-              {(() => {
-                const avatarCrear = normalizarUrlMedia(usuario?.avatarUrl || (usuario as any)?.comercio?.logoUrl)
-                return avatarCrear ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={avatarCrear} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  '🎥'
-                )
-              })()}
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#1B4332] overflow-hidden border-2 border-[#D4A017] shadow-sm">
+                {(() => {
+                  const avatarCrear = normalizarUrlMedia(usuario?.avatarUrl || (usuario as any)?.comercio?.logoUrl)
+                  return avatarCrear ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={avatarCrear} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-white font-bold text-sm">🎥</span>
+                  )
+                })()}
+              </div>
+              <span className="text-sm font-semibold text-[#1A1A1A]/60 truncate">¿Qué quieres compartir hoy de tu oferta?</span>
             </div>
-            <span className="text-sm font-medium text-[#1A1A1A]/50">¿Qué quieres compartir hoy de tu oferta?</span>
+            <div className="hidden sm:flex items-center gap-2 shrink-0">
+              <span className="text-xs font-bold text-[#1B4332] bg-[#2D6A4F]/10 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-[#2D6A4F]/20 transition-colors">
+                📷 Foto
+              </span>
+              <span className="text-xs font-bold text-[#9C6F0F] bg-[#D4A017]/15 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-[#D4A017]/25 transition-colors">
+                🎥 Video Clip
+              </span>
+              <span className="text-xs font-bold text-[#1B4332] bg-[#1B4332]/10 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-[#1B4332]/20 transition-colors">
+                🏷️ Publicar
+              </span>
+            </div>
           </Link>
         )}
 

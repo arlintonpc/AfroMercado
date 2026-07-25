@@ -194,6 +194,7 @@ const CulturaRepository = {
     };
     const where = {
       expiraAt: { gt: ahora },
+      comercioId: { not: null },
       ...(Object.keys(comercio).length > 0 ? { comercio } : {}),
     };
 
@@ -207,18 +208,20 @@ const CulturaRepository = {
       },
     });
 
-    // Agrupar por Comercio (si comercioId existe) o Autor (si personal)
+    // Las historias son una vitrina comercial: se agrupan exclusivamente por tienda.
     const gruposMap = new Map();
     for (const h of historias) {
-      const clave = h.comercioId ? `C_${h.comercioId}` : `U_${h.autorId}`;
+      const clave = `C_${h.comercioId}`;
       if (!gruposMap.has(clave)) {
         gruposMap.set(clave, {
           id: clave,
-          comercioId: h.comercioId ?? null,
+          comercioId: h.comercioId,
           autorId: h.autorId,
-          nombre: h.comercio ? h.comercio.nombre : h.autor.nombre,
-          avatarUrl: h.comercio ? h.comercio.logoUrl : h.autor.avatarUrl,
-          esComercio: !!h.comercioId,
+          nombre: h.comercio.nombre,
+          // Un comercio puede no haber cargado logo; en ese caso se conserva
+          // la identidad visual del propietario en lugar de mostrar iniciales.
+          avatarUrl: h.comercio.logoUrl || h.autor.avatarUrl,
+          esComercio: true,
           historias: [],
           vistasTodas: true,
         });

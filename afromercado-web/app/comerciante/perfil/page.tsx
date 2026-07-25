@@ -27,6 +27,7 @@ import { obtenerReglasPublicas } from '@/lib/api/config'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
 import PanelDeclaracionTerritorial from '@/components/comerciante/PanelDeclaracionTerritorial'
 import { subirAvatar } from '@/lib/api/usuario'
+import ModalCrearHistoria from '@/components/cultura/ModalCrearHistoria'
 
 const BANCOS_DISPERSION = [
   { valor: 'BANCOLOMBIA', etiqueta: 'Bancolombia' },
@@ -224,6 +225,7 @@ function requisitosDocumentoIdentidad(tipo?: TipoDocumento | null) {
 export default function PerfilComerciantePage() {
   const { usuario } = useAuth()
   const [comercio, setComercio] = useState<Comercio | null>(null)
+  const [modalHistoriaAbierto, setModalHistoriaAbierto] = useState(false)
   const [cargando, setCargando] = useState(true)
 
   const [nombre, setNombre] = useState('')
@@ -561,13 +563,22 @@ export default function PerfilComerciantePage() {
 
   return (
     <div className="mx-auto w-full max-w-2xl flex flex-col gap-6">
-      <div>
+      <div className="flex items-start justify-between gap-4">
+        <div>
         <h1 className="text-3xl text-[#1A1A1A]" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
           Mi tienda
         </h1>
         <p className="mt-1 text-sm text-[#1A1A1A]/60">
           Así te ven los compradores. Mantenlo actualizado.
         </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setModalHistoriaAbierto(true)}
+          className="shrink-0 rounded-full bg-[#2D6A4F] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#1B4332]"
+        >
+          Crear historia
+        </button>
       </div>
 
       {aviso && (
@@ -1079,6 +1090,12 @@ export default function PerfilComerciantePage() {
           </Button>
         </div>
       )}
+      <ModalCrearHistoria
+        isOpen={modalHistoriaAbierto}
+        onClose={() => setModalHistoriaAbierto(false)}
+        onHistoriaCreada={() => setModalHistoriaAbierto(false)}
+        nombreComercio={comercio?.nombre}
+      />
     </div>
   )
 }

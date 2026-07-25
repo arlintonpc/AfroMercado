@@ -69,16 +69,31 @@ export function CulturaHero({
   badge?: ReactNode
 }) {
   return (
-    <header className="relative overflow-hidden rounded-[2rem] border border-[#1A1A1A]/8 bg-white/85 p-6 shadow-[0_16px_50px_rgba(26,26,26,0.06)] backdrop-blur sm:p-8">
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(45,106,79,0.07),transparent_45%,rgba(212,160,23,0.07))]" />
-      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <header className="relative overflow-hidden rounded-[2.25rem] border border-[#D4A017]/25 bg-gradient-to-br from-[#1B4332] via-[#2D6A4F] to-[#123124] p-6 shadow-[0_20px_50px_rgba(27,67,50,0.25)] text-white sm:p-9">
+      {/* Background Mesh Overlay */}
+      <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[#D4A017]/15 blur-3xl" />
+      <div className="absolute -left-10 -bottom-10 h-64 w-64 rounded-full bg-[#52B788]/15 blur-2xl" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(212,160,23,0.12),transparent_60%)]" />
+
+      <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between z-10">
         <div className="max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#2D6A4F]">{eyebrow}</p>
-          <h1 className="mt-2 font-serif text-4xl leading-tight text-[#1B4332] sm:text-5xl">{title}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#1A1A1A]/68 sm:text-base">{description}</p>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[11px] font-extrabold uppercase tracking-[0.28em] text-[#D4A017] bg-[#D4A017]/15 px-3 py-1 rounded-full border border-[#D4A017]/30">
+              {eyebrow}
+            </span>
+            <span className="hidden sm:inline-flex text-[11px] font-semibold text-white/70 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
+              🌿 100% Auténtico
+            </span>
+          </div>
+          <h1 className="font-serif text-4xl leading-tight text-white sm:text-5xl drop-shadow-md">
+            {title}
+          </h1>
+          <p className="mt-3.5 max-w-2xl text-sm leading-relaxed text-white/80 sm:text-base">
+            {description}
+          </p>
         </div>
         {(actions || badge) && (
-          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end">
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end shrink-0">
             {badge}
             {actions}
           </div>
