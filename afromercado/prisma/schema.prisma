@@ -2842,6 +2842,7 @@ model HistoriaEfimera {
   @@index([expiraAt, createdAt])
   @@index([comercioId, expiraAt])
   @@index([autorId, expiraAt])
+  @@map("historias_efimeras")
 }
 
 model VistaHistoriaEfimera {
@@ -2849,7 +2850,7 @@ model VistaHistoriaEfimera {
   historiaId Int
   usuarioId  Int?
   sesionId   String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @map("vistoAt")
 
   historia HistoriaEfimera @relation(fields: [historiaId], references: [id], onDelete: Cascade)
   usuario  Usuario?        @relation("VistasHistoriaUsuario", fields: [usuarioId], references: [id], onDelete: SetNull)
@@ -2857,5 +2858,6 @@ model VistaHistoriaEfimera {
   @@unique([historiaId, usuarioId])
   @@index([historiaId, createdAt])
   @@index([usuarioId, createdAt])
+  @@map("historias_efimeras_vistas")
 }
 
