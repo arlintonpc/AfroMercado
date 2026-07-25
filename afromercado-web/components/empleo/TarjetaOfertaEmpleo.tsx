@@ -209,11 +209,13 @@ export default function TarjetaOfertaEmpleo({
   return (
     <div className={`group rounded-2xl border overflow-hidden transition-all duration-200 ${oferta.anuncioActivo ? 'bg-gradient-to-b from-[#FFFDF0] to-white border-[#D4A017]/30 hover:border-[#D4A017]/50 hover:shadow-[0_8px_24px_rgba(212,160,23,0.12)]' : 'bg-white border-[#1A1A1A]/8 hover:border-[#2D6A4F]/25 hover:shadow-[0_8px_24px_rgba(45,106,79,0.08)]'}`}>
       {tieneImagen && (
-        <Link href={`/empleo/${oferta.id}`} className="relative block h-40 w-full overflow-hidden bg-[#1B4332]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={oferta.imagenUrl!} alt="" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" />
-          <div className="absolute right-3 top-3">{accionesFlotantes}</div>
-        </Link>
+        <div className="relative block h-40 w-full overflow-hidden bg-[#1B4332]">
+          <Link href={`/empleo/${oferta.id}`} className="block h-full w-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={oferta.imagenUrl!} alt="" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" />
+          </Link>
+          <div className="absolute right-3 top-3 z-10">{accionesFlotantes}</div>
+        </div>
       )}
 
       <div className="p-5">
