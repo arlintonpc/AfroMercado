@@ -2111,7 +2111,7 @@ model ConfigHotel {
   activo                  Boolean   @default(false)
   confirmacionAuto        Boolean   @default(false)
   horasLimiteConfirm      Int       @default(2)
-  servicios               String[]
+  servicios               String[]  @default([])
   politicaCancelacion     String?
   checkInHora             String    @default("15:00")
   checkOutHora            String    @default("12:00")

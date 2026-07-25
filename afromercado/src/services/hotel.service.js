@@ -952,7 +952,7 @@ const HotelService = {
     });
     if (!cfg) {
       cfg = await prisma.configHotel.create({
-        data: { comercioId },
+        data: { comercioId, servicios: [] },
         include: { habitaciones: true, habitacionesFisicas: true },
       });
     }

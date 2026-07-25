@@ -185,6 +185,7 @@ export default function HeroBanner({ productos = [] }: { productos?: Producto[] 
             src={slide.url}
             alt={slide.alt}
             fill
+            sizes="100vw"
             className="object-cover object-center transition-transform duration-[15000ms] ease-out"
             style={{ transform: idx === currentIdx ? 'scale(1)' : 'scale(1.1)' }}
             priority={idx === 0}
@@ -259,7 +260,7 @@ export default function HeroBanner({ productos = [] }: { productos?: Producto[] 
             className="flex items-center gap-3 bg-black/40 hover:bg-black/70 backdrop-blur-md rounded-2xl p-2.5 pr-5 border border-white/10 hover:border-white/30 transition-all shadow-xl group max-w-xs"
           >
              <div className="w-14 h-14 rounded-xl overflow-hidden relative flex-shrink-0">
-               <Image src={activeItem.url} alt={activeItem.alt} fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
+               <Image src={activeItem.url} alt={activeItem.alt} fill sizes="56px" className="object-cover group-hover:scale-110 transition-transform duration-500" />
              </div>
              <div className="flex flex-col min-w-0">
                <span className="text-[9px] text-[#52B788] font-bold uppercase tracking-wider mb-0.5">
