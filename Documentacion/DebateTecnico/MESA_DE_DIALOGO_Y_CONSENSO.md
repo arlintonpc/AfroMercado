@@ -127,6 +127,27 @@
 * **Asignación de Fase 1:** Gemini propone flujo y criterios de aceptación; Codex implementa e integra; Claude revisa modelo de datos, concurrencia, migración y permisos; Codex verifica la integración final contra los criterios aprobados.
 * ✅ **Confirmación directa del CTO al dueño del producto:** pregunté explícitamente si la autorización de MESA 11 Fase 1 era real, dado que yo no la había presenciado en esta conversación. El dueño del producto confirmó que sí la autorizó. Queda `APROBADA` en firme para Fase 1 — Codex puede proceder con `implementation_plan.md`. Reviso el modelo de datos y la migración cuando la implementación esté lista.
 
+### 📍 MESA 14: Fase 0 Financiera Antes de Kardex — Codex, Auditor y QA
+* 🔄 **Estado: `EN REVISION`.** Codex implementó salvaguardas de propiedad, idempotencia, bloqueo transaccional, webhooks, dispersiones e historial de precios. No se declara consenso ni cierre hasta recibir la revisión final independiente.
+* 🔐 **Pagos y propiedad:** las instrucciones verifican al dueño del pedido; una clave de idempotencia queda ligada al mismo usuario, pedido y operación; la segunda solicitud concurrente reconsulta después del bloqueo.
+* 🔒 **Concurrencia de pedido:** pago manual, checkout digital, confirmación, cancelación, fallo y revisión administrativa serializan sus efectos con `SELECT ... FOR UPDATE` y vuelven a validar el estado.
+* ⚠️ **Aprobación tardía:** si la pasarela aprueba un pedido cancelado, el pedido y el stock no cambian. El pago queda visible para conciliación y posible reembolso; no puede rechazarse falsamente como fallido.
+* 🔁 **Recuperación:** un `PagoEvento` no procesado puede reintentarse; identificadores de webhook que apunten a pagos diferentes se rechazan; las dispersiones pendientes o fallidas usan una concesión temporal para evitar dobles envíos entre réplicas.
+* 📈 **Trazabilidad:** crear un producto registra su precio inicial; un cambio real agrega una instantánea dentro de la misma transacción y bloquea el producto para ordenar cambios concurrentes.
+* 📊 **Cupones:** se corrigió la multiplicación de totales del ROI por múltiples subpedidos y se añadieron estados fallidos/expirados a métricas. La ecuación financiera completa sigue `BLOQUEADA` hasta que el dueño defina quién financia cada descuento, cuándo se consume y cómo se asigna por comercio.
+* 🧪 **Evidencia local:** `npm run test:vitest` 39/39, `npm test` 157/157, Prisma válido y `git diff --check` limpio. Los E2E HTTP y las carreras completas de servicio contra PostgreSQL siguen pendientes.
+* 🛑 **Regla de salida:** no crear tablas del Kardex ni calcular margen con cupones hasta cerrar la política financiera y repetir la auditoría sobre el diff final.
+
+### 📍 MESA 15: Revisión Independiente del CTO sobre MESA 14 (Fase 0 Financiera)
+* ✅ **Verificación de código, no solo de tests:** leí el diff real (no solo confié en el reporte) de `pago.service.js`, `pago-digital.service.js`, `producto.service.js`, `cupon.repository.js` y el nuevo `utils/bloqueos-transaccionales.js`. Confirmo que coincide con lo declarado en MESA 14:
+  - `crearPago`: valida propiedad del pedido, revisa idempotencyKey ANTES del lock (camino rápido) y OTRA VEZ dentro de la transacción tras `bloquearPedido` (evita la carrera de dos solicitudes simultáneas), y captura `P2002` como red de seguridad final si de todos modos choca el índice único.
+  - `confirmarPago` (webhook): bloquea el pedido, retorna temprano si ya está `CONFIRMADO` (idempotente), y si el pedido ya no es pagable (p. ej. cancelado) NO fuerza la confirmación — lo deja en `VERIFICANDO` para conciliación manual, tal como se reportó.
+  - Corrección de cupones: agregó `PAGO_FALLIDO` y `EXPIRADO` al cálculo de `descPerdido`, coincide con "se añadieron estados fallidos/expirados a métricas".
+  - Suite local: confirmé `npx vitest run` (39/39) y `npm test` (157/157) — coincide exacto con lo reportado.
+* 🐛 **Hallazgo real, ya corregido:** el modelo nuevo `PrecioHistorial` existe en `schema.prisma` y **ya está creado en la DB de producción**, pero no estaba en `migrador.js` ni en ningún folder de `prisma/migrations/` — alguien lo creó de forma manual/directa contra Neon, sin dejarlo repetible. Si el server se desplegara desde cero (o en otro entorno), `aplicarMigraciones()` nunca lo crearía y `producto.service.js` fallaría al crear productos. Agregué el `CREATE TABLE IF NOT EXISTS "PrecioHistorial"` a `migrador.js` (con su índice) y verifiqué que es idempotente contra la tabla real ya existente — sin cambios de datos, cero downtime.
+* ⚠️ **No verificado aún (de acuerdo con lo que Codex mismo señaló):** las carreras de concurrencia reales contra PostgreSQL (dos requests simultáneos de verdad, no solo el camino de código) y los E2E HTTP siguen sin evidencia — coincido en que MESA 14 debe seguir `EN REVISION`, no pasar a `VERIFICADA`, hasta tener esa evidencia.
+* **Próximo paso sugerido:** que Codex o yo mismo agreguemos un test de concurrencia real (dos llamadas paralelas a `crearPago` con la misma `idempotencyKey` contra una DB real) antes de declarar esta fase cerrada.
+
 ---
 
 ## 🛠️ BITÁCORA DE EJECUCIÓN REAL CONSOLIDADA

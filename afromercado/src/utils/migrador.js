@@ -303,6 +303,17 @@ const STATEMENTS = [
     END IF;
   END $$`,
   `SELECT setval(pg_get_serial_sequence('"HistoriaEfimera"', 'id'), COALESCE((SELECT MAX("id") FROM "HistoriaEfimera"), 1), true)`,
+
+  // Historial de precios (Fase 0 financiera — snapshot en creación/cambio de precio de Producto)
+  `CREATE TABLE IF NOT EXISTS "PrecioHistorial" (
+    "id" SERIAL PRIMARY KEY,
+    "productoId" INTEGER NOT NULL,
+    "precio" DECIMAL(12,2) NOT NULL,
+    "cambiadoPor" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "PrecioHistorial_productoId_fkey" FOREIGN KEY ("productoId") REFERENCES "Producto"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS "PrecioHistorial_productoId_createdAt_idx" ON "PrecioHistorial"("productoId", "createdAt")`,
 ];
 
 async function asegurarTablaLog() {
