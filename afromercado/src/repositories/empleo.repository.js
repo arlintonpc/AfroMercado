@@ -1,7 +1,12 @@
 const prisma = require("../config/prisma");
 
 const EmpleoRepository = {
-  // ── Ofertas ───────────────────────────────────────────�  async buscarOfertaPorId(id) {
+  // ── Ofertas ──────────────────────────────────────────────────
+  async crearOferta(data) {
+    return prisma.ofertaEmpleo.create({ data });
+  },
+
+  async buscarOfertaPorId(id) {
     return prisma.ofertaEmpleo.findUnique({
       where: { id },
       include: {
@@ -18,14 +23,11 @@ const EmpleoRepository = {
   async listarPublicas({ municipio, departamento, categoria, tipoContrato, tipoPublicacion, search, salarioMin, salarioMax, page = 1, take = 20 }) {
     const min = salarioMin != null && salarioMin !== "" ? Number(salarioMin) : null;
     const max = salarioMax != null && salarioMax !== "" ? Number(salarioMax) : null;
-    // Rango solapado: la oferta califica si [oferta.salarioMin, oferta.salarioMax]
-    // se cruza con [min, max] pedido. Si el usuario pidió un rango de salario y la
-    // oferta no tiene salario definido, se excluye (no hay forma de comparar).
     const filtroSalario = [];
     if (min != null || max != null) {
       filtroSalario.push({ salarioMin: { not: null } }, { salarioMax: { not: null } });
       if (min != null) filtroSalario.push({ salarioMax: { gte: min } });
-      if (max != null) filtroSalario.push({ salarioMin: { lte: max } });
+      if (max != null) filtroSalario.push({ salarioMax: { lte: max } });
     }
     const where = {
       estado: "PUBLICADA",
@@ -112,11 +114,6 @@ const EmpleoRepository = {
       where: { id: { in: favs.map((f) => f.entidadId) } },
       include: {
         publicadoPor: { select: { id: true, nombre: true, avatarUrl: true } },
-        comercio: { select: { id: true, nombre: true, verificado: true, logoUrl: true } },
-      },
-    }); f.entidadId) } },
-      include: {
-        publicadoPor: { select: { id: true, nombre: true } },
         comercio: { select: { id: true, nombre: true, verificado: true, logoUrl: true } },
       },
     });
