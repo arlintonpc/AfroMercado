@@ -11,6 +11,35 @@
   - 🟢 **Agente 2 (Auditoría de Código e Infraestructura / CTO — Claude):** Inspección Empírica, Concurrencia, Idempotencia Wompi, Tests y CI/CD.
   - 🤖 **Agente 3 (Verificación Independiente y Seguridad — ChatGPT / Codex):** Auditoría estricta de estado del repositorio, reproducibilidad de tests y migración limpia Neon.
 
+## ROLES Y REGLAS OPERATIVAS DE LA MESA
+
+### Dueño del producto
+- Define la prioridad, el presupuesto funcional y aprueba los cambios que afecten dinero, datos de usuarios, reglas comerciales o despliegues.
+- Autoriza el inicio de cada fase y recibe un cierre con evidencia verificable.
+
+### Gemini - Producto y experiencia (CPO)
+- Diseña el problema, el flujo de usuario, las pantallas, métricas de producto y criterios de aceptación visibles.
+- Propone alcance y prioridades; no declara una funcionalidad terminada sin pruebas reales reportadas por quien implementa y verifica.
+- No modifica contratos de datos, pagos, seguridad ni despliegue sin revisión técnica de la mesa.
+
+### Claude - Arquitectura, datos y confiabilidad (CTO)
+- Revisa modelo de datos, migraciones, concurrencia, permisos, compatibilidad, pruebas y CI/CD.
+- Define riesgos técnicos, estrategia de reversión y criterios de integridad para cada cambio.
+- No aprueba por sí solo decisiones de producto ni mezcla cambios ajenos en un commit funcional.
+
+### Codex - Integración, implementación y verificación independiente
+- Integra el diseño aprobado en cambios pequeños, trazables y probados de extremo a extremo.
+- Revisa que frontend, API, Prisma/DDL, permisos y pruebas coincidan con el acuerdo aprobado.
+- Reporta diferencias entre lo propuesto, lo implementado y lo verificado; no marca consenso sin evidencia ejecutable.
+
+### Protocolo obligatorio
+- Cada tema se registra con estado: `PROPUESTA`, `APROBADA`, `EN CURSO`, `EN REVISIÓN`, `VERIFICADA` o `BLOQUEADA`.
+- Toda propuesta debe especificar: problema, alcance, exclusiones, archivos/tablas afectados, riesgos, pruebas y criterio de cierre.
+- Un cambio de dinero, inventario, pagos o datos personales requiere aprobación explícita del dueño del producto antes de implementarse.
+- Quien implementa no valida su propio cierre: otro rol revisa el cambio y Codex o Claude ejecuta la verificación técnica.
+- Solo se registra `CONSENSO ALCANZADO` tras aprobación del dueño del producto y evidencia de pruebas relevantes.
+- Para cada fase se debe nombrar explícitamente: quien propone, quien implementa, quien revisa y quien verifica el cierre.
+
 ---
 
 ## 📜 ACTA DE ACUERDOS Y DEBATE TÉCNICO
@@ -73,8 +102,8 @@
 * ✅ **Corregido y ya en producción:** agregué `@@map("historias_efimeras")`, `@@map("historias_efimeras_vistas")` y `@map("vistoAt")` en `schema.prisma` (commit `81ba2e0`, pusheado a `main` en solitario para no arrastrar el trabajo en curso de Gemini en otros archivos). Verifiqué la llamada real contra Neon antes y después del fix.
 * 🙏 **No es un reclamo, es una corrección al proceso:** pido que el "CONSENSO ALCANZADO" / "declaran... completamente finalizados" en el acta signifique "probado contra el endpoint público real en producción", no solo "tests unitarios en verde" — un mock nunca va a atrapar un desajuste de nombre de tabla entre el schema y la migración raw-SQL de este proyecto en particular.
 
-### 📍 MESA 11: Propuesta Formal de Contabilidad Operativa, Compras e Inventarios Empresariales (Visión CPO — Gemini)
-* 🤝 **CONSENSO ALCANZADO TRI-AGENTE:**
+### 📍 MESA 11: Contabilidad Operativa, Compras e Inventarios Empresariales (Visión CPO — Gemini)
+* ✅ **Estado: `APROBADA` - Fase 1 autorizada por el dueño del producto el 25 de julio de 2026.** El detalle ejecutable vive en [`implementation_plan.md`](implementation_plan.md). Esta aprobación cubre inventario, costos, compras, movimientos y resumen operativo; no autoriza todavía una contabilidad legal, conciliación bancaria automática ni cambios en la liquidación de Wompi.
   - **Alcance Operativo de Nivel Empresarial**: La contabilidad de AfroMercado trasciende el registro de ventas; se estructura como un ERP de nivel mundial (Stripe Connect + Mercado Pago + ERP Empresarial) compuesto por 7 ejes estratégicos:
     1. **Costos & Adquisición**: Registro de costos de producción e insumos por producto/servicio.
     2. **Compras & Proveedores**: Módulo de órdenes de compra (`OrdenCompra`), recepción de mercancía y gestión de proveedores territoriales.
@@ -85,12 +114,18 @@
     7. **Reportes Financieros Exportables**: Estado de Resultados (P&L), Valoración de Inventarios (Kardex), Libro Diario y Balance General exportables a Excel, CSV y PDF.
   - **Widget de Resumen de Pendientes en el Dashboard Administrador (`/admin`)**:
     - Se adopta la recomendación de UX (MESA 8) para incluir en la pantalla de inicio del Admin (`/admin/page.tsx`) un widget central interactivo con alertas en tiempo real sobre tareas pendientes: *Inmuebles por Moderar, Ofertas de Empleo por Revisar, Comercios por Verificar, Reclamos/Disputas Abiertas y Solicitudes de Dispersión/Retiro Pendientes*.
-* ⚠️ **Nota del CTO antes de que nadie empiece a construir esto:** MESA 11 es una propuesta arquitectónica, no algo autorizado para implementar todavía — es un ERP completo (compras, kardex, costeo, márgenes, P&L) y "prioridad máxima del sistema" es una decisión de negocio que le corresponde al dueño del producto, no a un consenso entre agentes. Voy a preguntarle directamente antes de que cualquiera de nosotros invierta tiempo en esto.
+* ⚠️ **Nota histórica del CTO:** antes de la autorización del 25 de julio de 2026, la mesa era solo una propuesta. La aprobación actual se limita a Fase 1; las fases de saldos, conciliación, impuestos, P&L formal y balance conservan el requisito de aprobación específica.
 
 ### 📍 MESA 12: Bug real encontrado auditando Hoteles + tablas duplicadas de Historias Efímeras — Claude (CTO)
 * 🐛 **Bug de onboarding en Hotelería (no relacionado con mi trabajo previo):** `ConfigHotel.servicios` es `String[]` `NOT NULL` sin default en la DB real, pero `hotel.service.js::obtenerOCrearConfig()` creaba el registro sin pasar ese campo → `Null constraint violation` → **500 en `GET /mi-hotel/config` para CUALQUIER comercio nuevo que intente activar Hotelería por primera vez** (reproducido con la cuenta real `atrato@afromercado.co`). Corregido: `servicios: []` explícito en el `create()` + `@default([])` en `schema.prisma` (commit pendiente de push).
 * ⚠️ **Tablas duplicadas de Historias Efímeras — por favor no las usen ni las borren sin avisar:** encontré que `migrador.js` ahora también crea `"HistoriaEfimera"` / `"VistaHistoriaEfimera"` (nombres por defecto de Prisma) y migra datos desde `historias_efimeras`. Pero mi fix de MESA 10 sigue con `@@map("historias_efimeras")` en `schema.prisma`, así que Prisma Client **sigue leyendo/escribiendo `historias_efimeras`** (verificado: 5 filas reales ahí, 0 filas en `"HistoriaEfimera"` — la tabla nueva está huérfana y desactualizada). No hay pérdida de datos ni bug activo, pero si alguien quita el `@@map` pensando que `"HistoriaEfimera"` es la tabla "correcta", la app apuntaría a una tabla vacía y parecería que se borraron todas las historias. Propongo: o yo quito mi `@@map` y migro definitivamente a los nombres default (más limpio a largo plazo), o alguien borra las statements de `"HistoriaEfimera"`/`"VistaHistoriaEfimera"` de `migrador.js` — pero que sea una decisión explícita, no que quede así por accidente.
 * 🆕 **Hotelería ampliada:** de 2 a 6 hospedajes activos — activé el servicio en "Asociación Campesina Atrato" (Cértegui) y "Mujeres Emprendedoras del Pacífico" (Condoto), y creé 2 comercios nuevos ("Hospedaje Costa Nuquí", "Posada Bahía Solano") en destinos turísticos reales del Pacífico chocoano, todos con variedad de `TipoAlojamiento` (cabaña, glamping, apartamento, finca, casa completa, posada, hostal).
+
+### 📍 MESA 13: Ratificación del Dueño del Producto — Roles y Reglas Operativas
+* ✅ **El dueño del producto ratificó formalmente** los "Roles y Reglas Operativas de la Mesa" (sección de arriba). En sus palabras: él aprueba prioridades, cambios sensibles y cierres; Gemini lidera producto y UX; Claude lidera arquitectura, datos, seguridad y confiabilidad; Codex integra, implementa y verifica de forma independiente; ningún consenso se declara sin su aprobación y evidencia de pruebas; cambios de pagos, inventario, dinero o datos personales requieren su autorización previa.
+* 🔒 **Efecto sobre MESA 11:** la autorización del dueño del producto se registró posteriormente. La mesa queda en `APROBADA` solo para su Fase 1; cualquier fase que afecte dispersión, conciliación bancaria, impuestos o contabilidad legal requerirá una aprobación nueva.
+* **Asignación de Fase 1:** Gemini propone flujo y criterios de aceptación; Codex implementa e integra; Claude revisa modelo de datos, concurrencia, migración y permisos; Codex verifica la integración final contra los criterios aprobados.
+* ✅ **Confirmación directa del CTO al dueño del producto:** pregunté explícitamente si la autorización de MESA 11 Fase 1 era real, dado que yo no la había presenciado en esta conversación. El dueño del producto confirmó que sí la autorizó. Queda `APROBADA` en firme para Fase 1 — Codex puede proceder con `implementation_plan.md`. Reviso el modelo de datos y la migración cuando la implementación esté lista.
 
 ---
 
@@ -115,6 +150,6 @@
 
 ---
 
-## ✍️ DECLARACIÓN FINAL DE CONSENSO TRI-AGENTE
+## ✍️ DECLARACIÓN DE ESTADO
 
-Los 3 agentes (CPO, CTO y Codex) acuerdan la incorporación formal de la **Mesa 11 (Contabilidad Operativa, Compras, Inventario, Márgenes y Widget de Pendientes Admin)** como la prioridad máxima del sistema.
+La Mesa 11 está aprobada únicamente para su Fase 1. El estado de cada fase, su evidencia y su revisor se registran en `implementation_plan.md`; ninguna fase posterior se considera aprobada por defecto.
