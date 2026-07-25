@@ -9,6 +9,7 @@ import { apiFetch, normalizarUrlMedia } from '@/lib/api/client'
 import { obtenerReglasPublicas } from '@/lib/api/config'
 import { DEPARTAMENTOS } from '@/lib/data/colombia'
 import { Utensils, Hotel, Map, Ship, Ticket, Clapperboard, Briefcase, Home, Leaf, Sparkles } from 'lucide-react'
+import ModalAvatarLightbox from '@/components/ui/ModalAvatarLightbox'
 import CampanaNotificaciones from './CampanaNotificaciones'
 import BuscadorGlobal from './BuscadorGlobal'
 
@@ -25,6 +26,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
   const badge = itemsCarrito ?? cantidadTotal
 
   const [menuAbierto, setMenuAbierto] = useState(false)
+  const [avatarModalAbierto, setAvatarModalAbierto] = useState(false)
   const [regionMenuAbierto, setRegionMenuAbierto] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [busquedasRecientes, setBusquedasRecientes] = useState<string[]>([])
@@ -245,9 +247,25 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                   role="menu"
                   className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] py-1 z-50"
                 >
-                  <div className="px-4 py-2 border-b border-[#1A1A1A]/10">
-                    <p className="text-sm font-semibold text-[#1A1A1A] truncate">{usuario?.nombre}</p>
-                    <p className="text-xs text-[#1A1A1A]/50 truncate">{usuario?.email}</p>
+                  <div className="px-4 py-2 border-b border-[#1A1A1A]/10 flex items-center justify-between">
+                    <div className="min-w-0 pr-2">
+                      <p className="text-sm font-semibold text-[#1A1A1A] truncate">{usuario?.nombre}</p>
+                      <p className="text-xs text-[#1A1A1A]/50 truncate">{usuario?.email}</p>
+                    </div>
+                    {usuario?.avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setMenuAbierto(false)
+                          setAvatarModalAbierto(true)
+                        }}
+                        className="text-xs text-[#2D6A4F] hover:underline font-semibold flex-shrink-0"
+                        title="Ver foto en HD"
+                      >
+                        Ver HD
+                      </button>
+                    )}
                   </div>
                   {usuario?.rol === 'ADMIN' && (
                     <Link href="/admin" role="menuitem" onClick={() => setMenuAbierto(false)}
@@ -410,6 +428,14 @@ export default function Header({ itemsCarrito }: HeaderProps) {
           </nav>
         </div>
       </div>
+
+      <ModalAvatarLightbox
+        isOpen={avatarModalAbierto}
+        onClose={() => setAvatarModalAbierto(false)}
+        src={normalizarUrlMedia(usuario?.avatarUrl)}
+        nombre={usuario?.nombre ?? 'Usuario'}
+        subtitulo={usuario?.email}
+      />
     </header>
   )
 }

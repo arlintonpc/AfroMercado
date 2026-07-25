@@ -219,6 +219,14 @@ router.get("/publicaciones/:id/comentarios",      autenticarOpcional, CulturaCon
 router.post("/publicaciones/:id/comentarios",     ...soloAuth, comentarioLimiter, CulturaController.crearComentario);
 router.post("/publicaciones/:id/comentarios/:comentarioId/fijar", ...soloAuth, CulturaController.toggleFijarComentario);
 
+// ── HISTORIAS EFÍMERAS 24H ─────────────────────────────────────
+router.get(   "/historias",            autenticarOpcional, CulturaController.listarHistorias);
+router.post(  "/historias",            ...soloAuth, publicacionLimiter, CulturaController.crearHistoria);
+router.post(  "/historias/foto",       ...soloAuth, publicacionLimiter, uploadFotoPublicacion.single("foto"), handlerSubidaFotoPublicacion);
+router.post(  "/historias/video",      ...soloAuth, publicacionLimiter, uploadVideoPublicacion, handlerSubidaVideoPublicacion);
+router.post(  "/historias/:id/vistas", autenticarOpcional, CulturaController.registrarVistaHistoria);
+router.delete("/historias/:id",        ...soloAuth, CulturaController.eliminarHistoria);
+
 // ── VITRINA DE VIDEO (v0) — publicaciones de comercio ──────────
 // Antes de "/:id" para evitar ambigüedad de rutas.
 router.get("/vitrina", autenticarOpcional, CulturaController.listarVitrina);

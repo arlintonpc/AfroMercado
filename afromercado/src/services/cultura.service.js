@@ -1169,6 +1169,67 @@ const CulturaService = {
     if (!pub || !pub.activa) throw new ErrorNoEncontrado("Publicación no encontrada");
     return pub;
   },
+
+  // ── Historias Efímeras 24h ───────────────────────────────────
+  async crearHistoria(usuario, datos = {}) {
+    if (!usuario?.id) throw new ErrorProhibido("Debes iniciar sesión para publicar una historia");
+
+    const mediaUrl = textoLimpio(datos.mediaUrl, 2048);
+    if (!mediaUrl) throw new ErrorValidacion("La historia debe contener una imagen o video");
+
+    const mediaTipo = datos.mediaTipo === "VIDEO" ? "VIDEO" : "FOTO";
+    const duracionSegundos = Math.max(5, Math.min(15, Number(datos.duracionSegundos) || 5));
+    const texto = textoLimpio(datos.texto, 300);
+    const fondoColor = textoLimpio(datos.fondoColor, 30) || "#1B4332";
+
+    // Si el usuario es comerciante y envía `esComercio: true`, asociamos la historia a su comercio
+    let comercioId = null;
+    if (datos.esComercio && usuario.comercio?.id) {
+      comercioId = usuario.comercio.id;
+    }
+
+    const expiraAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas exactas
+
+    return CulturaRepository.crearHistoria({
+      autorId: usuario.id,
+      comercioId,
+      mediaUrl,
+      mediaTipo,
+      duracionSegundos,
+      texto,
+      fondoColor,
+      expiraAt,
+    });
+  },
+
+  async listarHistorias(usuarioId, { departamento, municipio } = {}) {
+    return CulturaRepository.listarHistoriasActivas({ usuarioId, departamento, municipio });
+  },
+
+  async registrarVistaHistoria(historiaId, usuarioId, sesionId) {
+    const id = Number(historiaId);
+    if (!id) throw new ErrorValidacion("ID de historia no válido");
+    await CulturaRepository.registrarVistaHistoria({ historiaId: id, usuarioId, sesionId });
+    return { ok: true };
+  },
+
+  async eliminarHistoria(usuario, historiaId) {
+    const id = Number(historiaId);
+    if (!id) throw new ErrorValidacion("ID de historia no válido");
+    const historia = await CulturaRepository.buscarHistoriaPorId(id);
+    if (!historia) throw new ErrorNoEncontrado("Historia no encontrada");
+
+    const esAutor = historia.autorId === usuario.id;
+    const esComercioDueno = historia.comercio?.usuarioId === usuario.id;
+    const esAdmin = usuario.rol === "ADMIN";
+
+    if (!esAutor && !esComercioDueno && !esAdmin) {
+      throw new ErrorProhibido("No tienes permiso para eliminar esta historia");
+    }
+
+    await CulturaRepository.eliminarHistoria(id);
+    return { ok: true, mensaje: "Historia eliminada correctamente" };
+  },
 };
 
 module.exports = CulturaService;

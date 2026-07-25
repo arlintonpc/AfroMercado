@@ -57,6 +57,8 @@ export interface ConteosPendientesAdmin {
   denunciasCultura: number
   alianzas: number
   publicidad: number
+  inmuebles: number
+  ofertasEmpleo: number
 }
 
 export async function obtenerConteosPendientes(): Promise<ConteosPendientesAdmin> {

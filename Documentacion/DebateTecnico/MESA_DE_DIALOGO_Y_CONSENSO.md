@@ -40,12 +40,22 @@
   - **Botón Flotante de Audio (`🔊 Sonido ON` / `🔇 Sin sonido`)**: Ubicado en la esquina superior derecha del reproductor de Reels para alternar libremente el canal de audio del video.
   - **Tocar Pantalla para Pausar y Reanudar (`onClick`)**: Tocar o hacer clic en cualquier parte de la pantalla del video alterna de forma instantánea entre reproducción (`play`) y pausa (`pause`), desplegando una animación centrada de pulso (`▶️` / `⏸️`).
 
+### 📍 MESA 7: Poblado de Contenido Demo (Temporada, Hotelería, Bienes Raíces) — Claude (CTO)
+* ✅ **Verificación previa sin regresiones:** re-ejecuté `npm run lint` (backend), `npm test` (152 legacy), `npx vitest run` (17 tests) y `tsc --noEmit` (0 errores nuevos) antes de tocar datos — el cambio de CI de Gemini (quitar `--if-present` del lint) no rompe nada porque el backend ya tiene script `lint` real.
+* ✅ Confirmé en vivo que la corrección de botones de Reels (like/guardar/seguir/compartir) que reportó el dueño del producto ya estaba resuelta en `VitrinaReelsFeed.tsx` — estado por-ID aislado (`meGustaPorId`, `favoritoPorId`, `siguiendoPorId`, etc.), coherente con el patrón de `TarjetaPublicacionCultural.tsx`.
+* 🆕 **Ofertas de Temporada:** creadas 12 ofertas reales vía `POST /api/ofertas` sobre productos ya sembrados (Agro, Ropa, Calzado, Animales de Cría, Tours) — antes `/temporada` estaba vacío. Sin cambios de código; el endpoint ya existía (`oferta.controller.js`), solo faltaba contenido.
+* 🆕 **Variedad de alojamiento en Hotelería:** "Cooperativa Cacao Chocó" solo tenía 2 `HabitacionTipo` (una llamada literalmente "Preubas", resto de prueba visible en producción). Renombrada y agregados `CABANA`, `GLAMPING`, `APARTAMENTO`, `FINCA` — ahora ambos hoteles del piloto cubren los 6 tipos principales de `TipoAlojamiento`.
+* ⚠️ **Decisión importante sobre Bienes Raíces — pido que los otros agentes la respeten:** `inmueble.service.js` tiene una regla explícita (`REGLA CRÍTICA`, línea ~158) que impide aprobar CUALQUIER predio sin `documentoSoporteUrl` real, sin excepción ni para ADMIN — es la salvaguarda contra fraude/disputa de tierra en el territorio piloto. Antes de crear datos demo consulté al dueño del producto con dos opciones (dejar en `PENDIENTE` de moderación vs. aprobar con documento placeholder) y **eligió la opción segura**. Creé 6 predios (lote, casa, apartamento, finca, local comercial, bodega) en estado `PUBLICADO`/moderación `PENDIENTE` — visibles solo en `/admin` y "mis publicaciones", **no en la vitrina pública** (verificado: `GET /api/inmuebles` sigue devolviendo `total: 0`). Ningún agente debería adjuntar un `documentoSoporteUrl` sintético para saltarse este gate, ni siquiera para datos de demostración.
+
 ---
 
 ## 🛠️ BITÁCORA DE EJECUCIÓN REAL CONSOLIDADA
 
 ### 🟢 Claude (CTO):
 - ✅ Vitest instalado + `directUrl` en `schema.prisma` + marcado JSON-LD + middleware `503` para feature flags.
+- ✅ 12 Ofertas de Temporada creadas (Agro/Ropa/Calzado/Animales/Tours) — ver MESA 7.
+- ✅ Hotelería: "Cooperativa Cacao Chocó" con 6 `HabitacionTipo` (antes 2, uno de prueba) — ver MESA 7.
+- ⚠️ Bienes Raíces: 6 predios demo creados, deliberadamente en `PENDIENTE` de moderación (no públicos) por la salvaguarda anti-fraude de tierra — ver MESA 7.
 
 ### 🤖 Codex (Verificación Independiente / ChatGPT):
 - ✅ Auditoría estricta de archivos (93 modelos, 42 rutas API, 140 páginas Next.js, 17 tests Vitest pasados).

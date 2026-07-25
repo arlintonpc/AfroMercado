@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { obtenerPerfil, actualizarPerfil, subirAvatar } from '@/lib/api/usuario'
 import { apiFetch, normalizarUrlMedia } from '@/lib/api/client'
 import { PasswordInput } from '@/components/ui/PasswordInput'
+import ModalAvatarLightbox from '@/components/ui/ModalAvatarLightbox'
 import type { Usuario, TipoDocumento } from '@/types/usuario'
 import { DEPARTAMENTOS as DEPARTAMENTOS_COLOMBIA } from '@/lib/data/colombia'
 
@@ -57,6 +58,7 @@ export default function PerfilPage() {
   const inputAvatarRef = useRef<HTMLInputElement>(null)
   const [subiendoAvatar, setSubiendoAvatar] = useState(false)
   const [errorAvatar, setErrorAvatar] = useState<string | null>(null)
+  const [modalAvatarAbierto, setModalAvatarAbierto] = useState(false)
 
   // Cambio de contraseña
   const [cambiandoPassword, setCambiandoPassword] = useState(false)
@@ -192,15 +194,15 @@ export default function PerfilPage() {
 
         {/* Tarjeta de identidad */}
         <div className="bg-white rounded-2xl border border-[#1A1A1A]/8 p-6 flex items-center gap-5">
-          {/* Avatar con click para cambiar */}
+          {/* Avatar con click para ampliar HD / cambiar foto */}
           <div className="relative flex-shrink-0">
             <button
               type="button"
-              onClick={() => inputAvatarRef.current?.click()}
+              onClick={() => setModalAvatarAbierto(true)}
               disabled={subiendoAvatar}
-              className="relative group w-16 h-16 rounded-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/50 focus:ring-offset-2"
-              aria-label="Cambiar foto de perfil"
-              title="Cambiar foto de perfil"
+              className="relative group w-16 h-16 rounded-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/50 focus:ring-offset-2 cursor-pointer shadow-md"
+              aria-label="Ver foto de perfil en HD"
+              title="Haz clic para ver la foto en HD"
             >
               {(() => {
                 const avatarFinal = normalizarUrlMedia(perfil.avatarUrl)
@@ -224,18 +226,22 @@ export default function PerfilPage() {
               })()}
               {/* Overlay al hover */}
               <span className="absolute inset-0 flex items-center justify-center bg-[#1A1A1A]/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                {subiendoAvatar ? (
-                  <svg className="animate-spin text-white" width="20" height="20" viewBox="0 0 18 18" fill="none">
-                    <circle cx="9" cy="9" r="7" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
-                    <path d="M9 2a7 7 0 0 1 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" aria-hidden="true">
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                    <circle cx="12" cy="13" r="4" />
-                  </svg>
-                )}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" aria-hidden="true">
+                  <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </span>
+            </button>
+            {/* Botón flotante cámara para cambiar foto directamente */}
+            <button
+              type="button"
+              onClick={() => inputAvatarRef.current?.click()}
+              className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#D4A017] hover:bg-[#b58813] text-[#1A1A1A] flex items-center justify-center shadow-md transition-transform hover:scale-110"
+              title="Cambiar foto de perfil"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
             </button>
             <input
               ref={inputAvatarRef}

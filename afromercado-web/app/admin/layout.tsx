@@ -7,7 +7,9 @@ import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
 import { obtenerConteosPendientes, type ConteosPendientesAdmin } from '@/lib/api/admin'
 
-const NAV_LINKS = [
+type ContadorNav = keyof ConteosPendientesAdmin | readonly (keyof ConteosPendientesAdmin)[]
+
+const NAV_LINKS: { href: string; label: string; contador?: ContadorNav }[] = [
   { href: '/admin',                      label: 'Resumen'        },
   { href: '/admin/categorias',           label: 'Categorías'     },
   { href: '/admin/usuarios',             label: 'Usuarios'       },
@@ -18,8 +20,8 @@ const NAV_LINKS = [
   { href: '/admin/disputas',             label: 'Reclamos',      contador: 'disputas' as const },
   { href: '/admin/facturas',             label: 'Facturas'       },
   { href: '/admin/pqrsd',                label: 'PQRSD',         contador: 'pqrsd' as const },
-  { href: '/admin/empleo',               label: 'Empleo',        contador: 'denunciasEmpleo' as const },
-  { href: '/admin/inmuebles',            label: '🏘️ Bienes Raíces' },
+  { href: '/admin/empleo',               label: 'Empleo',        contador: ['denunciasEmpleo', 'ofertasEmpleo'] as const },
+  { href: '/admin/inmuebles',            label: '🏘️ Bienes Raíces', contador: 'inmuebles' as const },
   { href: '/admin/cultura',              label: '🎭 Cultura',    contador: 'denunciasCultura' as const },
   { href: '/admin/entregas',             label: 'Entregas'       },
   { href: '/admin/envios',              label: 'Envíos'         },
@@ -167,7 +169,11 @@ export default function AdminLayout({
               const activo = href === '/admin'
                 ? pathname === '/admin'
                 : pathname === href || pathname.startsWith(href + '/')
-              const pendientes = contador && conteos ? conteos[contador] : 0
+              const pendientes = !contador || !conteos
+                ? 0
+                : Array.isArray(contador)
+                  ? (contador as (keyof ConteosPendientesAdmin)[]).reduce((suma, clave) => suma + (conteos[clave] ?? 0), 0)
+                  : conteos[contador as keyof ConteosPendientesAdmin] ?? 0
               return (
                 <li key={href}>
                   <Link

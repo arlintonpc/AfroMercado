@@ -555,3 +555,96 @@ export async function toggleFijarComentario(publicacionId: number, comentarioId:
     body: {},
   })
 }
+
+// ── HISTORIAS EFÍMERAS 24H ─────────────────────────────────────
+
+export type TipoMediaHistoria = 'FOTO' | 'VIDEO'
+
+export interface HistoriaEfimera {
+  id: number
+  autorId: number
+  comercioId?: number | null
+  mediaUrl: string
+  mediaTipo: TipoMediaHistoria
+  duracionSegundos: number
+  texto?: string | null
+  fondoColor?: string | null
+  vistasCount: number
+  expiraAt: string
+  createdAt: string
+  visto?: boolean
+  autor?: { id: number; nombre: string; avatarUrl?: string | null }
+  comercio?: { id: number; nombre: string; logoUrl?: string | null; whatsapp?: string | null; departamento?: string; municipio?: string } | null
+}
+
+export interface GrupoHistoria {
+  id: string
+  comercioId?: number | null
+  autorId: number
+  nombre: string
+  avatarUrl?: string | null
+  esComercio: boolean
+  historias: HistoriaEfimera[]
+  vistasTodas: boolean
+}
+
+export async function listarHistorias(params?: { departamento?: string; municipio?: string }): Promise<GrupoHistoria[]> {
+  const q = new URLSearchParams()
+  if (params?.departamento) q.set('departamento', params.departamento)
+  if (params?.municipio) q.set('municipio', params.municipio)
+  const qs = q.toString()
+  return apiFetch<{ ok: boolean; data: GrupoHistoria[] }>(`/cultura/historias${qs ? `?${qs}` : ''}`).then((r) => r.data)
+}
+
+export async function crearHistoria(datos: {
+  mediaUrl: string
+  mediaTipo?: TipoMediaHistoria
+  duracionSegundos?: number
+  texto?: string
+  fondoColor?: string
+  esComercio?: boolean
+}): Promise<HistoriaEfimera> {
+  return apiFetch<{ ok: boolean; data: HistoriaEfimera }>('/cultura/historias', {
+    method: 'POST',
+    body: datos,
+  }).then((r) => r.data)
+}
+
+export async function subirFotoHistoria(file: File): Promise<{ url: string }> {
+  const fd = new FormData()
+  fd.append('foto', file)
+  return apiFetch<{ ok: boolean; url: string }>('/cultura/historias/foto', {
+    method: 'POST',
+    body: fd,
+  })
+}
+
+export async function subirVideoHistoria(file: File, recorte?: { inicioSegundos?: number; finSegundos?: number }): Promise<{ url: string }> {
+  const fd = new FormData()
+  fd.append('video', file)
+  if (recorte?.inicioSegundos !== undefined) {
+    fd.append('recorteInicioSegundos', String(recorte.inicioSegundos))
+    fd.append('inicioSegundos', String(recorte.inicioSegundos))
+  }
+  if (recorte?.finSegundos !== undefined) {
+    fd.append('recorteFinSegundos', String(recorte.finSegundos))
+    fd.append('finSegundos', String(recorte.finSegundos))
+  }
+  return apiFetch<{ ok: boolean; url: string }>('/cultura/historias/video', {
+    method: 'POST',
+    body: fd,
+  })
+}
+
+export async function registrarVistaHistoria(historiaId: number): Promise<void> {
+  await apiFetch<{ ok: boolean }>(`/cultura/historias/${historiaId}/vistas`, {
+    method: 'POST',
+    body: {},
+  })
+}
+
+export async function eliminarHistoria(historiaId: number): Promise<void> {
+  await apiFetch<{ ok: boolean }>(`/cultura/historias/${historiaId}`, {
+    method: 'DELETE',
+  })
+}

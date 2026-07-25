@@ -249,9 +249,35 @@ const STATEMENTS = [
   `ALTER TABLE "PublicacionCultural" ADD COLUMN IF NOT EXISTS "videoPublicId" TEXT`,
   `ALTER TABLE "PublicacionCultural" ADD COLUMN IF NOT EXISTS "productoId" INTEGER`,
   
-  // Vitrina Social / Comentarios
+  // Vitrina Social / Comentarios / Historias Efímeras 24h
   `ALTER TABLE "ComentarioPublicacionCultural" ADD COLUMN IF NOT EXISTS "respuestaAId" INTEGER`,
   `ALTER TABLE "ComentarioPublicacionCultural" ADD COLUMN IF NOT EXISTS "fijado" BOOLEAN NOT NULL DEFAULT false`,
+
+  `CREATE TABLE IF NOT EXISTS "historias_efimeras" (
+    "id" SERIAL PRIMARY KEY,
+    "autorId" INTEGER NOT NULL,
+    "comercioId" INTEGER,
+    "mediaUrl" TEXT NOT NULL,
+    "mediaTipo" TEXT NOT NULL DEFAULT 'FOTO',
+    "duracionSegundos" INTEGER NOT NULL DEFAULT 5,
+    "texto" TEXT,
+    "fondoColor" TEXT DEFAULT '#1B4332',
+    "vistasCount" INTEGER NOT NULL DEFAULT 0,
+    "expiraAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "historias_efimeras_autorId_fkey" FOREIGN KEY ("autorId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "historias_efimeras_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS "historias_efimeras_vistas" (
+    "id" SERIAL PRIMARY KEY,
+    "historiaId" INTEGER NOT NULL,
+    "usuarioId" INTEGER,
+    "sesionId" TEXT,
+    "vistoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "historias_efimeras_vistas_historiaId_fkey" FOREIGN KEY ("historiaId") REFERENCES "historias_efimeras"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "historias_efimeras_vistas_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
 ];
 
 async function asegurarTablaLog() {

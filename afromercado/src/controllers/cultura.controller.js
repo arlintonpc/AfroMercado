@@ -253,6 +253,39 @@ const CulturaController = {
       res.json({ ok: true, data });
     } catch (err) { next(err); }
   },
+
+  // ── Historias Efímeras 24h ──
+  async crearHistoria(req, res, next) {
+    try {
+      const historia = await CulturaService.crearHistoria(req.usuario, req.body);
+      res.status(201).json({ ok: true, data: historia });
+    } catch (e) { next(e); }
+  },
+
+  async listarHistorias(req, res, next) {
+    try {
+      const usuarioId = req.usuario?.id;
+      const { departamento, municipio } = req.query;
+      const data = await CulturaService.listarHistorias(usuarioId, { departamento, municipio });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  async registrarVistaHistoria(req, res, next) {
+    try {
+      const usuarioId = req.usuario?.id;
+      const sesionId = req.headers["x-session-id"] || req.ip;
+      const data = await CulturaService.registrarVistaHistoria(req.params.id, usuarioId, sesionId);
+      res.json({ ok: true, ...data });
+    } catch (e) { next(e); }
+  },
+
+  async eliminarHistoria(req, res, next) {
+    try {
+      const data = await CulturaService.eliminarHistoria(req.usuario, req.params.id);
+      res.json({ ok: true, ...data });
+    } catch (e) { next(e); }
+  },
 };
 
 module.exports = CulturaController;

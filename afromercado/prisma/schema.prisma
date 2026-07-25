@@ -242,6 +242,8 @@ model Usuario {
   comentariosPublicacionCultural ComentarioPublicacionCultural[]
   siguiendoUsuarios         SeguidorUsuario[] @relation("SeguidorDe")
   seguidoresUsuarios        SeguidorUsuario[] @relation("Seguidores")
+  historiasEfimeras         HistoriaEfimera[] @relation("HistoriasAutor")
+  vistasHistorias           VistaHistoriaEfimera[] @relation("VistasHistoriaUsuario")
 }
 
 model Comercio {
@@ -325,6 +327,7 @@ model Comercio {
   facturas              FacturaElectronica[]
   ofertasEmpleo         OfertaEmpleo[]
   inmuebles             Inmueble[]
+  historiasEfimeras     HistoriaEfimera[]
 }
 
 // IVA configurable por comercio (Fase 1.1) — apagado por defecto, solo el ADMIN
@@ -2812,3 +2815,47 @@ model ComentarioPublicacionCultural {
   @@index([publicacionCulturalId, createdAt])
   @@index([respuestaAId])
 }
+
+// ─── HISTORIAS EFÍMERAS 24H (Cultura / Vitrina) ─────────────
+enum TipoMediaHistoria {
+  FOTO
+  VIDEO
+}
+
+model HistoriaEfimera {
+  id               Int               @id @default(autoincrement())
+  comercioId       Int?
+  autorId          Int
+  mediaUrl         String
+  mediaTipo        TipoMediaHistoria @default(FOTO)
+  duracionSegundos Int               @default(5)
+  texto            String?
+  fondoColor       String?           @default("#1B4332")
+  vistasCount      Int               @default(0)
+  expiraAt         DateTime
+  createdAt        DateTime          @default(now())
+
+  autor    Usuario                @relation("HistoriasAutor", fields: [autorId], references: [id], onDelete: Cascade)
+  comercio Comercio?              @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  vistas   VistaHistoriaEfimera[]
+
+  @@index([expiraAt, createdAt])
+  @@index([comercioId, expiraAt])
+  @@index([autorId, expiraAt])
+}
+
+model VistaHistoriaEfimera {
+  id         Int      @id @default(autoincrement())
+  historiaId Int
+  usuarioId  Int?
+  sesionId   String?
+  createdAt  DateTime @default(now())
+
+  historia HistoriaEfimera @relation(fields: [historiaId], references: [id], onDelete: Cascade)
+  usuario  Usuario?        @relation("VistasHistoriaUsuario", fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@unique([historiaId, usuarioId])
+  @@index([historiaId, createdAt])
+  @@index([usuarioId, createdAt])
+}
+

@@ -63,6 +63,7 @@ const AdminController = {
       const [
         comercios, repartidores, disputas, pqrsd,
         denunciasEmpleo, denunciasCultura, alianzas, publicidad,
+        inmuebles, ofertasEmpleo,
       ] = await Promise.all([
         prisma.comercio.count({ where: { estadoRegistro: "PENDIENTE_REVISION" } }),
         prisma.solicitudRepartidor.count({ where: { estado: "PENDIENTE" } }),
@@ -72,10 +73,17 @@ const AdminController = {
         prisma.denunciaPublicacionCultural.count({ where: { estado: "PENDIENTE" } }),
         prisma.alianzaComercial.count({ where: { estado: "PENDIENTE_APROBACION" } }),
         prisma.solicitudPublicidad.count({ where: { estado: "PENDIENTE" } }),
+        // Predios (Bienes Raíces) publicados esperando revisión de documento de soporte
+        prisma.inmueble.count({ where: { estado: "PUBLICADO", estadoModeracion: "PENDIENTE", deletedAt: null } }),
+        // Ofertas de Empleo/Servicios publicadas esperando moderación (no confundir con denunciasEmpleo, que son quejas sobre ofertas ya vigentes)
+        prisma.ofertaEmpleo.count({ where: { estado: { not: "BORRADOR" }, estadoModeracion: "PENDIENTE" } }),
       ]);
       res.json({
         ok: true,
-        data: { comercios, repartidores, disputas, pqrsd, denunciasEmpleo, denunciasCultura, alianzas, publicidad },
+        data: {
+          comercios, repartidores, disputas, pqrsd, denunciasEmpleo, denunciasCultura, alianzas, publicidad,
+          inmuebles, ofertasEmpleo,
+        },
       });
     } catch (e) { next(e); }
   },

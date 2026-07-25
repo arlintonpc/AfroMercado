@@ -20,6 +20,7 @@ import ModalTeatroPublicacion from '@/components/cultura/ModalTeatroPublicacion'
 import ModalDenunciarPublicacion from '@/components/cultura/ModalDenunciarPublicacion'
 import BannerDisplay from '@/components/publicidad/BannerDisplay'
 import VitrinaReelsFeed from '@/components/cultura/VitrinaReelsFeed'
+import HistoriasCarrusel from '@/components/cultura/HistoriasCarrusel'
 
 interface ItemLightbox {
   publicacion: PublicacionCultural
@@ -212,6 +213,9 @@ export default function VitrinaPage() {
             {mensajeConfirmacion}
           </div>
         )}
+
+        {/* Carrusel de Historias Efímeras (24h) — Estilo Facebook / WhatsApp / IG */}
+        <HistoriasCarrusel />
 
         {comerciantes.length > 0 && (
           <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1" style={{ scrollbarWidth: 'none' }}>
