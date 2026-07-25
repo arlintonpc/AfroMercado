@@ -152,7 +152,7 @@ export default function VitrinaPage() {
 
   return (
     <CulturaShell>
-      <CulturaPageContainer className="space-y-6">
+      <CulturaPageContainer className="space-y-3.5 max-w-5xl">
         <CulturaHero
           eyebrow="Vitrina"
           title="Descubre tu territorio"
@@ -164,9 +164,9 @@ export default function VitrinaPage() {
                 setReelsVideoInicialId(primerVideo?.id || null)
                 setModoReels(true)
               }}
-              className="inline-flex items-center gap-2 bg-[#D4A017] hover:bg-[#b88a14] text-[#1B4332] font-extrabold text-sm px-5 py-2.5 rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-2 bg-[#D4A017] hover:bg-[#b88a14] text-[#1B4332] font-extrabold text-xs sm:text-sm px-4 py-2 rounded-full shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M8 5v14l11-7z" />
               </svg>
               Vitrina Videos 🎬
@@ -175,12 +175,12 @@ export default function VitrinaPage() {
         />
 
         {/* Pestañas Principales de Descubrimiento */}
-        <div className="flex items-center justify-center gap-1.5 p-1.5 bg-white border border-[#1A1A1A]/8 rounded-full max-w-md mx-auto shadow-sm">
+        <div className="flex items-center justify-center gap-1.5 p-1 bg-white border border-[#1A1A1A]/8 rounded-full max-w-xs sm:max-w-sm mx-auto shadow-sm">
           <button
             onClick={() => setPestaña('EXPLORAR')}
-            className={`flex-1 py-2.5 px-4 rounded-full text-xs font-bold transition-all duration-300 ${
+            className={`flex-1 py-1.5 px-3 rounded-full text-xs font-bold transition-all duration-300 ${
               pestaña === 'EXPLORAR'
-                ? 'bg-gradient-to-r from-[#1B4332] to-[#2D6A4F] text-white shadow-md shadow-[#2D6A4F]/20'
+                ? 'bg-gradient-to-r from-[#1B4332] to-[#2D6A4F] text-white shadow-sm'
                 : 'text-[#1A1A1A]/70 hover:text-[#1B4332] hover:bg-[#F8F5F0]'
             }`}
           >
@@ -188,9 +188,9 @@ export default function VitrinaPage() {
           </button>
           <button
             onClick={() => setPestaña('SIGUIENDO')}
-            className={`flex-1 py-2.5 px-4 rounded-full text-xs font-bold transition-all duration-300 ${
+            className={`flex-1 py-1.5 px-3 rounded-full text-xs font-bold transition-all duration-300 ${
               pestaña === 'SIGUIENDO'
-                ? 'bg-gradient-to-r from-[#1B4332] to-[#2D6A4F] text-white shadow-md shadow-[#2D6A4F]/20'
+                ? 'bg-gradient-to-r from-[#1B4332] to-[#2D6A4F] text-white shadow-sm'
                 : 'text-[#1A1A1A]/70 hover:text-[#1B4332] hover:bg-[#F8F5F0]'
             }`}
           >
@@ -198,9 +198,9 @@ export default function VitrinaPage() {
           </button>
           <button
             onClick={() => setPestaña('GUARDADOS')}
-            className={`flex-1 py-2.5 px-4 rounded-full text-xs font-bold transition-all duration-300 ${
+            className={`flex-1 py-1.5 px-3 rounded-full text-xs font-bold transition-all duration-300 ${
               pestaña === 'GUARDADOS'
-                ? 'bg-gradient-to-r from-[#1B4332] to-[#2D6A4F] text-white shadow-md shadow-[#2D6A4F]/20'
+                ? 'bg-gradient-to-r from-[#1B4332] to-[#2D6A4F] text-white shadow-sm'
                 : 'text-[#1A1A1A]/70 hover:text-[#1B4332] hover:bg-[#F8F5F0]'
             }`}
           >
@@ -209,7 +209,7 @@ export default function VitrinaPage() {
         </div>
 
         {mensajeConfirmacion && (
-          <div className="rounded-2xl border border-[#2D6A4F]/18 bg-[#EAF3DE]/70 px-4 py-3 text-sm font-semibold text-[#1B4332]">
+          <div className="rounded-xl border border-[#2D6A4F]/18 bg-[#EAF3DE]/70 px-4 py-2.5 text-xs font-semibold text-[#1B4332]">
             {mensajeConfirmacion}
           </div>
         )}
@@ -220,30 +220,30 @@ export default function VitrinaPage() {
         {esComerciante && (
           <Link
             href="/comerciante/vitrina/nueva"
-            className="flex items-center justify-between rounded-2xl border border-[#1A1A1A]/8 bg-white px-5 py-3.5 shadow-sm transition-all duration-300 hover:border-[#2D6A4F]/30 hover:shadow-md"
+            className="flex items-center justify-between rounded-2xl border border-[#1A1A1A]/8 bg-white px-4 py-2.5 shadow-sm transition-all duration-300 hover:border-[#2D6A4F]/30 hover:shadow-md"
           >
-            <div className="flex items-center gap-3.5 flex-1 min-w-0">
-              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#1B4332] overflow-hidden border-2 border-[#D4A017] shadow-sm">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#1B4332] overflow-hidden border-2 border-[#D4A017] shadow-sm">
                 {(() => {
                   const avatarCrear = normalizarUrlMedia(usuario?.avatarUrl || (usuario as any)?.comercio?.logoUrl)
                   return avatarCrear ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={avatarCrear} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-white font-bold text-sm">🎥</span>
+                    <span className="text-white font-bold text-xs">🎥</span>
                   )
                 })()}
               </div>
-              <span className="text-sm font-semibold text-[#1A1A1A]/60 truncate">¿Qué quieres compartir hoy de tu oferta?</span>
+              <span className="text-xs sm:text-sm font-semibold text-[#1A1A1A]/60 truncate">¿Qué quieres compartir hoy de tu oferta?</span>
             </div>
             <div className="hidden sm:flex items-center gap-2 shrink-0">
-              <span className="text-xs font-bold text-[#1B4332] bg-[#2D6A4F]/10 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-[#2D6A4F]/20 transition-colors">
+              <span className="text-[11px] font-bold text-[#1B4332] bg-[#2D6A4F]/10 px-2.5 py-1 rounded-full flex items-center gap-1 hover:bg-[#2D6A4F]/20 transition-colors">
                 📷 Foto
               </span>
-              <span className="text-xs font-bold text-[#9C6F0F] bg-[#D4A017]/15 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-[#D4A017]/25 transition-colors">
+              <span className="text-[11px] font-bold text-[#9C6F0F] bg-[#D4A017]/15 px-2.5 py-1 rounded-full flex items-center gap-1 hover:bg-[#D4A017]/25 transition-colors">
                 🎥 Video Clip
               </span>
-              <span className="text-xs font-bold text-[#1B4332] bg-[#1B4332]/10 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-[#1B4332]/20 transition-colors">
+              <span className="text-[11px] font-bold text-[#1B4332] bg-[#1B4332]/10 px-2.5 py-1 rounded-full flex items-center gap-1 hover:bg-[#1B4332]/20 transition-colors">
                 🏷️ Publicar
               </span>
             </div>

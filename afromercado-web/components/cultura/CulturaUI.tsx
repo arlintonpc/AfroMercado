@@ -69,7 +69,7 @@ export function CulturaHero({
   badge?: ReactNode
 }) {
   return (
-    <header className="relative overflow-hidden rounded-[2.25rem] border border-[#D4A017]/25 bg-gradient-to-br from-[#1B4332] via-[#2D6A4F] to-[#123124] p-6 shadow-[0_20px_50px_rgba(27,67,50,0.25)] text-white sm:p-9">
+    <header className="relative overflow-hidden rounded-[2rem] border border-[#D4A017]/25 bg-gradient-to-br from-[#1B4332] via-[#2D6A4F] to-[#123124] p-5 shadow-[0_16px_40px_rgba(27,67,50,0.2)] text-white sm:p-7">
       {/* Background Mesh Overlay */}
       <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[#D4A017]/15 blur-3xl" />
       <div className="absolute -left-10 -bottom-10 h-64 w-64 rounded-full bg-[#52B788]/15 blur-2xl" />
