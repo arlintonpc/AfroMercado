@@ -1,6 +1,8 @@
 import { obtenerHotel } from '@/lib/api/hotel'
+import { normalizarUrlMediaAbsoluta } from '@/lib/api/client'
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
+const OG_LOGO = `${SITE}/og-logo.png`
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   try {
@@ -10,7 +12,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     const municipio = hotel.comercio.municipio
     const descripcion = hotel.comercio.descripcion
       ?? `Hospédate en ${nombre}, ${municipio}. Reserva en Teravia.`
-    const imagen = hotel.habitaciones[0]?.fotos[0] ?? hotel.comercio.logoUrl
+    const imagenRaw = hotel.habitaciones[0]?.fotos[0] ?? hotel.comercio.logoUrl
+    const imagenAbsoluta = normalizarUrlMediaAbsoluta(imagenRaw, OG_LOGO)
 
     return {
       title: `${nombre} — ${municipio} | Teravia`,
@@ -18,8 +21,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       openGraph: {
         title: `${nombre} — ${municipio}`,
         description: descripcion.slice(0, 160),
-        images: imagen ? [{ url: imagen }] : [],
+        images: [{ url: imagenAbsoluta, width: 1200, height: 630, alt: nombre }],
         type: 'website',
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: `${nombre} — ${municipio}`,
+        description: descripcion.slice(0, 160),
+        images: [imagenAbsoluta],
       },
       alternates: { canonical: `/hoteles/${id}` },
     }

@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
+import { normalizarUrlMediaAbsoluta } from '@/lib/api/client'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
+const OG_LOGO = `${SITE}/og-logo.png`
 
 async function fetchEvento(id: string) {
   try {
@@ -19,7 +21,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   const ubicacion = `${data.municipio}, ${data.departamento}`
   const descripcion = data.descripcion?.slice(0, 160) ?? `Evento cultural en ${ubicacion}`
-  const imagen = data.portadaUrl || data.fotos?.[0]
+  const imagenRaw = data.portadaUrl || data.fotos?.[0]
+  const imagenAbsoluta = normalizarUrlMediaAbsoluta(imagenRaw, OG_LOGO)
 
   return {
     title: `${data.titulo} — ${ubicacion} | Teravia Cultura`,
@@ -28,13 +31,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       title: data.titulo,
       description: descripcion,
       type: 'website',
-      ...(imagen ? { images: [{ url: imagen, width: 1200, height: 630, alt: data.titulo }] } : {}),
+      images: [{ url: imagenAbsoluta, width: 1200, height: 630, alt: data.titulo }],
     },
     twitter: {
-      card: imagen ? 'summary_large_image' : 'summary',
+      card: 'summary_large_image',
       title: data.titulo,
       description: descripcion,
-      ...(imagen ? { images: [imagen] } : {}),
+      images: [imagenAbsoluta],
     },
   }
 }

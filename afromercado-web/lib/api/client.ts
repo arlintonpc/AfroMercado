@@ -47,6 +47,17 @@ export function normalizarUrlMedia(url?: string | null): string | null {
 }
 
 /**
+ * Normaliza cualquier URL de imagen/media asegurando que siempre devuelva una URL absoluta
+ * válida para metadatos Open Graph (WhatsApp, Facebook, Twitter, iMessage, etc.).
+ */
+export function normalizarUrlMediaAbsoluta(url?: string | null, fallback?: string): string {
+  const norm = normalizarUrlMedia(url)
+  if (norm) return norm
+  const site = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
+  return fallback ?? `${site}/og-logo.png`
+}
+
+/**
  * Extrae un mensaje de error legible del cuerpo de la respuesta.
  * El backend devuelve { error: string }; admitimos también { message }.
  */

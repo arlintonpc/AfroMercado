@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
+import { normalizarUrlMediaAbsoluta } from '@/lib/api/client'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
+const OG_LOGO = `${SITE}/og-logo.png`
 
 async function fetchTransporte(id: string) {
   try {
@@ -16,19 +18,28 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params
   const data = await fetchTransporte(id)
   if (!data) return { title: 'Transporte | Teravia' }
-  const foto = data.fotos?.[0]
+  const fotoRaw = data.fotos?.[0] ?? data.comercio?.logoUrl
+  const fotoAbsoluta = normalizarUrlMediaAbsoluta(fotoRaw, OG_LOGO)
   const rutas = data.rutas?.filter((r: any) => r.activo) ?? []
+  const descripcion = [
+    data.descripcion?.slice(0, 120),
+    rutas.length > 0 ? `${rutas.length} ruta${rutas.length !== 1 ? 's' : ''} disponible${rutas.length !== 1 ? 's' : ''}.` : null,
+  ].filter(Boolean).join(' ')
+
   return {
     title: `${data.nombre} — Transporte en ${data.comercio.municipio} | Teravia`,
-    description: [
-      data.descripcion?.slice(0, 120),
-      rutas.length > 0 ? `${rutas.length} ruta${rutas.length !== 1 ? 's' : ''} disponible${rutas.length !== 1 ? 's' : ''}.` : null,
-    ].filter(Boolean).join(' '),
+    description: descripcion,
     openGraph: {
       title: `${data.nombre} — ${data.comercio.municipio}`,
-      description: data.descripcion?.slice(0, 160) ?? `Transporte en ${data.comercio.municipio}`,
-      images: foto ? [{ url: foto, width: 800, height: 600 }] : [],
+      description: descripcion,
+      images: [{ url: fotoAbsoluta, width: 1200, height: 630, alt: data.nombre }],
       type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${data.nombre} — ${data.comercio.municipio}`,
+      description: descripcion,
+      images: [fotoAbsoluta],
     },
   }
 }

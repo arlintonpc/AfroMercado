@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { normalizarUrlMediaAbsoluta } from '@/lib/api/client'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
@@ -26,7 +27,10 @@ export async function generateMetadata({
           const comercio = pub.comercio?.nombre || pub.autor?.nombre || 'Teravia'
           const descripcionRaw = pub.descripcion || `Mira esta publicación de ${comercio} en ${municipio} a través de Teravia.`
           const descripcion = `${comercio} · ${municipio} — ${descripcionRaw}`.slice(0, 160)
-          const imagen = pub.fotoUrl || pub.videoPosterUrl || pub.producto?.fotoUrl || pub.comercio?.logoUrl || OG_LOGO
+          
+          const imagenRaw = pub.fotoUrl || pub.videoPosterUrl || pub.fotoUrls?.[0] || pub.producto?.fotoUrl || pub.comercio?.logoUrl
+          const imagenAbsoluta = normalizarUrlMediaAbsoluta(imagenRaw, OG_LOGO)
+          const videoAbsoluto = pub.videoUrl ? normalizarUrlMediaAbsoluta(pub.videoUrl) : null
           const shareUrl = `${SITE}/vitrina?publicacion=${publicacionId}`
 
           return {
@@ -37,21 +41,33 @@ export async function generateMetadata({
               description: descripcion,
               url: shareUrl,
               siteName: 'Teravia',
-              type: 'article',
+              type: videoAbsoluto ? 'video.other' : 'article',
               images: [
                 {
-                  url: imagen,
+                  url: imagenAbsoluta,
                   width: 1200,
                   height: 630,
                   alt: titulo,
                 },
               ],
+              ...(videoAbsoluto
+                ? {
+                    videos: [
+                      {
+                        url: videoAbsoluto,
+                        width: 1280,
+                        height: 720,
+                        type: 'video/mp4',
+                      },
+                    ],
+                  }
+                : {}),
             },
             twitter: {
               card: 'summary_large_image',
               title: `${titulo} — ${comercio} | Teravia`,
               description: descripcion,
-              images: [imagen],
+              images: [imagenAbsoluta],
             },
             alternates: {
               canonical: shareUrl,

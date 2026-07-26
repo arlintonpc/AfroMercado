@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
+import { normalizarUrlMediaAbsoluta } from '@/lib/api/client'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
+const OG_LOGO = `${SITE}/og-logo.png`
 
 async function fetchComercio(id: string) {
   try {
@@ -17,14 +19,22 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const data = await fetchComercio(id)
   if (!data) return { title: 'Restaurante | Teravia' }
   const { comercio } = data
+  const fotoAbsoluta = normalizarUrlMediaAbsoluta(comercio.logoUrl ?? comercio.bannerUrl, OG_LOGO)
+
   return {
     title: `${comercio.nombre} — Comida en ${comercio.municipio} | Teravia`,
     description: `Pide comida de ${comercio.nombre} en ${comercio.municipio}. Domicilio y recogida en tienda a través de Teravia.`,
     openGraph: {
       title: `${comercio.nombre} — ${comercio.municipio}`,
       description: `Pide comida de ${comercio.nombre} en ${comercio.municipio}`,
-      images: comercio.logoUrl ? [{ url: comercio.logoUrl, width: 800, height: 600 }] : [],
+      images: [{ url: fotoAbsoluta, width: 1200, height: 630, alt: comercio.nombre }],
       type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${comercio.nombre} — ${comercio.municipio}`,
+      description: `Pide comida de ${comercio.nombre} en ${comercio.municipio}`,
+      images: [fotoAbsoluta],
     },
   }
 }

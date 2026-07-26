@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { normalizarUrlMediaAbsoluta } from '@/lib/api/client'
 
 const API      = process.env.NEXT_PUBLIC_API_URL  ?? 'http://localhost:3001/api'
 const SITE     = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
@@ -59,7 +60,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const imagenProducto = imagenRaw
       ? (typeof imagenRaw === 'string' ? imagenRaw : imagenRaw.url ?? null)
       : p.videoPosterUrl ?? p.fotoUrl ?? null
-    const imagen = imagenProducto ?? OG_LOGO
+    const imagenAbsoluta = normalizarUrlMediaAbsoluta(imagenProducto, OG_LOGO)
 
     return {
       title:       `${nombre} · ${comercio} — Teravia`,
@@ -70,13 +71,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         url:         `${SITE}/producto/${id}`,
         siteName:    'Teravia',
         type:        'website',
-        images: [{ url: imagen, width: 800, height: 600, alt: nombre }],
+        images: [{ url: imagenAbsoluta, width: 1200, height: 630, alt: nombre }],
       },
       twitter: {
         card:        'summary_large_image',
         title:       `${nombre} · ${comercio} — Teravia`,
         description: descripcion,
-        images:      [imagen],
+        images:      [imagenAbsoluta],
       },
     }
   } catch {
