@@ -38,3 +38,19 @@ export function yoApi(): Promise<{ ok: boolean; usuario: import('@/types/usuario
     auth: false,
   })
 }
+
+export function loginConGoogle(credential: string): Promise<RespuestaAuth> {
+  return apiFetch<RespuestaAuth>('/auth/google', {
+    method: 'POST',
+    auth: false,
+    body: { credential },
+  })
+}
+
+export function loginConMicrosoft(datos: { email: string; nombre?: string; id: string; avatarUrl?: string }): Promise<RespuestaAuth> {
+  return apiFetch<RespuestaAuth>('/auth/microsoft', {
+    method: 'POST',
+    auth: false,
+    body: datos,
+  })
+}

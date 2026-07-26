@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { BotonesLoginSocial } from '@/components/auth/BotonesLoginSocial'
 
 type Modo = 'login' | 'registro'
 
@@ -162,6 +163,10 @@ function FormularioIngresar() {
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+            <BotonesLoginSocial
+              onExito={() => router.push(redirect)}
+              onError={(err) => setErrorGeneral(err)}
+            />
             {modo === 'registro' && (
               <>
                 <Input

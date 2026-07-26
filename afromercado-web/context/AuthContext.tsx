@@ -11,6 +11,8 @@ import {
 import {
   registro as apiRegistro,
   login as apiLogin,
+  loginConGoogle,
+  loginConMicrosoft,
   logoutApi,
   yoApi,
 } from '@/lib/api/auth'
@@ -23,6 +25,8 @@ interface AuthContextValor {
   cargando: boolean
   autenticado: boolean
   login: (email: string, password: string) => Promise<Usuario>
+  loginGoogle: (credential: string) => Promise<Usuario>
+  loginMicrosoft: (datos: { email: string; nombre?: string; id: string; avatarUrl?: string }) => Promise<Usuario>
   registro: (datos: DatosRegistro) => Promise<Usuario>
   logout: () => void
   actualizarUsuario: (usuario: Usuario) => void
@@ -104,6 +108,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return u
   }, [])
 
+  const loginGoogle = useCallback(async (credential: string) => {
+    const { usuario: u } = await loginConGoogle(credential)
+    guardarSesion(u)
+    setUsuario(u)
+    setToken('http-only')
+    return u
+  }, [])
+
+  const loginMicrosoft = useCallback(async (datos: { email: string; nombre?: string; id: string; avatarUrl?: string }) => {
+    const { usuario: u } = await loginConMicrosoft(datos)
+    guardarSesion(u)
+    setUsuario(u)
+    setToken('http-only')
+    return u
+  }, [])
+
   const registro = useCallback(async (datos: DatosRegistro) => {
     const { usuario: u } = await apiRegistro(datos)
     guardarSesion(u)
@@ -139,6 +159,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     cargando,
     autenticado: !!token,
     login,
+    loginGoogle,
+    loginMicrosoft,
     registro,
     logout,
     actualizarUsuario,

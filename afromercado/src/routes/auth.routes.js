@@ -8,6 +8,8 @@ const router = express.Router();
 
 router.post("/registro", AuthController.registrar);
 router.post("/login", AuthController.login);
+router.post("/google", AuthController.loginGoogle);
+router.post("/microsoft", AuthController.loginMicrosoft);
 router.post("/logout", AuthController.logout);
 router.get("/yo", autenticar, AuthController.yo);
 

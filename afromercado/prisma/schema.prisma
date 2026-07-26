@@ -172,7 +172,10 @@ model Usuario {
   email        String    @unique
   telefono     String?
   avatarUrl    String?
-  passwordHash String
+  passwordHash String?
+  googleId     String?   @unique
+  microsoftId  String?   @unique
+  provider     String?   @default("EMAIL")
   rol          Rol       @default(COMPRADOR)
   activo       Boolean   @default(true)
   motivoBloqueo String?

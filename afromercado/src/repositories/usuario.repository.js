@@ -21,6 +21,16 @@ const UsuarioRepository = {
     });
   },
 
+  async buscarPorGoogleId(googleId) {
+    if (!googleId) return null;
+    return prisma.usuario.findFirst({ where: { googleId } });
+  },
+
+  async buscarPorMicrosoftId(microsoftId) {
+    if (!microsoftId) return null;
+    return prisma.usuario.findFirst({ where: { microsoftId } });
+  },
+
   async buscarPorTelefono(telefono) {
     // telefono no es @unique en el schema → findFirst, no findUnique
     return prisma.usuario.findFirst({ where: { telefono } });

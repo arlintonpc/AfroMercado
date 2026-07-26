@@ -14,6 +14,12 @@ const ADVISORY_LOCK_ID = 778899;
 
 const STATEMENTS = [
   `ALTER TABLE "Usuario" ADD COLUMN IF NOT EXISTS "departamento" TEXT`,
+  `ALTER TABLE "Usuario" ADD COLUMN IF NOT EXISTS "googleId" TEXT`,
+  `ALTER TABLE "Usuario" ADD COLUMN IF NOT EXISTS "microsoftId" TEXT`,
+  `ALTER TABLE "Usuario" ADD COLUMN IF NOT EXISTS "provider" TEXT DEFAULT 'EMAIL'`,
+  `ALTER TABLE "Usuario" ALTER COLUMN "passwordHash" DROP NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Usuario_googleId_key" ON "Usuario"("googleId") WHERE "googleId" IS NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Usuario_microsoftId_key" ON "Usuario"("microsoftId") WHERE "microsoftId" IS NOT NULL`,
   `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "departamento" TEXT`,
   `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "latitud" DOUBLE PRECISION`,
   `ALTER TABLE "Comercio" ADD COLUMN IF NOT EXISTS "longitud" DOUBLE PRECISION`,

@@ -42,6 +42,26 @@ const AuthController = {
     }
   },
 
+  async loginGoogle(req, res, next) {
+    try {
+      const resultado = await AuthService.loginSocialGoogle(req.body);
+      setTokenCookie(res, resultado.token);
+      res.status(200).json({ ok: true, ...resultado });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async loginMicrosoft(req, res, next) {
+    try {
+      const resultado = await AuthService.loginSocialMicrosoft(req.body);
+      setTokenCookie(res, resultado.token);
+      res.status(200).json({ ok: true, ...resultado });
+    } catch (e) {
+      next(e);
+    }
+  },
+
   async logout(req, res) {
     res.clearCookie('afromercado_token', {
       httpOnly: true,
