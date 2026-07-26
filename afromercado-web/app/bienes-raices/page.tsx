@@ -201,6 +201,8 @@ export default function BienesRaicesPage() {
   const [tardando, setTardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
+  const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
+  const [ubicacionUsuario, setUbicacionUsuario] = useState<{ lat: number; lng: number } | null>(null)
   const [mostrarFiltros, setMostrarFiltros] = useState(false)
   const [filtros, setFiltros] = useState({
     departamento: '', municipio: '',
@@ -208,6 +210,25 @@ export default function BienesRaicesPage() {
     tipoOperacion: '' as TipoOperacionInmueble | '',
     precioMax: 0,
   })
+
+  function obtenerUbicacion() {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      alert('Tu navegador no soporta geolocalización.')
+      return
+    }
+    setBuscandoUbicacion(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUbicacionUsuario({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setBuscandoUbicacion(false)
+      },
+      () => {
+        setBuscandoUbicacion(false)
+        alert('No pudimos obtener tu ubicación actual. Revisa los permisos de tu navegador.')
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
 
   useEffect(() => {
     const t = setTimeout(() => setTardando(true), 6000)
@@ -324,6 +345,28 @@ export default function BienesRaicesPage() {
                 className="w-full pl-10 pr-4 py-2.5 bg-transparent text-gray-900 placeholder-gray-400 text-sm font-medium focus:outline-none" />
             </div>
             <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={obtenerUbicacion}
+                disabled={buscandoUbicacion}
+                className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  ubicacionUsuario
+                    ? 'bg-[#1B4332] text-white shadow-md'
+                    : 'bg-emerald-50 hover:bg-emerald-100 text-[#1B4332]'
+                }`}
+                title="Buscar predios más cercanos a mi posición"
+              >
+                {buscandoUbicacion ? (
+                  <div className="w-4 h-4 border-2 border-[#1B4332] border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                )}
+                <span>{ubicacionUsuario ? 'Cerca de mí' : '📍 Cerca de mí'}</span>
+              </button>
+
               <button onClick={() => setMostrarFiltros(true)}
                 className={`relative flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
                   filtrosActivos ? 'bg-[#D4A017] text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
