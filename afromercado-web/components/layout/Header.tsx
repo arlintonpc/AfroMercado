@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCarrito } from '@/context/CarritoContext'
 import { useAuth } from '@/context/AuthContext'
 import { useRegion } from '@/context/RegionContext'
+import { useTheme } from '@/context/ThemeContext'
 import { apiFetch, normalizarUrlMedia } from '@/lib/api/client'
 import { obtenerReglasPublicas } from '@/lib/api/config'
 import { DEPARTAMENTOS } from '@/lib/data/colombia'
@@ -21,6 +22,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
   const { cantidadTotal } = useCarrito()
   const { usuario, autenticado, logout } = useAuth()
   const { regionActiva, elegirRegion } = useRegion()
+  const { theme, toggleTheme } = useTheme()
   const router = useRouter()
 
   const badge = itemsCarrito ?? cantidadTotal
@@ -205,6 +207,20 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             <svg className="w-5 h-5 text-[#1A1A1A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
+          </button>
+
+          {/* Toggle Modo Oscuro / Claro */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center justify-center w-11 h-11 rounded-lg hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 transition-colors"
+            title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            aria-label="Alternar tema"
+          >
+            {theme === 'dark' ? (
+              <span className="text-xl" role="img" aria-label="Sol">☀️</span>
+            ) : (
+              <span className="text-xl" role="img" aria-label="Luna">🌙</span>
+            )}
           </button>
 
           {/* Campana de notificaciones — solo usuarios autenticados */}
@@ -427,6 +443,9 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             )}
             <Link href="/temporada" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#D4A017] hover:bg-[#D4A017]/10 flex items-center gap-1.5 transition-colors">
               <Sparkles className="w-4 h-4" /> Temporada
+            </Link>
+            <Link href="/mapa" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-bold text-[#1B4332] dark:text-[#52B788] hover:bg-[#1B4332]/10 flex items-center gap-1.5 transition-colors">
+              <Map className="w-4 h-4" /> Mapa
             </Link>
           </div>
 

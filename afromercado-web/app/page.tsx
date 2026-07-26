@@ -6,6 +6,7 @@ import Image from 'next/image'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import HeroBanner from '@/components/catalogo/HeroBanner'
+import CarruselHistorias from '@/components/home/CarruselHistorias'
 import BannerCarrusel from '@/components/publicidad/BannerCarrusel'
 import FiltrosHorizontales from '@/components/catalogo/FiltrosHorizontales'
 import TarjetaProducto from '@/components/catalogo/TarjetaProducto'
@@ -510,13 +511,11 @@ export default function Home() {
     () => inicioData?.destHomeEtiquetas ?? new Map<string, string>(),
     [inicioData?.destHomeEtiquetas],
   )
-  // Map: productoId (string) -> etiqueta del sello publicitario.
   const destCatalogo = useMemo(
     () => inicioData?.destCatalogo ?? new Map<string, string>(),
     [inicioData?.destCatalogo],
   )
 
-  // Recomendaciones personalizadas (solo usuarios autenticados)
   useEffect(() => {
     if (!autenticado) return
     apiFetch<{ ok: boolean; data: unknown[] }>('/productos/recomendaciones?limite=8')
@@ -524,7 +523,6 @@ export default function Home() {
         const data = Array.isArray(res?.data) ? (res.data as ProductoCrudo[]) : []
         setRecomendados(mapearProductos(data))
       })
-      .catch(() => {})
   }, [autenticado])
 
   function handleFiltroChange(filtro: string) {
@@ -542,6 +540,9 @@ export default function Home() {
 
         {/* Hero */}
         <HeroBanner productos={destacados} />
+
+        {/* Historias / Reels Culturales en Vivo */}
+        <CarruselHistorias />
 
         {/* Banners patrocinados — carrusel */}
         <BannerCarrusel />
@@ -579,8 +580,6 @@ export default function Home() {
 
         {/* Categorías */}
         <SeccionCategorias />
-
-        {/* Hoteles & Turismo */}
         <SeccionHoteles hoteles={hoteles} />
 
         {/* Tours & Aventura */}
