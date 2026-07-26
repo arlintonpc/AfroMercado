@@ -28,6 +28,8 @@ export default function Header({ itemsCarrito }: HeaderProps) {
   const [menuAbierto, setMenuAbierto] = useState(false)
   const [avatarModalAbierto, setAvatarModalAbierto] = useState(false)
   const [regionMenuAbierto, setRegionMenuAbierto] = useState(false)
+  const [masMenuAbierto, setMasMenuAbierto] = useState(false)
+  const [masMenuPos, setMasMenuPos] = useState<{ top: number; left: number } | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [busquedasRecientes, setBusquedasRecientes] = useState<string[]>([])
   const [mostrarSugerencias, setMostrarSugerencias] = useState(false)
@@ -36,6 +38,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const regionRef = useRef<HTMLDivElement>(null)
   const busquedaRef = useRef<HTMLDivElement>(null)
+  const masRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     obtenerReglasPublicas()
@@ -90,6 +93,17 @@ export default function Header({ itemsCarrito }: HeaderProps) {
   }, [regionMenuAbierto])
 
   useEffect(() => {
+    if (!masMenuAbierto) return
+    function onClick(e: MouseEvent) {
+      if (masRef.current && !masRef.current.contains(e.target as Node)) {
+        setMasMenuAbierto(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [masMenuAbierto])
+
+  useEffect(() => {
     if (!mostrarSugerencias) return
     function onClick(e: MouseEvent) {
       if (busquedaRef.current && !busquedaRef.current.contains(e.target as Node)) {
@@ -124,13 +138,14 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             onClick={() => setRegionMenuAbierto((v) => !v)}
             aria-haspopup="menu"
             aria-expanded={regionMenuAbierto}
-            className="flex items-center gap-1 min-h-[36px] px-2 md:px-2.5 rounded-lg text-xs md:text-sm font-semibold text-[#1B4332] hover:bg-[#2D6A4F]/10 border border-[#2D6A4F]/20"
+            aria-label={`Región activa: ${regionActiva ?? 'Todo el país'}`}
+            className="flex items-center gap-1 min-h-[36px] w-9 sm:w-auto justify-center px-0 sm:px-2 md:px-2.5 rounded-lg text-xs md:text-sm font-semibold text-[#1B4332] hover:bg-[#2D6A4F]/10 border border-[#2D6A4F]/20"
           >
             <span aria-hidden="true">📍</span>
-            <span className="max-w-[90px] md:max-w-[140px] truncate">
+            <span className="hidden sm:inline max-w-[90px] md:max-w-[140px] truncate">
               {regionActiva ?? 'Todo el país'}
             </span>
-            <svg className="w-3 h-3 text-[#1A1A1A]/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="hidden sm:block w-3 h-3 text-[#1A1A1A]/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
@@ -396,11 +411,6 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                 <Map className="w-4 h-4" /> Tours
               </Link>
             )}
-            {(!reglas || reglas.flagModuloTransportes) && (
-              <Link href="/transportes" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
-                <Ship className="w-4 h-4" /> Transporte
-              </Link>
-            )}
             <Link href="/cultura" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
               <Ticket className="w-4 h-4" /> Cultura
             </Link>
@@ -414,17 +424,70 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                 <Briefcase className="w-4 h-4" /> Empleo
               </Link>
             )}
-            {(!reglas || reglas.flagModuloInmuebles) && (
-              <Link href="/bienes-raices" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
-                <Home className="w-4 h-4" /> Bienes Raíces
-              </Link>
-            )}
-            <Link href="/agro" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
-              <Leaf className="w-4 h-4" /> Agro
-            </Link>
             <Link href="/temporada" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#D4A017] hover:bg-[#D4A017]/10 flex items-center gap-1.5 transition-colors">
               <Sparkles className="w-4 h-4" /> Temporada
             </Link>
+
+            {/* Categorías menos frecuentes agrupadas para no saturar el menú */}
+            <div className="relative flex-shrink-0" ref={masRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!masMenuAbierto && masRef.current) {
+                    const r = masRef.current.getBoundingClientRect()
+                    const anchoMenu = 192 // w-48
+                    const left = Math.min(r.left, window.innerWidth - anchoMenu - 8)
+                    setMasMenuPos({ top: r.bottom + 8, left: Math.max(8, left) })
+                  }
+                  setMasMenuAbierto((v) => !v)
+                }}
+                aria-haspopup="menu"
+                aria-expanded={masMenuAbierto}
+                className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1 transition-colors"
+              >
+                Más
+                <svg className={`w-3 h-3 transition-transform ${masMenuAbierto ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {masMenuAbierto && masMenuPos && (
+                <div
+                  role="menu"
+                  style={{ position: 'fixed', top: masMenuPos.top, left: masMenuPos.left }}
+                  className="w-48 bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] py-1 z-50"
+                >
+                  {(!reglas || reglas.flagModuloTransportes) && (
+                    <Link
+                      href="/transportes"
+                      role="menuitem"
+                      onClick={() => setMasMenuAbierto(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#1A1A1A] hover:bg-[#2D6A4F]/10"
+                    >
+                      <Ship className="w-4 h-4 text-[#2D6A4F]" /> Transporte
+                    </Link>
+                  )}
+                  {(!reglas || reglas.flagModuloInmuebles) && (
+                    <Link
+                      href="/bienes-raices"
+                      role="menuitem"
+                      onClick={() => setMasMenuAbierto(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#1A1A1A] hover:bg-[#2D6A4F]/10"
+                    >
+                      <Home className="w-4 h-4 text-[#2D6A4F]" /> Bienes Raíces
+                    </Link>
+                  )}
+                  <Link
+                    href="/agro"
+                    role="menuitem"
+                    onClick={() => setMasMenuAbierto(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#1A1A1A] hover:bg-[#2D6A4F]/10"
+                  >
+                    <Leaf className="w-4 h-4 text-[#2D6A4F]" /> Agro
+                  </Link>
+                </div>
+              )}
+            </div>
           </nav>
         </div>
       </div>
