@@ -8,9 +8,11 @@ const {
   ErrorValidacion,
   ErrorNoEncontrado,
   ErrorProhibido,
+  ErrorConflicto,
 } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
 const PaymentConfigService = require("./payment-config.service");
+const { bloquearPedido } = require("../utils/bloqueos-transaccionales");
 
 const METODOS_VALIDOS = ["NEQUI", "DAVIPLATA", "TRANSFERENCIA", "EFECTIVO"];
 
@@ -39,18 +41,25 @@ const PagoService = {
       );
     }
 
-    // 1. Idempotencia: si ya existe un pago con esa clave, lo retornamos tal cual.
-    const existente = await PagoRepository.buscarPorIdempotencyKey(idempotencyKey);
-    if (existente) return existente;
-
     const pedidoIdNum = Number(pedidoId);
 
-    // 2. Validar que el pedido existe, pertenece al usuario y está en PENDIENTE_PAGO.
+    // Validar propiedad antes de consultar una clave que podria pertenecer a otro usuario.
     const pedido = await PedidoRepository.buscarPorId(pedidoIdNum);
     if (!pedido) throw new ErrorNoEncontrado("Pedido no encontrado");
     if (pedido.compradorId !== usuarioId) {
       throw new ErrorProhibido("Este pedido no te pertenece");
     }
+
+    const existente = await PagoRepository.buscarPorIdempotencyKey(idempotencyKey);
+    if (existente) {
+      if (existente.pedidoId !== pedidoIdNum || existente.metodo !== metodo) {
+        throw new ErrorConflicto(
+          "La clave de idempotencia ya fue usada con una solicitud diferente"
+        );
+      }
+      return existente;
+    }
+
     if (pedido.estado !== "PENDIENTE_PAGO") {
       throw new ErrorValidacion(
         `No se puede pagar un pedido en estado "${pedido.estado}"`
@@ -58,23 +67,71 @@ const PagoService = {
     }
 
     // 3-4. Crear pago (PENDIENTE) y mover pedido a VERIFICANDO_PAGO en una transacción.
-    const pago = await prisma.$transaction(async (tx) => {
-      const nuevoPago = await PagoRepository.crear(
-        {
-          pedidoId: pedidoIdNum,
-          monto: pedido.total,
-          metodo,
-          estado: "PENDIENTE",
-          referencia: referencia || null,
+    let pago;
+    try {
+      pago = await prisma.$transaction(async (tx) => {
+        await bloquearPedido(tx, pedidoIdNum);
+        const pedidoActual = await tx.pedido.findUnique({
+          where: { id: pedidoIdNum },
+          select: { compradorId: true, estado: true, total: true },
+        });
+        if (!pedidoActual) throw new ErrorNoEncontrado("Pedido no encontrado");
+        if (pedidoActual.compradorId !== usuarioId) {
+          throw new ErrorProhibido("Este pedido no te pertenece");
+        }
+
+        const concurrente = await PagoRepository.buscarPorIdempotencyKey(
           idempotencyKey,
-        },
-        tx
-      );
+          tx
+        );
+        if (concurrente) {
+          if (
+            concurrente.pedidoId !== pedidoIdNum ||
+            concurrente.metodo !== metodo
+          ) {
+            throw new ErrorConflicto(
+              "La clave de idempotencia ya fue usada con una solicitud diferente"
+            );
+          }
+          return concurrente;
+        }
 
-      await PedidoRepository.actualizarEstado(pedidoIdNum, "VERIFICANDO_PAGO", tx);
+        if (pedidoActual.estado !== "PENDIENTE_PAGO") {
+          throw new ErrorValidacion(
+            `No se puede pagar un pedido en estado "${pedidoActual.estado}"`
+          );
+        }
 
-      return nuevoPago;
-    });
+        const nuevoPago = await PagoRepository.crear(
+          {
+            pedidoId: pedidoIdNum,
+            monto: pedidoActual.total,
+            metodo,
+            estado: "PENDIENTE",
+            referencia: referencia || null,
+            idempotencyKey,
+          },
+          tx
+        );
+
+        await PedidoRepository.actualizarEstado(pedidoIdNum, "VERIFICANDO_PAGO", tx);
+
+        return nuevoPago;
+      });
+    } catch (error) {
+      if (error?.code !== "P2002") throw error;
+      const concurrente = await PagoRepository.buscarPorIdempotencyKey(idempotencyKey);
+      if (
+        !concurrente ||
+        concurrente.pedidoId !== pedidoIdNum ||
+        concurrente.metodo !== metodo
+      ) {
+        throw new ErrorConflicto(
+          "La clave de idempotencia ya fue usada con una solicitud diferente"
+        );
+      }
+      return concurrente;
+    }
 
     // 5. Retornar pago
     return pago;
@@ -132,10 +189,18 @@ const PagoService = {
    * Devuelve las instrucciones de pago para el comprador: a qué número Nequi /
    * Daviplata de la plataforma transferir, el monto y la referencia sugerida.
    */
-  async obtenerInstruccionesPago(pedidoId) {
+  async obtenerInstruccionesPago(usuarioId, pedidoId) {
     await validarPagosManualesActivos();
     const pedido = await PedidoRepository.buscarPorId(Number(pedidoId));
     if (!pedido) throw new ErrorNoEncontrado("Pedido no encontrado");
+    if (pedido.compradorId !== usuarioId) {
+      throw new ErrorProhibido("Este pedido no te pertenece");
+    }
+    if (!["PENDIENTE_PAGO", "VERIFICANDO_PAGO"].includes(pedido.estado)) {
+      throw new ErrorValidacion(
+        `No se pueden consultar instrucciones para un pedido en estado "${pedido.estado}"`
+      );
+    }
 
     return {
       pedidoId: pedido.id,

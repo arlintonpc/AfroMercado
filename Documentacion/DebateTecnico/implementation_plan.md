@@ -3,6 +3,49 @@
 ## Estado
 `APROBADA` por el dueño del producto el 25 de julio de 2026.
 
+La implementacion de tablas de Kardex y calculos de margen permanece
+condicionada al cierre de la Fase 0 financiera.
+
+## Prerrequisito: Fase 0 Financiera
+
+Estado tecnico: `VERIFICADA`.
+
+Estado de politica financiera de cupones: `BLOQUEADA` hasta decision del
+dueno del producto.
+
+Implementado en el arbol de trabajo:
+
+- Propiedad de instrucciones de pago.
+- Idempotencia aislada por usuario, pedido y operacion.
+- Bloqueo de pedido para serializar pago, cancelacion, confirmacion y rechazo.
+- Conciliacion segura de aprobaciones tardias sin descontar stock.
+- Reintento de webhooks previamente registrados pero no procesados.
+- Validacion de identificadores contradictorios de pasarela.
+- Reclamo temporal e idempotente de dispersiones pendientes o fallidas.
+- Historial de precios atomico y serializado.
+- ROI de cupones agregado primero por pedido.
+
+Evidencia de cierre tecnico:
+
+- Auditoria independiente final sin bloqueadores altos ni criticos.
+- QA independiente aprobado para correlacion de webhooks, aprobaciones
+  tardias, reintentos, backoff e idempotencia de dispersiones.
+- `npm run test:vitest`: 50/50; pruebas focalizadas finales: 23/23.
+- `npm test`: 157/157.
+- Pruebas operativas no destructivas contra PostgreSQL confirmaron espera de
+  locks de pedido y producto, un solo reclamo de lease y ausencia de doble
+  liberacion.
+- Pendiente no bloqueante: E2E HTTP y validacion con sandbox real de Wompi.
+
+Decision bloqueante del dueño del producto:
+
+- Definir si el descuento lo financia Teravia, el comercio, un programa externo
+  o una combinacion.
+- Definir el momento de consumo y liberacion del cupon.
+- Definir GMV y tratamiento de IVA de forma uniforme.
+- Persistir la asignacion del descuento y su financiador por subpedido antes de
+  calcular margen o modificar liquidaciones.
+
 ## Objetivo
 Dar a cada comercio un control operativo verificable de inventario, costos y compras. No reemplaza la contabilidad legal, la facturacion electronica ni la conciliacion bancaria.
 

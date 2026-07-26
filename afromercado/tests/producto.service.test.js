@@ -7,6 +7,7 @@
 
 const ComercioRepository = require("../src/repositories/comercio.repository");
 const ProductoRepository = require("../src/repositories/producto.repository");
+const prisma = require("../src/config/prisma");
 
 // Valores por defecto reutilizables en los tests
 const comercioFake = {
@@ -19,19 +20,37 @@ const comercioFake = {
   fotoDocumentoReversoUrl: "https://docs/reverso.jpg",
   cuentaDispersion: { estado: "VERIFICADA", proveedor: "SANDBOX" },
 };
-const productoFake = { id: "prod-999", comercioId: "comercio-123", nombre: "Borojó", activo: true };
+const productoFake = {
+  id: 999,
+  comercioId: "comercio-123",
+  nombre: "Borojó",
+  precio: 8000,
+  activo: true,
+};
 
 // Estado mutable de los mocks (se puede sobreescribir por test)
 let mockComercio = comercioFake;
 let mockProducto = productoFake;
 let productoCreado = null;
 let productoActualizado = null;
+let historialPrecios = [];
 
 ComercioRepository.buscarPorUsuarioId = async () => mockComercio;
 ComercioRepository.buscarPorUsuarioIdConCuenta = async () => mockComercio;
 ProductoRepository.buscarPorId       = async () => mockProducto;
 ProductoRepository.crear             = async (data) => { productoCreado = data; return { id: "prod-nuevo", ...data }; };
 ProductoRepository.actualizar        = async (id, data) => { productoActualizado = data; return { id, ...data }; };
+prisma.$transaction = async (callback) => callback(prisma);
+prisma.$queryRaw = async () => [{ id: mockProducto?.id }];
+prisma.producto = {
+  findUnique: async () => mockProducto,
+};
+prisma.precioHistorial = {
+  create: async ({ data }) => {
+    historialPrecios.push(data);
+    return { id: historialPrecios.length, ...data };
+  },
+};
 
 // Ahora sí cargamos el servicio (ya ve los mocks en memoria)
 const ProductoService = require("../src/services/producto.service");
@@ -164,15 +183,23 @@ async function runCrearTests() {
   // 10. Acepta datos válidos y llama a ProductoRepository.crear con los campos correctos
   mockComercio = comercioFake;
   productoCreado = null;
+  historialPrecios = [];
   let resultado;
   try {
-    resultado = await ProductoService.crear("u1", datosValidos);
+    resultado = await ProductoService.crear(1, datosValidos);
   } catch (e) {
     resultado = null;
   }
   esperar(
     "Acepta datos válidos y retorna el producto creado",
     resultado !== null && resultado.nombre === datosValidos.nombre.trim() && resultado.comercioId === comercioFake.id,
+    true
+  );
+  esperar(
+    "Crear producto registra el precio inicial en el historial",
+    historialPrecios.length === 1 &&
+      historialPrecios[0].productoId === "prod-nuevo" &&
+      historialPrecios[0].precio === datosValidos.precio,
     true
   );
 }
@@ -208,6 +235,31 @@ async function runActualizarTests() {
     "Rechaza actualizar producto de otro comercio",
     ProductoService.actualizar("u-otro", "prod-999", { nombre: "Intento hackeo" }),
     ErrorNoAutorizado
+  );
+
+  // 4. Un cambio real de precio crea una instantánea en la misma operación.
+  mockComercio = comercioFake;
+  mockProducto = productoFake;
+  historialPrecios = [];
+  productoActualizado = null;
+  await ProductoService.actualizar(1, 999, { precio: 9500 });
+  esperar(
+    "Cambiar el precio registra una instantánea nueva",
+    productoActualizado?.precio === 9500 &&
+      historialPrecios.length === 1 &&
+      historialPrecios[0].productoId === 999 &&
+      historialPrecios[0].precio === 9500,
+    true
+  );
+
+  // 5. Reenviar el mismo precio no duplica el historial.
+  mockProducto = { ...productoFake, precio: 9500 };
+  historialPrecios = [];
+  await ProductoService.actualizar(1, 999, { precio: "9500.00", nombre: "Borojó premium" });
+  esperar(
+    "Reenviar el mismo precio no duplica el historial",
+    historialPrecios.length,
+    0
   );
 }
 

@@ -394,7 +394,15 @@ const CuponRepository = {
     ]);
 
     const estadoMap = {};
-    const ESTADOS = ["PENDIENTE_PAGO","VERIFICANDO_PAGO","CONFIRMADO","ENTREGADO","CANCELADO"];
+    const ESTADOS = [
+      "PENDIENTE_PAGO",
+      "VERIFICANDO_PAGO",
+      "CONFIRMADO",
+      "ENTREGADO",
+      "CANCELADO",
+      "PAGO_FALLIDO",
+      "EXPIRADO",
+    ];
     ESTADOS.forEach(e => estadoMap[e] = { pedidos: 0, descuento: 0, gmv: 0, ticket_promedio: 0 });
     for (const fila of pedidosPorEstado) estadoMap[fila.estado] = fila;
 
@@ -403,7 +411,8 @@ const CuponRepository = {
 
     const descRealizado = confirmados.reduce((s, e) => s + (estadoMap[e]?.descuento ?? 0), 0);
     const descEnRiesgo  = enRiesgo.reduce((s, e) => s + (estadoMap[e]?.descuento ?? 0), 0);
-    const descPerdido   = estadoMap["CANCELADO"]?.descuento ?? 0;
+    const descPerdido   = ["CANCELADO", "PAGO_FALLIDO", "EXPIRADO"]
+      .reduce((s, e) => s + (estadoMap[e]?.descuento ?? 0), 0);
     const descBruto     = descRealizado + descEnRiesgo + descPerdido;
     const gmvAtribuido  = confirmados.reduce((s, e) => s + (estadoMap[e]?.gmv ?? 0), 0);
     const pedidosTotales = ESTADOS.reduce((s, e) => s + (estadoMap[e]?.pedidos ?? 0), 0);

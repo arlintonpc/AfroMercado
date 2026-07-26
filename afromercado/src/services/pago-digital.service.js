@@ -3,12 +3,14 @@ const {
   ErrorNoEncontrado,
   ErrorProhibido,
   ErrorValidacion,
+  ErrorConflicto,
 } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
 const FacturacionService = require("./facturacion.service");
 const FidelizacionService = require("./fidelizacion.service");
 const VisibilidadRepository = require("../repositories/visibilidad.repository");
 const PagoPublicidadService = require("./pago-publicidad.service");
+const { bloquearPedido } = require("../utils/bloqueos-transaccionales");
 const {
   normalizarProveedor,
   obtenerProveedor,
@@ -19,9 +21,27 @@ const ESTADOS_CONFIRMABLES = ["PENDIENTE", "VERIFICANDO"];
 const ESTADOS_PEDIDO_PAGABLES = ["PENDIENTE_PAGO", "VERIFICANDO_PAGO"];
 const ESTADOS_APROBADOS = ["APPROVED", "APROBADO", "CONFIRMED", "CONFIRMADO", "PAID", "SUCCESS", "SUCCESSFUL"];
 const ESTADOS_FALLIDOS = ["DECLINED", "REJECTED", "FAILED", "FALLIDO", "ERROR", "CANCELLED", "CANCELED", "EXPIRED", "VOIDED"];
+const MAX_INTENTOS_DISPERSION = 5;
+const BACKOFF_DISPERSION_MINUTOS = [5, 15, 30, 60, 120];
 
 function numero(valor) {
   return valor == null ? 0 : Number(valor);
+}
+
+function datosFalloDispersion(dispersion, mensaje, ahora = new Date()) {
+  const intentos = numero(dispersion.intentosFallidos) + 1;
+  const minutos = BACKOFF_DISPERSION_MINUTOS[
+    Math.min(intentos - 1, BACKOFF_DISPERSION_MINUTOS.length - 1)
+  ];
+  return {
+    estado: "FALLIDA",
+    errorMensaje: mensaje,
+    intentosFallidos: { increment: 1 },
+    proximoReintentoAt:
+      intentos >= MAX_INTENTOS_DISPERSION
+        ? null
+        : new Date(ahora.getTime() + minutos * 60 * 1000),
+  };
 }
 
 function referenciaPago(pedido) {
@@ -57,6 +77,31 @@ function mapearPagoDigital(pago) {
       providerStatus: d.providerStatus,
     })),
   };
+}
+
+function checkoutDigitalListo(pago) {
+  return Boolean(
+    pago?.providerCheckoutUrl ||
+    pago?.providerPaymentId ||
+    ["FALLIDO", "CONFIRMADO", "REEMBOLSADO"].includes(pago?.estado)
+  );
+}
+
+async function esperarCheckoutConcurrente(idempotencyKey, pagoInicial) {
+  let pago = pagoInicial;
+  for (let intento = 0; intento < 20 && !checkoutDigitalListo(pago); intento += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    pago = await prisma.pago.findUnique({
+      where: { idempotencyKey },
+      include: { dispersiones: true },
+    });
+  }
+  if (!checkoutDigitalListo(pago)) {
+    throw new ErrorConflicto(
+      "El checkout se esta creando. Intenta consultar nuevamente en unos segundos"
+    );
+  }
+  return mapearPagoDigital(pago);
 }
 
 function obtenerMontoEventoCentavos(evento) {
@@ -243,17 +288,25 @@ const PagoDigitalService = {
     if (!idempotencyKey) throw new ErrorValidacion("El idempotencyKey es obligatorio");
     if (!pedidoId) throw new ErrorValidacion("El pedidoId es obligatorio");
 
-    const existente = await prisma.pago.findUnique({
-      where: { idempotencyKey },
-      include: { dispersiones: true },
-    });
-    if (existente) return mapearPagoDigital(existente);
-
     const pedido = await cargarPedido(pedidoId);
     if (!pedido) throw new ErrorNoEncontrado("Pedido no encontrado");
     if (pedido.compradorId !== usuarioId) {
       throw new ErrorProhibido("Este pedido no te pertenece");
     }
+
+    const existente = await prisma.pago.findUnique({
+      where: { idempotencyKey },
+      include: { dispersiones: true },
+    });
+    if (existente) {
+      if (existente.pedidoId !== pedido.id || existente.metodo !== "PASARELA") {
+        throw new ErrorConflicto(
+          "La clave de idempotencia ya fue usada con una solicitud diferente"
+        );
+      }
+      return esperarCheckoutConcurrente(idempotencyKey, existente);
+    }
+
     if (!ESTADOS_PEDIDO_PAGABLES.includes(pedido.estado)) {
       throw new ErrorValidacion(`No se puede pagar un pedido en estado "${pedido.estado}"`);
     }
@@ -265,49 +318,115 @@ const PagoDigitalService = {
     const cuentasPorComercio = await obtenerCuentasDispersion(pedido, proveedorNombre);
     const referencia = referenciaPago(pedido);
 
-    let pago = await prisma.$transaction(async (tx) => {
-      const nuevoPago = await tx.pago.create({
-        data: {
-          pedidoId: pedido.id,
-          monto: pedido.total,
-          metodo: "PASARELA",
-          estado: "PENDIENTE",
-          idempotencyKey,
-          proveedor: proveedorNombre,
-          moneda: "COP",
-          providerReference: referencia,
-          providerStatus: "CREATED",
-          expiraAt: pedido.expiresAt,
-        },
-      });
+    let pago;
+    try {
+      const resultadoCreacion = await prisma.$transaction(async (tx) => {
+        await bloquearPedido(tx, pedido.id);
+        const pedidoActual = await tx.pedido.findUnique({
+          where: { id: pedido.id },
+          select: {
+            compradorId: true,
+            estado: true,
+            total: true,
+            expiresAt: true,
+          },
+        });
+        if (!pedidoActual) throw new ErrorNoEncontrado("Pedido no encontrado");
+        if (pedidoActual.compradorId !== usuarioId) {
+          throw new ErrorProhibido("Este pedido no te pertenece");
+        }
 
-      await tx.pagoDispersion.createMany({
-        data: pedido.subPedidos.map((sp) => {
-          const cuenta = cuentasPorComercio.get(sp.comercioId);
-          return {
-            pagoId: nuevoPago.id,
-            subPedidoId: sp.id,
-            comercioId: sp.comercioId,
-            cuentaDispersionId: cuenta.id,
-            proveedor: proveedorNombre,
+        const concurrente = await tx.pago.findUnique({
+          where: { idempotencyKey },
+          include: { dispersiones: true },
+        });
+        if (concurrente) {
+          if (
+            concurrente.pedidoId !== pedido.id ||
+            concurrente.metodo !== "PASARELA"
+          ) {
+            throw new ErrorConflicto(
+              "La clave de idempotencia ya fue usada con una solicitud diferente"
+            );
+          }
+          return { pago: concurrente, reutilizado: true };
+        }
+
+        if (!ESTADOS_PEDIDO_PAGABLES.includes(pedidoActual.estado)) {
+          throw new ErrorValidacion(
+            `No se puede pagar un pedido en estado "${pedidoActual.estado}"`
+          );
+        }
+        if (pedidoActual.expiresAt && pedidoActual.expiresAt.getTime() < Date.now()) {
+          throw new ErrorValidacion("El tiempo para pagar este pedido expiro");
+        }
+
+        const nuevoPago = await tx.pago.create({
+          data: {
+            pedidoId: pedido.id,
+            monto: pedidoActual.total,
+            metodo: "PASARELA",
             estado: "PENDIENTE",
-            montoBruto: sp.subtotal,
-            comision: sp.comision,
-            montoNeto: sp.neto,
-          };
-        }),
-      });
+            idempotencyKey,
+            proveedor: proveedorNombre,
+            moneda: "COP",
+            providerReference: referencia,
+            providerStatus: "CREATED",
+            expiraAt: pedidoActual.expiresAt,
+          },
+        });
 
-      await tx.pedido.update({
-        where: { id: pedido.id },
-        data: { estado: "VERIFICANDO_PAGO" },
-      });
+        await tx.pagoDispersion.createMany({
+          data: pedido.subPedidos.map((sp) => {
+            const cuenta = cuentasPorComercio.get(sp.comercioId);
+            return {
+              pagoId: nuevoPago.id,
+              subPedidoId: sp.id,
+              comercioId: sp.comercioId,
+              cuentaDispersionId: cuenta.id,
+              proveedor: proveedorNombre,
+              estado: "PENDIENTE",
+              montoBruto: sp.subtotal,
+              comision: sp.comision,
+              montoNeto: sp.neto,
+            };
+          }),
+        });
 
-      return tx.pago.findUnique({
-        where: { id: nuevoPago.id },
+        await tx.pedido.update({
+          where: { id: pedido.id },
+          data: { estado: "VERIFICANDO_PAGO" },
+        });
+
+        return {
+          pago: await tx.pago.findUnique({
+            where: { id: nuevoPago.id },
+            include: { dispersiones: true },
+          }),
+          reutilizado: false,
+        };
+      });
+      pago = resultadoCreacion.pago;
+      if (resultadoCreacion.reutilizado) {
+        return esperarCheckoutConcurrente(idempotencyKey, pago);
+      }
+    } catch (error) {
+      if (error?.code !== "P2002") throw error;
+      const concurrente = await prisma.pago.findUnique({
+        where: { idempotencyKey },
         include: { dispersiones: true },
       });
-    });
+      if (
+        !concurrente ||
+        concurrente.pedidoId !== pedido.id ||
+        concurrente.metodo !== "PASARELA"
+      ) {
+        throw new ErrorConflicto(
+          "La clave de idempotencia ya fue usada con una solicitud diferente"
+        );
+      }
+      return esperarCheckoutConcurrente(idempotencyKey, concurrente);
+    }
 
     try {
       const checkout = await proveedor.crearCheckout({
@@ -336,8 +455,8 @@ const PagoDigitalService = {
             notas: e.message,
           },
         });
-        await tx.pedido.update({
-          where: { id: pedido.id },
+        await tx.pedido.updateMany({
+          where: { id: pedido.id, estado: "VERIFICANDO_PAGO" },
           data: { estado: "PENDIENTE_PAGO" },
         });
         await tx.pagoDispersion.updateMany({
@@ -380,6 +499,14 @@ const PagoDigitalService = {
 
   async confirmarPago(pagoId, evento = {}) {
     const resultado = await prisma.$transaction(async (tx) => {
+      const referenciaPago = await tx.pago.findUnique({
+        where: { id: Number(pagoId) },
+        select: { pedidoId: true },
+      });
+      if (!referenciaPago) throw new ErrorNoEncontrado("Pago no encontrado");
+
+      await bloquearPedido(tx, referenciaPago.pedidoId);
+
       const pago = await tx.pago.findUnique({
         where: { id: Number(pagoId) },
         include: {
@@ -398,6 +525,32 @@ const PagoDigitalService = {
       });
       if (!pago) throw new ErrorNoEncontrado("Pago no encontrado");
       if (pago.estado === "CONFIRMADO") return { pago, yaConfirmado: true };
+
+      if (!ESTADOS_PEDIDO_PAGABLES.includes(pago.pedido.estado)) {
+        const motivoConciliacion =
+          `La pasarela aprobo el pago, pero el pedido esta en estado ` +
+          `${pago.pedido.estado}. Requiere conciliacion y posible reembolso.`;
+        const notas = pago.notas?.includes(motivoConciliacion)
+          ? pago.notas
+          : [pago.notas, motivoConciliacion].filter(Boolean).join("\n");
+        const actualizado = await tx.pago.update({
+          where: { id: pago.id },
+          data: {
+            estado: pago.estado === "REEMBOLSADO" ? "REEMBOLSADO" : "VERIFICANDO",
+            providerStatus: evento.estado || "APPROVED",
+            providerPayload: evento.payload || pago.providerPayload,
+            notas,
+          },
+          include: { dispersiones: true },
+        });
+        return {
+          pago: actualizado,
+          yaConfirmado: false,
+          requiereConciliacion: true,
+          motivoConciliacion,
+        };
+      }
+
       if (!ESTADOS_CONFIRMABLES.includes(pago.estado)) {
         throw new ErrorValidacion(`Este pago no se puede confirmar desde estado ${pago.estado}`);
       }
@@ -431,7 +584,7 @@ const PagoDigitalService = {
       };
     });
 
-    if (!resultado.yaConfirmado) {
+    if (!resultado.yaConfirmado && !resultado.requiereConciliacion) {
       try {
         await this.ejecutarDispersiones(resultado.pago.id);
       } catch (e) {
@@ -442,6 +595,14 @@ const PagoDigitalService = {
             notas: `Pago aprobado; dispersion pendiente/fallida: ${e.message}`,
           },
         });
+        if (e.requiereConciliacionDispersion) {
+          NotificacionService.dispersionFallidaAdmin({
+            pagoId: resultado.pago.id,
+            intentos: 1,
+          }).catch((errorNotificacion) =>
+            console.error("[PAGOS] No se pudo alertar dispersion incierta:", errorNotificacion.message)
+          );
+        }
       }
       await notificarPagoAprobado(resultado.pago.pedidoId);
 
@@ -464,16 +625,31 @@ const PagoDigitalService = {
       }).catch((e) => console.error("[FIDELIZACION] otorgar puntos fallido:", e.message));
     }
 
-    return mapearPagoDigital(
+    const pagoMapeado = mapearPagoDigital(
       await prisma.pago.findUnique({
         where: { id: resultado.pago.id },
         include: { dispersiones: true },
       })
     );
+    return resultado.requiereConciliacion
+      ? {
+          ...pagoMapeado,
+          requiereConciliacion: true,
+          motivoConciliacion: resultado.motivoConciliacion,
+        }
+      : pagoMapeado;
   },
 
   async fallarPago(pagoId, motivo = "Pago rechazado por la pasarela") {
     const resultado = await prisma.$transaction(async (tx) => {
+      const referenciaPago = await tx.pago.findUnique({
+        where: { id: Number(pagoId) },
+        select: { pedidoId: true },
+      });
+      if (!referenciaPago) throw new ErrorNoEncontrado("Pago no encontrado");
+
+      await bloquearPedido(tx, referenciaPago.pedidoId);
+
       const pago = await tx.pago.findUnique({
         where: { id: Number(pagoId) },
         include: {
@@ -483,8 +659,21 @@ const PagoDigitalService = {
       if (!pago) throw new ErrorNoEncontrado("Pago no encontrado");
       if (["CONFIRMADO", "FALLIDO"].includes(pago.estado)) return pago;
 
-      await liberarStockPedido(tx, pago.pedido);
-      await tx.pedido.update({ where: { id: pago.pedidoId }, data: { estado: "PAGO_FALLIDO" } });
+      const pedidoYaLiberoStock = ["CANCELADO", "EXPIRADO", "PAGO_FALLIDO"]
+        .includes(pago.pedido.estado);
+      if (!pedidoYaLiberoStock && !ESTADOS_PEDIDO_PAGABLES.includes(pago.pedido.estado)) {
+        throw new ErrorValidacion(
+          `El fallo del pago requiere conciliacion porque el pedido esta en estado ` +
+          `"${pago.pedido.estado}"`
+        );
+      }
+      if (!pedidoYaLiberoStock) {
+        await liberarStockPedido(tx, pago.pedido);
+        await tx.pedido.update({
+          where: { id: pago.pedidoId },
+          data: { estado: "PAGO_FALLIDO" },
+        });
+      }
       await tx.pagoDispersion.updateMany({
         where: { pagoId: pago.id },
         data: { estado: "CANCELADA", errorMensaje: motivo },
@@ -498,11 +687,33 @@ const PagoDigitalService = {
   },
 
   async ejecutarDispersiones(pagoId) {
+    const ahora = new Date();
+    const leaseHasta = new Date(ahora.getTime() + 10 * 60 * 1000);
+    const reclamadas = await prisma.pagoDispersion.updateMany({
+      where: {
+        pagoId: Number(pagoId),
+        pago: { estado: "CONFIRMADO" },
+        estado: { in: ["PENDIENTE", "FALLIDA"] },
+        OR: [
+          { proximoReintentoAt: null },
+          { proximoReintentoAt: { lte: ahora } },
+        ],
+      },
+      data: {
+        proximoReintentoAt: leaseHasta,
+        errorMensaje: null,
+      },
+    });
+    if (reclamadas.count === 0) return [];
+
     const pago = await prisma.pago.findUnique({
       where: { id: Number(pagoId) },
       include: {
         dispersiones: {
-          where: { estado: { in: ["PENDIENTE", "PROGRAMADA"] } },
+          where: {
+            estado: { in: ["PENDIENTE", "FALLIDA"] },
+            proximoReintentoAt: leaseHasta,
+          },
           include: { cuentaDispersion: true },
         },
       },
@@ -510,35 +721,111 @@ const PagoDigitalService = {
     if (!pago || pago.dispersiones.length === 0) return [];
 
     const proveedor = obtenerProveedor(pago.proveedor);
-    let resultados = [];
-    try {
-      resultados = await proveedor.dispersar({ pago, dispersiones: pago.dispersiones });
-    } catch (e) {
-      await prisma.pagoDispersion.updateMany({
-        where: { pagoId: pago.id, estado: { in: ["PENDIENTE", "PROGRAMADA"] } },
-        data: { estado: "FALLIDA", errorMensaje: e.message },
-      });
-      throw e;
-    }
-
     const actualizadas = [];
-    for (const resultado of resultados) {
+    const errores = [];
+    let requiereConciliacion = false;
+
+    // Cada dispersion usa su propio request. Asi un reintento parcial nunca
+    // reutiliza una clave idempotente con un cuerpo de lote diferente.
+    for (const dispersion of pago.dispersiones) {
+      let resultados;
+      try {
+        resultados = await proveedor.dispersar({
+          pago,
+          dispersiones: [dispersion],
+        });
+      } catch (e) {
+        const envioIncierto = e?.envioIncierto === true;
+        const data = envioIncierto
+          ? {
+              estado: "ENVIADA",
+              providerStatus: "ENVIO_INCIERTO",
+              errorMensaje:
+                `${e.message}. No se reintentara automaticamente para evitar un pago duplicado.`,
+              intentosFallidos: { increment: 1 },
+              proximoReintentoAt: null,
+              enviadaAt: new Date(),
+            }
+          : datosFalloDispersion(dispersion, e.message);
+        actualizadas.push(
+          await prisma.pagoDispersion.update({
+            where: { id: dispersion.id },
+            data,
+          })
+        );
+        errores.push(`dispersion #${dispersion.id}: ${data.errorMensaje}`);
+        if (envioIncierto) {
+          requiereConciliacion = true;
+        }
+        continue;
+      }
+
+      const resultado = Array.isArray(resultados)
+        ? resultados.find((item) => item.id === dispersion.id)
+        : null;
+      if (!resultado) {
+        const mensaje =
+          `La pasarela no devolvio resultado para la dispersion #${dispersion.id}. ` +
+          "No se reintentara automaticamente para evitar un pago duplicado.";
+        actualizadas.push(
+          await prisma.pagoDispersion.update({
+            where: { id: dispersion.id },
+            data: {
+              estado: "ENVIADA",
+              providerStatus: "ENVIO_INCIERTO",
+              errorMensaje: mensaje,
+              intentosFallidos: { increment: 1 },
+              proximoReintentoAt: null,
+              enviadaAt: new Date(),
+            },
+          })
+        );
+        errores.push(`dispersion #${dispersion.id}: ${mensaje}`);
+        requiereConciliacion = true;
+        continue;
+      }
+
       const estado = resultado.estado || "ENVIADA";
       const data = {
         estado,
         providerTransferId: resultado.providerTransferId || null,
         providerStatus: resultado.providerStatus || estado,
         errorMensaje: resultado.errorMensaje || null,
+        proximoReintentoAt: null,
         ...(estado === "PROGRAMADA" ? { programadaAt: new Date() } : {}),
         ...(estado === "ENVIADA" ? { enviadaAt: new Date() } : {}),
-        ...(estado === "CONFIRMADA" ? { enviadaAt: new Date(), confirmadaAt: new Date() } : {}),
+        ...(estado === "CONFIRMADA"
+          ? { enviadaAt: new Date(), confirmadaAt: new Date() }
+          : {}),
       };
+
+      if (estado === "FALLIDA") {
+        Object.assign(
+          data,
+          datosFalloDispersion(
+            dispersion,
+            resultado.errorMensaje || `La pasarela reporto ${resultado.providerStatus || estado}`
+          )
+        );
+        errores.push(`dispersion #${dispersion.id}: ${data.errorMensaje}`);
+      }
+
+      // Si esta escritura falla despues de que la pasarela acepto el envio,
+      // dejamos el lease y el contador intactos. El siguiente intento usara
+      // exactamente la misma clave idempotente.
       actualizadas.push(
         await prisma.pagoDispersion.update({
-          where: { id: resultado.id },
+          where: { id: dispersion.id },
           data,
         })
       );
+    }
+
+    if (errores.length > 0) {
+      const error = new Error(`No se completaron todas las dispersiones: ${errores.join("; ")}`);
+      error.requiereConciliacionDispersion = requiereConciliacion;
+      error.resultados = actualizadas;
+      throw error;
     }
     return actualizadas;
   },
@@ -548,18 +835,56 @@ const PagoDigitalService = {
     const proveedor = obtenerProveedor(proveedorNombre);
     const evento = await proveedor.interpretarWebhook({ body, headers, rawBody });
 
-    const criteriosPago = [
-      evento.providerPaymentId ? { providerPaymentId: evento.providerPaymentId } : undefined,
-      evento.providerReference ? { providerReference: evento.providerReference } : undefined,
-    ].filter(Boolean);
-    let pago = criteriosPago.length
-      ? await prisma.pago.findFirst({
-          where: {
-            proveedor: proveedorNombre,
-            OR: criteriosPago,
-          },
-        })
-      : null;
+    const [pagoPorIdProveedor, pagoPorReferencia] = await Promise.all([
+      evento.providerPaymentId
+        ? prisma.pago.findFirst({
+            where: {
+              proveedor: proveedorNombre,
+              providerPaymentId: evento.providerPaymentId,
+            },
+          })
+        : null,
+      evento.providerReference
+        ? prisma.pago.findFirst({
+            where: {
+              proveedor: proveedorNombre,
+              providerReference: evento.providerReference,
+            },
+          })
+        : null,
+    ]);
+    let conflictoIdentificadores =
+      pagoPorIdProveedor &&
+      pagoPorReferencia &&
+      pagoPorIdProveedor.id !== pagoPorReferencia.id
+        ? "Los identificadores del webhook corresponden a pagos diferentes"
+        : null;
+    let pago = conflictoIdentificadores
+      ? null
+      : (pagoPorIdProveedor || pagoPorReferencia);
+
+    if (
+      !conflictoIdentificadores &&
+      pago &&
+      evento.providerPaymentId &&
+      pago.providerPaymentId &&
+      pago.providerPaymentId !== evento.providerPaymentId
+    ) {
+      conflictoIdentificadores =
+        "El identificador de transaccion del webhook no coincide con el pago";
+      pago = null;
+    }
+    if (
+      !conflictoIdentificadores &&
+      pago &&
+      evento.providerReference &&
+      pago.providerReference &&
+      pago.providerReference !== evento.providerReference
+    ) {
+      conflictoIdentificadores =
+        "La referencia del webhook no coincide con el pago";
+      pago = null;
+    }
 
     if (pago && evento.providerPaymentId && !pago.providerPaymentId) {
       try {
@@ -570,6 +895,9 @@ const PagoDigitalService = {
         });
       } catch (e) {
         if (e?.code !== "P2002") throw e;
+        conflictoIdentificadores =
+          "El identificador de la pasarela ya pertenece a otro pago";
+        pago = null;
       }
     }
 
@@ -589,9 +917,40 @@ const PagoDigitalService = {
       });
     } catch (e) {
       if (e?.code === "P2002") {
-        return { ok: true, duplicado: true };
+        const existente = evento.eventoId
+          ? await prisma.pagoEvento.findUnique({
+              where: {
+                proveedor_eventoId: {
+                  proveedor: proveedorNombre,
+                  eventoId: evento.eventoId,
+                },
+              },
+            })
+          : null;
+        if (!existente || existente.procesado) {
+          return { ok: true, duplicado: true };
+        }
+        eventoDb = existente;
+      } else {
+        throw e;
       }
-      throw e;
+    }
+
+    if (conflictoIdentificadores) {
+      await prisma.pagoEvento.update({
+        where: { id: eventoDb.id },
+        data: {
+          procesado: true,
+          processedAt: new Date(),
+          errorMensaje: conflictoIdentificadores,
+        },
+      });
+      return {
+        ok: false,
+        recibido: true,
+        procesado: true,
+        error: conflictoIdentificadores,
+      };
     }
 
     if (!pago) {
@@ -645,10 +1004,14 @@ const PagoDigitalService = {
     }
 
     const estado = String(evento.estado || "").trim().toUpperCase();
+    let conciliacion = null;
     try {
       if (ESTADOS_APROBADOS.includes(estado)) {
         validarMontoEvento(pago, evento);
-        await this.confirmarPago(pago.id, evento);
+        const confirmacion = await this.confirmarPago(pago.id, evento);
+        if (confirmacion.requiereConciliacion) {
+          conciliacion = confirmacion.motivoConciliacion;
+        }
       } else if (ESTADOS_FALLIDOS.includes(estado)) {
         await this.fallarPago(pago.id, `Pasarela reporto estado ${estado}`);
       } else {
@@ -660,9 +1023,18 @@ const PagoDigitalService = {
 
       await prisma.pagoEvento.update({
         where: { id: eventoDb.id },
-        data: { procesado: true, processedAt: new Date() },
+        data: {
+          procesado: true,
+          processedAt: new Date(),
+          errorMensaje: conciliacion || null,
+        },
       });
-      return { ok: true, recibido: true, procesado: true };
+      return {
+        ok: true,
+        recibido: true,
+        procesado: true,
+        ...(conciliacion ? { requiereConciliacion: true } : {}),
+      };
     } catch (e) {
       await prisma.pagoEvento.update({
         where: { id: eventoDb.id },

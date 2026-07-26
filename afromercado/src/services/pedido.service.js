@@ -14,6 +14,7 @@ const { ofertaTieneCupo, ofertaVigente, precioVigente } = require("../utils/ofer
 const NotificacionService = require("./notificacion.service");
 const Reglas = require("../config/reglas");
 const { cotizarEnvio } = require("../utils/envio");
+const { bloquearPedido } = require("../utils/bloqueos-transaccionales");
 
 const ESTADOS_CANCELABLES = ["PENDIENTE_PAGO", "VERIFICANDO_PAGO"];
 
@@ -416,6 +417,21 @@ const PedidoService = {
     }
 
     await prisma.$transaction(async (tx) => {
+      await bloquearPedido(tx, pedidoId);
+      const pedidoActual = await tx.pedido.findUnique({
+        where: { id: pedidoId },
+        select: { compradorId: true, estado: true },
+      });
+      if (!pedidoActual) throw new ErrorNoEncontrado("Pedido no encontrado");
+      if (pedidoActual.compradorId !== usuarioId) {
+        throw new ErrorProhibido("No puedes cancelar este pedido");
+      }
+      if (!ESTADOS_CANCELABLES.includes(pedidoActual.estado)) {
+        throw new ErrorValidacion(
+          `No se puede cancelar un pedido en estado "${pedidoActual.estado}"`
+        );
+      }
+
       // Liberar stockReservado
       for (const sub of pedido.subPedidos) {
         for (const item of sub.items) {

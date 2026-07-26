@@ -44,8 +44,9 @@ function includeProductoPublico(ahora = new Date()) {
 }
 
 const ProductoRepository = {
-  async crear(data) {
-    return prisma.producto.create({ data });
+  async crear(data, tx) {
+    const db = tx || prisma;
+    return db.producto.create({ data });
   },
 
   async buscarPorId(id) {
@@ -215,8 +216,9 @@ const ProductoRepository = {
     });
   },
 
-  async actualizar(id, data) {
-    return prisma.producto.update({ where: { id: Number(id) }, data });
+  async actualizar(id, data, tx) {
+    const db = tx || prisma;
+    return db.producto.update({ where: { id: Number(id) }, data });
   },
 
   async desactivar(id) {

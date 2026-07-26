@@ -10,8 +10,18 @@ const {
 } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
 const VisibilidadRepository = require("../repositories/visibilidad.repository");
+const { bloquearPedido } = require("../utils/bloqueos-transaccionales");
 
 const ACCIONES_VALIDAS = ["APROBAR", "RECHAZAR"];
+const ESTADOS_PROVEEDOR_APROBADOS = [
+  "APPROVED",
+  "APROBADO",
+  "CONFIRMED",
+  "CONFIRMADO",
+  "PAID",
+  "SUCCESS",
+  "SUCCESSFUL",
+];
 
 function tieneDocumentoIdentidadCompleto(comercio) {
   return Boolean(
@@ -65,8 +75,50 @@ const AdminService = {
     const pedido = await PedidoRepository.buscarPorId(pago.pedidoId);
     if (!pedido) throw new ErrorNoEncontrado("Pedido asociado no encontrado");
 
+    if (
+      accion === "RECHAZAR" &&
+      pago.metodo === "PASARELA" &&
+      ESTADOS_PROVEEDOR_APROBADOS.includes(
+        String(pago.providerStatus || "").trim().toUpperCase()
+      )
+    ) {
+      throw new ErrorValidacion(
+        "La pasarela reporta este pago como aprobado; requiere conciliacion o reembolso"
+      );
+    }
+
     if (accion === "APROBAR") {
+      if (!["PENDIENTE_PAGO", "VERIFICANDO_PAGO"].includes(pedido.estado)) {
+        throw new ErrorValidacion(
+          `No se puede aprobar un pago para un pedido en estado "${pedido.estado}"`
+        );
+      }
+
       const resultadoAprobar = await prisma.$transaction(async (tx) => {
+        await bloquearPedido(tx, pedido.id);
+        const [pagoActual, pedidoActual] = await Promise.all([
+          tx.pago.findUnique({
+            where: { id: pago.id },
+            select: { estado: true },
+          }),
+          tx.pedido.findUnique({
+            where: { id: pedido.id },
+            select: { estado: true },
+          }),
+        ]);
+        if (!pagoActual || !["VERIFICANDO", "PENDIENTE"].includes(pagoActual.estado)) {
+          throw new ErrorValidacion("Este pago ya no esta disponible para aprobacion");
+        }
+        if (
+          !pedidoActual ||
+          !["PENDIENTE_PAGO", "VERIFICANDO_PAGO"].includes(pedidoActual.estado)
+        ) {
+          throw new ErrorValidacion(
+            `No se puede aprobar un pago para un pedido en estado ` +
+            `"${pedidoActual?.estado || "NO_ENCONTRADO"}"`
+          );
+        }
+
         // 1. Descontar stock real y liberar el reservado de cada item, de forma
         //    atómica. Cada item pertenece a un subPedido del pedido.
         for (const sub of pedido.subPedidos) {
@@ -164,20 +216,58 @@ const AdminService = {
 
     // accion === "RECHAZAR"
     const resultadoRechazar = await prisma.$transaction(async (tx) => {
-      // Liberar el stock reservado de cada item.
-      for (const sub of pedido.subPedidos) {
-        for (const item of sub.items) {
-          await tx.$executeRaw`
-            UPDATE "Producto"
-            SET "stockReservado" = GREATEST("stockReservado" - ${item.cantidad}, 0)
-            WHERE id = ${item.productoId}
-          `;
-          if (item.ofertaId) {
+      await bloquearPedido(tx, pedido.id);
+      const [pagoActual, pedidoActual] = await Promise.all([
+        tx.pago.findUnique({
+          where: { id: pago.id },
+          select: { estado: true, metodo: true, providerStatus: true },
+        }),
+        tx.pedido.findUnique({
+          where: { id: pedido.id },
+          select: { estado: true },
+        }),
+      ]);
+      if (!pagoActual || !["VERIFICANDO", "PENDIENTE"].includes(pagoActual.estado)) {
+        throw new ErrorValidacion("Este pago ya no esta disponible para rechazo");
+      }
+      if (
+        pagoActual.metodo === "PASARELA" &&
+        ESTADOS_PROVEEDOR_APROBADOS.includes(
+          String(pagoActual.providerStatus || "").trim().toUpperCase()
+        )
+      ) {
+        throw new ErrorValidacion(
+          "La pasarela reporta este pago como aprobado; requiere conciliacion o reembolso"
+        );
+      }
+
+      const pedidoYaLiberoStock = ["CANCELADO", "EXPIRADO", "PAGO_FALLIDO"]
+        .includes(pedidoActual?.estado);
+      if (
+        !pedidoYaLiberoStock &&
+        !["PENDIENTE_PAGO", "VERIFICANDO_PAGO"].includes(pedidoActual?.estado)
+      ) {
+        throw new ErrorValidacion(
+          `El rechazo requiere conciliacion porque el pedido esta en estado ` +
+          `"${pedidoActual?.estado || "NO_ENCONTRADO"}"`
+        );
+      }
+
+      if (!pedidoYaLiberoStock) {
+        for (const sub of pedido.subPedidos) {
+          for (const item of sub.items) {
             await tx.$executeRaw`
-              UPDATE "Oferta"
-              SET "stockUsado" = GREATEST("stockUsado" - ${item.cantidad}, 0)
-              WHERE id = ${item.ofertaId}
+              UPDATE "Producto"
+              SET "stockReservado" = GREATEST("stockReservado" - ${item.cantidad}, 0)
+              WHERE id = ${item.productoId}
             `;
+            if (item.ofertaId) {
+              await tx.$executeRaw`
+                UPDATE "Oferta"
+                SET "stockUsado" = GREATEST("stockUsado" - ${item.cantidad}, 0)
+                WHERE id = ${item.ofertaId}
+              `;
+            }
           }
         }
       }
@@ -193,12 +283,16 @@ const AdminService = {
         tx
       );
 
-      await PedidoRepository.actualizarEstado(pedido.id, "PAGO_FALLIDO", tx);
+      if (!pedidoYaLiberoStock) {
+        await PedidoRepository.actualizarEstado(pedido.id, "PAGO_FALLIDO", tx);
+      }
 
       return {
         accion: "RECHAZAR",
         pago: pagoActualizado,
-        mensaje: "Pago rechazado y stock liberado",
+        mensaje: pedidoYaLiberoStock
+          ? "Pago rechazado; el pedido ya habia liberado su reserva"
+          : "Pago rechazado y stock liberado",
       };
     });
 

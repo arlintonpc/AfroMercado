@@ -515,17 +515,28 @@ const ReporteRepository = {
   async cuponesROI({ desde, hasta }) {
     const { d, h } = rangoPeriodo({ desde, hasta });
     return prisma.$queryRaw`
+      WITH pedido_roi AS (
+        SELECT
+          p.id,
+          p."cuponId",
+          p.total,
+          p."cuponDescuento",
+          COALESCE(SUM(sp.comision), 0) AS comision
+        FROM "Pedido" p
+        JOIN "SubPedido" sp ON sp."pedidoId" = p.id
+        WHERE p.estado IN ('CONFIRMADO','ENTREGADO')
+          AND p."createdAt" >= ${d} AND p."createdAt" <= ${h}
+          AND p."cuponId" IS NOT NULL
+        GROUP BY p.id, p."cuponId", p.total, p."cuponDescuento"
+      )
       SELECT cu.id, cu.codigo, cu.tipo, cu.valor,
-             COUNT(DISTINCT p.id)::int               AS pedidos,
-             COALESCE(SUM(p.total), 0)::float        AS gmv_influido,
-             COALESCE(SUM(p."cuponDescuento"), 0)::float AS costo_descuento,
-             COALESCE(SUM(sp.comision), 0)::float    AS comision_generada,
-             (COALESCE(SUM(sp.comision), 0) - COALESCE(SUM(p."cuponDescuento"), 0))::float AS resultado_neto
+             COUNT(pr.id)::int                         AS pedidos,
+             COALESCE(SUM(pr.total), 0)::float         AS gmv_influido,
+             COALESCE(SUM(pr."cuponDescuento"), 0)::float AS costo_descuento,
+             COALESCE(SUM(pr.comision), 0)::float      AS comision_generada,
+             (COALESCE(SUM(pr.comision), 0) - COALESCE(SUM(pr."cuponDescuento"), 0))::float AS resultado_neto
       FROM "Cupon" cu
-      JOIN "Pedido" p     ON p."cuponId" = cu.id
-      JOIN "SubPedido" sp ON sp."pedidoId" = p.id
-      WHERE p.estado IN ('CONFIRMADO','ENTREGADO')
-        AND p."createdAt" >= ${d} AND p."createdAt" <= ${h}
+      JOIN pedido_roi pr ON pr."cuponId" = cu.id
       GROUP BY cu.id
       ORDER BY resultado_neto DESC
     `;

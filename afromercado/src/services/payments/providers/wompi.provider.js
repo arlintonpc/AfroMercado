@@ -176,13 +176,33 @@ async function requestPayouts(path, { method = "GET", body, idempotencyKey } = {
   };
   if (idempotencyKey) headers["idempotency-key"] = limpiarIdempotency(idempotencyKey);
 
-  const respuesta = await fetch(`${config.apiUrl}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let respuesta;
+  try {
+    respuesta = await fetch(`${config.apiUrl}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (causa) {
+    const error = new ErrorValidacion(
+      "No fue posible confirmar si Wompi recibio la dispersion"
+    );
+    error.envioIncierto = true;
+    error.cause = causa;
+    throw error;
+  }
 
-  const texto = await respuesta.text();
+  let texto;
+  try {
+    texto = await respuesta.text();
+  } catch (causa) {
+    const error = new ErrorValidacion(
+      "Wompi respondio, pero no fue posible leer el resultado de la dispersion"
+    );
+    error.envioIncierto = true;
+    error.cause = causa;
+    throw error;
+  }
   let data = null;
   try {
     data = texto ? JSON.parse(texto) : null;
@@ -192,7 +212,13 @@ async function requestPayouts(path, { method = "GET", body, idempotencyKey } = {
 
   if (!respuesta.ok) {
     const detalle = data?.error?.message || data?.message || data?.error || respuesta.statusText;
-    throw new ErrorValidacion(`Wompi Payouts rechazo la solicitud (${respuesta.status}): ${detalle}`);
+    const error = new ErrorValidacion(
+      `Wompi Payouts rechazo la solicitud (${respuesta.status}): ${detalle}`
+    );
+    // Un 5xx puede ocurrir despues de que el proveedor acepto el lote.
+    // No se debe reintentar con una clave nueva sin conciliacion previa.
+    if (respuesta.status >= 500) error.envioIncierto = true;
+    throw error;
   }
 
   return data || {};
@@ -268,7 +294,18 @@ function obtenerTransaction(body) {
 }
 
 function referenciaDispersion(dispersion) {
-  return limpiarIdempotency(`AFM-DISP-${dispersion.id}`);
+  const intento = Number(dispersion.intentosFallidos || 0) + 1;
+  return limpiarIdempotency(`AFM-DISP-${dispersion.id}-A${intento}`);
+}
+
+function referenciaLoteDispersion(pago, dispersiones) {
+  const huella = sha256(
+    dispersiones
+      .map((dispersion) => referenciaDispersion(dispersion))
+      .sort()
+      .join("|")
+  ).slice(0, 20);
+  return limpiarIdempotency(`AFM-PAYOUT-${pago.id}-${huella}`);
 }
 
 const WompiPaymentProvider = {
@@ -400,7 +437,7 @@ const WompiPaymentProvider = {
 
   async dispersar({ pago, dispersiones }) {
     const config = await payoutsConfig();
-    const reference = limpiarIdempotency(`AFM-PAYOUT-${pago.id}`);
+    const reference = referenciaLoteDispersion(pago, dispersiones);
 
     const transactions = [];
     for (const dispersion of dispersiones) {

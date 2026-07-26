@@ -24,6 +24,7 @@ let executeRawLlamadas = []; // strings del template tag ejecutado (para disting
 let pagoEventosCreados = [];
 let pagoEventoActualizado = null;
 let forzarP2002EnPagoEventoCreate = false;
+let pagoEventoExistente = null;
 let visibilidadLlamadas = 0;
 
 function clonarPago(base) {
@@ -87,6 +88,16 @@ prisma.pago = {
   findFirst: async ({ where }) => {
     if (!mockPago) return null;
     if (where.proveedor && where.proveedor !== mockPago.proveedor) return null;
+    if (where.providerPaymentId) {
+      return where.providerPaymentId === mockPago.providerPaymentId
+        ? clonarPago(mockPago)
+        : null;
+    }
+    if (where.providerReference) {
+      return where.providerReference === mockPago.providerReference
+        ? clonarPago(mockPago)
+        : null;
+    }
     const criterios = where.OR || [];
     const coincide = criterios.some((criterio) => {
       if (criterio.providerPaymentId) return criterio.providerPaymentId === mockPago.providerPaymentId;
@@ -129,6 +140,7 @@ prisma.pagoDispersion = {
 };
 
 prisma.pagoEvento = {
+  findUnique: async () => pagoEventoExistente,
   create: async ({ data }) => {
     if (forzarP2002EnPagoEventoCreate) {
       const err = new Error("Unique constraint failed on eventoId");
@@ -256,10 +268,32 @@ function resetMocksComunes() {
   pagoEventosCreados = [];
   pagoEventoActualizado = null;
   forzarP2002EnPagoEventoCreate = false;
+  pagoEventoExistente = null;
   visibilidadLlamadas = 0;
   filasAfectadasExecuteRaw = 1;
   dispersarResultado = [];
   dispersarLlamadas = 0;
+}
+
+function contarActualizacionesStock() {
+  return executeRawLlamadas.filter((llamada) =>
+    llamada.sql.includes('UPDATE "Producto"') && llamada.sql.includes('"stock" = "stock" -')
+  ).length;
+}
+
+function contarBloqueosPedido() {
+  return executeRawLlamadas.filter((llamada) =>
+    llamada.sql.includes('FROM "Pedido"') && llamada.sql.includes("FOR UPDATE")
+  ).length;
+}
+
+function contarLiberacionesReserva() {
+  return executeRawLlamadas.filter((llamada) =>
+    (llamada.sql.includes('UPDATE "Producto"') &&
+      llamada.sql.includes('"stockReservado" = GREATEST')) ||
+    (llamada.sql.includes('UPDATE "Oferta"') &&
+      llamada.sql.includes('"stockUsado" = GREATEST'))
+  ).length;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -277,7 +311,7 @@ async function runConfirmarPagoIdempotenteTests() {
   esperar("Pago ya confirmado: retorna el pago sin cambiar su estado", resultado.estado, "CONFIRMADO");
   esperar("Pago ya confirmado: NO llama al proveedor de dispersión", dispersarLlamadas, 0);
   esperar("Pago ya confirmado: NO marca subpedidos como CONFIRMADO de nuevo", subPedidoUpdateManyLlamadas, 0);
-  esperar("Pago ya confirmado: NO descuenta stock de nuevo (sin $executeRaw)", executeRawLlamadas.length, 0);
+  esperar("Pago ya confirmado: NO descuenta stock de nuevo", contarActualizacionesStock(), 0);
   esperar("Pago ya confirmado: NO incrementa totalVentas del comercio de nuevo", comercioUpdateLlamadas.length, 0);
   esperar("Pago ya confirmado: NO vuelve a atribuir visibilidad", visibilidadLlamadas, 0);
 
@@ -291,7 +325,8 @@ async function runConfirmarPagoIdempotenteTests() {
 
   esperar("Pago PENDIENTE: pasa a estado CONFIRMADO", resultado2.estado, "CONFIRMADO");
   esperar("Pago PENDIENTE: SÍ marca el subpedido como CONFIRMADO", subPedidoUpdateManyLlamadas, 1);
-  esperar("Pago PENDIENTE: SÍ descuenta stock (1 UPDATE Producto por item)", executeRawLlamadas.length, 1);
+  esperar("Pago PENDIENTE: bloquea el pedido antes de confirmar", contarBloqueosPedido(), 1);
+  esperar("Pago PENDIENTE: SÍ descuenta stock (1 UPDATE Producto por item)", contarActualizacionesStock(), 1);
   esperar("Pago PENDIENTE: SÍ incrementa totalVentas del comercio", comercioUpdateLlamadas.length, 1);
   esperar("Pago PENDIENTE: SÍ atribuye visibilidad del pedido confirmado", visibilidadLlamadas, 1);
 
@@ -299,7 +334,7 @@ async function runConfirmarPagoIdempotenteTests() {
   // comportarse igual que el caso 1 — sin duplicar efectos.
   const efectosAntesSegundaLlamada = {
     subPedido: subPedidoUpdateManyLlamadas,
-    executeRaw: executeRawLlamadas.length,
+    stock: contarActualizacionesStock(),
     comercio: comercioUpdateLlamadas.length,
     visibilidad: visibilidadLlamadas,
   };
@@ -309,7 +344,7 @@ async function runConfirmarPagoIdempotenteTests() {
     "Segunda llamada sobre pago ya confirmado: no repite ningún efecto de negocio",
     {
       subPedido: subPedidoUpdateManyLlamadas,
-      executeRaw: executeRawLlamadas.length,
+      stock: contarActualizacionesStock(),
       comercio: comercioUpdateLlamadas.length,
       visibilidad: visibilidadLlamadas,
     },
@@ -354,6 +389,7 @@ async function runFallarPagoTests() {
     estado: "VERIFICANDO",
     pedido: {
       id: 9002,
+      estado: "VERIFICANDO_PAGO",
       subPedidos: [
         { id: 7002, items: [{ id: 1, productoId: 111, cantidad: 2, ofertaId: null }] },
         { id: 7003, items: [{ id: 2, productoId: 222, cantidad: 1, ofertaId: 55 }] },
@@ -367,7 +403,7 @@ async function runFallarPagoTests() {
   esperar("fallarPago(): el pedido pasa a PAGO_FALLIDO", pedidoActualizado?.estado, "PAGO_FALLIDO");
   esperar(
     "fallarPago(): libera stockReservado + stockUsado (3 UPDATE: 2 Producto + 1 Oferta)",
-    executeRawLlamadas.length,
+    contarLiberacionesReserva(),
     3
   );
   esperar(
@@ -390,7 +426,11 @@ async function runFallarPagoTests() {
     pedido: { id: 9003, subPedidos: [{ id: 7004, items: [{ id: 3, productoId: 333, cantidad: 5, ofertaId: null }] }] },
   };
   await PagoDigitalService.fallarPago(mockPago.id, "Segundo intento de fallo");
-  esperar("fallarPago() sobre un pago ya FALLIDO no libera stock de nuevo", executeRawLlamadas.length, 0);
+  esperar(
+    "fallarPago() sobre un pago ya FALLIDO no libera stock de nuevo",
+    contarLiberacionesReserva(),
+    0
+  );
 
   resetMocksComunes();
   mockPago = null;
@@ -466,6 +506,7 @@ async function runWebhookDuplicadoTests() {
   resetMocksComunes();
   mockPago = pagoBase({ estado: "PENDIENTE" });
   forzarP2002EnPagoEventoCreate = true;
+  pagoEventoExistente = { id: 999, procesado: true };
   proveedorFake.interpretarWebhook = async () => ({
     eventoId: "evt-repetido",
     tipo: "payment.status.changed",
@@ -488,6 +529,32 @@ async function runWebhookDuplicadoTests() {
   esperar("Evento duplicado: responde { ok: true, duplicado: true }", resultado, { ok: true, duplicado: true });
   esperar("Evento duplicado: el pago NO se toca (sigue PENDIENTE)", mockPago.estado, "PENDIENTE");
   esperar("Evento duplicado: no se dispara ninguna dispersión", dispersarLlamadas, 0);
+
+  // Si el primer intento quedó sin procesar por un error temporal, el mismo
+  // evento debe poder reintentarse en lugar de quedar bloqueado por la unique.
+  resetMocksComunes();
+  mockPago = pagoBase({ estado: "PENDIENTE" });
+  forzarP2002EnPagoEventoCreate = true;
+  pagoEventoExistente = { id: 1000, procesado: false };
+  proveedorFake.interpretarWebhook = async () => ({
+    eventoId: "evt-reintento-pendiente",
+    tipo: "payment.status.changed",
+    estado: "APPROVED",
+    providerPaymentId: null,
+    providerReference: mockPago.providerReference,
+    payload: { data: { transaction: { amount_in_cents: 2400000 } } },
+    firma: null,
+  });
+
+  const reintentado = await PagoDigitalService.procesarWebhook(
+    "SANDBOX",
+    { body: {}, headers: {}, rawBody: "" }
+  );
+  esperar(
+    "Evento no procesado: el reintento completa el pago",
+    { respuesta: reintentado.ok, estado: mockPago.estado },
+    { respuesta: true, estado: "CONFIRMADO" }
+  );
 }
 
 // ── Ejecución ─────────────────────────────────────────────────────────────────

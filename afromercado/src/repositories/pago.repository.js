@@ -14,8 +14,9 @@ const PagoRepository = {
     return db.pago.create({ data: datos });
   },
 
-  async buscarPorIdempotencyKey(idempotencyKey) {
-    return prisma.pago.findUnique({ where: { idempotencyKey } });
+  async buscarPorIdempotencyKey(idempotencyKey, tx) {
+    const db = tx || prisma;
+    return db.pago.findUnique({ where: { idempotencyKey } });
   },
 
   async buscarPorId(id) {

@@ -10,6 +10,7 @@ const NotificacionService = require("./notificacion.service");
 const { enviarMensajeWA } = require("../utils/whatsapp");
 const prisma = require("../config/prisma");
 const cache = require("../utils/cache");
+const { bloquearProducto } = require("../utils/bloqueos-transaccionales");
 
 const UNIDADES_VALIDAS = ["KG", "UNIDAD", "LITRO", "PAQUETE", "DOCENA", "MANOJO", "ANIMAL"];
 const ALCANCES_VALIDOS = ["LOCAL", "NACIONAL", "AMBOS"];
@@ -76,22 +77,32 @@ const ProductoService = {
       throw new ErrorValidacion("El stock mínimo debe ser un número entero mayor o igual a cero");
     }
 
-    const nuevoProducto = await ProductoRepository.crear({
-      comercioId: comercio.id,
-      nombre: nombre.trim(),
-      descripcion: descripcion?.trim(),
-      precio: parseFloat(precio),
-      unidad,
-      stock: parseInt(stock ?? 0),
-      stockMinimo: parseInt(stockMinimo ?? 0),
-      diasAlistamientoMin: min,
-      diasAlistamientoMax: max,
-      alcance: alcance ?? "LOCAL",
-      fotoUrl,
-      ...(categoriaId ? { categoriaId: parseInt(categoriaId) } : {}),
-      ...(pesoKg !== undefined && pesoKg !== null ? { pesoKg: parseFloat(pesoKg) } : {}),
-      esExpress: esExpress === true || esExpress === 'true',
-      ...(tiempoEntregaMin ? { tiempoEntregaMin: parseInt(tiempoEntregaMin) } : {}),
+    const nuevoProducto = await prisma.$transaction(async (tx) => {
+      const creado = await ProductoRepository.crear({
+        comercioId: comercio.id,
+        nombre: nombre.trim(),
+        descripcion: descripcion?.trim(),
+        precio: parseFloat(precio),
+        unidad,
+        stock: parseInt(stock ?? 0),
+        stockMinimo: parseInt(stockMinimo ?? 0),
+        diasAlistamientoMin: min,
+        diasAlistamientoMax: max,
+        alcance: alcance ?? "LOCAL",
+        fotoUrl,
+        ...(categoriaId ? { categoriaId: parseInt(categoriaId) } : {}),
+        ...(pesoKg !== undefined && pesoKg !== null ? { pesoKg: parseFloat(pesoKg) } : {}),
+        esExpress: esExpress === true || esExpress === 'true',
+        ...(tiempoEntregaMin ? { tiempoEntregaMin: parseInt(tiempoEntregaMin) } : {}),
+      }, tx);
+      await tx.precioHistorial.create({
+        data: {
+          productoId: creado.id,
+          precio: creado.precio,
+          cambiadoPor: Number(usuarioId),
+        },
+      });
+      return creado;
     });
     cache.invalidatePrefix("productos:");
     return nuevoProducto;
@@ -210,7 +221,34 @@ const ProductoService = {
     if (datos.esExpress !== undefined) campos.esExpress = datos.esExpress === true || datos.esExpress === 'true';
     if (datos.tiempoEntregaMin !== undefined) campos.tiempoEntregaMin = datos.tiempoEntregaMin ? parseInt(datos.tiempoEntregaMin) : null;
 
-    return ProductoRepository.actualizar(productoId, campos);
+    if (campos.precio === undefined) {
+      return ProductoRepository.actualizar(productoId, campos);
+    }
+
+    return prisma.$transaction(async (tx) => {
+      await bloquearProducto(tx, productoId);
+      const productoActual = await tx.producto.findUnique({
+        where: { id: Number(productoId) },
+        select: { comercioId: true, precio: true },
+      });
+      if (!productoActual) throw new ErrorNoEncontrado("Producto no encontrado");
+      if (productoActual.comercioId !== comercio.id) {
+        throw new ErrorNoAutorizado("No puedes editar productos de otro comerciante");
+      }
+
+      const precioCambio = Number(campos.precio) !== Number(productoActual.precio);
+      const actualizado = await ProductoRepository.actualizar(productoId, campos, tx);
+      if (precioCambio) {
+        await tx.precioHistorial.create({
+          data: {
+            productoId: Number(productoId),
+            precio: actualizado.precio,
+            cambiadoPor: Number(usuarioId),
+          },
+        });
+      }
+      return actualizado;
+    });
   },
 
   async desactivar(usuarioId, productoId) {

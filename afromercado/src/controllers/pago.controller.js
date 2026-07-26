@@ -148,7 +148,10 @@ const PagoController = {
   // GET /pagos/instrucciones/:pedidoId
   async instrucciones(req, res, next) {
     try {
-      const data = await PagoService.obtenerInstruccionesPago(req.params.pedidoId);
+      const data = await PagoService.obtenerInstruccionesPago(
+        req.usuario.id,
+        req.params.pedidoId
+      );
       res.json({ ok: true, data });
     } catch (e) {
       next(e);

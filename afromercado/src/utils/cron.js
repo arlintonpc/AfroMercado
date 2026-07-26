@@ -5,6 +5,7 @@ const sseManager = require("./sse-manager");
 const { enviarMensajeWA } = require("./whatsapp");
 const ExpressService = require("../services/express.service");
 const HotelService = require("../services/hotel.service");
+const { bloquearPedido } = require("./bloqueos-transaccionales");
 
 async function cancelarPedidosExpressExpirados() {
   try {
@@ -112,7 +113,21 @@ async function expirarPedidosVencidos() {
     if (!pedidos.length) return;
 
     for (const pedido of pedidos) {
-      await prisma.$transaction(async (tx) => {
+      const expirado = await prisma.$transaction(async (tx) => {
+        await bloquearPedido(tx, pedido.id);
+        const pedidoActual = await tx.pedido.findUnique({
+          where: { id: pedido.id },
+          select: { estado: true, expiresAt: true },
+        });
+        if (
+          !pedidoActual ||
+          pedidoActual.estado !== "PENDIENTE_PAGO" ||
+          !pedidoActual.expiresAt ||
+          pedidoActual.expiresAt.getTime() >= Date.now()
+        ) {
+          return false;
+        }
+
         for (const sub of pedido.subPedidos) {
           for (const item of sub.items) {
             await tx.$executeRaw`
@@ -130,8 +145,11 @@ async function expirarPedidosVencidos() {
           }
         }
         await tx.pedido.update({ where: { id: pedido.id }, data: { estado: "EXPIRADO" } });
+        return true;
       });
-      console.log(`[CRON] Pedido #${pedido.id} expirado — stock liberado`);
+      if (expirado) {
+        console.log(`[CRON] Pedido #${pedido.id} expirado — stock liberado`);
+      }
     }
 
     console.log(`[CRON] ${pedidos.length} pedido(s) expirado(s) y stock liberado`);
