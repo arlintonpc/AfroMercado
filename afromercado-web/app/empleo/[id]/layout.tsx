@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
+import { API_URL, SITE_URL, normalizarUrlMediaAbsoluta } from '@/lib/api/client'
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
+const SITE = SITE_URL
+const OG_LOGO = `${SITE_URL}/og-logo.png`
 
 const EMPLOYMENT_TYPE_SCHEMA: Record<string, string> = {
   TIEMPO_COMPLETO: 'FULL_TIME',
@@ -13,7 +14,7 @@ const EMPLOYMENT_TYPE_SCHEMA: Record<string, string> = {
 
 async function fetchOferta(id: string) {
   try {
-    const res = await fetch(`${API}/empleo/ofertas/${id}`, { next: { revalidate: 3600 } })
+    const res = await fetch(`${API_URL}/empleo/ofertas/${id}`, { next: { revalidate: 3600 } })
     if (!res.ok) return null
     const { data } = await res.json()
     return data
@@ -25,13 +26,26 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const data = await fetchOferta(id)
   if (!data) return { title: 'Oferta de empleo | Teravia' }
   const ubicacion = data.departamento ? `${data.municipio}, ${data.departamento}` : data.municipio
+  const fotoRaw = data.publicadoPor?.avatarUrl ?? data.comercio?.logoUrl
+  const fotoAbsoluta = normalizarUrlMediaAbsoluta(fotoRaw, OG_LOGO)
+  const desc = data.descripcion?.slice(0, 160) ?? `Vacante de empleo y oportunidades en ${ubicacion}.`
+
   return {
     title: `${data.titulo} — Empleo en ${ubicacion} | Teravia`,
-    description: data.descripcion?.slice(0, 160) ?? `Vacante en ${ubicacion}`,
+    description: desc,
     openGraph: {
       title: `${data.titulo} — ${ubicacion}`,
-      description: data.descripcion?.slice(0, 160) ?? `Bolsa de trabajo comunitaria Teravia`,
+      description: desc,
+      url: `${SITE_URL}/empleo/${id}`,
+      siteName: 'Teravia',
       type: 'website',
+      images: [{ url: fotoAbsoluta, width: 1200, height: 630, alt: data.titulo }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${data.titulo} — ${ubicacion}`,
+      description: desc,
+      images: [fotoAbsoluta],
     },
   }
 }

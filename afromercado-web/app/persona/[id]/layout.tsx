@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
+import { API_URL, SITE_URL, normalizarUrlMediaAbsoluta } from '@/lib/api/client'
 
-const API  = process.env.NEXT_PUBLIC_API_URL  ?? 'https://afromercado-api.onrender.com/api'
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
-const OG_LOGO = `${SITE}/og-logo.png`
+const SITE = SITE_URL
+const OG_LOGO = `${SITE_URL}/og-logo.png`
 
 interface PerfilPublicoData {
   nombre?:       string
@@ -20,7 +20,7 @@ interface Props {
 
 async function fetchPerfil(id: string): Promise<PerfilPublicoData | null> {
   try {
-    const res = await fetch(`${API}/usuario/${id}/perfil`, { next: { revalidate: 300 } })
+    const res = await fetch(`${API_URL}/usuario/${id}/perfil`, { next: { revalidate: 300 } })
     if (!res.ok) return null
     const json = await res.json() as { ok?: boolean; data?: PerfilPublicoData }
     return json.data ?? null
@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       openGraph: {
         title:    'Perfil — Teravia',
         siteName: 'Teravia',
-        images:   [{ url: OG_LOGO, width: 800, height: 600, alt: 'Teravia' }],
+        images:   [{ url: OG_LOGO, width: 1200, height: 630, alt: 'Teravia' }],
       },
     }
   }
@@ -49,7 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const descripcion = (
     p.bio?.trim() || `Perfil de ${p.nombre} en Teravia · ${ubicacion}`
   ).slice(0, 160)
-  const imagen = p.avatarUrl ?? OG_LOGO
+  const imagenAbsoluta = normalizarUrlMediaAbsoluta(p.avatarUrl, OG_LOGO)
 
   return {
     title:       `${p.nombre} — Teravia`,
@@ -57,16 +57,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title:       `${p.nombre} — Teravia`,
       description: descripcion,
-      url:         `${SITE}/persona/${id}`,
+      url:         `${SITE_URL}/persona/${id}`,
       siteName:    'Teravia',
       type:        'profile',
-      images: [{ url: imagen, width: 800, height: 600, alt: p.nombre }],
+      images:      [{ url: imagenAbsoluta, width: 1200, height: 630, alt: p.nombre }],
     },
     twitter: {
       card:        'summary_large_image',
       title:       `${p.nombre} — Teravia`,
       description: descripcion,
-      images:      [imagen],
+      images:      [imagenAbsoluta],
     },
   }
 }
