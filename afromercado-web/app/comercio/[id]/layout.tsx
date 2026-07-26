@@ -1,14 +1,14 @@
 import type { Metadata } from 'next'
-import { normalizarUrlMediaAbsoluta } from '@/lib/api/client'
+import { API_URL, SITE_URL, normalizarUrlMediaAbsoluta } from '@/lib/api/client'
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
-const OG_LOGO = `${SITE}/og-logo.png`
+const API = API_URL
+const SITE = SITE_URL
+const OG_LOGO = `${SITE_URL}/og-logo.png`
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   try {
     const { id } = await params
-    const res = await fetch(`${API}/comercio/${id}`, { next: { revalidate: 3600 } })
+    const res = await fetch(`${API_URL}/comercio/${id}`, { next: { revalidate: 3600 } })
     if (!res.ok) throw new Error()
     const json = await res.json()
     const c = json.data ?? json

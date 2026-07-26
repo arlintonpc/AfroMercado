@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
-import { normalizarUrlMediaAbsoluta } from '@/lib/api/client'
+import { API_URL, SITE_URL, normalizarUrlMediaAbsoluta } from '@/lib/api/client'
 
-const API      = process.env.NEXT_PUBLIC_API_URL  ?? 'http://localhost:3001/api'
-const SITE     = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
-const OG_LOGO  = `${SITE}/og-logo.png`
+const API = API_URL
+const SITE = SITE_URL
+const OG_LOGO  = `${SITE_URL}/og-logo.png`
 
 interface Props {
   params: Promise<{ id: string }>
@@ -12,7 +12,7 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   try {
-    const res = await fetch(`${API}/productos/${id}`, {
+    const res = await fetch(`${API_URL}/productos/${id}`, {
       next: { revalidate: 60 },
     })
     if (!res.ok) throw new Error('not found')
@@ -68,7 +68,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       openGraph: {
         title:       `${nombre} · ${comercio} — Teravia`,
         description: descripcion,
-        url:         `${SITE}/producto/${id}`,
+        url:         `${SITE_URL}/producto/${id}`,
         siteName:    'Teravia',
         type:        'website',
         images: [{ url: imagenAbsoluta, width: 1200, height: 630, alt: nombre }],

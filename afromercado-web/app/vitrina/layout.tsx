@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
-import { normalizarUrlMediaAbsoluta } from '@/lib/api/client'
+import { API_URL, SITE_URL, normalizarUrlMediaAbsoluta } from '@/lib/api/client'
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
-const OG_LOGO = `${SITE}/og-logo.png`
+const API = API_URL
+const SITE = SITE_URL
+const OG_LOGO = `${SITE_URL}/og-logo.png`
 
 export async function generateMetadata({
   searchParams,
@@ -15,7 +15,7 @@ export async function generateMetadata({
 
   if (publicacionId) {
     try {
-      const res = await fetch(`${API}/cultura/publicaciones/${publicacionId}`, {
+      const res = await fetch(`${API_URL}/cultura/publicaciones/${publicacionId}`, {
         next: { revalidate: 60 },
       })
       if (res.ok) {
@@ -31,7 +31,7 @@ export async function generateMetadata({
           const imagenRaw = pub.fotoUrl || pub.videoPosterUrl || pub.fotoUrls?.[0] || pub.producto?.fotoUrl || pub.comercio?.logoUrl
           const imagenAbsoluta = normalizarUrlMediaAbsoluta(imagenRaw, OG_LOGO)
           const videoAbsoluto = pub.videoUrl ? normalizarUrlMediaAbsoluta(pub.videoUrl) : null
-          const shareUrl = `${SITE}/vitrina?publicacion=${publicacionId}`
+          const shareUrl = `${SITE_URL}/vitrina?publicacion=${publicacionId}`
 
           return {
             title: `${titulo} — ${comercio} | Teravia`,
@@ -89,7 +89,7 @@ export async function generateMetadata({
       description:
         'Historias, fotos y videos de la cultura viva de comunidades locales en todo el territorio colombiano.',
       type: 'website',
-      url: `${SITE}/vitrina`,
+      url: `${SITE_URL}/vitrina`,
       images: [
         {
           url: OG_LOGO,
@@ -107,7 +107,7 @@ export async function generateMetadata({
       images: [OG_LOGO],
     },
     alternates: {
-      canonical: `${SITE}/vitrina`,
+      canonical: `${SITE_URL}/vitrina`,
     },
   }
 }

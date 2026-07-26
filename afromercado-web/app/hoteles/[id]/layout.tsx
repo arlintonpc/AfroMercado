@@ -1,8 +1,9 @@
 import { obtenerHotel } from '@/lib/api/hotel'
-import { normalizarUrlMediaAbsoluta } from '@/lib/api/client'
+import { API_URL, SITE_URL, normalizarUrlMediaAbsoluta } from '@/lib/api/client'
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afromercado.vercel.app'
-const OG_LOGO = `${SITE}/og-logo.png`
+const API = API_URL
+const SITE = SITE_URL
+const OG_LOGO = `${SITE_URL}/og-logo.png`
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   try {

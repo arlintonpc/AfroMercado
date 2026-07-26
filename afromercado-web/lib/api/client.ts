@@ -13,11 +13,12 @@ export const USUARIO_KEY = 'afromercado_usuario'
 // URL del backend. Si NEXT_PUBLIC_API_URL está definida, manda. Si no, el
 // valor por defecto depende del entorno de compilación: en producción apunta
 // al backend en Render; en desarrollo, al backend local.
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://afro-mercado.vercel.app'
+
+// URL del backend. Si NEXT_PUBLIC_API_URL está definida, manda. Si no, el
+// valor por defecto apunta al backend público en Render para garantizar que SSR en Vercel responda.
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  (process.env.NODE_ENV === 'production'
-    ? 'https://afromercado-api.onrender.com/api'
-    : 'http://localhost:3001/api')
+  process.env.NEXT_PUBLIC_API_URL ?? 'https://afromercado-api.onrender.com/api'
 
 /**
  * Lee el token guardado en localStorage. Devuelve null en SSR o si no existe.
