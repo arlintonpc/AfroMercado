@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import Header from '@/components/layout/Header'
+import Footer from '@/components/layout/Footer'
 import { listarHoteles, type ConfigHotel, type TipoAlojamiento, TIPOS_ALOJAMIENTO } from '@/lib/api/hotel'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { optimizarImagenPequena } from '@/lib/cloudinary'
@@ -351,9 +353,10 @@ export default function HotelesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F5F2]">
-
-      {/* ── HERO ─────────────────────────────────────────────── */}
+    <div className="min-h-screen flex flex-col bg-[#F7F5F2]">
+      <Header />
+      <div className="flex-1">
+        {/* ── HERO ─────────────────────────────────────────────── */}
       <div className="relative overflow-hidden min-h-[280px] sm:min-h-[320px] flex flex-col justify-end bg-[#111]">
         {heroFotos.map((url, idx) => (
           <img 
@@ -535,6 +538,8 @@ export default function HotelesPage() {
           </div>
         )}
       </main>
+      </div>
+      <Footer />
 
       {mostrarFiltros && (
         <PanelFiltros filtros={filtros} onChange={setFiltros} onClose={() => setMostrarFiltros(false)} />

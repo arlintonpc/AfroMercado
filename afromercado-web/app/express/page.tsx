@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import Header from '@/components/layout/Header'
+import Footer from '@/components/layout/Footer'
 import { listarComerciosExpress, type ComercioExpress } from '@/lib/api/express'
 import TarjetaRestaurante from '@/components/express/TarjetaRestaurante'
 import BannerDisplay from '@/components/publicidad/BannerDisplay'
@@ -152,9 +154,10 @@ export default function ExpressPage() {
   const abiertosCount = todos.filter(c => c.abierto).length
 
   return (
-    <div className="min-h-screen bg-[#F7F5F2]">
-
-      {/* ── HERO ─────────────────────────────────────────────── */}
+    <div className="min-h-screen flex flex-col bg-[#F7F5F2]">
+      <Header />
+      <div className="flex-1">
+        {/* ── HERO ─────────────────────────────────────────────── */}
       <div className="relative overflow-hidden min-h-[280px] sm:min-h-[320px] flex flex-col justify-end bg-[#111]">
         {heroFotos.map((url, idx) => (
           <img 
@@ -352,6 +355,8 @@ export default function ExpressPage() {
           </svg>
         </Link>
       </main>
+      </div>
+      <Footer />
     </div>
   )
 }

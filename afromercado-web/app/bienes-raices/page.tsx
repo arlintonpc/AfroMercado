@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import Header from '@/components/layout/Header'
+import Footer from '@/components/layout/Footer'
 import {
   listarInmuebles,
   TIPOS_INMUEBLE,
@@ -281,9 +283,10 @@ export default function BienesRaicesPage() {
   }, [heroFotos])
 
   return (
-    <div className="min-h-screen bg-[#F7F5F2]">
-
-      {/* ── HERO ─────────────────────────────────────────────── */}
+    <div className="min-h-screen flex flex-col bg-[#F7F5F2]">
+      <Header />
+      <div className="flex-1">
+        {/* ── HERO ─────────────────────────────────────────────── */}
       <div className="relative overflow-hidden min-h-[280px] sm:min-h-[320px] flex flex-col justify-end bg-[#111]">
         {heroFotos.map((url, idx) => (
           <img 
@@ -466,6 +469,8 @@ export default function BienesRaicesPage() {
           </div>
         )}
       </main>
+      </div>
+      <Footer />
 
       {mostrarFiltros && (
         <PanelFiltros filtros={filtros} onChange={setFiltros} onClose={() => setMostrarFiltros(false)} />

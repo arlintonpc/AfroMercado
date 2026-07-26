@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import Header from '@/components/layout/Header'
+import Footer from '@/components/layout/Footer'
 import { listarTransportes, type ConfigTransporte } from '@/lib/api/transporte'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { optimizarImagenPequena } from '@/lib/cloudinary'
@@ -255,9 +257,10 @@ export default function TransportesPage() {
   const tiposDisponibles = TIPOS.filter(tp => transportes.some(t => t.tipo === tp))
 
   return (
-    <div className="min-h-screen bg-[#F7F5F2]">
-
-      {/* ── HERO ─────────────────────────────────────────────── */}
+    <div className="min-h-screen flex flex-col bg-[#F7F5F2]">
+      <Header />
+      <div className="flex-1">
+        {/* ── HERO ─────────────────────────────────────────────── */}
       <div className="relative overflow-hidden min-h-[280px] sm:min-h-[320px] flex flex-col justify-end bg-[#111]">
         {heroFotos.map((url, idx) => (
           <img 
@@ -435,6 +438,8 @@ export default function TransportesPage() {
           </div>
         )}
       </main>
+      </div>
+      <Footer />
     </div>
   )
 }
