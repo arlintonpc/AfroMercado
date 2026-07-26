@@ -395,7 +395,8 @@ export default function Header({ itemsCarrito }: HeaderProps) {
       {/* Fila Inferior: Menú de Navegación Completo (Scrollable en móviles, distribuido en desktop) */}
       <div className="flex bg-[#2D6A4F]/5 border-t border-black/5">
         <div className="w-full max-w-6xl mx-auto px-2 md:px-6">
-          <nav className="flex items-center gap-2 lg:justify-between py-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }} aria-label="Navegación principal">
+          <nav className="flex items-center gap-2 py-1.5" aria-label="Navegación principal">
+          <div className="flex items-center gap-2 overflow-x-auto flex-1 min-w-0 lg:justify-between" style={{ scrollbarWidth: 'none' }}>
             {(!reglas || reglas.flagModuloExpress) && (
               <Link href="/express" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
                 <Utensils className="w-4 h-4" /> Sabores
@@ -427,8 +428,9 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             <Link href="/temporada" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#D4A017] hover:bg-[#D4A017]/10 flex items-center gap-1.5 transition-colors">
               <Sparkles className="w-4 h-4" /> Temporada
             </Link>
+          </div>
 
-            {/* Categorías menos frecuentes agrupadas para no saturar el menú */}
+            {/* Categorías menos frecuentes agrupadas para no saturar el menú — siempre visible, fuera del área con scroll */}
             <div className="relative flex-shrink-0" ref={masRef}>
               <button
                 type="button"
