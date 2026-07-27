@@ -196,63 +196,64 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
       </Link>
 
       {/* Contenido */}
-      <div className="px-3.5 py-2.5 bg-white dark:bg-[#151D18] transition-colors">
-
-        {/* Comercio */}
-        <p className="truncate text-[#1A1A1A]/50 dark:text-gray-400 font-medium text-[11px] leading-tight mb-0.5">
-          {producto.comercioId
-            ? <Link href={`/comercio/${producto.comercioId}`} onClick={e => e.stopPropagation()} className="hover:underline">
-                {producto.comercio?.nombre}
-                {producto.comercio?.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}
-              </Link>
-            : <>{producto.comercio?.nombre}{producto.comercio?.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}</>
-          }
-        </p>
-
-        {mostrarBadgeVerificado && (
-          <div className="mb-1">
-            <BadgeVendedorVerificado verificado={producto.comercio?.verificado} size="sm" mostrarTooltip={false} />
-          </div>
-        )}
-
-        {/* Nombre */}
-        <Link
-          href={href}
-          onClick={() => registrarPatrocinado('clic')}
-          className="block truncate font-bold text-[#1A1A1A] dark:text-white text-sm sm:text-base leading-snug mb-0.5"
-        >
-          {producto.nombre}
-        </Link>
-
-        <p className="flex items-center gap-1 truncate text-[#1A1A1A]/55 dark:text-gray-400 text-xs mb-1.5">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            className="h-3 w-3 flex-shrink-0 text-[#52B788]"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z" />
-            <circle cx="12" cy="10" r="3" />
-          </svg>
-          <span className="truncate">{producto.comercio?.municipio}</span>
-        </p>
-
-        {/* Etiqueta de la oferta */}
-        {producto.oferta?.etiqueta && (
-          <p className="text-[10px] text-[#2D6A4F] dark:text-[#52B788] font-bold truncate mb-1">
-            {producto.oferta.etiqueta}
+      <div className="p-3 bg-white dark:bg-[#151D18] transition-colors flex-1 flex flex-col justify-between">
+        <div>
+          {/* Comercio */}
+          <p className="truncate text-[#1A1A1A]/50 dark:text-gray-400 font-medium text-[11px] leading-tight mb-0.5">
+            {producto.comercioId
+              ? <Link href={`/comercio/${producto.comercioId}`} onClick={e => e.stopPropagation()} className="hover:underline">
+                  {producto.comercio?.nombre}
+                  {producto.comercio?.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}
+                </Link>
+              : <>{producto.comercio?.nombre}{producto.comercio?.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}</>
+            }
           </p>
-        )}
 
-        {/* Precio e unidad inline en la misma fila */}
-        <div className="mt-1">
+          {mostrarBadgeVerificado && (
+            <div className="mb-0.5">
+              <BadgeVendedorVerificado verificado={producto.comercio?.verificado} size="sm" mostrarTooltip={false} />
+            </div>
+          )}
+
+          {/* Nombre del Producto */}
+          <Link
+            href={href}
+            onClick={() => registrarPatrocinado('clic')}
+            className="block truncate font-bold text-[#1A1A1A] dark:text-white text-sm sm:text-base leading-snug"
+          >
+            {producto.nombre}
+          </Link>
+
+          {/* Ubicación pegada inmediatamente debajo del nombre */}
+          <p className="flex items-center gap-1 truncate text-[#1A1A1A]/55 dark:text-gray-400 text-xs mt-0.5">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-3 w-3 flex-shrink-0 text-[#52B788]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            <span className="truncate">{producto.comercio?.municipio}</span>
+          </p>
+        </div>
+
+        {/* Sección inferior: Precio e unidad */}
+        <div className="mt-2 pt-1">
+          {producto.oferta?.etiqueta && (
+            <p className="text-[10px] text-[#2D6A4F] dark:text-[#52B788] font-bold truncate mb-0.5">
+              {producto.oferta.etiqueta}
+            </p>
+          )}
+
           {producto.oferta ? (
             <div>
-              <span className="text-xs text-[#1A1A1A]/40 dark:text-gray-500 line-through block leading-none mb-0.5">
+              <span className="text-[11px] text-[#1A1A1A]/40 dark:text-gray-500 line-through block leading-none mb-0.5">
                 {formatearPrecio(producto.precio)}
               </span>
               <div className="flex items-baseline gap-1 flex-wrap">
