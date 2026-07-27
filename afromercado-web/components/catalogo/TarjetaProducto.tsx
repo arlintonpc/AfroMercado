@@ -5,31 +5,20 @@ import Image from 'next/image'
 import { useState } from 'react'
 import type { Producto } from '@/types/producto'
 import { formatearPrecio } from '@/lib/formatearPrecio'
-import { useFavoritos } from '@/context/FavoritoContext'
-import { useAuth } from '@/context/AuthContext'
 import { registrarEventoPatrocinado } from '@/lib/publicidadTracking'
-import BadgeVendedorVerificado from '@/components/ui/BadgeVendedorVerificado'
 
 interface TarjetaProductoProps {
   producto: Producto
   esDestacado?: boolean
   etiquetaDestacado?: string
-  /** Muestra la insignia "Vendedor verificado" (usado en la pestaña Tienda Local del buscador). */
   mostrarBadgeVerificado?: boolean
 }
 
-export default function TarjetaProducto({ producto, esDestacado = false, etiquetaDestacado, mostrarBadgeVerificado = false }: TarjetaProductoProps) {
-  const selloTexto = etiquetaDestacado?.trim() || 'Patrocinado'
-  const { toggle: toggleFav, esFavorito } = useFavoritos()
-  const { autenticado } = useAuth()
+export default function TarjetaProducto({ producto, esDestacado = false, etiquetaDestacado }: TarjetaProductoProps) {
   const [imgCargando, setImgCargando] = useState(true)
   const [imgError, setImgError]       = useState(false)
   const [hover, setHover]             = useState(false)
 
-  // Los hooks de arriba deben correr siempre, en el mismo orden, en cada
-  // render (regla de React) — por eso este early-return va DESPUÉS de ellos,
-  // no antes. BannerDisplay inyecta ítems marcados así en la misma lista de
-  // productos; esta tarjeta los ignora y BannerDisplay los renderiza aparte.
   if ((producto as { esBannerDisplay?: boolean }).esBannerDisplay) {
     return null
   }
@@ -41,10 +30,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
       : Math.round(((producto.precio - producto.oferta.precioFinal) / producto.precio) * 100)
     : 0
   const agotado    = disponible === 0
-  const stockBajo  = !agotado && disponible <= 5
-  const tieneVideo = Boolean(producto.videoUrl || producto.comercio?.videoUrl)
   const mostrarNacional = !agotado && (producto.alcance === 'NACIONAL' || producto.alcance === 'AMBOS')
-
   const mostrarPlaceholder = !producto.fotoUrl || imgError
   const href = `/producto/${producto.id}`
 
@@ -57,44 +43,36 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
     <article
       className={`group bg-white dark:bg-[#151D18] rounded-2xl overflow-hidden flex flex-col transition-all duration-300 ${
         esDestacado
-          ? 'shadow-[0_4px_20px_rgba(45,106,79,0.18)] ring-2 ring-[#2D6A4F]/35'
-          : 'shadow-[0_2px_10px_rgba(0,0,0,0.05)]'
+          ? 'shadow-md ring-2 ring-[#2D6A4F]/35'
+          : 'shadow-sm border border-gray-100 dark:border-white/10'
       } ${
         agotado
           ? 'opacity-70'
-          : 'hover:-translate-y-1 hover:shadow-[0_8px_25px_rgba(45,106,79,0.15)]'
+          : 'hover:-translate-y-0.5 hover:shadow-md'
       }`}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      {/* Banda superior — solo en tarjetas seleccionadas */}
-      {esDestacado && (
-        <div className="h-[3px] w-full bg-gradient-to-r from-[#2D6A4F] via-[#52B788] to-[#2D6A4F] flex-shrink-0" />
-      )}
-
-      {/* Imagen / Placeholder — Más larga/alta (aspect-square) para destacar la foto del producto */}
+      {/* Imagen Limpia — Sin saturación de íconos o botones encima (Estilo MercadoLibre) */}
       <Link
         href={href}
         aria-label={`Ver ${producto.nombre}`}
         onClick={() => registrarPatrocinado('clic')}
-        className="relative block w-full aspect-square flex-1 min-h-[190px] overflow-hidden"
+        className="relative block w-full aspect-[4/5] overflow-hidden bg-gray-100 dark:bg-white/5"
       >
         {mostrarPlaceholder ? (
-          <div className="absolute inset-0 bg-[#F0EBE3] flex flex-col items-center justify-center px-4 text-center">
+          <div className="absolute inset-0 bg-[#F0EBE3] dark:bg-white/5 flex flex-col items-center justify-center px-4 text-center">
             <p
-              className={`text-[#2D6A4F] text-2xl leading-tight font-normal transition-opacity duration-300 ${hover ? 'opacity-100' : 'opacity-80'}`}
+              className="text-[#2D6A4F] dark:text-[#52B788] text-xl leading-tight font-normal"
               style={{ fontFamily: 'var(--font-dm-serif)' }}
             >
               {producto.nombre}
-            </p>
-            <p className="text-[#2D6A4F]/50 text-xs mt-2 tracking-wide uppercase">
-              {producto.comercio?.municipio}
             </p>
           </div>
         ) : (
           <>
             {imgCargando && (
-              <div className="absolute inset-0 bg-[#F0EBE3] animate-pulse" />
+              <div className="absolute inset-0 bg-[#F0EBE3] dark:bg-white/5 animate-pulse" />
             )}
             <Image
               src={producto.fotoUrl!}
@@ -108,159 +86,79 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
           </>
         )}
 
-        {/* Badge Agotado */}
-        {agotado && (
-          <div className="absolute inset-0 bg-[#1A1A1A]/30 flex items-center justify-center">
-            <span className="bg-white text-[#1A1A1A] text-xs font-bold px-3 py-1.5 rounded-full shadow">
-              Agotado
-            </span>
-          </div>
+        {/* Únicamente insignias esenciales súper limpias */}
+        {producto.oferta && !agotado && (
+          <span className="absolute top-2.5 left-2.5 bg-[#2D6A4F] text-white text-[11px] font-bold px-2 py-0.5 rounded-md shadow-sm">
+            -{descuentoPct}%
+          </span>
         )}
 
-        {/* Badge Nacional */}
         {mostrarNacional && (
-          <span className="absolute top-3 right-3 bg-white/70 backdrop-blur-md text-[#1A1A1A] text-[10px] font-bold px-2.5 py-1 rounded-full leading-none shadow-sm border border-white/40">
+          <span className="absolute top-2.5 right-2.5 bg-white/90 dark:bg-black/70 backdrop-blur-md text-gray-800 dark:text-gray-200 text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm border border-white/40">
             📦 Nacional
           </span>
         )}
 
-        {/* Badge stock bajo */}
-        {stockBajo && !esDestacado && !producto.oferta && (
-          <span className="absolute top-3 left-3 bg-[#B7800A]/80 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-full leading-none shadow-sm border border-white/20">
-            Últimas {disponible}
-          </span>
-        )}
-
-        {/* Badge oferta — % descuento */}
-        {producto.oferta && !agotado && !esDestacado && (
-          <span className="absolute top-3 left-3 bg-[#2D6A4F]/80 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-full leading-none shadow-sm border border-white/20">
-            -{descuentoPct}%
-          </span>
-        )}
-        {/* Badge oferta secundario cuando hay destacado */}
-        {producto.oferta && !agotado && esDestacado && (
-          <span className="absolute bottom-3 left-3 bg-[#2D6A4F] text-white text-[9px] font-bold px-2 py-0.5 rounded-full leading-none">
-            -{descuentoPct}%
-          </span>
-        )}
-
-        {/* Badge Express */}
-        {producto.esExpress && !agotado && (
-          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-[#D4A017]/90 backdrop-blur-md px-2.5 py-1 text-[10px] font-bold text-white shadow-sm border border-white/20">
-            ⚡ {producto.tiempoEntregaMin ? `${producto.tiempoEntregaMin} min` : 'Express'}
-          </span>
-        )}
-
-        {/* Badge contacto directo */}
-        {!producto.esExpress && producto.comercio?.comprableEnPlataforma === false && !agotado && (
-          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-[#25D366] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
-            🤝 Contacto directo
-          </span>
-        )}
-
-        {tieneVideo && (
-          <span className={`absolute ${producto.esExpress && !agotado ? 'bottom-3 right-3' : 'bottom-3 right-3'} inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-md shadow-sm border border-white/20`}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-            Video
-          </span>
-        )}
-
-        {/* Botón favorito */}
-        {autenticado && (
-          <button
-            type="button"
-            onClick={(e) => { e.preventDefault(); toggleFav(Number(producto.id)) }}
-            aria-label={esFavorito(Number(producto.id)) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
-            className={`absolute right-2.5 ${mostrarNacional ? 'top-11' : 'top-2.5'} w-8 h-8 flex items-center justify-center rounded-full bg-white/80 backdrop-blur shadow-sm hover:bg-white transition-colors z-10`}
-          >
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill={esFavorito(Number(producto.id)) ? '#2D6A4F' : 'none'} stroke={esFavorito(Number(producto.id)) ? '#2D6A4F' : '#1A1A1A'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-            </svg>
-          </button>
-        )}
-
-        {/* Sello personalizado */}
-        {esDestacado && (
-          <span className="absolute top-3 left-3 flex items-center gap-1 bg-[#2D6A4F] text-white text-[10px] font-bold px-2.5 py-1 rounded-full leading-none shadow-sm">
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M17 8C8 10 5.9 16.17 3.82 19.52 3.23 20.5 4.5 21.5 5.3 20.67 7 18.9 8.91 17.5 11 17c-1 3-4 4-4 4s6 0 9-8c1.5 2 2 3.5 2 5.5 0 0 2-10-1-10.5z"/>
-            </svg>
-            {selloTexto}
-          </span>
+        {agotado && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <span className="bg-white text-gray-900 text-xs font-bold px-3 py-1 rounded-full shadow">
+              Agotado
+            </span>
+          </div>
         )}
       </Link>
 
-      {/* Contenido compacto sin flex-1 ni justify-between que estiren o separen el texto */}
-      <div className="p-3 bg-white dark:bg-[#151D18] transition-colors flex flex-col gap-1 flex-shrink-0">
-        {/* Comercio */}
-        <p className="truncate text-[#1A1A1A]/50 dark:text-gray-400 font-medium text-[11px] leading-tight">
-          {producto.comercioId
-            ? <Link href={`/comercio/${producto.comercioId}`} onClick={e => e.stopPropagation()} className="hover:underline">
-                {producto.comercio?.nombre}
-                {producto.comercio?.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}
-              </Link>
-            : <>{producto.comercio?.nombre}{producto.comercio?.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}</>
-          }
-        </p>
+      {/* Contenido Limpio y Estructurado */}
+      <div className="p-3 flex flex-col justify-between flex-1 gap-1.5 bg-white dark:bg-[#151D18]">
+        <div>
+          {/* Comercio y Municipio en 1 sola línea limpia */}
+          <p className="truncate text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">
+            {producto.comercio?.nombre || 'Teravia'}
+            {producto.comercio?.municipio ? ` • ${producto.comercio.municipio}` : ''}
+          </p>
 
-        {mostrarBadgeVerificado && (
-          <div>
-            <BadgeVendedorVerificado verificado={producto.comercio?.verificado} size="sm" mostrarTooltip={false} />
-          </div>
-        )}
-
-        {/* Nombre del Producto */}
-        <Link
-          href={href}
-          onClick={() => registrarPatrocinado('clic')}
-          className="block truncate font-bold text-[#1A1A1A] dark:text-white text-sm sm:text-base leading-snug"
-        >
-          {producto.nombre}
-        </Link>
-
-        {/* Ubicación pegada inmediatamente debajo del nombre */}
-        <p className="flex items-center gap-1 truncate text-[#1A1A1A]/55 dark:text-gray-400 text-xs">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            className="h-3 w-3 flex-shrink-0 text-[#52B788]"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          {/* Nombre del Producto */}
+          <Link
+            href={href}
+            onClick={() => registrarPatrocinado('clic')}
+            className="block text-sm font-bold text-gray-900 dark:text-white leading-snug line-clamp-2 hover:text-[#2D6A4F] transition-colors"
           >
-            <path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z" />
-            <circle cx="12" cy="10" r="3" />
-          </svg>
-          <span className="truncate">{producto.comercio?.municipio}</span>
-        </p>
+            {producto.nombre}
+          </Link>
+        </div>
 
-        {/* Sección inferior: Precio e unidad */}
-        <div className="pt-0.5">
-          {producto.oferta?.etiqueta && (
-            <p className="text-[10px] text-[#2D6A4F] dark:text-[#52B788] font-bold truncate mb-0.5">
-              {producto.oferta.etiqueta}
-            </p>
-          )}
-
+        {/* Sección de Precio estilo e-commerce */}
+        <div className="pt-1">
           {producto.oferta ? (
             <div>
-              <span className="text-[11px] text-[#1A1A1A]/40 dark:text-gray-500 line-through block leading-none mb-0.5">
-                {formatearPrecio(producto.precio)}
-              </span>
-              <div className="flex items-baseline gap-1 flex-wrap">
-                <span className="text-base sm:text-lg font-black text-[#2D6A4F] dark:text-[#52B788]">{formatearPrecio(producto.oferta.precioFinal)}</span>
-                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">/ {producto.unidad.toLowerCase()}</span>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-base sm:text-lg font-black text-[#2D6A4F] dark:text-[#52B788]">
+                  {formatearPrecio(producto.oferta.precioFinal)}
+                </span>
+                <span className="text-xs text-gray-400 line-through">
+                  {formatearPrecio(producto.precio)}
+                </span>
               </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-normal">
+                / {producto.unidad.toLowerCase()}
+              </p>
             </div>
           ) : (
-            <div className="flex items-baseline gap-1 flex-wrap">
-              <span className="text-base sm:text-lg font-black text-[#1A1A1A] dark:text-white">{formatearPrecio(producto.precio)}</span>
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">/ {producto.unidad.toLowerCase()}</span>
+            <div>
+              <span className="text-base sm:text-lg font-black text-gray-900 dark:text-white">
+                {formatearPrecio(producto.precio)}
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 font-normal ml-1">
+                / {producto.unidad.toLowerCase()}
+              </span>
             </div>
+          )}
+
+          {/* Etiqueta de Oferta */}
+          {producto.oferta?.etiqueta && (
+            <p className="text-xs font-semibold text-[#2D6A4F] dark:text-[#52B788] mt-1">
+              {producto.oferta.etiqueta}
+            </p>
           )}
         </div>
       </div>

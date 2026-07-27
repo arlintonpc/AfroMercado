@@ -620,7 +620,7 @@ export default function Home() {
         )}
 
         {/* Catálogo completo */}
-        <section id="catalogo" className="max-w-7xl mx-auto w-full px-4 md:px-6 py-10 flex flex-col gap-6">
+        <section id="catalogo" className="max-w-7xl mx-auto w-full px-2 sm:px-6 py-6 flex flex-col gap-4">
 
           {/* Encabezado */}
           <div className="flex items-end justify-between">
