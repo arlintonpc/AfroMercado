@@ -108,23 +108,40 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         )}
       </Link>
 
-      {/* Contenido Limpio y Estructurado */}
-      <div className="p-3 flex flex-col justify-between flex-1 gap-1.5 bg-white dark:bg-[#151D18]">
+      {/* Contenido Limpio y Apretado sin justify-between que separe el texto */}
+      <div className="p-3 flex flex-col gap-1 bg-white dark:bg-[#151D18] transition-colors">
         <div>
-          {/* Comercio y Municipio en 1 sola línea limpia */}
-          <p className="truncate text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">
+          {/* Comercio */}
+          <p className="truncate text-xs font-medium text-gray-500 dark:text-gray-400 leading-tight mb-0.5">
             {producto.comercio?.nombre || 'Teravia'}
-            {producto.comercio?.municipio ? ` • ${producto.comercio.municipio}` : ''}
           </p>
 
           {/* Nombre del Producto */}
           <Link
             href={href}
             onClick={() => registrarPatrocinado('clic')}
-            className="block text-sm font-bold text-gray-900 dark:text-white leading-snug line-clamp-2 hover:text-[#2D6A4F] transition-colors"
+            className="block text-sm font-bold text-gray-900 dark:text-white leading-tight line-clamp-2 hover:text-[#2D6A4F] transition-colors"
           >
             {producto.nombre}
           </Link>
+
+          {/* Ubicación pegada inmediatamente debajo del nombre */}
+          <p className="flex items-center gap-1 truncate text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-3 w-3 flex-shrink-0 text-[#52B788]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            <span className="truncate">{producto.comercio?.municipio}</span>
+          </p>
         </div>
 
         {/* Sección de Precio estilo e-commerce */}
