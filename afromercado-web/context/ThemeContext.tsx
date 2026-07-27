@@ -25,20 +25,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Modo oscuro deshabilitado temporalmente: la cobertura de clases `dark:`
+  // no llega a secciones clave (carruseles del home, resultados de búsqueda),
+  // así que activarlo por preferencia del sistema operativo dejaría la
+  // interfaz a medias sin que el usuario haya tocado nada. Forzamos claro
+  // hasta completar esa cobertura; no se lee ni la preferencia del SO ni lo
+  // guardado en localStorage de sesiones previas.
   useEffect(() => {
-    const stored = localStorage.getItem('teravia_theme') as Theme | null
-    if (stored === 'dark' || stored === 'light') {
-      setThemeState(stored)
-      aplicarTemaDOM(stored)
-    } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      if (prefersDark) {
-        setThemeState('dark')
-        aplicarTemaDOM('dark')
-      } else {
-        aplicarTemaDOM('light')
-      }
-    }
+    aplicarTemaDOM('light')
   }, [])
 
   function setTheme(newTheme: Theme) {

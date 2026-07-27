@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useCarrito } from '@/context/CarritoContext'
 import { useAuth } from '@/context/AuthContext'
 import { useRegion } from '@/context/RegionContext'
-import { useTheme } from '@/context/ThemeContext'
 import { apiFetch, normalizarUrlMedia } from '@/lib/api/client'
 import { obtenerReglasPublicas } from '@/lib/api/config'
 import { DEPARTAMENTOS } from '@/lib/data/colombia'
@@ -22,7 +21,6 @@ export default function Header({ itemsCarrito }: HeaderProps) {
   const { cantidadTotal } = useCarrito()
   const { usuario, autenticado, logout } = useAuth()
   const { regionActiva, elegirRegion } = useRegion()
-  const { theme, toggleTheme } = useTheme()
   const router = useRouter()
 
   const badge = itemsCarrito ?? cantidadTotal
@@ -209,19 +207,10 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             </svg>
           </button>
 
-          {/* Toggle Modo Oscuro / Claro */}
-          <button
-            onClick={toggleTheme}
-            className="flex items-center justify-center w-11 h-11 rounded-lg hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 transition-colors"
-            title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-            aria-label="Alternar tema"
-          >
-            {theme === 'dark' ? (
-              <span className="text-xl" role="img" aria-label="Sol">☀️</span>
-            ) : (
-              <span className="text-xl" role="img" aria-label="Luna">🌙</span>
-            )}
-          </button>
+          {/* Toggle de modo oscuro oculto temporalmente: la cobertura de `dark:` no
+              alcanza a secciones clave (carruseles del home, resultados de búsqueda),
+              así que activarlo deja la interfaz a medias. Reactivar cuando esa
+              cobertura esté completa — ver ThemeContext.tsx. */}
 
           {/* Campana de notificaciones — solo usuarios autenticados */}
           {autenticado && <CampanaNotificaciones />}
