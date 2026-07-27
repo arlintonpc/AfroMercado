@@ -12,6 +12,7 @@ import QueryProvider from '@/components/ui/QueryProvider'
 import BannerRegionDetectada from '@/components/region/BannerRegionDetectada'
 import IrruptorBienvenida from '@/components/publicidad/IrruptorBienvenida'
 import IndicadorSinConexion from '@/components/IndicadorSinConexion'
+import MobileHistoryGuard from '@/components/layout/MobileHistoryGuard'
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -24,6 +25,7 @@ export default function Providers({ children }: { children: ReactNode }) {
                 <FavoritoProvider>
                   <CarritoProvider>
                     {children}
+                    <MobileHistoryGuard />
                     <BannerRegionDetectada />
                     <IrruptorBienvenida />
                     <IndicadorSinConexion />

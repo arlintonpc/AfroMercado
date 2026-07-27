@@ -196,12 +196,10 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
       </Link>
 
       {/* Contenido */}
-      <div className="px-3 py-2">
+      <div className="px-3.5 py-2.5 bg-white dark:bg-[#151D18] transition-colors">
 
         {/* Comercio */}
-        <p className="truncate text-[#1A1A1A]/50 font-medium" style={{ fontSize: 11, lineHeight: '14px', marginBottom: 3 }}>
-          {/* El check ✓ se omite cuando ya se muestra el badge "Vendedor verificado"
-              completo debajo (mismo dato, ya comunicado) — evita repetirlo dos veces. */}
+        <p className="truncate text-[#1A1A1A]/50 dark:text-gray-400 font-medium text-[11px] leading-tight mb-0.5">
           {producto.comercioId
             ? <Link href={`/comercio/${producto.comercioId}`} onClick={e => e.stopPropagation()} className="hover:underline">
                 {producto.comercio?.nombre}
@@ -212,7 +210,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         </p>
 
         {mostrarBadgeVerificado && (
-          <div className="mb-1.5">
+          <div className="mb-1">
             <BadgeVendedorVerificado verificado={producto.comercio?.verificado} size="sm" mostrarTooltip={false} />
           </div>
         )}
@@ -221,13 +219,12 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         <Link
           href={href}
           onClick={() => registrarPatrocinado('clic')}
-          className="block truncate font-semibold text-[#1A1A1A]"
-          style={{ fontSize: 15, lineHeight: '17px', marginBottom: 2, minHeight: 0 }}
+          className="block truncate font-bold text-[#1A1A1A] dark:text-white text-sm sm:text-base leading-snug mb-0.5"
         >
           {producto.nombre}
         </Link>
 
-        <p className="flex items-center gap-1 truncate text-[#1A1A1A]/55" style={{ fontSize: 11, lineHeight: '13px', marginBottom: 5 }}>
+        <p className="flex items-center gap-1 truncate text-[#1A1A1A]/55 dark:text-gray-400 text-xs mb-1.5">
           <svg
             aria-hidden="true"
             viewBox="0 0 24 24"
@@ -246,28 +243,28 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
 
         {/* Etiqueta de la oferta */}
         {producto.oferta?.etiqueta && (
-          <p className="text-[10px] text-[#2D6A4F] font-semibold truncate mb-1" style={{ lineHeight: '12px' }}>
+          <p className="text-[10px] text-[#2D6A4F] dark:text-[#52B788] font-bold truncate mb-1">
             {producto.oferta.etiqueta}
           </p>
         )}
 
-        {/* Precio — sin botón junto a él: la tarjeta completa ya es tappable
-            (imagen/nombre) para ir a la ficha y agregar ahí. Esto le da al
-            precio todo el ancho disponible, siempre visible sin recortes. */}
-        <div style={{ lineHeight: 1 }}>
+        {/* Precio e unidad inline en la misma fila */}
+        <div className="mt-1">
           {producto.oferta ? (
-            <>
-              <span className="text-xs text-[#1A1A1A]/40 line-through block" style={{ lineHeight: '14px' }}>
+            <div>
+              <span className="text-xs text-[#1A1A1A]/40 dark:text-gray-500 line-through block leading-none mb-0.5">
                 {formatearPrecio(producto.precio)}
               </span>
-              <span className="text-xl font-bold text-[#2D6A4F] block truncate">{formatearPrecio(producto.oferta.precioFinal)}</span>
-              <span className="text-[10px] text-[#1A1A1A]/50 block truncate" style={{ marginTop: 2 }}>/ {producto.unidad.toLowerCase()}</span>
-            </>
+              <div className="flex items-baseline gap-1 flex-wrap">
+                <span className="text-base sm:text-lg font-black text-[#2D6A4F] dark:text-[#52B788]">{formatearPrecio(producto.oferta.precioFinal)}</span>
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">/ {producto.unidad.toLowerCase()}</span>
+              </div>
+            </div>
           ) : (
-            <>
-              <span className="text-xl font-bold text-[#1A1A1A] block truncate">{formatearPrecio(producto.precio)}</span>
-              <span className="text-[10px] text-[#1A1A1A]/50 block truncate" style={{ marginTop: 2 }}>/ {producto.unidad.toLowerCase()}</span>
-            </>
+            <div className="flex items-baseline gap-1 flex-wrap">
+              <span className="text-base sm:text-lg font-black text-[#1A1A1A] dark:text-white">{formatearPrecio(producto.precio)}</span>
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">/ {producto.unidad.toLowerCase()}</span>
+            </div>
           )}
         </div>
       </div>

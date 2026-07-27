@@ -58,19 +58,19 @@ export default function ExpressPage() {
   const [fotoHeroIdx, setFotoHeroIdx] = useState(0)
 
   useEffect(() => {
-    async function cargar() {
-      setCargando(true)
+    async function cargar(esInicial = false) {
+      if (esInicial) setCargando(true)
       try {
         const data = await listarComerciosExpress()
         setTodos(data)
       } catch (e: any) {
         setError(e.message)
       } finally {
-        setCargando(false)
+        if (esInicial) setCargando(false)
       }
     }
-    cargar()
-    const interval = setInterval(cargar, 30_000)
+    cargar(true)
+    const interval = setInterval(() => cargar(false), 30_000)
     return () => clearInterval(interval)
   }, [])
 
