@@ -117,7 +117,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
   }, [mostrarSugerencias])
 
   return (
-    <header className="sticky top-0 z-50 bg-[#F8F5F0] shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
+    <header className="sticky top-0 z-50 bg-[#F8F5F0] dark:bg-[#15201A] shadow-[0_2px_8px_rgba(0,0,0,0.12)] border-b border-transparent dark:border-white/10 transition-colors">
       <div className="w-full max-w-6xl mx-auto px-4 md:px-6 flex items-center justify-between h-14 md:h-16">
 
         {/* Logo */}
@@ -127,7 +127,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             <img src={logoUrl} alt="Teravia" className="h-9 w-auto max-w-[180px] object-contain" />
           ) : (
             <span className="text-2xl" style={{ fontFamily: 'var(--font-dm-serif)' }}>
-              <span className="text-[#2D6A4F]">Tera</span>
+              <span className="text-[#2D6A4F] dark:text-[#52B788]">Tera</span>
               <span className="text-[#D4A017]">via</span>
             </span>
           )}
@@ -141,13 +141,13 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             aria-haspopup="menu"
             aria-expanded={regionMenuAbierto}
             aria-label={`Región activa: ${regionActiva ?? 'Todo el país'}`}
-            className="flex items-center gap-1 min-h-[36px] w-9 sm:w-auto justify-center px-0 sm:px-2 md:px-2.5 rounded-lg text-xs md:text-sm font-semibold text-[#1B4332] hover:bg-[#2D6A4F]/10 border border-[#2D6A4F]/20"
+            className="flex items-center gap-1 min-h-[36px] w-9 sm:w-auto justify-center px-0 sm:px-2 md:px-2.5 rounded-lg text-xs md:text-sm font-semibold text-[#1B4332] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 border border-[#2D6A4F]/20 dark:border-white/20"
           >
             <span aria-hidden="true">📍</span>
             <span className="hidden sm:inline max-w-[90px] md:max-w-[140px] truncate">
               {regionActiva ?? 'Todo el país'}
             </span>
-            <svg className="hidden sm:block w-3 h-3 text-[#1A1A1A]/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="hidden sm:block w-3 h-3 text-[#1A1A1A]/50 dark:text-white/60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
@@ -155,22 +155,22 @@ export default function Header({ itemsCarrito }: HeaderProps) {
           {regionMenuAbierto && (
             <div
               role="menu"
-              className="absolute left-0 mt-2 w-56 bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] py-1 z-50"
+              className="absolute left-0 mt-2 w-56 bg-white dark:bg-[#1A241F] border border-gray-100 dark:border-white/10 rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] py-1 z-50"
             >
-              <p className="px-4 py-1.5 text-xs font-semibold text-[#1A1A1A]/40 uppercase tracking-wide">
+              <p className="px-4 py-1.5 text-xs font-semibold text-[#1A1A1A]/40 dark:text-white/40 uppercase tracking-wide">
                 Región activa
               </p>
               <button
                 type="button"
                 role="menuitem"
                 onClick={() => { elegirRegion(null); setRegionMenuAbierto(false) }}
-                className={`block w-full text-left px-4 py-2 text-sm hover:bg-[#2D6A4F]/10 ${
-                  regionActiva === null ? 'font-semibold text-[#D4A017]' : 'text-[#1A1A1A]'
+                className={`block w-full text-left px-4 py-2 text-sm hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 ${
+                  regionActiva === null ? 'font-semibold text-[#D4A017]' : 'text-[#1A1A1A] dark:text-white'
                 }`}
               >
                 🌎 Todo el país
               </button>
-              <div className="border-t border-[#1A1A1A]/10 my-1" />
+              <div className="border-t border-[#1A1A1A]/10 dark:border-white/10 my-1" />
               <div className="max-h-64 overflow-y-auto">
                 {DEPARTAMENTOS.map((departamento) => (
                   <button
@@ -178,8 +178,8 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                     type="button"
                     role="menuitem"
                     onClick={() => { elegirRegion(departamento); setRegionMenuAbierto(false) }}
-                    className={`block w-full text-left px-4 py-2 text-sm hover:bg-[#2D6A4F]/10 ${
-                      regionActiva === departamento ? 'font-semibold text-[#D4A017]' : 'text-[#1A1A1A]'
+                    className={`block w-full text-left px-4 py-2 text-sm hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 ${
+                      regionActiva === departamento ? 'font-semibold text-[#D4A017]' : 'text-[#1A1A1A] dark:text-white'
                     }`}
                   >
                     {departamento}
@@ -201,10 +201,10 @@ export default function Header({ itemsCarrito }: HeaderProps) {
           {/* Búsqueda móvil */}
           <button
             onClick={() => router.push('/buscar')}
-            className="md:hidden flex items-center justify-center w-11 h-11 rounded-lg hover:bg-[#2D6A4F]/10"
+            className="md:hidden flex items-center justify-center w-11 h-11 rounded-lg hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10"
             aria-label="Buscar"
           >
-            <svg className="w-5 h-5 text-[#1A1A1A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-[#1A1A1A] dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </button>
@@ -227,8 +227,8 @@ export default function Header({ itemsCarrito }: HeaderProps) {
           {autenticado && <CampanaNotificaciones />}
 
           {/* Carrito */}
-          <Link href="/carrito" className="relative flex items-center justify-center w-11 h-11 rounded-lg hover:bg-[#2D6A4F]/10" aria-label="Carrito">
-            <svg className="w-5 h-5 text-[#1A1A1A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <Link href="/carrito" className="relative flex items-center justify-center w-11 h-11 rounded-lg hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10" aria-label="Carrito">
+            <svg className="w-5 h-5 text-[#1A1A1A] dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             {badge > 0 && (
@@ -242,7 +242,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
           {!autenticado ? (
             <Link
               href="/ingresar"
-              className="flex items-center justify-center min-h-[44px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10"
+              className="flex items-center justify-center min-h-[44px] px-3 rounded-lg text-sm font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10"
             >
               Ingresar
             </Link>
@@ -251,7 +251,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
               <button
                 type="button"
                 onClick={() => setMenuAbierto(!menuAbierto)}
-                className="flex items-center gap-1.5 min-h-[44px] px-3 rounded-lg text-sm font-semibold text-[#1A1A1A] hover:bg-[#2D6A4F]/10"
+                className="flex items-center gap-1.5 min-h-[44px] px-3 rounded-lg text-sm font-semibold text-[#1A1A1A] dark:text-white hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10"
                 aria-haspopup="menu"
                 aria-expanded={menuAbierto}
               >
@@ -268,7 +268,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                 <span className="hidden sm:inline max-w-[120px] truncate">
                   {usuario?.nombre}
                 </span>
-                <svg className="hidden sm:inline w-3.5 h-3.5 text-[#1A1A1A]/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="hidden sm:inline w-3.5 h-3.5 text-[#1A1A1A]/50 dark:text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
@@ -276,12 +276,12 @@ export default function Header({ itemsCarrito }: HeaderProps) {
               {menuAbierto && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] py-1 z-50"
+                  className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#1A241F] border border-gray-100 dark:border-white/10 rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] py-1 z-50"
                 >
-                  <div className="px-4 py-2 border-b border-[#1A1A1A]/10 flex items-center justify-between">
+                  <div className="px-4 py-2 border-b border-[#1A1A1A]/10 dark:border-white/10 flex items-center justify-between">
                     <div className="min-w-0 pr-2">
-                      <p className="text-sm font-semibold text-[#1A1A1A] truncate">{usuario?.nombre}</p>
-                      <p className="text-xs text-[#1A1A1A]/50 truncate">{usuario?.email}</p>
+                      <p className="text-sm font-semibold text-[#1A1A1A] dark:text-white truncate">{usuario?.nombre}</p>
+                      <p className="text-xs text-[#1A1A1A]/50 dark:text-white/50 truncate">{usuario?.email}</p>
                     </div>
                     {usuario?.avatarUrl && (
                       <button
@@ -414,37 +414,37 @@ export default function Header({ itemsCarrito }: HeaderProps) {
           <nav className="flex items-center gap-2 py-1.5" aria-label="Navegación principal">
           <div className="flex items-center gap-2 overflow-x-auto flex-1 min-w-0 lg:justify-between" style={{ scrollbarWidth: 'none' }}>
             {(!reglas || reglas.flagModuloExpress) && (
-              <Link href="/express" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Link href="/express" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 flex items-center gap-1.5 transition-colors">
                 <Utensils className="w-4 h-4" /> Sabores
               </Link>
             )}
             {(!reglas || reglas.flagModuloHoteles) && (
-              <Link href="/hoteles" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Link href="/hoteles" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 flex items-center gap-1.5 transition-colors">
                 <Hotel className="w-4 h-4" /> Hoteles
               </Link>
             )}
             {(!reglas || reglas.flagModuloTours) && (
-              <Link href="/tours" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Link href="/tours" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 flex items-center gap-1.5 transition-colors">
                 <Map className="w-4 h-4" /> Tours
               </Link>
             )}
-            <Link href="/cultura" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+            <Link href="/cultura" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 flex items-center gap-1.5 transition-colors">
               <Ticket className="w-4 h-4" /> Cultura
             </Link>
             {(!reglas || reglas.flagModuloVitrinaReels) && (
-              <Link href="/vitrina" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Link href="/vitrina" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 flex items-center gap-1.5 transition-colors">
                 <Clapperboard className="w-4 h-4" /> Vitrina
               </Link>
             )}
             {(!reglas || reglas.flagModuloEmpleo) && (
-              <Link href="/empleo" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Link href="/empleo" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 flex items-center gap-1.5 transition-colors">
                 <Briefcase className="w-4 h-4" /> Empleo
               </Link>
             )}
             <Link href="/temporada" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#D4A017] hover:bg-[#D4A017]/10 flex items-center gap-1.5 transition-colors">
               <Sparkles className="w-4 h-4" /> Temporada
             </Link>
-            <Link href="/mapa" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-bold text-[#1B4332] dark:text-[#52B788] hover:bg-[#1B4332]/10 flex items-center gap-1.5 transition-colors">
+            <Link href="/mapa" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-bold text-[#1B4332] dark:text-[#52B788] hover:bg-[#1B4332]/10 dark:hover:bg-white/10 flex items-center gap-1.5 transition-colors">
               <Map className="w-4 h-4" /> Mapa
             </Link>
           </div>
