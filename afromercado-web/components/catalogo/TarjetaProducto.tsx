@@ -72,12 +72,12 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         <div className="h-[3px] w-full bg-gradient-to-r from-[#2D6A4F] via-[#52B788] to-[#2D6A4F] flex-shrink-0" />
       )}
 
-      {/* Imagen / Placeholder — Aspect ratio 4:3 para tarjetas más anchas y compactas */}
+      {/* Imagen / Placeholder — Más larga/alta (aspect-square) para destacar la foto del producto */}
       <Link
         href={href}
         aria-label={`Ver ${producto.nombre}`}
         onClick={() => registrarPatrocinado('clic')}
-        className="relative block w-full aspect-[4/3] overflow-hidden"
+        className="relative block w-full aspect-square flex-1 min-h-[190px] overflow-hidden"
       >
         {mostrarPlaceholder ? (
           <div className="absolute inset-0 bg-[#F0EBE3] flex flex-col items-center justify-center px-4 text-center">
@@ -151,8 +151,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
           </span>
         )}
 
-        {/* Badge contacto directo — el vendedor aún no tiene RUT/cuenta
-            verificada, se compra coordinando con él directamente. */}
+        {/* Badge contacto directo */}
         {!producto.esExpress && producto.comercio?.comprableEnPlataforma === false && !agotado && (
           <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-[#25D366] px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
             🤝 Contacto directo
@@ -168,9 +167,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
           </span>
         )}
 
-        {/* Botón favorito — se desplaza debajo del badge Nacional cuando
-            ambos coinciden en la esquina superior derecha, para que no se
-            superpongan. */}
+        {/* Botón favorito */}
         {autenticado && (
           <button
             type="button"
@@ -195,56 +192,54 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         )}
       </Link>
 
-      {/* Contenido */}
-      <div className="p-3 bg-white dark:bg-[#151D18] transition-colors flex-1 flex flex-col justify-between">
-        <div>
-          {/* Comercio */}
-          <p className="truncate text-[#1A1A1A]/50 dark:text-gray-400 font-medium text-[11px] leading-tight mb-0.5">
-            {producto.comercioId
-              ? <Link href={`/comercio/${producto.comercioId}`} onClick={e => e.stopPropagation()} className="hover:underline">
-                  {producto.comercio?.nombre}
-                  {producto.comercio?.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}
-                </Link>
-              : <>{producto.comercio?.nombre}{producto.comercio?.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}</>
-            }
-          </p>
+      {/* Contenido compacto sin flex-1 ni justify-between que estiren o separen el texto */}
+      <div className="p-3 bg-white dark:bg-[#151D18] transition-colors flex flex-col gap-1 flex-shrink-0">
+        {/* Comercio */}
+        <p className="truncate text-[#1A1A1A]/50 dark:text-gray-400 font-medium text-[11px] leading-tight">
+          {producto.comercioId
+            ? <Link href={`/comercio/${producto.comercioId}`} onClick={e => e.stopPropagation()} className="hover:underline">
+                {producto.comercio?.nombre}
+                {producto.comercio?.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}
+              </Link>
+            : <>{producto.comercio?.nombre}{producto.comercio?.verificado && !mostrarBadgeVerificado && <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-[#52B788] text-white text-[7px] font-bold ml-1 align-middle">✓</span>}</>
+          }
+        </p>
 
-          {mostrarBadgeVerificado && (
-            <div className="mb-0.5">
-              <BadgeVendedorVerificado verificado={producto.comercio?.verificado} size="sm" mostrarTooltip={false} />
-            </div>
-          )}
+        {mostrarBadgeVerificado && (
+          <div>
+            <BadgeVendedorVerificado verificado={producto.comercio?.verificado} size="sm" mostrarTooltip={false} />
+          </div>
+        )}
 
-          {/* Nombre del Producto */}
-          <Link
-            href={href}
-            onClick={() => registrarPatrocinado('clic')}
-            className="block truncate font-bold text-[#1A1A1A] dark:text-white text-sm sm:text-base leading-snug"
+        {/* Nombre del Producto */}
+        <Link
+          href={href}
+          onClick={() => registrarPatrocinado('clic')}
+          className="block truncate font-bold text-[#1A1A1A] dark:text-white text-sm sm:text-base leading-snug"
+        >
+          {producto.nombre}
+        </Link>
+
+        {/* Ubicación pegada inmediatamente debajo del nombre */}
+        <p className="flex items-center gap-1 truncate text-[#1A1A1A]/55 dark:text-gray-400 text-xs">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-3 w-3 flex-shrink-0 text-[#52B788]"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            {producto.nombre}
-          </Link>
-
-          {/* Ubicación pegada inmediatamente debajo del nombre */}
-          <p className="flex items-center gap-1 truncate text-[#1A1A1A]/55 dark:text-gray-400 text-xs mt-0.5">
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="h-3 w-3 flex-shrink-0 text-[#52B788]"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-            <span className="truncate">{producto.comercio?.municipio}</span>
-          </p>
-        </div>
+            <path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z" />
+            <circle cx="12" cy="10" r="3" />
+          </svg>
+          <span className="truncate">{producto.comercio?.municipio}</span>
+        </p>
 
         {/* Sección inferior: Precio e unidad */}
-        <div className="mt-2 pt-1">
+        <div className="pt-0.5">
           {producto.oferta?.etiqueta && (
             <p className="text-[10px] text-[#2D6A4F] dark:text-[#52B788] font-bold truncate mb-0.5">
               {producto.oferta.etiqueta}
