@@ -33,11 +33,25 @@ function SkeletonCard() {
   )
 }
 
-function TarjetaInmueble({ inmueble }: { inmueble: Inmueble }) {
+const RADIO_CERCA_KM = 250
+
+function distanciaKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function TarjetaInmueble({ inmueble, userLat, userLon }: { inmueble: Inmueble; userLat?: number | null; userLon?: number | null }) {
   const foto = inmueble.fotoUrls.length > 0 ? inmueble.fotoUrls[0] : null
   const tipoInfo = TIPOS_INMUEBLE.find(t => t.value === inmueble.tipoInmueble)
   const precio = Number(inmueble.precio)
   const esArriendo = inmueble.tipoOperacion === 'ARRIENDO'
+
+  const dist = userLat != null && userLon != null && inmueble.latitud && inmueble.longitud
+    ? distanciaKm(userLat, userLon, inmueble.latitud, inmueble.longitud)
+    : null
 
   return (
     <Link href={`/bienes-raices/${inmueble.id}`} className="group block rounded-2xl overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 bg-white border border-gray-100/80 shadow-sm">
@@ -64,6 +78,14 @@ function TarjetaInmueble({ inmueble }: { inmueble: Inmueble }) {
             {esArriendo ? 'Arriendo' : 'Venta'}
           </span>
         </div>
+
+        {dist !== null && (
+          <div className="absolute top-3 right-3">
+            <span className="bg-[#1B4332]/90 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
+              📍 {dist < 1 ? 'A menos de 1km' : `${dist.toFixed(1)}km`}
+            </span>
+          </div>
+        )}
 
         {inmueble.folioMatricula && (
           <div className="absolute top-3 right-3">
@@ -203,8 +225,10 @@ export default function BienesRaicesPage() {
   const [tardando, setTardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
-  const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
-  const [ubicacionUsuario, setUbicacionUsuario] = useState<{ lat: number; lng: number } | null>(null)
+  const [userLat, setUserLat] = useState<number | null>(null)
+  const [userLon, setUserLon] = useState<number | null>(null)
+  const [gpsCiudad, setGpsCiudad] = useState('')
+  const [gpsCargando, setGpsCargando] = useState(false)
   const [mostrarFiltros, setMostrarFiltros] = useState(false)
   const [filtros, setFiltros] = useState({
     departamento: '', municipio: '',
@@ -213,23 +237,29 @@ export default function BienesRaicesPage() {
     precioMax: 0,
   })
 
-  function obtenerUbicacion() {
-    if (typeof window === 'undefined' || !navigator.geolocation) {
-      alert('Tu navegador no soporta geolocalización.')
-      return
-    }
-    setBuscandoUbicacion(true)
+  async function activarGPS() {
+    if (!navigator.geolocation) return
+    setGpsCargando(true)
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUbicacionUsuario({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-        setBuscandoUbicacion(false)
+      async pos => {
+        setUserLat(pos.coords.latitude)
+        setUserLon(pos.coords.longitude)
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`)
+          const j = await res.json()
+          const ciudad = (j.address?.city || j.address?.town || j.address?.village || j.address?.county || '').replace(/^(Perímetro Urbano|Municipio de|Corregimiento de)\s+/i, '').trim()
+          setGpsCiudad(ciudad)
+        } catch {}
+        setGpsCargando(false)
       },
-      () => {
-        setBuscandoUbicacion(false)
-        alert('No pudimos obtener tu ubicación actual. Revisa los permisos de tu navegador.')
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
+      () => setGpsCargando(false)
     )
+  }
+
+  function limpiarGPS() {
+    setUserLat(null)
+    setUserLon(null)
+    setGpsCiudad('')
   }
 
   useEffect(() => {
@@ -252,16 +282,38 @@ export default function BienesRaicesPage() {
   const filtrosActivos = !!filtros.departamento || !!filtros.municipio || !!filtros.tipoInmueble || !!filtros.tipoOperacion || filtros.precioMax > 0
   const nFiltros = [!!filtros.departamento, !!filtros.municipio, !!filtros.tipoInmueble, !!filtros.tipoOperacion, filtros.precioMax > 0].filter(Boolean).length
 
-  const filtrados = useMemo(() => {
-    if (!busqueda) return inmuebles
-    const q = busqueda.toLowerCase()
-    return inmuebles.filter((i: any) =>
-      i.esBannerDisplay ||
-      i.titulo?.toLowerCase().includes(q) ||
-      i.municipio?.toLowerCase().includes(q) ||
-      i.departamento?.toLowerCase().includes(q)
-    )
-  }, [inmuebles, busqueda])
+  const banners = inmuebles.filter((i: any) => i.esBannerDisplay)
+  const organicos = inmuebles.filter((i: any) => !i.esBannerDisplay)
+
+  let filtrados = organicos.filter((i: any) => {
+    if (busqueda) {
+      const q = busqueda.toLowerCase()
+      if (!i.titulo?.toLowerCase().includes(q) && !i.municipio?.toLowerCase().includes(q) && !i.departamento?.toLowerCase().includes(q)) return false
+    }
+    return true
+  })
+
+  if (userLat != null && userLon != null) {
+    filtrados = [...filtrados].sort((a, b) => {
+      const da = a.latitud && a.longitud ? distanciaKm(userLat, userLon, a.latitud, a.longitud) : 9999
+      const db = b.latitud && b.longitud ? distanciaKm(userLat, userLon, b.latitud, b.longitud) : 9999
+      return da - db
+    })
+  }
+
+  const cercanos = userLat != null && userLon != null
+    ? filtrados.filter((i: any) => i.latitud && i.longitud && distanciaKm(userLat, userLon, i.latitud, i.longitud) <= RADIO_CERCA_KM)
+    : filtrados
+
+  const ordenados = [...cercanos]
+  if (banners.length > 0 && ordenados.length >= 3) {
+    ordenados.splice(3, 0, banners[0])
+    if (banners.length > 1 && ordenados.length >= 7) {
+      ordenados.splice(7, 0, banners[1])
+    }
+  }
+
+  const sinCercania = userLat != null && userLon != null && cercanos.length === 0 && filtrados.length > 0
 
   const [fotoHeroIdx, setFotoHeroIdx] = useState(0)
 
@@ -350,16 +402,16 @@ export default function BienesRaicesPage() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={obtenerUbicacion}
-                disabled={buscandoUbicacion}
+                onClick={userLat ? limpiarGPS : activarGPS}
+                disabled={gpsCargando}
                 className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                  ubicacionUsuario
+                  userLat
                     ? 'bg-[#1B4332] text-white shadow-md'
                     : 'bg-emerald-50 hover:bg-emerald-100 text-[#1B4332]'
                 }`}
                 title="Buscar predios más cercanos a mi posición"
               >
-                {buscandoUbicacion ? (
+                {gpsCargando ? (
                   <div className="w-4 h-4 border-2 border-[#1B4332] border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -367,7 +419,7 @@ export default function BienesRaicesPage() {
                     <circle cx="12" cy="10" r="3" />
                   </svg>
                 )}
-                <span>{ubicacionUsuario ? 'Cerca de mí' : '📍 Cerca de mí'}</span>
+                <span>{gpsCiudad ? `📍 ${gpsCiudad}` : userLat ? '📍 Cerca de mí' : 'Cerca de mí'}</span>
               </button>
 
               <button onClick={() => setMostrarFiltros(true)}
@@ -395,7 +447,7 @@ export default function BienesRaicesPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <p className="text-sm text-gray-500">
           {cargando ? 'Buscando publicaciones…' : (
-            <><span className="font-semibold text-gray-800">{filtrados.length}</span> {filtrados.length !== 1 ? 'publicaciones' : 'publicación'}</>
+            <><span className="font-semibold text-gray-800">{ordenados.length}</span> {ordenados.length !== 1 ? 'publicaciones' : 'publicación'}{userLat ? <span className="text-[#2D6A4F]"> · a menos de {RADIO_CERCA_KM}km de tu ubicación</span> : ''}</>
           )}
         </p>
       </div>
@@ -419,7 +471,23 @@ export default function BienesRaicesPage() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
-        ) : filtrados.length === 0 ? (
+        ) : sinCercania ? (
+          <div className="text-center py-20 bg-white rounded-3xl border border-gray-100 shadow-sm p-8 max-w-md mx-auto">
+            <div className="w-16 h-16 bg-[#1B4332]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">🗺️</span>
+            </div>
+            <h3 className="font-bold text-gray-800 text-lg">Nada cerca de ti todavía</h3>
+            <p className="text-xs text-gray-500 mt-1 mb-5 leading-relaxed">
+              No hay publicaciones a menos de {RADIO_CERCA_KM}km de tu ubicación actual.
+            </p>
+            <button
+              onClick={limpiarGPS}
+              className="px-5 py-2.5 bg-[#1B4332] text-white text-xs font-bold rounded-xl hover:bg-[#2D6A4F] transition-all shadow-md"
+            >
+              Ver todas las publicaciones
+            </button>
+          </div>
+        ) : ordenados.length === 0 ? (
           <div className="text-center py-24">
             <div className="w-20 h-20 bg-[#1B4332]/8 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl">🏘️</span>
@@ -457,13 +525,13 @@ export default function BienesRaicesPage() {
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filtrados.map((i: any) => (
+            {ordenados.map((i: any) => (
               i.esBannerDisplay ? (
                 <div key={i.id} className="col-span-full mt-2 mb-2">
                   <BannerDisplay banner={i} />
                 </div>
               ) : (
-                <TarjetaInmueble key={i.id} inmueble={i} />
+                <TarjetaInmueble key={i.id} inmueble={i} userLat={userLat} userLon={userLon} />
               )
             ))}
           </div>

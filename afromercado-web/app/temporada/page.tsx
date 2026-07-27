@@ -10,46 +10,50 @@ import { listarProductos } from '@/lib/api/productos'
 import { mapearProductos } from '@/lib/mapearProducto'
 import type { Producto } from '@/types/producto'
 
+const RADIO_CERCA_KM = 250
+
+function distanciaKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 export default function PaginaTemporada() {
   const [productos, setProductos] = useState<Producto[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [orden, setOrden] = useState<'MAYOR_DESCUENTO' | 'MENOR_PRECIO' | 'RECIENTES'>('MAYOR_DESCUENTO')
-  const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
-  const [ubicacionUsuario, setUbicacionUsuario] = useState<{ lat: number; lng: number } | null>(null)
+  const [userLat, setUserLat] = useState<number | null>(null)
+  const [userLon, setUserLon] = useState<number | null>(null)
+  const [gpsCiudad, setGpsCiudad] = useState('')
+  const [gpsCargando, setGpsCargando] = useState(false)
 
-  function cargar() {
-    setCargando(true)
-    setError(null)
-    listarProductos({ enOferta: true, q: busqueda.trim() || undefined, porPagina: 48 })
-      .then(({ items }) => {
-        setProductos(mapearProductos(items).filter(p => p.oferta))
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : 'No pudimos cargar la temporada.')
-        setProductos([])
-      })
-      .finally(() => setCargando(false))
+  async function activarGPS() {
+    if (!navigator.geolocation) return
+    setGpsCargando(true)
+    navigator.geolocation.getCurrentPosition(
+      async pos => {
+        setUserLat(pos.coords.latitude)
+        setUserLon(pos.coords.longitude)
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`)
+          const j = await res.json()
+          const ciudad = (j.address?.city || j.address?.town || j.address?.village || j.address?.county || '').replace(/^(Perímetro Urbano|Municipio de|Corregimiento de)\s+/i, '').trim()
+          setGpsCiudad(ciudad)
+        } catch {}
+        setGpsCargando(false)
+      },
+      () => setGpsCargando(false)
+    )
   }
 
-  function obtenerUbicacion() {
-    if (typeof window === 'undefined' || !navigator.geolocation) {
-      alert('Tu navegador no soporta geolocalización.')
-      return
-    }
-    setBuscandoUbicacion(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUbicacionUsuario({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-        setBuscandoUbicacion(false)
-      },
-      () => {
-        setBuscandoUbicacion(false)
-        alert('No pudimos obtener tu ubicación actual. Revisa los permisos de tu navegador.')
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
+  function limpiarGPS() {
+    setUserLat(null)
+    setUserLon(null)
+    setGpsCiudad('')
   }
 
   useEffect(() => {
@@ -69,7 +73,7 @@ export default function PaginaTemporada() {
     return () => { cancelado = true }
   }, [busqueda])
 
-  const productosFiltrados = productos.sort((a, b) => {
+  let productosFiltrados = [...productos].sort((a, b) => {
     if (orden === 'MAYOR_DESCUENTO') {
       const descA = a.oferta?.tipo === 'PORCENTAJE' ? a.oferta.valor : (a.oferta ? Math.round(((a.precio - a.oferta.precioFinal) / a.precio) * 100) : 0)
       const descB = b.oferta?.tipo === 'PORCENTAJE' ? b.oferta.valor : (b.oferta ? Math.round(((b.precio - b.oferta.precioFinal) / b.precio) * 100) : 0)
@@ -80,6 +84,20 @@ export default function PaginaTemporada() {
     }
     return Number(b.id) - Number(a.id)
   })
+
+  if (userLat != null && userLon != null) {
+    productosFiltrados = [...productosFiltrados].sort((a: any, b: any) => {
+      const da = a.comercio?.latitud && a.comercio?.longitud ? distanciaKm(userLat, userLon, a.comercio.latitud, a.comercio.longitud) : 9999
+      const db = b.comercio?.latitud && b.comercio?.longitud ? distanciaKm(userLat, userLon, b.comercio.latitud, b.comercio.longitud) : 9999
+      return da - db
+    })
+  }
+
+  const cercanos = userLat != null && userLon != null
+    ? productosFiltrados.filter((p: any) => p.comercio?.latitud && p.comercio?.longitud && distanciaKm(userLat, userLon, p.comercio.latitud, p.comercio.longitud) <= RADIO_CERCA_KM)
+    : productosFiltrados
+
+  const listadoFinal = cercanos
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F5F0]">
@@ -120,16 +138,16 @@ export default function PaginaTemporada() {
 
               <button
                 type="button"
-                onClick={obtenerUbicacion}
-                disabled={buscandoUbicacion}
+                onClick={userLat ? limpiarGPS : activarGPS}
+                disabled={gpsCargando}
                 className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
-                  ubicacionUsuario
+                  userLat
                     ? 'bg-[#2D6A4F] text-white shadow-md'
                     : 'bg-emerald-50 hover:bg-emerald-100 text-[#2D6A4F]'
                 }`}
                 title="Buscar ofertas más cercanas a tu ubicación"
               >
-                {buscandoUbicacion ? (
+                {gpsCargando ? (
                   <div className="w-4 h-4 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -137,7 +155,7 @@ export default function PaginaTemporada() {
                     <circle cx="12" cy="10" r="3" />
                   </svg>
                 )}
-                <span>{ubicacionUsuario ? 'Ofertas cerca de mí' : '📍 Ofertas cerca de mí'}</span>
+                <span>{gpsCiudad ? `📍 ${gpsCiudad}` : userLat ? '📍 Cerca de mí' : 'Ofertas cerca de mí'}</span>
               </button>
 
               <select
@@ -154,10 +172,10 @@ export default function PaginaTemporada() {
         </section>
 
         <section className="max-w-7xl mx-auto w-full px-4 md:px-6 py-8 flex flex-col gap-6">
-          {!cargando && !error && productosFiltrados.length > 0 && (
+          {!cargando && !error && listadoFinal.length > 0 && (
             <div className="flex items-center justify-between">
               <p className="text-sm text-[#1A1A1A]/55">
-                {productosFiltrados.length} {productosFiltrados.length === 1 ? 'producto vigente' : 'productos vigentes'}
+                {listadoFinal.length} {listadoFinal.length === 1 ? 'producto vigente' : 'productos vigentes'}{userLat ? <span className="text-[#2D6A4F]"> · a menos de {RADIO_CERCA_KM}km de tu ubicación</span> : ''}
               </p>
             </div>
           )}
@@ -174,21 +192,37 @@ export default function PaginaTemporada() {
             <EmptyState
               titulo="No pudimos cargar la temporada"
               descripcion={error}
-              onReintentar={cargar}
             />
           )}
 
-          {!cargando && !error && productosFiltrados.length === 0 && (
+          {!cargando && !error && userLat != null && listadoFinal.length === 0 && productos.length > 0 && (
+            <div className="text-center py-20 bg-white rounded-3xl border border-gray-100 shadow-sm p-8 max-w-md mx-auto">
+              <div className="w-16 h-16 bg-[#2D6A4F]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl">✨</span>
+              </div>
+              <h3 className="font-bold text-gray-800 text-lg">Nada cerca de ti todavía</h3>
+              <p className="text-xs text-gray-500 mt-1 mb-5 leading-relaxed">
+                No hay ofertas de temporada a menos de {RADIO_CERCA_KM}km de tu ubicación actual.
+              </p>
+              <button
+                onClick={limpiarGPS}
+                className="px-5 py-2.5 bg-[#2D6A4F] text-white text-xs font-bold rounded-xl hover:bg-[#1B4332] transition-all shadow-md"
+              >
+                Ver todas las ofertas de temporada
+              </button>
+            </div>
+          )}
+
+          {!cargando && !error && listadoFinal.length === 0 && (userLat == null || productos.length === 0) && (
             <EmptyState
               titulo="No se encontraron productos de temporada"
               descripcion="Prueba modificando la búsqueda o el filtro de ubicación."
-              onReintentar={cargar}
             />
           )}
 
-          {!cargando && !error && productosFiltrados.length > 0 && (
+          {!cargando && !error && listadoFinal.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {productosFiltrados.map(producto => (
+              {listadoFinal.map(producto => (
                 <TarjetaProducto key={producto.id} producto={producto} />
               ))}
             </div>

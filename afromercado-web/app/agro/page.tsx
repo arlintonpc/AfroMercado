@@ -16,34 +16,52 @@ import BannerDisplay from '@/components/publicidad/BannerDisplay'
 // por completo el Producto/carrito/checkout del Marketplace — TERAVIA es la
 // capa transaccional, no un directorio de productores paralelo. La única
 // pieza nueva es GrupoCategoria.AGRO (mismo patrón que "Tienda Local").
+const RADIO_CERCA_KM = 250
+
+function distanciaKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 export default function AgroPage() {
   const [productos, setProductos] = useState<Producto[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [categoriaId, setCategoriaId] = useState('')
   const [busqueda, setBusqueda] = useState('')
-  const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
-  const [ubicacionUsuario, setUbicacionUsuario] = useState<{ lat: number; lng: number } | null>(null)
+  const [userLat, setUserLat] = useState<number | null>(null)
+  const [userLon, setUserLon] = useState<number | null>(null)
+  const [gpsCiudad, setGpsCiudad] = useState('')
+  const [gpsCargando, setGpsCargando] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [tardando, setTardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  function obtenerUbicacion() {
-    if (typeof window === 'undefined' || !navigator.geolocation) {
-      alert('Tu navegador no soporta geolocalización.')
-      return
-    }
-    setBuscandoUbicacion(true)
+  async function activarGPS() {
+    if (!navigator.geolocation) return
+    setGpsCargando(true)
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUbicacionUsuario({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-        setBuscandoUbicacion(false)
+      async pos => {
+        setUserLat(pos.coords.latitude)
+        setUserLon(pos.coords.longitude)
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`)
+          const j = await res.json()
+          const ciudad = (j.address?.city || j.address?.town || j.address?.village || j.address?.county || '').replace(/^(Perímetro Urbano|Municipio de|Corregimiento de)\s+/i, '').trim()
+          setGpsCiudad(ciudad)
+        } catch {}
+        setGpsCargando(false)
       },
-      () => {
-        setBuscandoUbicacion(false)
-        alert('No pudimos obtener tu ubicación actual. Revisa los permisos de tu navegador.')
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
+      () => setGpsCargando(false)
     )
+  }
+
+  function limpiarGPS() {
+    setUserLat(null)
+    setUserLon(null)
+    setGpsCiudad('')
   }
 
   useEffect(() => {
@@ -81,6 +99,21 @@ export default function AgroPage() {
   }, [heroFotos])
 
   const categoriasAgro = categorias.filter(c => c.grupo === 'AGRO')
+
+  let ordenados = [...productos]
+  if (userLat != null && userLon != null) {
+    ordenados = ordenados.sort((a: any, b: any) => {
+      const da = a.comercio?.latitud && a.comercio?.longitud ? distanciaKm(userLat, userLon, a.comercio.latitud, a.comercio.longitud) : 9999
+      const db = b.comercio?.latitud && b.comercio?.longitud ? distanciaKm(userLat, userLon, b.comercio.latitud, b.comercio.longitud) : 9999
+      return da - db
+    })
+  }
+
+  const cercanos = userLat != null && userLon != null
+    ? ordenados.filter((p: any) => p.comercio?.latitud && p.comercio?.longitud && distanciaKm(userLat, userLon, p.comercio.latitud, p.comercio.longitud) <= RADIO_CERCA_KM)
+    : ordenados
+
+  const listadoFinal = cercanos
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
@@ -140,16 +173,16 @@ export default function AgroPage() {
 
             <button
               type="button"
-              onClick={obtenerUbicacion}
-              disabled={buscandoUbicacion}
+              onClick={userLat ? limpiarGPS : activarGPS}
+              disabled={gpsCargando}
               className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
-                ubicacionUsuario
+                userLat
                   ? 'bg-[#1B4332] text-white shadow-md'
                   : 'bg-emerald-50 hover:bg-emerald-100 text-[#1B4332]'
               }`}
               title="Buscar productores agrícolas más cercanos"
             >
-              {buscandoUbicacion ? (
+              {gpsCargando ? (
                 <div className="w-4 h-4 border-2 border-[#1B4332] border-t-transparent rounded-full animate-spin" />
               ) : (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -157,7 +190,7 @@ export default function AgroPage() {
                   <circle cx="12" cy="10" r="3" />
                 </svg>
               )}
-              <span>{ubicacionUsuario ? 'Productores cerca de mí' : '📍 Productores cerca de mí'}</span>
+              <span>{gpsCiudad ? `📍 ${gpsCiudad}` : userLat ? '📍 Cerca de mí' : 'Productores cerca de mí'}</span>
             </button>
 
             <Link href="/comerciante/publicar"
@@ -209,14 +242,30 @@ export default function AgroPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
-        ) : productos.length === 0 ? (
+        ) : userLat != null && listadoFinal.length === 0 && productos.length > 0 ? (
+          <div className="text-center py-20 bg-white rounded-3xl border border-gray-100 shadow-sm p-8 max-w-md mx-auto">
+            <div className="w-16 h-16 bg-[#1B4332]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">🌾</span>
+            </div>
+            <h3 className="font-bold text-gray-800 text-lg">Nada cerca de ti todavía</h3>
+            <p className="text-xs text-gray-500 mt-1 mb-5 leading-relaxed">
+              No hay productos del campo a menos de {RADIO_CERCA_KM}km de tu ubicación actual.
+            </p>
+            <button
+              onClick={limpiarGPS}
+              className="px-5 py-2.5 bg-[#1B4332] text-white text-xs font-bold rounded-xl hover:bg-[#2D6A4F] transition-all shadow-md"
+            >
+              Ver todos los productos del campo
+            </button>
+          </div>
+        ) : listadoFinal.length === 0 ? (
           <EmptyState
             titulo={busqueda || categoriaId ? 'Sin resultados' : 'Aún no hay productos de Agro'}
             descripcion={busqueda ? `No encontramos productos para "${busqueda}"` : categoriaId ? 'Ningún producto en esta categoría por ahora.' : 'Sé la primera persona en publicar un producto del campo.'}
           />
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {productos.map((p: any) => (
+            {listadoFinal.map((p: any) => (
               p.esBannerDisplay ? (
                 <div key={p.id} className="col-span-full mt-2 mb-2">
                   <BannerDisplay banner={p} />
