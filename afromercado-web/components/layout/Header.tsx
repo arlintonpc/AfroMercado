@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCarrito } from '@/context/CarritoContext'
 import { useAuth } from '@/context/AuthContext'
 import { useRegion } from '@/context/RegionContext'
+import { useTheme } from '@/context/ThemeContext'
 import { apiFetch, normalizarUrlMedia } from '@/lib/api/client'
 import { obtenerReglasPublicas } from '@/lib/api/config'
 import { DEPARTAMENTOS } from '@/lib/data/colombia'
@@ -21,6 +22,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
   const { cantidadTotal } = useCarrito()
   const { usuario, autenticado, logout } = useAuth()
   const { regionActiva, elegirRegion } = useRegion()
+  const { theme, toggleTheme } = useTheme()
   const router = useRouter()
 
   const badge = itemsCarrito ?? cantidadTotal
@@ -29,7 +31,6 @@ export default function Header({ itemsCarrito }: HeaderProps) {
   const [avatarModalAbierto, setAvatarModalAbierto] = useState(false)
   const [regionMenuAbierto, setRegionMenuAbierto] = useState(false)
   const [masMenuAbierto, setMasMenuAbierto] = useState(false)
-  const [masMenuPos, setMasMenuPos] = useState<{ top: number; left: number } | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [busquedasRecientes, setBusquedasRecientes] = useState<string[]>([])
   const [mostrarSugerencias, setMostrarSugerencias] = useState(false)
@@ -207,10 +208,19 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             </svg>
           </button>
 
-          {/* Toggle de modo oscuro oculto temporalmente: la cobertura de `dark:` no
-              alcanza a secciones clave (carruseles del home, resultados de búsqueda),
-              así que activarlo deja la interfaz a medias. Reactivar cuando esa
-              cobertura esté completa — ver ThemeContext.tsx. */}
+          {/* Toggle Modo Oscuro / Claro */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center justify-center w-11 h-11 rounded-lg hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 transition-colors"
+            title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            aria-label="Alternar tema"
+          >
+            {theme === 'dark' ? (
+              <span className="text-xl" role="img" aria-label="Sol">☀️</span>
+            ) : (
+              <span className="text-xl" role="img" aria-label="Luna">🌙</span>
+            )}
+          </button>
 
           {/* Campana de notificaciones — solo usuarios autenticados */}
           {autenticado && <CampanaNotificaciones />}
@@ -400,8 +410,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
       {/* Fila Inferior: Menú de Navegación Completo (Scrollable en móviles, distribuido en desktop) */}
       <div className="flex bg-[#2D6A4F]/5 border-t border-black/5">
         <div className="w-full max-w-6xl mx-auto px-2 md:px-6">
-          <nav className="flex items-center gap-2 py-1.5" aria-label="Navegación principal">
-          <div className="flex items-center gap-2 overflow-x-auto flex-1 min-w-0 lg:justify-between" style={{ scrollbarWidth: 'none' }}>
+          <nav className="flex items-center gap-2 lg:justify-between py-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }} aria-label="Navegación principal">
             {(!reglas || reglas.flagModuloExpress) && (
               <Link href="/express" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 flex items-center gap-1.5 transition-colors">
                 <Utensils className="w-4 h-4" /> Sabores
@@ -436,21 +445,12 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             <Link href="/mapa" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-bold text-[#1B4332] dark:text-[#52B788] hover:bg-[#1B4332]/10 dark:hover:bg-white/10 flex items-center gap-1.5 transition-colors">
               <Map className="w-4 h-4" /> Mapa
             </Link>
-          </div>
 
-            {/* Categorías menos frecuentes agrupadas para no saturar el menú — siempre visible, fuera del área con scroll */}
+            {/* Categorías menos frecuentes agrupadas para no saturar el menú */}
             <div className="relative flex-shrink-0" ref={masRef}>
               <button
                 type="button"
-                onClick={() => {
-                  if (!masMenuAbierto && masRef.current) {
-                    const r = masRef.current.getBoundingClientRect()
-                    const anchoMenu = 192 // w-48
-                    const left = Math.min(r.left, window.innerWidth - anchoMenu - 8)
-                    setMasMenuPos({ top: r.bottom + 8, left: Math.max(8, left) })
-                  }
-                  setMasMenuAbierto((v) => !v)
-                }}
+                onClick={() => setMasMenuAbierto((v) => !v)}
                 aria-haspopup="menu"
                 aria-expanded={masMenuAbierto}
                 className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1 transition-colors"
@@ -461,12 +461,8 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                 </svg>
               </button>
 
-              {masMenuAbierto && masMenuPos && (
-                <div
-                  role="menu"
-                  style={{ position: 'fixed', top: masMenuPos.top, left: masMenuPos.left }}
-                  className="w-48 bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] py-1 z-50"
-                >
+              {masMenuAbierto && (
+                <div role="menu" className="absolute left-0 mt-2 w-48 bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] py-1 z-50">
                   {(!reglas || reglas.flagModuloTransportes) && (
                     <Link
                       href="/transportes"
