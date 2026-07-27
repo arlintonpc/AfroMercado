@@ -156,7 +156,6 @@ export default function VitrinaPage() {
         <CulturaHero
           eyebrow="Vitrina"
           title="Descubre tu territorio"
-          edgeToEdgeOnMobile
           description="La Vitrina Digital de la Economía Territorial — conecta todo lo que un territorio produce, ofrece y vive."
           actions={
             <button
@@ -344,7 +343,7 @@ export default function VitrinaPage() {
           />
         ) : (
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-0 -mx-4 sm:mx-auto sm:max-w-xl sm:w-full sm:gap-6">
+            <div className="flex flex-col gap-6 max-w-xl mx-auto w-full">
               {publicacionesFiltradas.map((p: any) =>
                 p.esBannerDisplay ? (
                   <BannerDisplay

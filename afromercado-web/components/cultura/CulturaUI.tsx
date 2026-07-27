@@ -61,22 +61,15 @@ export function CulturaHero({
   description,
   actions,
   badge,
-  edgeToEdgeOnMobile = false,
 }: {
   eyebrow: string
   title: string
   description: string
   actions?: ReactNode
   badge?: ReactNode
-  /** Ocupa el ancho completo de la pantalla en móvil (sin bordes/esquinas redondeadas), como el hero de apps tipo Instagram/TikTok. Vuelve a la tarjeta contenida normal desde `sm:` en adelante. */
-  edgeToEdgeOnMobile?: boolean
 }) {
   return (
-    <header
-      className={`relative overflow-hidden border border-[#D4A017]/25 bg-gradient-to-br from-[#1B4332] via-[#2D6A4F] to-[#123124] p-5 shadow-[0_16px_40px_rgba(27,67,50,0.2)] text-white sm:p-7 sm:rounded-[2rem] sm:border ${
-        edgeToEdgeOnMobile ? '-mx-4 rounded-none border-x-0 sm:mx-0' : 'rounded-[2rem]'
-      }`}
-    >
+    <header className="relative overflow-hidden rounded-[2rem] border border-[#D4A017]/25 bg-gradient-to-br from-[#1B4332] via-[#2D6A4F] to-[#123124] p-5 shadow-[0_16px_40px_rgba(27,67,50,0.2)] text-white sm:p-7">
       {/* Background Mesh Overlay */}
       <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[#D4A017]/15 blur-3xl" />
       <div className="absolute -left-10 -bottom-10 h-64 w-64 rounded-full bg-[#52B788]/15 blur-2xl" />
@@ -112,18 +105,11 @@ export function CulturaHero({
 
 export function CulturaToolbar({
   children,
-  edgeToEdgeOnMobile = false,
 }: {
   children: ReactNode
-  /** Ocupa el ancho completo de la pantalla en móvil (sin bordes/esquinas redondeadas). Vuelve a la tarjeta contenida normal desde `sm:` en adelante. */
-  edgeToEdgeOnMobile?: boolean
 }) {
   return (
-    <div
-      className={`flex flex-col gap-3 border border-[#1A1A1A]/8 bg-white/80 p-4 shadow-sm backdrop-blur sm:flex-row sm:items-end sm:justify-between sm:rounded-2xl sm:border ${
-        edgeToEdgeOnMobile ? '-mx-4 rounded-none border-x-0 sm:mx-0' : 'rounded-2xl'
-      }`}
-    >
+    <div className="flex flex-col gap-3 rounded-2xl border border-[#1A1A1A]/8 bg-white/80 p-4 shadow-sm backdrop-blur sm:flex-row sm:items-end sm:justify-between">
       {children}
     </div>
   )
