@@ -355,10 +355,10 @@ export default function MapaEcosistemico() {
                       </p>
                     )}
 
-                    <div className="mt-3 flex flex-col gap-1.5">
+                    <div className="mt-3 flex flex-col gap-2">
                       <Link
                         href={item.linkUrl}
-                        className="w-full bg-[#1B4332] text-white text-xs font-bold py-1.5 px-3 rounded-lg block text-center hover:bg-[#2D6A4F] transition-colors"
+                        className="w-full bg-[#1B4332] text-white text-xs font-bold py-2 px-3 rounded-xl block text-center hover:bg-[#2D6A4F] transition-colors shadow-sm"
                       >
                         Ver Detalle en Teravia
                       </Link>
@@ -367,9 +367,9 @@ export default function MapaEcosistemico() {
                         href={googleMapsUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-full bg-blue-600 text-white text-xs font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 hover:bg-blue-700 transition-colors"
+                        className="w-full bg-[#D4A017] text-[#1A1A1A] text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 hover:bg-[#b88a14] transition-colors shadow-sm"
                       >
-                        <MapPin size={13} />
+                        <MapPin size={14} className="text-[#1A1A1A]" />
                         <span>Cómo llegar en Google Maps</span>
                       </a>
                     </div>

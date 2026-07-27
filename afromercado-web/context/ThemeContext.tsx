@@ -15,20 +15,28 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('light')
 
+  function aplicarTemaDOM(nuevoTema: Theme) {
+    if (nuevoTema === 'dark') {
+      document.documentElement.classList.add('dark')
+      document.body.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      document.body.classList.remove('dark')
+    }
+  }
+
   useEffect(() => {
     const stored = localStorage.getItem('teravia_theme') as Theme | null
     if (stored === 'dark' || stored === 'light') {
       setThemeState(stored)
-      if (stored === 'dark') {
-        document.documentElement.classList.add('dark')
-      } else {
-        document.documentElement.classList.remove('dark')
-      }
+      aplicarTemaDOM(stored)
     } else {
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
       if (prefersDark) {
         setThemeState('dark')
-        document.documentElement.classList.add('dark')
+        aplicarTemaDOM('dark')
+      } else {
+        aplicarTemaDOM('light')
       }
     }
   }, [])
@@ -36,15 +44,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   function setTheme(newTheme: Theme) {
     setThemeState(newTheme)
     localStorage.setItem('teravia_theme', newTheme)
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
+    aplicarTemaDOM(newTheme)
   }
 
   function toggleTheme() {
-    setTheme(theme === 'light' ? 'dark' : 'light')
+    const siguienteTema = theme === 'light' ? 'dark' : 'light'
+    setTheme(siguienteTema)
   }
 
   return (
@@ -57,7 +62,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 export function useTheme() {
   const context = useContext(ThemeContext)
   if (!context) {
-    // Retornar fallback seguro para SSR
     return {
       theme: 'light' as Theme,
       toggleTheme: () => {},
