@@ -672,7 +672,7 @@ export default function Home() {
 
           {/* Estado: cargando → skeletons en grid */}
           {cargando && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-5">
               {Array.from({ length: 8 }).map((_, i) => (
                 <SkeletonCard key={i} />
               ))}
@@ -690,7 +690,7 @@ export default function Home() {
 
           {/* Grid — destacados intercalados: 1 pagado cada 4 orgánicos */}
           {!cargando && !isError && productos.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-5">
               {(() => {
                 const MAX_PATROCINADOS_PCT = 0.15
                 const maxPatrocinados = Math.max(1, Math.floor(productos.length * MAX_PATROCINADOS_PCT))

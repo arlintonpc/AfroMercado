@@ -239,7 +239,7 @@ export default function AgroPage() {
         )}
 
         {cargando ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-5">
             {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : userLat != null && listadoFinal.length === 0 && productos.length > 0 ? (
@@ -264,7 +264,7 @@ export default function AgroPage() {
             descripcion={busqueda ? `No encontramos productos para "${busqueda}"` : categoriaId ? 'Ningún producto en esta categoría por ahora.' : 'Sé la primera persona en publicar un producto del campo.'}
           />
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-5">
             {listadoFinal.map((p: any) => (
               p.esBannerDisplay ? (
                 <div key={p.id} className="col-span-full mt-2 mb-2">

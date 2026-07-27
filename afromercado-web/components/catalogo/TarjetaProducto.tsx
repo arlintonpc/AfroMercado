@@ -55,14 +55,14 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
 
   return (
     <article
-      className={`group bg-white rounded-3xl overflow-hidden flex flex-col transition-all duration-300 ${
+      className={`group bg-white dark:bg-[#151D18] rounded-2xl overflow-hidden flex flex-col transition-all duration-300 ${
         esDestacado
           ? 'shadow-[0_4px_20px_rgba(45,106,79,0.18)] ring-2 ring-[#2D6A4F]/35'
-          : 'shadow-[0_2px_12px_rgba(0,0,0,0.06)]'
+          : 'shadow-[0_2px_10px_rgba(0,0,0,0.05)]'
       } ${
         agotado
           ? 'opacity-70'
-          : 'hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(45,106,79,0.15)]'
+          : 'hover:-translate-y-1 hover:shadow-[0_8px_25px_rgba(45,106,79,0.15)]'
       }`}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -72,12 +72,12 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         <div className="h-[3px] w-full bg-gradient-to-r from-[#2D6A4F] via-[#52B788] to-[#2D6A4F] flex-shrink-0" />
       )}
 
-      {/* Imagen / Placeholder */}
+      {/* Imagen / Placeholder — Aspect ratio 4:3 para tarjetas más anchas y compactas */}
       <Link
         href={href}
         aria-label={`Ver ${producto.nombre}`}
         onClick={() => registrarPatrocinado('clic')}
-        className="relative block w-full aspect-square overflow-hidden"
+        className="relative block w-full aspect-[4/3] overflow-hidden"
       >
         {mostrarPlaceholder ? (
           <div className="absolute inset-0 bg-[#F0EBE3] flex flex-col items-center justify-center px-4 text-center">
