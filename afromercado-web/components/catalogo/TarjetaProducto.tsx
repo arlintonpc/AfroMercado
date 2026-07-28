@@ -15,7 +15,7 @@ interface TarjetaProductoProps {
   mostrarBadgeVerificado?: boolean
 }
 
-export default function TarjetaProducto({ producto, esDestacado = false, etiquetaDestacado }: TarjetaProductoProps) {
+export default function TarjetaProducto({ producto, esDestacado = false, etiquetaDestacado: _etiquetaDestacado }: TarjetaProductoProps) {
   const { agregar } = useCarrito()
   const [imgCargando, setImgCargando] = useState(true)
   const [imgError, setImgError]       = useState(false)
@@ -54,7 +54,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
 
   return (
     <article
-      className={`group bg-white rounded-2xl overflow-hidden flex flex-col transition-all duration-300 ${
+      className={`group relative h-[286px] bg-white rounded-2xl overflow-hidden flex flex-col transition-all duration-300 sm:h-auto ${
         esDestacado
           ? 'shadow-md ring-2 ring-[#2D6A4F]/35'
           : 'shadow-sm border border-gray-100 hover:border-gray-200'
@@ -71,7 +71,7 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         href={href}
         aria-label={`Ver ${producto.nombre}`}
         onClick={() => registrarPatrocinado('clic')}
-        className="relative block w-full aspect-[4/3] overflow-hidden bg-gray-100"
+        className="relative block h-[70%] w-full shrink-0 overflow-hidden bg-gray-100 sm:h-auto sm:aspect-[4/3]"
       >
         {mostrarPlaceholder ? (
           <div className="absolute inset-0 bg-[#F5F2EC] flex flex-col items-center justify-center px-4 text-center">
@@ -123,87 +123,43 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
         )}
 
         {/* Botón flotante de compra rápida estilo MercadoLibre */}
-        {!agotado && (
-          <button
-            type="button"
-            onClick={handleAgregarRapido}
-            title="Agregar al carrito"
-            aria-label="Agregar al carrito"
-            className={`absolute bottom-2.5 right-2.5 w-9 h-9 rounded-full shadow-md border border-gray-100 flex items-center justify-center transition-all z-10 ${
-              agregadoAnim
-                ? 'bg-[#2D6A4F] text-white scale-110'
-                : 'bg-white text-[#2D6A4F] hover:bg-[#2D6A4F] hover:text-white hover:scale-105'
-            }`}
-          >
-            {agregadoAnim ? (
-              <span className="text-xs font-bold">✓</span>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="9" cy="21" r="1" />
-                <circle cx="20" cy="21" r="1" />
-                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                <path d="M12 9v6M9 12h6" />
-              </svg>
-            )}
-          </button>
-        )}
       </Link>
 
       {/* Contenido Elegante sobre Blanco Puro */}
-      <div className="p-3.5 flex flex-col gap-1 bg-white">
-        <div>
+      <div className="h-[30%] overflow-hidden p-3 pt-2.5 pr-12 flex flex-col justify-start gap-1 bg-white sm:h-auto sm:min-h-[150px] sm:p-3.5">
+        <div className="shrink-0">
           {/* Comercio */}
-          <p className="truncate text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">
-            {producto.comercio?.nombre || 'Teravia'}
-          </p>
-
           {/* Nombre del Producto */}
           <Link
             href={href}
             onClick={() => registrarPatrocinado('clic')}
-            className="block text-sm font-bold text-gray-900 leading-snug line-clamp-2 hover:text-[#2D6A4F] transition-colors"
+            className="block text-[12px] font-bold text-gray-900 leading-[15px] line-clamp-2 hover:text-[#2D6A4F] transition-colors sm:text-sm sm:leading-snug"
           >
             {producto.nombre}
           </Link>
 
           {/* Ubicación pegada al nombre */}
-          <p className="flex items-center gap-1 truncate text-xs text-gray-500 mt-1">
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="h-3 w-3 flex-shrink-0 text-[#2D6A4F]"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 0 1 16 0Z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-            <span className="truncate">{producto.comercio?.municipio}</span>
-          </p>
         </div>
 
         {/* Sección de Precio en Verde Marca de Elegancia */}
-        <div className="pt-1">
+        <div className="shrink-0 pt-0.5">
           {producto.oferta ? (
             <div>
               <div className="flex items-baseline gap-1.5 flex-wrap">
-                <span className="text-lg font-extrabold text-[#1B4332]">
+                <span className="text-[17px] font-extrabold text-[#1B4332] sm:text-lg">
                   {formatearPrecio(producto.oferta.precioFinal)}
                 </span>
                 <span className="text-xs text-gray-400 line-through">
                   {formatearPrecio(producto.precio)}
                 </span>
               </div>
-              <p className="text-xs text-gray-500 font-medium">
+              <p className="hidden text-xs text-gray-500 font-medium sm:block">
                 / {producto.unidad.toLowerCase()}
               </p>
             </div>
           ) : (
             <div>
-              <span className="text-lg font-extrabold text-[#1B4332]">
+              <span className="text-[17px] font-extrabold text-[#1B4332] sm:text-lg">
                 {formatearPrecio(producto.precio)}
               </span>
               <span className="text-xs text-gray-500 font-medium ml-1">
@@ -214,12 +170,17 @@ export default function TarjetaProducto({ producto, esDestacado = false, etiquet
 
           {/* Etiqueta de Oferta */}
           {producto.oferta?.etiqueta && (
-            <p className="text-xs font-semibold text-[#2D6A4F] mt-1">
+            <p className="hidden text-xs font-semibold text-[#2D6A4F] mt-1 sm:block">
               {producto.oferta.etiqueta}
             </p>
           )}
         </div>
       </div>
+      {!agotado && (
+        <button type="button" onClick={handleAgregarRapido} title="Agregar al carrito" aria-label={`Agregar ${producto.nombre} al carrito`} className={`absolute right-2.5 top-[calc(70%-18px)] z-10 flex h-11 w-11 items-center justify-center rounded-full border border-gray-100 shadow-md transition-all sm:top-[calc(50%-18px)] ${agregadoAnim ? 'bg-[#2D6A4F] text-white scale-110' : 'bg-white text-[#2D6A4F] hover:bg-[#2D6A4F] hover:text-white hover:scale-105'}`}>
+          {agregadoAnim ? <span className="text-xs font-bold">✓</span> : <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /><path d="M12 9v6M9 12h6" /></svg>}
+        </button>
+      )}
     </article>
   )
 }

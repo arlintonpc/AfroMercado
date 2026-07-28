@@ -320,6 +320,142 @@ const STATEMENTS = [
     CONSTRAINT "PrecioHistorial_productoId_fkey" FOREIGN KEY ("productoId") REFERENCES "Producto"("id") ON DELETE RESTRICT ON UPDATE CASCADE
   )`,
   `CREATE INDEX IF NOT EXISTS "PrecioHistorial_productoId_createdAt_idx" ON "PrecioHistorial"("productoId", "createdAt")`,
+
+  // Inventario operativo y costos (Fase 1)
+  `ALTER TABLE "Producto" ADD COLUMN IF NOT EXISTS "costoPromedio" DECIMAL(12,2) NOT NULL DEFAULT 0`,
+  `ALTER TABLE "Producto" ADD COLUMN IF NOT EXISTS "costoActualizadoAt" TIMESTAMP(3)`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoCompraInventario') THEN
+      CREATE TYPE "EstadoCompraInventario" AS ENUM ('BORRADOR','RECIBIDA','CANCELADA');
+    END IF;
+  END $$`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoMovimientoInventario') THEN
+      CREATE TYPE "TipoMovimientoInventario" AS ENUM ('COMPRA','AJUSTE_ENTRADA','AJUSTE_SALIDA','MERMA','DEVOLUCION_CLIENTE','VENTA');
+    END IF;
+  END $$`,
+  `CREATE TABLE IF NOT EXISTS "ProveedorInventario" (
+    "id" SERIAL PRIMARY KEY,
+    "comercioId" INTEGER NOT NULL,
+    "nombre" TEXT NOT NULL,
+    "nit" TEXT,
+    "telefono" TEXT,
+    "email" TEXT,
+    "direccion" TEXT,
+    "notas" TEXT,
+    "activo" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ProveedorInventario_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "ProveedorInventario_comercioId_nombre_key" UNIQUE ("comercioId", "nombre")
+  )`,
+  `CREATE INDEX IF NOT EXISTS "ProveedorInventario_comercioId_activo_idx" ON "ProveedorInventario"("comercioId", "activo")`,
+  `CREATE TABLE IF NOT EXISTS "CompraInventario" (
+    "id" SERIAL PRIMARY KEY,
+    "comercioId" INTEGER NOT NULL,
+    "proveedorId" INTEGER,
+    "codigo" TEXT NOT NULL UNIQUE,
+    "idempotencyKey" TEXT NOT NULL UNIQUE,
+    "estado" "EstadoCompraInventario" NOT NULL DEFAULT 'BORRADOR',
+    "fechaCompra" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "recibidoAt" TIMESTAMP(3),
+    "notas" TEXT,
+    "total" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "creadoPor" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "CompraInventario_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "CompraInventario_proveedorId_fkey" FOREIGN KEY ("proveedorId") REFERENCES "ProveedorInventario"("id") ON DELETE SET NULL ON UPDATE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS "CompraInventario_comercioId_fechaCompra_idx" ON "CompraInventario"("comercioId", "fechaCompra")`,
+  `CREATE INDEX IF NOT EXISTS "CompraInventario_proveedorId_idx" ON "CompraInventario"("proveedorId")`,
+  `CREATE TABLE IF NOT EXISTS "CompraInventarioItem" (
+    "id" SERIAL PRIMARY KEY,
+    "compraId" INTEGER NOT NULL,
+    "productoId" INTEGER NOT NULL,
+    "cantidad" INTEGER NOT NULL CHECK ("cantidad" > 0),
+    "costoUnitario" DECIMAL(12,2) NOT NULL CHECK ("costoUnitario" >= 0),
+    "subtotal" DECIMAL(12,2) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "CompraInventarioItem_compraId_fkey" FOREIGN KEY ("compraId") REFERENCES "CompraInventario"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "CompraInventarioItem_productoId_fkey" FOREIGN KEY ("productoId") REFERENCES "Producto"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "CompraInventarioItem_compraId_productoId_key" UNIQUE ("compraId", "productoId")
+  )`,
+  `CREATE INDEX IF NOT EXISTS "CompraInventarioItem_productoId_idx" ON "CompraInventarioItem"("productoId")`,
+  `CREATE TABLE IF NOT EXISTS "MovimientoInventario" (
+    "id" SERIAL PRIMARY KEY,
+    "comercioId" INTEGER NOT NULL,
+    "productoId" INTEGER NOT NULL,
+    "tipo" "TipoMovimientoInventario" NOT NULL,
+    "cantidad" INTEGER NOT NULL,
+    "stockAnterior" INTEGER NOT NULL,
+    "stockPosterior" INTEGER NOT NULL,
+    "costoUnitario" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "costoPromedioAnterior" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "costoPromedioPosterior" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "valorTotal" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "compraItemId" INTEGER UNIQUE,
+    "pedidoItemId" INTEGER UNIQUE,
+    "idempotencyKey" TEXT UNIQUE,
+    "motivo" TEXT,
+    "creadoPor" INTEGER,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "MovimientoInventario_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "MovimientoInventario_productoId_fkey" FOREIGN KEY ("productoId") REFERENCES "Producto"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "MovimientoInventario_compraItemId_fkey" FOREIGN KEY ("compraItemId") REFERENCES "CompraInventarioItem"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "MovimientoInventario_pedidoItemId_fkey" FOREIGN KEY ("pedidoItemId") REFERENCES "PedidoItem"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS "MovimientoInventario_comercioId_createdAt_idx" ON "MovimientoInventario"("comercioId", "createdAt")`,
+  `CREATE INDEX IF NOT EXISTS "MovimientoInventario_productoId_createdAt_idx" ON "MovimientoInventario"("productoId", "createdAt")`,
+  `CREATE INDEX IF NOT EXISTS "MovimientoInventario_tipo_createdAt_idx" ON "MovimientoInventario"("tipo", "createdAt")`,
+
+  // Contabilidad operativa bÃ¡sica (Fase 2): gastos propios del comercio.
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'CategoriaGastoOperativo') THEN
+      CREATE TYPE "CategoriaGastoOperativo" AS ENUM ('FLETE','EMPAQUE','TRANSPORTE','SERVICIO','NOMINA','ARRIENDO','OTRO');
+    END IF;
+  END $$`,
+  `CREATE TABLE IF NOT EXISTS "GastoOperativo" (
+    "id" SERIAL PRIMARY KEY,
+    "comercioId" INTEGER NOT NULL,
+    "categoria" "CategoriaGastoOperativo" NOT NULL,
+    "concepto" TEXT NOT NULL,
+    "monto" DECIMAL(12,2) NOT NULL CHECK ("monto" > 0),
+    "fecha" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "notas" TEXT,
+    "creadoPor" INTEGER,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "GastoOperativo_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS "GastoOperativo_comercioId_fecha_idx" ON "GastoOperativo"("comercioId", "fecha")`,
+  `CREATE INDEX IF NOT EXISTS "GastoOperativo_categoria_fecha_idx" ON "GastoOperativo"("categoria", "fecha")`,
+
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoCuentaOperativa') THEN
+      CREATE TYPE "EstadoCuentaOperativa" AS ENUM ('PENDIENTE','PARCIAL','PAGADA','VENCIDA','CANCELADA');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoMovimientoCaja') THEN
+      CREATE TYPE "TipoMovimientoCaja" AS ENUM ('INGRESO','EGRESO');
+    END IF;
+  END $$`,
+  `CREATE TABLE IF NOT EXISTS "CuentaOperativa" (
+    "id" SERIAL PRIMARY KEY, "comercioId" INTEGER NOT NULL, "tipo" "TipoMovimientoCaja" NOT NULL,
+    "concepto" TEXT NOT NULL, "contraparte" TEXT, "montoOriginal" DECIMAL(12,2) NOT NULL CHECK ("montoOriginal" > 0),
+    "montoPagado" DECIMAL(12,2) NOT NULL DEFAULT 0 CHECK ("montoPagado" >= 0), "fechaEmision" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "fechaVencimiento" TIMESTAMP(3), "estado" "EstadoCuentaOperativa" NOT NULL DEFAULT 'PENDIENTE', "notas" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "CuentaOperativa_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS "CuentaOperativa_comercioId_tipo_estado_idx" ON "CuentaOperativa"("comercioId", "tipo", "estado")`,
+  `CREATE TABLE IF NOT EXISTS "MovimientoCaja" (
+    "id" SERIAL PRIMARY KEY, "comercioId" INTEGER NOT NULL, "cuentaOperativaId" INTEGER, "tipo" "TipoMovimientoCaja" NOT NULL,
+    "monto" DECIMAL(12,2) NOT NULL CHECK ("monto" > 0), "concepto" TEXT NOT NULL, "fecha" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "comprobanteUrl" TEXT, "notas" TEXT, "creadoPor" INTEGER, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "MovimientoCaja_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "MovimientoCaja_cuentaOperativaId_fkey" FOREIGN KEY ("cuentaOperativaId") REFERENCES "CuentaOperativa"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS "MovimientoCaja_comercioId_fecha_idx" ON "MovimientoCaja"("comercioId", "fecha")`,
 ];
 
 async function asegurarTablaLog() {

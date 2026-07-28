@@ -39,7 +39,7 @@ export default function TarjetaRestaurante({
 
   return (
     <Link href={`/express/${cfg.comercio.id}`}
-      className="group block rounded-[2rem] overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 bg-white shadow-sm relative h-[22rem] sm:h-96">
+      className="group block rounded-[1.5rem] overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 bg-white shadow-sm relative h-72 sm:h-96 sm:rounded-[2rem]">
 
       {/* Imagen full */}
       <div className="absolute inset-0 bg-[#1B4332]">
@@ -57,7 +57,7 @@ export default function TarjetaRestaurante({
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
 
       {/* Badge abierto/cerrado + cupón superiores */}
-      <div className="absolute top-4 left-4 flex gap-2">
+      <div className="absolute top-3 left-3 flex gap-2 sm:top-4 sm:left-4">
         <span className={`text-[10px] font-bold px-3 py-1.5 rounded-full backdrop-blur-md border border-white/20 shadow-sm ${
           cfg.abierto
             ? 'bg-emerald-500/90 text-white'
@@ -84,7 +84,7 @@ export default function TarjetaRestaurante({
           </svg>
         </button>
       ) : (
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl px-3 py-2 shadow-xl border border-white/40">
             <p className="text-[10px] text-gray-500 font-medium leading-none mb-0.5 text-right">entrega</p>
             <p className="text-[#1A1A1A] font-black text-sm leading-none">~{cfg.tiempoPrepMinutos} min</p>
@@ -93,13 +93,13 @@ export default function TarjetaRestaurante({
       )}
 
       {/* Info inferior superpuesta */}
-      <div className="absolute bottom-0 left-0 right-0 p-5">
-        <div className="flex items-end justify-between gap-2 mb-3">
+      <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-5">
+        <div className="flex items-end justify-between gap-2 mb-2 sm:mb-3">
           <div className="min-w-0">
             <p className="text-white/80 text-xs font-semibold mb-1.5 uppercase tracking-widest flex items-center gap-1">
               <span>📍 {cfg.comercio.municipio}</span>
             </p>
-            <h3 className="text-white font-black text-2xl leading-tight line-clamp-2 drop-shadow-md">{cfg.comercio.nombre}</h3>
+            <h3 className="text-white font-black text-lg leading-tight line-clamp-2 drop-shadow-md sm:text-2xl">{cfg.comercio.nombre}</h3>
           </div>
           {dist !== null && (
             <span className="text-white/90 text-[10px] flex-shrink-0 bg-black/50 backdrop-blur-sm px-2.5 py-1 rounded-full mb-1 border border-white/10">
@@ -108,10 +108,10 @@ export default function TarjetaRestaurante({
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-white/20 pt-4">
+        <div className="flex items-center justify-between border-t border-white/20 pt-2.5 sm:pt-4">
           <div className="flex items-center gap-3">
             {/* Avatar */}
-            <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-inner">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-inner sm:w-10 sm:h-10">
               <span className="text-white text-sm font-bold">{inicial}</span>
             </div>
 

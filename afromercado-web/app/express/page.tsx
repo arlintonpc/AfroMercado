@@ -293,7 +293,7 @@ export default function ExpressPage() {
         )}
 
         {cargando ? (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : vista === 'mapa' ? null : comercios.length === 0 ? (
@@ -325,7 +325,7 @@ export default function ExpressPage() {
             </div>
           </div>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {comercios.map((cfg: any) => (
               cfg.esBannerDisplay ? (
                 <div key={cfg.id} className="col-span-full mt-2 mb-2">

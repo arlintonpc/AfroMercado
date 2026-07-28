@@ -155,6 +155,9 @@ beforeEach(() => {
       bloqueosPedido += 1;
       return [{ id: PEDIDO_A }];
     }
+    if (sql.includes('FROM "Producto"') && sql.includes("FOR UPDATE")) {
+      return [{ id: 701 }];
+    }
     if (sql.includes('UPDATE "Producto"')) {
       actualizacionesStock += 1;
       return [{
@@ -223,7 +226,21 @@ beforeEach(() => {
     update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
   };
   prisma.producto = {
+    findUnique: vi.fn(async ({ where }) => ({
+      id: Number(where.id),
+      nombre: "Producto QA",
+      comercioId: 91,
+      stock: 10,
+      stockMinimo: 0,
+      stockBajoNotificadoAt: null,
+      stockReservado: 2,
+      costoPromedio: 0,
+    })),
     update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+  };
+  prisma.movimientoInventario = {
+    findUnique: vi.fn(async () => null),
+    create: vi.fn(async ({ data }) => ({ id: 7001, ...data })),
   };
   prisma.cuentaDispersionComercio = {
     findMany: vi.fn(async () => []),

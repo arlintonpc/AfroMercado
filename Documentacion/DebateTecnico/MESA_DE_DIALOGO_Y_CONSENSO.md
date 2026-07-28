@@ -181,3 +181,29 @@
 ## ✍️ DECLARACIÓN DE ESTADO
 
 La Mesa 11 está aprobada únicamente para su Fase 1. El estado de cada fase, su evidencia y su revisor se registran en `implementation_plan.md`; ninguna fase posterior se considera aprobada por defecto.
+
+---
+
+### 📍 MESA 17: Inventario Operativo y Compras - Fase 1
+* **Estado:** `EN REVISION`
+* **Responsables:** Codex implementa e integra; QA independiente aporta contratos de inventario; el dueño del producto conserva la decisión pendiente sobre financiación de cupones.
+* **Alcance implementado:** proveedores por comercio, compras recibidas con varios productos, costo promedio ponderado, movimientos Kardex (compra, ajuste, merma, devolución y venta), stock sin saldos negativos, idempotencia y una pantalla de comerciante para consultar existencias, costos, alertas y trazabilidad.
+* **Integridad:** la recepción de compra y la confirmación de venta bloquean el producto dentro de la transacción. Cada `PedidoItem` solo puede generar un movimiento de venta y cada clave de idempotencia se rechaza si se reutiliza con un payload diferente.
+* **Integración de ventas:** al confirmar un pago se descuenta stock reservado y se registra la salida `VENTA` con el costo promedio vigente. No se cambia la liquidación comercial ni se presenta un margen oficial.
+* **Evidencia local:** `npm run test:vitest` 56/56, `npm test` 163/163 y `npm run lint` de backend aprobados. El ESLint focalizado y TypeScript del frontend se ejecutan como verificación de cierre.
+* **Límite explícito:** el margen con cupones, P&L, cuentas por cobrar/pagar, caja/bancos y reportes contables quedan fuera de Fase 1 hasta aprobar la política de financiación y asignación de descuentos.
+* **Bloqueo técnico de cierre:** `prisma generate` no puede finalizar mientras el proceso local de Node mantiene bloqueado `query_engine-windows.dll.node`. No se detuvo el servidor sin autorización. Antes de probar el flujo UI contra la base local debe reiniciarse backend, ejecutar `npm run build` en `afromercado/` y aplicar la DDL segura en el arranque.
+
+### 📍 MESA 18: Contabilidad Operativa Básica - Fase 2A
+* **Estado:** `EN REVISION`
+* **Alcance implementado:** libro de gastos operativos aislado por comercio, con categorías verificables; resumen por periodo de ingresos del Kardex de ventas, costo de ventas, utilidad bruta, gastos operativos, utilidad operativa y margen bruto.
+* **Salvaguardas:** los gastos no modifican pagos, liquidaciones, saldo de clientes ni dispersión. Solo el comerciante autenticado puede consultar o registrar los de su propio comercio.
+* **Experiencia:** nueva pantalla `/comerciante/contabilidad` para registrar gastos y revisar el resultado operativo, sin duplicar los reportes de ventas existentes.
+* **Exclusiones deliberadas:** cuentas por cobrar/pagar, caja/bancos, impuestos, balance general, P&L oficial y asignación de cupones. Estos temas requieren reglas aprobadas de devengo, responsables de pago y financiación de descuentos.
+* **Evidencia:** `prisma validate`, `node --check`, ESLint focalizado y `tsc --noEmit` aprobados. La prueba integrada contra PostgreSQL queda pendiente del reinicio seguro y `prisma generate` local.
+
+### 📍 MESA 19: Política Financiera Provisional - Fase 2D
+* **Estado:** `EN REVISION`
+* **Criterio provisional para avanzar sin riesgo:** el resultado operativo se presenta en base de caja; los impuestos son informativos y los descuentos por cupón quedan excluidos del P&L oficial mientras no exista una regla aprobada de financiación por comercio.
+* **Salvaguarda:** esta política no altera pagos, liquidaciones, comisiones ni saldos de usuarios. Su propósito es evitar mostrar una utilidad oficial potencialmente incorrecta.
+* **Pendiente de decisión del dueño:** definir si el cupón lo asume la plataforma, el comercio o ambos; y si el cierre oficial usará caja o devengo.

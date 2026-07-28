@@ -25,6 +25,8 @@ const productoFake = {
   comercioId: "comercio-123",
   nombre: "Borojó",
   precio: 8000,
+  stock: 0,
+  costoPromedio: 0,
   activo: true,
 };
 
@@ -50,6 +52,9 @@ prisma.precioHistorial = {
     historialPrecios.push(data);
     return { id: historialPrecios.length, ...data };
   },
+};
+prisma.movimientoInventario = {
+  create: async ({ data }) => ({ id: 1, ...data }),
 };
 
 // Ahora sí cargamos el servicio (ya ve los mocks en memoria)

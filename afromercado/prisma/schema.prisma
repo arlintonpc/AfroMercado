@@ -164,6 +164,44 @@ enum EstadoDispersionPago {
   REVERTIDA
 }
 
+enum EstadoCompraInventario {
+  BORRADOR
+  RECIBIDA
+  CANCELADA
+}
+
+enum TipoMovimientoInventario {
+  COMPRA
+  AJUSTE_ENTRADA
+  AJUSTE_SALIDA
+  MERMA
+  DEVOLUCION_CLIENTE
+  VENTA
+}
+
+enum CategoriaGastoOperativo {
+  FLETE
+  EMPAQUE
+  TRANSPORTE
+  SERVICIO
+  NOMINA
+  ARRIENDO
+  OTRO
+}
+
+enum EstadoCuentaOperativa {
+  PENDIENTE
+  PARCIAL
+  PAGADA
+  VENCIDA
+  CANCELADA
+}
+
+enum TipoMovimientoCaja {
+  INGRESO
+  EGRESO
+}
+
 // ─── MODELOS ──────────────────────────────────────────────────
 
 model Usuario {
@@ -331,6 +369,12 @@ model Comercio {
   ofertasEmpleo         OfertaEmpleo[]
   inmuebles             Inmueble[]
   historiasEfimeras     HistoriaEfimera[]
+  proveedoresInventario ProveedorInventario[]
+  comprasInventario     CompraInventario[]
+  movimientosInventario MovimientoInventario[]
+  gastosOperativos      GastoOperativo[]
+  cuentasOperativas     CuentaOperativa[]
+  movimientosCaja       MovimientoCaja[]
 }
 
 // IVA configurable por comercio (Fase 1.1) — apagado por defecto, solo el ADMIN
@@ -378,6 +422,8 @@ model Producto {
   stock               Int          @default(0)
   stockReservado      Int          @default(0)
   stockMinimo         Int          @default(0)
+  costoPromedio       Decimal      @default(0) @db.Decimal(12, 2)
+  costoActualizadoAt  DateTime?
   stockBajoNotificadoAt DateTime?
   fotoUrl             String?
   imagenes            String[]     @default([])
@@ -420,6 +466,8 @@ model Producto {
   gruposComplementoAsignados ProductoGrupoComplemento[]
   denuncias        DenunciaProducto[]
   publicacionesVitrina PublicacionCultural[]
+  comprasInventario    CompraInventarioItem[]
+  movimientosInventario MovimientoInventario[]
 
   @@index([comercioId, activo])
   @@index([categoriaId, activo])
@@ -469,6 +517,155 @@ model PrecioHistorial {
   createdAt   DateTime @default(now())
 
   producto Producto @relation(fields: [productoId], references: [id])
+}
+
+model ProveedorInventario {
+  id          Int      @id @default(autoincrement())
+  comercioId  Int
+  nombre      String
+  nit         String?
+  telefono    String?
+  email       String?
+  direccion   String?
+  notas       String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  comercio Comercio           @relation(fields: [comercioId], references: [id])
+  compras  CompraInventario[]
+
+  @@unique([comercioId, nombre])
+  @@index([comercioId, activo])
+}
+
+model CompraInventario {
+  id             Int                     @id @default(autoincrement())
+  comercioId     Int
+  proveedorId    Int?
+  codigo         String                  @unique
+  idempotencyKey String                  @unique
+  estado         EstadoCompraInventario @default(BORRADOR)
+  fechaCompra    DateTime                @default(now())
+  recibidoAt     DateTime?
+  notas          String?
+  total          Decimal                 @default(0) @db.Decimal(12, 2)
+  creadoPor      Int?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  comercio  Comercio             @relation(fields: [comercioId], references: [id])
+  proveedor ProveedorInventario? @relation(fields: [proveedorId], references: [id])
+  items     CompraInventarioItem[]
+
+  @@index([comercioId, fechaCompra])
+  @@index([proveedorId])
+}
+
+model CompraInventarioItem {
+  id             Int      @id @default(autoincrement())
+  compraId       Int
+  productoId     Int
+  cantidad       Int
+  costoUnitario  Decimal  @db.Decimal(12, 2)
+  subtotal       Decimal  @db.Decimal(12, 2)
+  createdAt      DateTime @default(now())
+
+  compra     CompraInventario      @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  producto   Producto               @relation(fields: [productoId], references: [id])
+  movimiento MovimientoInventario?
+
+  @@unique([compraId, productoId])
+  @@index([productoId])
+}
+
+model MovimientoInventario {
+  id                     Int                      @id @default(autoincrement())
+  comercioId             Int
+  productoId             Int
+  tipo                   TipoMovimientoInventario
+  cantidad               Int
+  stockAnterior          Int
+  stockPosterior         Int
+  costoUnitario          Decimal                  @default(0) @db.Decimal(12, 2)
+  costoPromedioAnterior  Decimal                  @default(0) @db.Decimal(12, 2)
+  costoPromedioPosterior Decimal                  @default(0) @db.Decimal(12, 2)
+  valorTotal             Decimal                  @default(0) @db.Decimal(12, 2)
+  compraItemId           Int?                     @unique
+  pedidoItemId           Int?                     @unique
+  idempotencyKey         String?                  @unique
+  motivo                 String?
+  creadoPor              Int?
+  createdAt              DateTime                 @default(now())
+
+  comercio    Comercio              @relation(fields: [comercioId], references: [id])
+  producto    Producto              @relation(fields: [productoId], references: [id])
+  compraItem  CompraInventarioItem? @relation(fields: [compraItemId], references: [id])
+  pedidoItem  PedidoItem?           @relation(fields: [pedidoItemId], references: [id])
+
+  @@index([comercioId, createdAt])
+  @@index([productoId, createdAt])
+  @@index([tipo, createdAt])
+}
+
+model GastoOperativo {
+  id          Int                     @id @default(autoincrement())
+  comercioId  Int
+  categoria   CategoriaGastoOperativo
+  concepto    String
+  monto       Decimal                 @db.Decimal(12, 2)
+  fecha       DateTime                @default(now())
+  notas       String?
+  creadoPor   Int?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  comercio Comercio @relation(fields: [comercioId], references: [id])
+
+  @@index([comercioId, fecha])
+  @@index([categoria, fecha])
+}
+
+model CuentaOperativa {
+  id              Int                    @id @default(autoincrement())
+  comercioId      Int
+  tipo            TipoMovimientoCaja
+  concepto        String
+  contraparte     String?
+  montoOriginal   Decimal                @db.Decimal(12, 2)
+  montoPagado     Decimal                @default(0) @db.Decimal(12, 2)
+  fechaEmision    DateTime               @default(now())
+  fechaVencimiento DateTime?
+  estado          EstadoCuentaOperativa @default(PENDIENTE)
+  notas           String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  comercio Comercio          @relation(fields: [comercioId], references: [id])
+  abonos   MovimientoCaja[]
+
+  @@index([comercioId, tipo, estado])
+  @@index([comercioId, fechaVencimiento])
+}
+
+model MovimientoCaja {
+  id                Int                 @id @default(autoincrement())
+  comercioId        Int
+  cuentaOperativaId Int?
+  tipo              TipoMovimientoCaja
+  monto             Decimal             @db.Decimal(12, 2)
+  concepto          String
+  fecha             DateTime            @default(now())
+  comprobanteUrl    String?
+  notas             String?
+  creadoPor         Int?
+  createdAt         DateTime            @default(now())
+
+  comercio Comercio          @relation(fields: [comercioId], references: [id])
+  cuenta   CuentaOperativa? @relation(fields: [cuentaOperativaId], references: [id])
+
+  @@index([comercioId, fecha])
+  @@index([cuentaOperativaId])
 }
 
 model Direccion {
@@ -570,6 +767,7 @@ model PedidoItem {
   subPedido SubPedido @relation(fields: [subPedidoId], references: [id])
   producto  Producto  @relation(fields: [productoId], references: [id])
   oferta    Oferta?   @relation(fields: [ofertaId], references: [id], onDelete: SetNull)
+  movimientoInventario MovimientoInventario?
 
   @@index([ofertaId])
 }
@@ -2863,4 +3061,3 @@ model VistaHistoriaEfimera {
   @@index([usuarioId, createdAt])
   @@map("historias_efimeras_vistas")
 }
-

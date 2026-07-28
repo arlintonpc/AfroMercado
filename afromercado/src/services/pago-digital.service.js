@@ -10,6 +10,7 @@ const FacturacionService = require("./facturacion.service");
 const FidelizacionService = require("./fidelizacion.service");
 const VisibilidadRepository = require("../repositories/visibilidad.repository");
 const PagoPublicidadService = require("./pago-publicidad.service");
+const InventarioService = require("./inventario.service");
 const { bloquearPedido } = require("../utils/bloqueos-transaccionales");
 const {
   normalizarProveedor,
@@ -241,20 +242,12 @@ async function confirmarPedidoPorPago(tx, pago) {
   const productosStockBajo = [];
   for (const sub of pedido.subPedidos) {
     for (const item of sub.items) {
-      const filas = await tx.$queryRaw`
-        UPDATE "Producto"
-        SET "stock" = "stock" - ${item.cantidad},
-            "stockReservado" = GREATEST("stockReservado" - ${item.cantidad}, 0)
-        WHERE id = ${item.productoId}
-          AND "stock" >= ${item.cantidad}
-        RETURNING id, nombre, "comercioId", stock, "stockMinimo", "stockBajoNotificadoAt"
-      `;
-      if (filas.length === 0) {
-        throw new ErrorValidacion(
-          `Stock insuficiente para confirmar el producto #${item.productoId}`
-        );
-      }
-      const p = filas[0];
+      const resultadoInventario = await InventarioService.registrarVentaConfirmadaEnTx(tx, {
+        comercioId: sub.comercioId,
+        pedidoItem: item,
+      });
+      const p = resultadoInventario.producto;
+      if (!p) continue;
       if (p.stockMinimo > 0 && p.stock <= p.stockMinimo && p.stockBajoNotificadoAt === null) {
         await tx.producto.update({ where: { id: p.id }, data: { stockBajoNotificadoAt: new Date() } });
         productosStockBajo.push({ id: p.id, nombre: p.nombre, comercioId: p.comercioId, stock: p.stock });

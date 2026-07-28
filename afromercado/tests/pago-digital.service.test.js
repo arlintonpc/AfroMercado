@@ -20,6 +20,7 @@ let dispersionesActualizadas = [];
 let pedidoActualizado = null;
 let subPedidoUpdateManyLlamadas = 0;
 let comercioUpdateLlamadas = [];
+let productoUpdateLlamadas = 0;
 let executeRawLlamadas = []; // strings del template tag ejecutado (para distinguir UPDATE stock vs UPDATE oferta)
 let pagoEventosCreados = [];
 let pagoEventoActualizado = null;
@@ -128,6 +129,35 @@ prisma.comercio = {
     comercioUpdateLlamadas.push({ where, data });
     return { id: where.id, ...data };
   },
+};
+
+prisma.producto = {
+  findUnique: async ({ where }) => ({
+    id: where.id,
+    nombre: "Producto mock",
+    comercioId: 42,
+    stock: 100,
+    stockMinimo: 0,
+    stockBajoNotificadoAt: null,
+    stockReservado: 3,
+    costoPromedio: 0,
+  }),
+  update: async ({ where, data }) => {
+    productoUpdateLlamadas++;
+    return {
+      id: where.id,
+      nombre: "Producto mock",
+      comercioId: 42,
+      stock: data.stock,
+      stockMinimo: 0,
+      stockBajoNotificadoAt: null,
+    };
+  },
+};
+
+prisma.movimientoInventario = {
+  findUnique: async () => null,
+  create: async ({ data }) => ({ id: 1, ...data }),
 };
 
 prisma.pagoDispersion = {
@@ -264,6 +294,7 @@ function resetMocksComunes() {
   pedidoActualizado = null;
   subPedidoUpdateManyLlamadas = 0;
   comercioUpdateLlamadas = [];
+  productoUpdateLlamadas = 0;
   executeRawLlamadas = [];
   pagoEventosCreados = [];
   pagoEventoActualizado = null;
@@ -276,9 +307,7 @@ function resetMocksComunes() {
 }
 
 function contarActualizacionesStock() {
-  return executeRawLlamadas.filter((llamada) =>
-    llamada.sql.includes('UPDATE "Producto"') && llamada.sql.includes('"stock" = "stock" -')
-  ).length;
+  return productoUpdateLlamadas;
 }
 
 function contarBloqueosPedido() {

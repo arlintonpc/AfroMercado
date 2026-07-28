@@ -192,6 +192,8 @@ export default function ComercianteLayout({
     { href: '/comerciante/transportes',    etiqueta: '🛥️ Transporte' },
     { href: '/comerciante/cultura',        etiqueta: '🎭 Cultura' },
     { href: '/comerciante/mis-productos',  etiqueta: 'Mis productos' },
+    { href: '/comerciante/inventario',     etiqueta: 'Inventario' },
+    { href: '/comerciante/contabilidad',   etiqueta: 'Contabilidad' },
     { href: '/comerciante/publicar',       etiqueta: 'Publicar' },
     { href: '/comerciante/vitrina',        etiqueta: '🎥 Vitrina de video' },
     { href: '/comerciante/ofertas',        etiqueta: 'Ofertas' },

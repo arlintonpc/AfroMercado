@@ -221,7 +221,7 @@ const ProductoService = {
     if (datos.esExpress !== undefined) campos.esExpress = datos.esExpress === true || datos.esExpress === 'true';
     if (datos.tiempoEntregaMin !== undefined) campos.tiempoEntregaMin = datos.tiempoEntregaMin ? parseInt(datos.tiempoEntregaMin) : null;
 
-    if (campos.precio === undefined) {
+    if (campos.precio === undefined && campos.stock === undefined) {
       return ProductoRepository.actualizar(productoId, campos);
     }
 
@@ -229,14 +229,15 @@ const ProductoService = {
       await bloquearProducto(tx, productoId);
       const productoActual = await tx.producto.findUnique({
         where: { id: Number(productoId) },
-        select: { comercioId: true, precio: true },
+        select: { comercioId: true, precio: true, stock: true, costoPromedio: true },
       });
       if (!productoActual) throw new ErrorNoEncontrado("Producto no encontrado");
       if (productoActual.comercioId !== comercio.id) {
         throw new ErrorNoAutorizado("No puedes editar productos de otro comerciante");
       }
 
-      const precioCambio = Number(campos.precio) !== Number(productoActual.precio);
+      const precioCambio =
+        campos.precio !== undefined && Number(campos.precio) !== Number(productoActual.precio);
       const actualizado = await ProductoRepository.actualizar(productoId, campos, tx);
       if (precioCambio) {
         await tx.precioHistorial.create({
@@ -244,6 +245,27 @@ const ProductoService = {
             productoId: Number(productoId),
             precio: actualizado.precio,
             cambiadoPor: Number(usuarioId),
+          },
+        });
+      }
+      const stockPosterior = campos.stock ?? productoActual.stock;
+      const diferenciaStock = stockPosterior - productoActual.stock;
+      if (diferenciaStock !== 0) {
+        const costoPromedio = Number(productoActual.costoPromedio || 0);
+        await tx.movimientoInventario.create({
+          data: {
+            comercioId: comercio.id,
+            productoId: Number(productoId),
+            tipo: diferenciaStock > 0 ? "AJUSTE_ENTRADA" : "AJUSTE_SALIDA",
+            cantidad: diferenciaStock,
+            stockAnterior: productoActual.stock,
+            stockPosterior,
+            costoUnitario: costoPromedio,
+            costoPromedioAnterior: costoPromedio,
+            costoPromedioPosterior: costoPromedio,
+            valorTotal: Number((Math.abs(diferenciaStock) * costoPromedio).toFixed(2)),
+            motivo: "Ajuste manual desde productos",
+            creadoPor: Number(usuarioId),
           },
         });
       }
