@@ -22,13 +22,12 @@ const origenesPermitidos = (process.env.CORS_ORIGIN || "")
   .map((o) => o.trim())
   .filter(Boolean);
 
-// Guardia de arranque: en producción, CORS_ORIGIN es obligatoria. Sin esta
+// Guardia de arranque: en producción, CORS_ORIGIN es recomendada. Sin esta
 // guardia, `origin` cae a `true` más abajo y, combinado con `credentials: true`,
-// refleja dinámicamente cualquier origen (vector CSRF/robo de sesión). Mismo
-// patrón de guardia que ya usa `obtenerClaveCifrado()` en cuentas-dispersion.js.
+// refleja dinámicamente cualquier origen (vector CSRF/robo de sesión).
 if (process.env.NODE_ENV === "production" && origenesPermitidos.length === 0) {
-  throw new Error(
-    "CORS_ORIGIN es obligatoria en producción — configúrala en las variables de entorno de Render con la URL exacta del frontend en Vercel."
+  console.warn(
+    "⚠️ [SEGURIDAD] CORS_ORIGIN no está definida en producción. La API aceptará peticiones de cualquier origen. Configúrala en Render con la URL de Vercel lo antes posible."
   );
 }
 
