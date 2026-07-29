@@ -47,6 +47,38 @@ function SkeletonTransporte() {
   )
 }
 
+function AutocompleteInput({ value, onChange, placeholder, opciones, onSelectFocus }: { value: string, onChange: (v: string) => void, placeholder: string, opciones: string[], onSelectFocus?: () => void }) {
+  const [abierto, setAbierto] = useState(false)
+  const filtradas = opciones.filter(o => o.toLowerCase().includes(value.toLowerCase()))
+
+  return (
+    <div className="relative min-w-0" onBlur={() => setTimeout(() => setAbierto(false), 200)}>
+      <input 
+        value={value} 
+        onChange={e => { onChange(e.target.value); setAbierto(true) }}
+        onFocus={() => { setAbierto(true); if(onSelectFocus) onSelectFocus(); }}
+        placeholder={placeholder}
+        className="w-full rounded-xl bg-gray-50 px-3 py-2.5 text-gray-900 placeholder-gray-400 text-sm font-medium outline-none ring-1 ring-transparent focus:ring-[#2D6A4F]"
+      />
+      {abierto && filtradas.length > 0 && (
+        <div className="absolute left-0 top-full z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-xl bg-white p-1.5 shadow-2xl ring-1 ring-black/5">
+          {filtradas.map(o => (
+            <button
+              key={o}
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); onChange(o); setAbierto(false); }}
+              className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-[#1B4332]/10 hover:text-[#1B4332] rounded-lg transition-colors"
+            >
+              <svg className="mr-2 h-4 w-4 opacity-50 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <span className="truncate">{o}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CupoRuta({ ruta, fecha, pasajeros }: { ruta: RutaTransporte; fecha: string; pasajeros: number }) {
   const [estado, setEstado] = useState<{ disponibles: number; opera: boolean } | null>(null)
 
@@ -205,6 +237,7 @@ export default function TransportesPage() {
             if (r.destino) setCiudades.add(r.destino.trim())
           }
         })
+        if (t.comercio?.municipio) setCiudades.add(t.comercio.municipio.trim())
       }
     })
     return Array.from(setCiudades).sort((a, b) => a.localeCompare(b))
@@ -375,15 +408,22 @@ export default function TransportesPage() {
 
           {/* Búsqueda */}
           <div className="mt-6 bg-white shadow-2xl rounded-2xl p-3 flex flex-col gap-2 border border-gray-100 relative z-10">
-            <datalist id="ciudades-transporte">
-              {ciudadesUnicas.map(c => <option key={c} value={c} />)}
-            </datalist>
             <div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr_150px_120px]">
-              <input list="ciudades-transporte" value={origen} onChange={e => setOrigen(e.target.value)} placeholder="Origen" aria-label="Origen" className="min-w-0 rounded-xl bg-gray-50 px-3 py-2.5 text-gray-900 placeholder-gray-400 text-sm font-medium outline-none ring-1 ring-transparent focus:ring-[#2D6A4F]" />
+              <AutocompleteInput 
+                value={origen} 
+                onChange={setOrigen} 
+                placeholder="Origen" 
+                opciones={ciudadesUnicas} 
+              />
               <button type="button" onClick={intercambiarTrayecto} aria-label="Intercambiar origen y destino" className="hidden sm:flex h-9 w-9 self-center items-center justify-center rounded-full text-[#1B4332] hover:bg-[#1B4332]/10 transition-colors">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m7 7 3-3 3 3M10 4v11M17 17l-3 3-3-3M14 20V9"/></svg>
               </button>
-              <input list="ciudades-transporte" value={destino} onChange={e => setDestino(e.target.value)} placeholder="Destino" aria-label="Destino" className="min-w-0 rounded-xl bg-gray-50 px-3 py-2.5 text-gray-900 placeholder-gray-400 text-sm font-medium outline-none ring-1 ring-transparent focus:ring-[#2D6A4F]" />
+              <AutocompleteInput 
+                value={destino} 
+                onChange={setDestino} 
+                placeholder="Destino" 
+                opciones={ciudadesUnicas} 
+              />
               <input type="date" value={fechaViaje} onChange={e => setFechaViaje(e.target.value)} aria-label="Fecha de viaje" className="min-w-0 rounded-xl bg-gray-50 px-3 py-2.5 text-gray-700 text-sm font-medium outline-none ring-1 ring-transparent focus:ring-[#2D6A4F]" />
               <select value={pasajeros} onChange={e => setPasajeros(Number(e.target.value))} aria-label="Pasajeros" className="min-w-0 rounded-xl bg-gray-50 px-3 py-2.5 text-gray-700 text-sm font-medium outline-none ring-1 ring-transparent focus:ring-[#2D6A4F]">
                 {[1, 2, 3, 4, 5, 6].map(cantidad => <option key={cantidad} value={cantidad}>{cantidad} pasajero{cantidad !== 1 ? 's' : ''}</option>)}
