@@ -90,10 +90,10 @@ self.addEventListener('push', event => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: 'AfroMercado', body: event.data ? event.data.text() : '' };
+    data = { title: 'Teravia', body: event.data ? event.data.text() : '' };
   }
 
-  const title = data.title || 'AfroMercado';
+  const title = data.title || 'Teravia';
   const options = {
     body: data.body || '',
     icon: data.icon || '/icon-192.svg',

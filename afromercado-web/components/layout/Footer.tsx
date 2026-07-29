@@ -12,7 +12,7 @@ export default function Footer() {
               <span className="text-white">Tera</span>
               <span className="text-[#D4A017]">via</span>
             </p>
-            <p className="text-white/70 text-sm italic">Del Chocó para toda Colombia</p>
+            <p className="text-white/70 text-sm italic">Territorios que florecen</p>
           </div>
 
           {/* Turismo */}
