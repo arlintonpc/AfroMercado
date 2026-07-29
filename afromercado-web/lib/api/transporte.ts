@@ -7,12 +7,42 @@ export interface RutaTransporte {
   configTransporteId: number
   origen: string
   destino: string
+  puntoAbordaje?: string | null
+  puntoDescenso?: string | null
   horario: string
+  horaLlegada?: string | null
+  duracionMinutos?: number | null
   diasSemana: string[]
   capacidad: number
   precioAsiento: number | string
   activo: boolean
   creadoAt: string
+}
+
+export interface SalidaTransporte {
+  id: number
+  rutaTransporteId: number
+  fechaHora: string
+  capacidad?: number | null
+  estado: 'PROGRAMADA' | 'CANCELADA'
+  notasOperativas?: string | null
+  vehiculoId?: number | null
+  conductorNombre?: string | null
+  estadoOperacion?: 'PROGRAMADA' | 'EN_ABORDAJE' | 'EN_RUTA' | 'FINALIZADA'
+}
+
+export interface VehiculoTransporte {
+  id: number
+  nombre: string
+  tipo: string
+  placa?: string | null
+  capacidad: number
+  activo: boolean
+}
+
+export interface AsientosSalidaTransporte {
+  capacidad: number
+  ocupados: string[]
 }
 
 export interface ConfigTransporte {
@@ -21,6 +51,7 @@ export interface ConfigTransporte {
   activo: boolean
   nombre: string
   descripcion?: string | null
+  politicaCancelacion?: string | null
   tipo: string
   fotos: string[]
   videoUrl?: string | null
@@ -46,6 +77,7 @@ export interface ReservaTransporte {
   id: number
   codigo: string
   rutaTransporteId: number
+  salidaTransporteId?: number | null
   clienteId?: number
   fechaViaje: string
   asientos: number
@@ -58,8 +90,18 @@ export interface ReservaTransporte {
   creadoAt: string
   montoDescuento?: number | null
   codigoCupon?: string | null
+  abordadoAt?: string | null
+  noShowAt?: string | null
   ruta?: RutaTransporte & { configTransporte?: ConfigTransporte }
+  salida?: (SalidaTransporte & { vehiculo?: VehiculoTransporte | null }) | null
   cliente?: { id: number; nombre: string; email: string }
+}
+
+export interface ManifiestoSalidaTransporte extends SalidaTransporte {
+  ruta: RutaTransporte & { configTransporte?: Pick<ConfigTransporte, 'nombre' | 'tipo'> }
+  reservas: ReservaTransporte[]
+  asientosReservados: number
+  capacidadTotal: number
 }
 
 // ── CUPONES ───────────────────────────────────────────────────
@@ -127,16 +169,63 @@ export async function obtenerTransporte(id: number): Promise<ConfigTransporte> {
   return r.data
 }
 
-export async function verificarDisponibilidadTransporte(rutaId: number, fecha: string): Promise<{ disponibles: number; capacidad: number }> {
-  const r = await apiFetch<{ ok: boolean; data: { disponibles: number; capacidad: number } }>(
-    `/transportes/disponibilidad?rutaId=${rutaId}&fecha=${fecha}`
+export async function verificarDisponibilidadTransporte(rutaId: number, fecha: string, salidaId?: number): Promise<{ disponibles: number; capacidad: number; opera: boolean }> {
+  const r = await apiFetch<{ ok: boolean; data: { disponibles: number; capacidad: number; opera: boolean } }>(
+    `/transportes/disponibilidad?rutaId=${rutaId}&fecha=${fecha}${salidaId ? `&salidaId=${salidaId}` : ''}`
   )
+  return r.data
+}
+
+export async function listarSalidasTransporte(rutaId: number, fecha: string): Promise<SalidaTransporte[]> {
+  const r = await apiFetch<{ ok: boolean; data: SalidaTransporte[] }>(`/transportes/rutas/${rutaId}/salidas?fecha=${fecha}`, { auth: false })
+  return r.data
+}
+
+export async function listarAsientosSalidaTransporte(salidaId: number): Promise<AsientosSalidaTransporte> {
+  const r = await apiFetch<{ ok: boolean; data: AsientosSalidaTransporte }>(`/transportes/salidas/${salidaId}/asientos`, { auth: false })
+  return r.data
+}
+
+export async function crearSalidaTransporte(rutaId: number, datos: { fechaHora: string; capacidad?: number; notasOperativas?: string; vehiculoId?: number; conductorNombre?: string }): Promise<SalidaTransporte> {
+  const r = await apiFetch<{ ok: boolean; data: SalidaTransporte }>(`/transportes/mi-transporte/rutas/${rutaId}/salidas`, { method: 'POST', body: datos })
+  return r.data
+}
+
+export async function listarVehiculosTransporte(): Promise<VehiculoTransporte[]> {
+  const r = await apiFetch<{ ok: boolean; data: VehiculoTransporte[] }>('/transportes/mi-transporte/vehiculos')
+  return r.data
+}
+
+export async function listarSalidasOperadorTransporte(): Promise<Array<SalidaTransporte & { ruta: RutaTransporte; vehiculo?: VehiculoTransporte | null }>> {
+  const r = await apiFetch<{ ok: boolean; data: Array<SalidaTransporte & { ruta: RutaTransporte; vehiculo?: VehiculoTransporte | null }> }>('/transportes/mi-transporte/salidas')
+  return r.data
+}
+
+export async function crearVehiculoTransporte(datos: { nombre: string; tipo: string; placa?: string; capacidad: number }): Promise<VehiculoTransporte> {
+  const r = await apiFetch<{ ok: boolean; data: VehiculoTransporte }>('/transportes/mi-transporte/vehiculos', { method: 'POST', body: datos })
+  return r.data
+}
+
+export async function actualizarVehiculoTransporte(id: number, datos: Partial<VehiculoTransporte>): Promise<VehiculoTransporte> {
+  const r = await apiFetch<{ ok: boolean; data: VehiculoTransporte }>(`/transportes/mi-transporte/vehiculos/${id}`, { method: 'PATCH', body: datos })
+  return r.data
+}
+
+export async function cambiarOperacionSalidaTransporte(id: number, estadoOperacion: SalidaTransporte['estadoOperacion']): Promise<SalidaTransporte> {
+  const r = await apiFetch<{ ok: boolean; data: SalidaTransporte }>(`/transportes/mi-transporte/salidas/${id}/operacion`, { method: 'PATCH', body: { estadoOperacion } })
+  return r.data
+}
+
+export async function cambiarEstadoSalidaTransporte(salidaId: number, estado: 'PROGRAMADA' | 'CANCELADA'): Promise<SalidaTransporte> {
+  const r = await apiFetch<{ ok: boolean; data: SalidaTransporte }>(`/transportes/mi-transporte/salidas/${salidaId}/estado`, { method: 'PATCH', body: { estado } })
   return r.data
 }
 
 // ── CLIENTE ──────────────────────────────────────────────────
 export async function crearReservaTransporte(datos: {
   rutaTransporteId: number
+  salidaTransporteId?: number | null
+  puestos?: string[]
   fechaViaje: string
   asientos: number
   metodoPago: string
@@ -151,6 +240,16 @@ export async function crearReservaTransporte(datos: {
 
 export async function misReservasTransporte(): Promise<ReservaTransporte[]> {
   const r = await apiFetch<{ ok: boolean; data: ReservaTransporte[] }>('/transportes/reservas/mis')
+  return r.data
+}
+
+export async function obtenerTicketTransporte(id: number): Promise<{ reserva: ReservaTransporte; qrDataUrl: string }> {
+  const r = await apiFetch<{ ok: boolean; data: { reserva: ReservaTransporte; qrDataUrl: string } }>(`/transportes/reservas/${id}/ticket`)
+  return r.data
+}
+
+export async function manifiestoSalidaTransporte(salidaId: number): Promise<ManifiestoSalidaTransporte> {
+  const r = await apiFetch<{ ok: boolean; data: ManifiestoSalidaTransporte }>(`/transportes/mi-transporte/salidas/${salidaId}/manifiesto`)
   return r.data
 }
 
@@ -192,6 +291,16 @@ export async function reservasOperadorTransporte(estado?: string): Promise<Reser
 
 export async function cambiarEstadoReservaTransporte(id: number, estado: EstadoReservaTransporte): Promise<ReservaTransporte> {
   const r = await apiFetch<{ ok: boolean; data: ReservaTransporte }>(`/transportes/mi-transporte/reservas/${id}/estado`, { method: 'PATCH', body: { estado } })
+  return r.data
+}
+
+export async function reprogramarReservaTransporte(id: number, salidaTransporteId: number, puestos: string[]): Promise<ReservaTransporte> {
+  const r = await apiFetch<{ ok: boolean; data: ReservaTransporte }>(`/transportes/reservas/${id}/reprogramar`, { method: 'PATCH', body: { salidaTransporteId, puestos } })
+  return r.data
+}
+
+export async function registrarAbordajeTransporte(id: number, tipo: 'ABORDO' | 'NO_SHOW'): Promise<ReservaTransporte> {
+  const r = await apiFetch<{ ok: boolean; data: ReservaTransporte }>(`/transportes/mi-transporte/reservas/${id}/abordaje`, { method: 'PATCH', body: { tipo } })
   return r.data
 }
 

@@ -33,8 +33,8 @@ const TransporteController = {
 
   async disponibilidad(req, res, next) {
     try {
-      const { rutaId, fecha } = req.query;
-      res.json({ ok: true, data: await TransporteService.verificarDisponibilidad(Number(rutaId), fecha) });
+      const { rutaId, fecha, salidaId } = req.query;
+      res.json({ ok: true, data: await TransporteService.verificarDisponibilidad(Number(rutaId), fecha, salidaId ? Number(salidaId) : null) });
     } catch (e) { next(e); }
   },
 
@@ -87,6 +87,56 @@ const TransporteController = {
     } catch (e) { next(e); }
   },
 
+  async reprogramarReserva(req, res, next) {
+    try { res.json({ ok: true, data: await TransporteService.reprogramarReserva(req.usuario.id, Number(req.params.id), req.body.salidaTransporteId, req.body.puestos) }); } catch (e) { next(e); }
+  },
+
+  async obtenerTicket(req, res, next) {
+    try {
+      res.json({ ok: true, data: await TransporteService.obtenerTicket(req.usuario.id, Number(req.params.id)) });
+    } catch (e) { next(e); }
+  },
+
+  async listarSalidas(req, res, next) {
+    try { res.json({ ok: true, data: await TransporteService.listarSalidas(Number(req.params.rutaId), req.query.fecha) }); } catch (e) { next(e); }
+  },
+
+  async listarAsientosSalida(req, res, next) {
+    try { res.json({ ok: true, data: await TransporteService.listarAsientosSalida(Number(req.params.salidaId)) }); } catch (e) { next(e); }
+  },
+
+  async crearSalida(req, res, next) {
+    try { res.status(201).json({ ok: true, data: await TransporteService.crearSalida(req.usuario.comercio.id, Number(req.params.rutaId), req.body) }); } catch (e) { next(e); }
+  },
+
+  async listarVehiculos(req, res, next) {
+    try { res.json({ ok: true, data: await TransporteService.listarVehiculos(req.usuario.comercio.id) }); } catch (e) { next(e); }
+  },
+
+  async listarSalidasOperador(req, res, next) {
+    try { res.json({ ok: true, data: await TransporteService.listarSalidasOperador(req.usuario.comercio.id) }); } catch (e) { next(e); }
+  },
+
+  async crearVehiculo(req, res, next) {
+    try { res.status(201).json({ ok: true, data: await TransporteService.crearVehiculo(req.usuario.comercio.id, req.body) }); } catch (e) { next(e); }
+  },
+
+  async actualizarVehiculo(req, res, next) {
+    try { res.json({ ok: true, data: await TransporteService.actualizarVehiculo(req.usuario.comercio.id, Number(req.params.vehiculoId), req.body) }); } catch (e) { next(e); }
+  },
+
+  async cambiarEstadoSalida(req, res, next) {
+    try { res.json({ ok: true, data: await TransporteService.cambiarEstadoSalida(req.usuario.comercio.id, Number(req.params.salidaId), req.body.estado) }); } catch (e) { next(e); }
+  },
+
+  async cambiarEstadoOperacionSalida(req, res, next) {
+    try { res.json({ ok: true, data: await TransporteService.cambiarEstadoOperacionSalida(req.usuario.comercio.id, Number(req.params.salidaId), req.body.estadoOperacion) }); } catch (e) { next(e); }
+  },
+
+  async manifiestoSalida(req, res, next) {
+    try { res.json({ ok: true, data: await TransporteService.manifiestoSalida(req.usuario.comercio.id, Number(req.params.salidaId)) }); } catch (e) { next(e); }
+  },
+
   async reservasOperador(req, res, next) {
     try {
       res.json({ ok: true, data: await TransporteService.reservasOperador(req.usuario.comercio.id, req.query.estado) });
@@ -97,6 +147,10 @@ const TransporteController = {
     try {
       res.json({ ok: true, data: await TransporteService.cambiarEstado(req.usuario.comercio.id, Number(req.params.id), req.body.estado) });
     } catch (e) { next(e); }
+  },
+
+  async registrarAbordaje(req, res, next) {
+    try { res.json({ ok: true, data: await TransporteService.registrarAbordaje(req.usuario.comercio.id, Number(req.params.id), req.body.tipo) }); } catch (e) { next(e); }
   },
 
   async subirFotos(req, res, next) {

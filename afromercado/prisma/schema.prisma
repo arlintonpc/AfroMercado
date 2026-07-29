@@ -2578,6 +2578,7 @@ model ConfigTransporte {
   activo      Boolean  @default(false)
   nombre      String   @default("Mi Servicio")
   descripcion String?
+  politicaCancelacion String?
   tipo        String   @default("LANCHA")
   fotos          String[]
   videoUrl       String?
@@ -2587,6 +2588,7 @@ model ConfigTransporte {
 
   comercio   Comercio            @relation(fields: [comercioId], references: [id])
   rutas      RutaTransporte[]
+  vehiculos  VehiculoTransporte[]
 
   @@index([activo])
 }
@@ -2596,7 +2598,11 @@ model RutaTransporte {
   configTransporteId  Int
   origen              String
   destino             String
+  puntoAbordaje       String?
+  puntoDescenso       String?
   horario             String
+  horaLlegada         String?
+  duracionMinutos     Int?
   diasSemana          String[]
   capacidad           Int      @default(10)
   precioAsiento       Decimal  @db.Decimal(12, 2)
@@ -2605,6 +2611,46 @@ model RutaTransporte {
 
   configTransporte ConfigTransporte    @relation(fields: [configTransporteId], references: [id], onDelete: Cascade)
   reservas         ReservaTransporte[]
+  salidas          SalidaTransporte[]
+
+  @@index([configTransporteId, activo])
+}
+
+model SalidaTransporte {
+  id                 Int      @id @default(autoincrement())
+  rutaTransporteId   Int
+  fechaHora          DateTime
+  capacidad          Int?
+  estado             String   @default("PROGRAMADA")
+  notasOperativas    String?
+  vehiculoId         Int?
+  conductorNombre    String?
+  estadoOperacion    String   @default("PROGRAMADA")
+  creadoAt           DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  ruta      RutaTransporte      @relation(fields: [rutaTransporteId], references: [id], onDelete: Cascade)
+  vehiculo  VehiculoTransporte? @relation(fields: [vehiculoId], references: [id], onDelete: SetNull)
+  reservas  ReservaTransporte[]
+  asientosAsignados AsientoReservaTransporte[]
+
+  @@unique([rutaTransporteId, fechaHora])
+  @@index([rutaTransporteId, fechaHora, estado])
+}
+
+model VehiculoTransporte {
+  id                  Int      @id @default(autoincrement())
+  configTransporteId  Int
+  nombre              String
+  tipo                String
+  placa               String?
+  capacidad           Int
+  activo              Boolean  @default(true)
+  creadoAt            DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  configTransporte ConfigTransporte @relation(fields: [configTransporteId], references: [id], onDelete: Cascade)
+  salidas          SalidaTransporte[]
 
   @@index([configTransporteId, activo])
 }
@@ -2621,6 +2667,7 @@ model ReservaTransporte {
   id               Int                     @id @default(autoincrement())
   codigo           String                  @unique
   rutaTransporteId Int
+  salidaTransporteId Int?
   clienteId        Int
   fechaViaje       DateTime
   asientos         Int                     @default(1)
@@ -2634,15 +2681,34 @@ model ReservaTransporte {
   tasaComision     Decimal?                @db.Decimal(5, 4)
   montoDescuento   Decimal?                @db.Decimal(10, 2)
   codigoCupon      String?
+  abordadoAt       DateTime?
+  noShowAt         DateTime?
   creadoAt         DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 
   ruta          RutaTransporte     @relation(fields: [rutaTransporteId], references: [id])
+  salida        SalidaTransporte?  @relation(fields: [salidaTransporteId], references: [id])
   cliente       Usuario            @relation("ReservasTransporteCliente", fields: [clienteId], references: [id])
+  asientosAsignados AsientoReservaTransporte[]
 
   @@index([rutaTransporteId, estado])
   @@index([clienteId])
   @@index([fechaViaje])
+  @@index([salidaTransporteId])
+}
+
+model AsientoReservaTransporte {
+  id                  Int      @id @default(autoincrement())
+  salidaTransporteId  Int
+  reservaTransporteId Int
+  codigoAsiento       String
+  creadoAt            DateTime @default(now())
+
+  salida   SalidaTransporte  @relation(fields: [salidaTransporteId], references: [id], onDelete: Cascade)
+  reserva  ReservaTransporte @relation(fields: [reservaTransporteId], references: [id], onDelete: Cascade)
+
+  @@unique([salidaTransporteId, codigoAsiento])
+  @@index([reservaTransporteId])
 }
 
 // ─── REVIEWS ─────────────────────────────────────────────────

@@ -128,7 +128,7 @@ async function runVerificarDisponibilidadTests() {
   esperar(
     "Sin reservas previas, disponibles == capacidad total",
     disp,
-    { disponibles: 10, capacidad: 10 }
+    { disponibles: 10, capacidad: 10, opera: true }
   );
 
   // 3. Descuenta los asientos ya reservados (PENDIENTE/CONFIRMADA) de la capacidad
@@ -138,7 +138,7 @@ async function runVerificarDisponibilidadTests() {
   esperar(
     "Descuenta asientos ya ocupados de la capacidad",
     disp,
-    { disponibles: 3, capacidad: 10 }
+    { disponibles: 3, capacidad: 10, opera: true }
   );
 
   // 4. Nunca retorna disponibles negativos aunque haya sobreventa (defensivo)
@@ -148,7 +148,15 @@ async function runVerificarDisponibilidadTests() {
   esperar(
     "No retorna disponibles negativos en caso de sobreventa",
     disp,
-    { disponibles: 0, capacidad: 10 }
+    { disponibles: 0, capacidad: 10, opera: true }
+  );
+
+  mockRuta = { ...rutaFake, diasSemana: ["lunes"] };
+  disp = await TransporteService.verificarDisponibilidad("ruta-1", "2026-08-02");
+  esperar(
+    "No ofrece cupos cuando la ruta no opera ese dia",
+    disp,
+    { disponibles: 0, capacidad: 10, opera: false }
   );
 }
 

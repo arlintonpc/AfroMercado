@@ -31,6 +31,8 @@ const uploadFotos = _upload.array("fotos", 10);
 // ── PÚBLICO ──────────────────────────────────────────────────
 router.get("/",               TransporteController.listar);
 router.get("/disponibilidad", TransporteController.disponibilidad);
+router.get("/rutas/:rutaId/salidas", TransporteController.listarSalidas);
+router.get("/salidas/:salidaId/asientos", TransporteController.listarAsientosSalida);
 
 // Validación de cupón — auth opcional (clienteId puede ser null)
 router.post("/cupones/validar", TransporteController.validarCupon);
@@ -49,7 +51,9 @@ router.get( "/favoritos/:id",        ...soloAuth, async (req, res, next) => {
 // ── CLIENTE ──────────────────────────────────────────────────
 router.post(  "/reservas",              ...soloAuth, TransporteController.reservar);
 router.get(   "/reservas/mis",          ...soloAuth, TransporteController.misReservas);
+router.get(   "/reservas/:id/ticket",   ...soloAuth, TransporteController.obtenerTicket);
 router.patch( "/reservas/:id/cancelar", ...soloAuth, TransporteController.cancelarReserva);
+router.patch( "/reservas/:id/reprogramar", ...soloAuth, TransporteController.reprogramarReserva);
 
 // ── OPERADOR ─────────────────────────────────────────────────
 router.get(   "/mi-transporte/config",              ...soloComercio, TransporteController.miConfig);
@@ -61,8 +65,17 @@ router.patch( "/mi-transporte/config/video-link",   ...soloComercio, TransporteC
 router.post(  "/mi-transporte/rutas",               ...soloComercio, TransporteController.agregarRuta);
 router.put(   "/mi-transporte/rutas/:id",           ...soloComercio, TransporteController.actualizarRuta);
 router.delete("/mi-transporte/rutas/:id",           ...soloComercio, TransporteController.eliminarRuta);
+router.post(  "/mi-transporte/rutas/:rutaId/salidas", ...soloComercio, TransporteController.crearSalida);
+router.get(   "/mi-transporte/vehiculos", ...soloComercio, TransporteController.listarVehiculos);
+router.get(   "/mi-transporte/salidas", ...soloComercio, TransporteController.listarSalidasOperador);
+router.post(  "/mi-transporte/vehiculos", ...soloComercio, TransporteController.crearVehiculo);
+router.patch( "/mi-transporte/vehiculos/:vehiculoId", ...soloComercio, TransporteController.actualizarVehiculo);
+router.patch( "/mi-transporte/salidas/:salidaId/estado", ...soloComercio, TransporteController.cambiarEstadoSalida);
+router.patch( "/mi-transporte/salidas/:salidaId/operacion", ...soloComercio, TransporteController.cambiarEstadoOperacionSalida);
+router.get(   "/mi-transporte/salidas/:salidaId/manifiesto", ...soloComercio, TransporteController.manifiestoSalida);
 router.get(   "/mi-transporte/reservas",            ...soloComercio, TransporteController.reservasOperador);
 router.patch( "/mi-transporte/reservas/:id/estado", ...soloComercio, TransporteController.cambiarEstado);
+router.patch( "/mi-transporte/reservas/:id/abordaje", ...soloComercio, TransporteController.registrarAbordaje);
 
 // Cupones del servicio de transporte
 router.get(   "/mi-transporte/cupones",     ...soloComercio, TransporteController.listarCupones);

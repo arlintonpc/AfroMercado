@@ -1,4 +1,5 @@
 const prisma = require("../config/prisma");
+const QRCode = require("qrcode");
 const { ErrorValidacion, ErrorNoEncontrado } = require("../utils/errores");
 const sseManager = require("../utils/sse-manager");
 const { enviarPushAUsuario } = require("../utils/push");
@@ -15,6 +16,28 @@ function generarCodigo() {
   const ts = Date.now().toString(36).toUpperCase();
   const rnd = Math.random().toString(36).substring(2, 5).toUpperCase();
   return `TX-${ts}-${rnd}`;
+}
+
+const DIAS_SEMANA = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
+
+function operaEnFecha(ruta, fecha) {
+  // Una ruta sin dias configurados conserva el comportamiento heredado: opera todos los dias.
+  if (!ruta.diasSemana || ruta.diasSemana.length === 0) return true;
+  const fechaLocal = new Date(`${fecha}T12:00:00`);
+  return ruta.diasSemana.includes(DIAS_SEMANA[fechaLocal.getDay()]);
+}
+
+function datosRutaPermitidos(datos) {
+  const permitidos = [
+    "origen", "destino", "puntoAbordaje", "puntoDescenso", "horario", "horaLlegada",
+    "duracionMinutos", "diasSemana", "capacidad", "precioAsiento", "activo",
+  ];
+  return Object.fromEntries(Object.entries(datos).filter(([campo]) => permitidos.includes(campo)));
+}
+
+function normalizarPuestos(puestos) {
+  if (!Array.isArray(puestos)) return [];
+  return [...new Set(puestos.map((puesto) => String(puesto).trim()).filter((puesto) => /^\d+$/.test(puesto)))];
 }
 
 async function notif(usuarioId, titulo, cuerpo, url) {
@@ -139,52 +162,78 @@ const TransporteService = {
     return t;
   },
 
-  async verificarDisponibilidad(rutaId, fecha) {
+  async verificarDisponibilidad(rutaId, fecha, salidaTransporteId = null) {
     const ruta = await prisma.rutaTransporte.findUnique({ where: { id: rutaId } });
     if (!ruta) throw new ErrorNoEncontrado("Ruta no encontrada");
+
+    if (!fecha || Number.isNaN(new Date(`${fecha}T12:00:00`).getTime())) {
+      throw new ErrorValidacion("Fecha de viaje invalida");
+    }
+    if (!salidaTransporteId && !operaEnFecha(ruta, fecha)) {
+      return { disponibles: 0, capacidad: ruta.capacidad, opera: false };
+    }
+
+    let salida = null;
+    if (salidaTransporteId) {
+      salida = await prisma.salidaTransporte.findFirst({ where: { id: salidaTransporteId, rutaTransporteId: rutaId } });
+      if (!salida || salida.estado !== "PROGRAMADA") return { disponibles: 0, capacidad: 0, opera: false };
+    }
 
     const fechaD = new Date(fecha);
     const inicio = new Date(fechaD); inicio.setHours(0, 0, 0, 0);
     const fin    = new Date(fechaD); fin.setHours(23, 59, 59, 999);
 
     const reservados = await prisma.reservaTransporte.aggregate({
-      where: { rutaTransporteId: rutaId, fechaViaje: { gte: inicio, lte: fin }, estado: { in: ["PENDIENTE", "CONFIRMADA"] } },
+      where: salida ? { salidaTransporteId, estado: { in: ["PENDIENTE", "CONFIRMADA"] } } : { rutaTransporteId: rutaId, fechaViaje: { gte: inicio, lte: fin }, estado: { in: ["PENDIENTE", "CONFIRMADA"] } },
       _sum: { asientos: true },
     });
     const ocupados = reservados._sum.asientos ?? 0;
-    return { disponibles: Math.max(0, ruta.capacidad - ocupados), capacidad: ruta.capacidad };
+    const capacidad = salida?.capacidad ?? ruta.capacidad;
+    return { disponibles: Math.max(0, capacidad - ocupados), capacidad, opera: true };
   },
 
-  async crearReserva(clienteId, { rutaTransporteId, fechaViaje, asientos, metodoPago, notasCliente, nombreContacto, telefonoContacto, codigoCupon }) {
+  async crearReserva(clienteId, { rutaTransporteId, salidaTransporteId, fechaViaje, asientos, puestos, metodoPago, notasCliente, nombreContacto, telefonoContacto, codigoCupon }) {
     const ruta = await prisma.rutaTransporte.findUnique({
       where: { id: rutaTransporteId },
       include: { configTransporte: { include: TRANSPORTE_INCLUDE } },
     });
     if (!ruta || !ruta.activo) throw new ErrorValidacion("Ruta no disponible");
+    if (!salidaTransporteId && !operaEnFecha(ruta, fechaViaje)) throw new ErrorValidacion("Esta ruta no opera en la fecha seleccionada");
 
     // Chequeo rápido fuera de la transacción (optimización UX, no atómico) — la
     // garantía real contra sobreventa concurrente viene del lock dentro de la
     // transacción, igual que en Hotel/Tour.
-    const disp = await TransporteService.verificarDisponibilidad(rutaTransporteId, fechaViaje);
+    const disp = await TransporteService.verificarDisponibilidad(rutaTransporteId, fechaViaje, salidaTransporteId);
     if (disp.disponibles < asientos) throw new ErrorValidacion("No hay suficientes asientos disponibles");
 
     const totalOriginal = Number(ruta.precioAsiento) * asientos;
+    const puestosSeleccionados = normalizarPuestos(puestos);
+    if (salidaTransporteId && puestosSeleccionados.length !== Number(asientos)) {
+      throw new ErrorValidacion("Selecciona exactamente los asientos que deseas reservar");
+    }
 
     const { reserva } = await prisma.$transaction(async (tx) => {
       // Bloquea la fila de la ruta para serializar reservas concurrentes sobre el
       // mismo cupo (antes esta verificación no tenía ningún lock — dos reservas
       // simultáneas podían ambas pasar el chequeo y sobrevender asientos).
       await tx.$queryRaw`SELECT id FROM "RutaTransporte" WHERE id = ${rutaTransporteId} FOR UPDATE`;
+      if (salidaTransporteId) await tx.$queryRaw`SELECT id FROM "SalidaTransporte" WHERE id = ${salidaTransporteId} FOR UPDATE`;
 
       const fechaD = new Date(fechaViaje);
       const inicio = new Date(fechaD); inicio.setHours(0, 0, 0, 0);
       const fin    = new Date(fechaD); fin.setHours(23, 59, 59, 999);
+      const salidaDentroDeTx = salidaTransporteId ? await tx.salidaTransporte.findFirst({ where: { id: salidaTransporteId, rutaTransporteId, estado: "PROGRAMADA" } }) : null;
+      if (salidaTransporteId && !salidaDentroDeTx) throw new ErrorValidacion("La salida seleccionada no esta disponible");
       const reservadosDentroDeTx = await tx.reservaTransporte.aggregate({
-        where: { rutaTransporteId, fechaViaje: { gte: inicio, lte: fin }, estado: { in: ["PENDIENTE", "CONFIRMADA"] } },
+        where: salidaTransporteId ? { salidaTransporteId, estado: { in: ["PENDIENTE", "CONFIRMADA"] } } : { rutaTransporteId, fechaViaje: { gte: inicio, lte: fin }, estado: { in: ["PENDIENTE", "CONFIRMADA"] } },
         _sum: { asientos: true },
       });
-      const disponiblesDentroDeTx = Math.max(0, ruta.capacidad - (reservadosDentroDeTx._sum.asientos ?? 0));
+      const capacidadDentroDeTx = salidaDentroDeTx?.capacidad ?? ruta.capacidad;
+      const disponiblesDentroDeTx = Math.max(0, capacidadDentroDeTx - (reservadosDentroDeTx._sum.asientos ?? 0));
       if (disponiblesDentroDeTx < asientos) throw new ErrorValidacion("No hay suficientes asientos disponibles");
+      if (salidaTransporteId && puestosSeleccionados.some((puesto) => Number(puesto) < 1 || Number(puesto) > capacidadDentroDeTx)) {
+        throw new ErrorValidacion("Uno o mas asientos no pertenecen a esta salida");
+      }
 
       let montoDescuento = 0;
       let cuponValidado = null;
@@ -211,6 +260,7 @@ const TransporteService = {
         data: {
           codigo: generarCodigo(),
           rutaTransporteId,
+          salidaTransporteId: salidaTransporteId || null,
           clienteId,
           fechaViaje: new Date(fechaViaje),
           asientos,
@@ -227,6 +277,17 @@ const TransporteService = {
         },
         include: { ruta: { include: { configTransporte: { include: TRANSPORTE_INCLUDE } } } },
       });
+
+      if (salidaTransporteId) {
+        try {
+          await tx.asientoReservaTransporte.createMany({
+            data: puestosSeleccionados.map((codigoAsiento) => ({ salidaTransporteId, reservaTransporteId: nuevaReserva.id, codigoAsiento })),
+          });
+        } catch (error) {
+          if (error?.code === "P2002") throw new ErrorValidacion("Uno de los asientos acaba de ser reservado. Elige otro.");
+          throw error;
+        }
+      }
 
       // Un descuento de alianza no tiene fila CuponVertical propia que actualizar.
       if (cuponValidado && !cuponEsAlianza) {
@@ -253,10 +314,119 @@ const TransporteService = {
     return reserva;
   },
 
+  async listarSalidas(rutaId, fecha) {
+    const inicio = new Date(`${fecha}T00:00:00`);
+    const fin = new Date(`${fecha}T23:59:59.999`);
+    return prisma.salidaTransporte.findMany({
+      where: { rutaTransporteId: rutaId, fechaHora: { gte: inicio, lte: fin }, estado: "PROGRAMADA" },
+      orderBy: { fechaHora: "asc" },
+    });
+  },
+
+  async listarAsientosSalida(salidaId) {
+    const salida = await prisma.salidaTransporte.findUnique({ include: { ruta: true }, where: { id: salidaId } });
+    if (!salida || salida.estado !== "PROGRAMADA") throw new ErrorNoEncontrado("Salida no disponible");
+    const asientos = await prisma.asientoReservaTransporte.findMany({
+      where: { salidaTransporteId: salidaId, reserva: { estado: { in: ["PENDIENTE", "CONFIRMADA"] } } },
+      select: { codigoAsiento: true },
+    });
+    return { capacidad: salida.capacidad ?? salida.ruta.capacidad, ocupados: asientos.map((asiento) => asiento.codigoAsiento) };
+  },
+
+  async crearSalida(comercioId, rutaId, datos) {
+    const ruta = await prisma.rutaTransporte.findFirst({ where: { id: rutaId, configTransporte: { comercioId } } });
+    if (!ruta) throw new ErrorNoEncontrado("Ruta no encontrada");
+    const fechaHora = new Date(datos.fechaHora);
+    if (Number.isNaN(fechaHora.getTime())) throw new ErrorValidacion("Fecha y hora de salida invalidas");
+    if (datos.capacidad != null && (!Number.isInteger(Number(datos.capacidad)) || Number(datos.capacidad) < 1)) throw new ErrorValidacion("La capacidad debe ser mayor que cero");
+    if (datos.vehiculoId) {
+      const vehiculo = await prisma.vehiculoTransporte.findFirst({ where: { id: Number(datos.vehiculoId), configTransporte: { comercioId }, activo: true } });
+      if (!vehiculo) throw new ErrorValidacion("Vehiculo no disponible");
+    }
+    return prisma.salidaTransporte.create({ data: { rutaTransporteId: rutaId, fechaHora, capacidad: datos.capacidad ?? null, vehiculoId: datos.vehiculoId ? Number(datos.vehiculoId) : null, conductorNombre: datos.conductorNombre?.trim() || null, notasOperativas: datos.notasOperativas?.trim() || null } });
+  },
+
+  async listarVehiculos(comercioId) {
+    const cfg = await prisma.configTransporte.findUnique({ where: { comercioId } });
+    if (!cfg) return [];
+    return prisma.vehiculoTransporte.findMany({ where: { configTransporteId: cfg.id }, orderBy: { creadoAt: "desc" } });
+  },
+
+  async listarSalidasOperador(comercioId) {
+    return prisma.salidaTransporte.findMany({
+      where: { ruta: { configTransporte: { comercioId } }, fechaHora: { gte: new Date() } },
+      include: { ruta: true, vehiculo: true },
+      orderBy: { fechaHora: "asc" },
+      take: 100,
+    });
+  },
+
+  async crearVehiculo(comercioId, datos) {
+    const cfg = await prisma.configTransporte.findUnique({ where: { comercioId } });
+    if (!cfg) throw new ErrorNoEncontrado("Configuracion no encontrada");
+    const capacidad = Number(datos.capacidad);
+    if (!datos.nombre?.trim() || !datos.tipo?.trim() || !Number.isInteger(capacidad) || capacidad < 1) throw new ErrorValidacion("Nombre, tipo y capacidad valida son obligatorios");
+    return prisma.vehiculoTransporte.create({ data: { configTransporteId: cfg.id, nombre: datos.nombre.trim(), tipo: datos.tipo.trim(), placa: datos.placa?.trim().toUpperCase() || null, capacidad } });
+  },
+
+  async actualizarVehiculo(comercioId, vehiculoId, datos) {
+    const vehiculo = await prisma.vehiculoTransporte.findFirst({ where: { id: vehiculoId, configTransporte: { comercioId } } });
+    if (!vehiculo) throw new ErrorNoEncontrado("Vehiculo no encontrado");
+    const capacidad = datos.capacidad == null ? vehiculo.capacidad : Number(datos.capacidad);
+    if (!Number.isInteger(capacidad) || capacidad < 1) throw new ErrorValidacion("Capacidad invalida");
+    return prisma.vehiculoTransporte.update({ where: { id: vehiculoId }, data: { nombre: datos.nombre?.trim() || vehiculo.nombre, tipo: datos.tipo?.trim() || vehiculo.tipo, placa: datos.placa === undefined ? vehiculo.placa : (datos.placa?.trim().toUpperCase() || null), capacidad, activo: datos.activo === undefined ? vehiculo.activo : Boolean(datos.activo) } });
+  },
+
+  async cambiarEstadoOperacionSalida(comercioId, salidaId, estadoOperacion) {
+    const permitidos = ["PROGRAMADA", "EN_ABORDAJE", "EN_RUTA", "FINALIZADA"];
+    if (!permitidos.includes(estadoOperacion)) throw new ErrorValidacion("Estado operativo invalido");
+    const salida = await prisma.salidaTransporte.findFirst({ where: { id: salidaId, ruta: { configTransporte: { comercioId } } }, include: { reservas: { where: { estado: { in: ["PENDIENTE", "CONFIRMADA"] } }, include: { cliente: { select: { id: true } } } }, ruta: true } });
+    if (!salida) throw new ErrorNoEncontrado("Salida no encontrada");
+    const actualizada = await prisma.salidaTransporte.update({ where: { id: salidaId }, data: { estadoOperacion } });
+    await Promise.all(salida.reservas.map(reserva => notif(reserva.cliente.id, `Viaje ${estadoOperacion.toLowerCase().replace("_", " ")}`, `${salida.ruta.origen} -> ${salida.ruta.destino}`, "/transportes/mis-reservas")));
+    return actualizada;
+  },
+
+  async registrarAbordaje(comercioId, reservaId, tipo) {
+    if (!["ABORDO", "NO_SHOW"].includes(tipo)) throw new ErrorValidacion("Registro de abordaje invalido");
+    const reserva = await prisma.reservaTransporte.findFirst({ where: { id: reservaId, ruta: { configTransporte: { comercioId } } } });
+    if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
+    if (reserva.estado !== "CONFIRMADA") throw new ErrorValidacion("Solo se puede registrar una reserva confirmada");
+    return prisma.reservaTransporte.update({ where: { id: reservaId }, data: tipo === "ABORDO" ? { abordadoAt: new Date() } : { noShowAt: new Date() } });
+  },
+
+  async cambiarEstadoSalida(comercioId, salidaId, estado) {
+    if (!["PROGRAMADA", "CANCELADA"].includes(estado)) throw new ErrorValidacion("Estado de salida invalido");
+    const salida = await prisma.salidaTransporte.findFirst({
+      where: { id: salidaId, ruta: { configTransporte: { comercioId } } },
+      include: { ruta: true },
+    });
+    if (!salida) throw new ErrorNoEncontrado("Salida no encontrada");
+    const actualizada = await prisma.salidaTransporte.update({ where: { id: salidaId }, data: { estado } });
+
+    // Una salida cancelada no cambia silenciosamente: cada pasajero activo recibe
+    // el aviso y puede gestionar su reserva desde sus viajes.
+    if (estado === "CANCELADA" && salida.estado !== "CANCELADA") {
+      const reservasActivas = await prisma.reservaTransporte.findMany({
+        where: { salidaTransporteId: salidaId, estado: { in: ["PENDIENTE", "CONFIRMADA"] } },
+        include: { cliente: { select: { id: true } } },
+      });
+      await Promise.all(reservasActivas.map((reserva) =>
+        notif(
+          reserva.cliente.id,
+          "Salida cancelada",
+          `La salida ${salida.ruta.origen} -> ${salida.ruta.destino} fue cancelada. Revisa tus viajes para gestionar la reserva.`,
+          "/transportes/mis-reservas"
+        )
+      ));
+    }
+    return actualizada;
+  },
+
   async misReservas(clienteId) {
     const reservas = await prisma.reservaTransporte.findMany({
       where: { clienteId },
-      include: { ruta: { include: { configTransporte: { include: TRANSPORTE_INCLUDE } } } },
+      include: { salida: { include: { vehiculo: true } }, ruta: { include: { configTransporte: { include: TRANSPORTE_INCLUDE } } } },
       orderBy: { creadoAt: "desc" },
     });
     // Resena (Fase 3, Anexo B) no tiene relación directa a ReservaTransporte
@@ -275,6 +445,40 @@ const TransporteService = {
     if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
     if (!["PENDIENTE", "CONFIRMADA"].includes(reserva.estado)) throw new ErrorValidacion("No se puede cancelar");
     return prisma.reservaTransporte.update({ where: { id: reservaId }, data: { estado: "CANCELADA", updatedAt: new Date() } });
+  },
+
+  async reprogramarReserva(clienteId, reservaId, salidaTransporteId, puestos) {
+    const reserva = await prisma.reservaTransporte.findFirst({ where: { id: reservaId, clienteId } });
+    if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
+    if (!["PENDIENTE", "CONFIRMADA"].includes(reserva.estado)) throw new ErrorValidacion("Esta reserva no se puede reprogramar");
+    const puestosSeleccionados = normalizarPuestos(puestos);
+    if (puestosSeleccionados.length !== reserva.asientos) throw new ErrorValidacion("Selecciona todos los nuevos asientos");
+    return prisma.$transaction(async (tx) => {
+      const salida = await tx.salidaTransporte.findFirst({ where: { id: Number(salidaTransporteId), rutaTransporteId: reserva.rutaTransporteId, estado: "PROGRAMADA" }, include: { ruta: true } });
+      if (!salida) throw new ErrorValidacion("La nueva salida no esta disponible para esta ruta");
+      await tx.$queryRaw`SELECT id FROM "SalidaTransporte" WHERE id = ${salida.id} FOR UPDATE`;
+      const ocupados = await tx.reservaTransporte.aggregate({ where: { salidaTransporteId: salida.id, estado: { in: ["PENDIENTE", "CONFIRMADA"] }, id: { not: reserva.id } }, _sum: { asientos: true } });
+      const capacidad = salida.capacidad ?? salida.ruta.capacidad;
+      if (capacidad - (ocupados._sum.asientos ?? 0) < reserva.asientos) throw new ErrorValidacion("La nueva salida no tiene cupos suficientes");
+      if (puestosSeleccionados.some(puesto => Number(puesto) < 1 || Number(puesto) > capacidad)) throw new ErrorValidacion("Uno o mas asientos no pertenecen a la nueva salida");
+      await tx.asientoReservaTransporte.deleteMany({ where: { reservaTransporteId: reserva.id } });
+      await tx.asientoReservaTransporte.createMany({ data: puestosSeleccionados.map(codigoAsiento => ({ salidaTransporteId: salida.id, reservaTransporteId: reserva.id, codigoAsiento })) });
+      return tx.reservaTransporte.update({ where: { id: reserva.id }, data: { salidaTransporteId: salida.id, fechaViaje: salida.fechaHora, updatedAt: new Date() } });
+    });
+  },
+
+  async obtenerTicket(clienteId, reservaId) {
+    const reserva = await prisma.reservaTransporte.findFirst({
+      where: { id: reservaId, clienteId },
+      include: { salida: true, ruta: { include: { configTransporte: { include: TRANSPORTE_INCLUDE } } } },
+    });
+    if (!reserva) throw new ErrorNoEncontrado("Reserva no encontrada");
+    if (!["PENDIENTE", "CONFIRMADA"].includes(reserva.estado)) {
+      throw new ErrorValidacion("El pase QR no esta disponible para esta reserva");
+    }
+    const contenidoQr = JSON.stringify({ tipo: "PASE_TRANSPORTE", codigo: reserva.codigo, reservaId: reserva.id });
+    const qrDataUrl = await QRCode.toDataURL(contenidoQr, { margin: 1, width: 360, errorCorrectionLevel: "M" });
+    return { reserva, qrDataUrl };
   },
 
   // Operador
@@ -299,7 +503,11 @@ const TransporteService = {
   async agregarRuta(comercioId, datos) {
     const cfg = await prisma.configTransporte.findUnique({ where: { comercioId } });
     if (!cfg) throw new ErrorNoEncontrado("Configuración no encontrada");
-    return prisma.rutaTransporte.create({ data: { ...datos, configTransporteId: cfg.id } });
+    const ruta = datosRutaPermitidos(datos);
+    if (!ruta.origen || !ruta.destino || !ruta.horario) throw new ErrorValidacion("Origen, destino y hora de salida son obligatorios");
+    if (!Number.isInteger(Number(ruta.capacidad)) || Number(ruta.capacidad) < 1) throw new ErrorValidacion("La capacidad debe ser mayor que cero");
+    if (Number(ruta.precioAsiento) < 0) throw new ErrorValidacion("El precio por asiento no puede ser negativo");
+    return prisma.rutaTransporte.create({ data: { ...ruta, configTransporteId: cfg.id } });
   },
 
   async actualizarRuta(comercioId, rutaId, datos) {
@@ -307,7 +515,12 @@ const TransporteService = {
       where: { id: rutaId, configTransporte: { comercioId } },
     });
     if (!ruta) throw new ErrorNoEncontrado("Ruta no encontrada");
-    return prisma.rutaTransporte.update({ where: { id: rutaId }, data: datos });
+    const rutaActualizada = datosRutaPermitidos(datos);
+    if (rutaActualizada.capacidad !== undefined && (!Number.isInteger(Number(rutaActualizada.capacidad)) || Number(rutaActualizada.capacidad) < 1)) {
+      throw new ErrorValidacion("La capacidad debe ser mayor que cero");
+    }
+    if (rutaActualizada.precioAsiento !== undefined && Number(rutaActualizada.precioAsiento) < 0) throw new ErrorValidacion("El precio por asiento no puede ser negativo");
+    return prisma.rutaTransporte.update({ where: { id: rutaId }, data: rutaActualizada });
   },
 
   async eliminarRuta(comercioId, rutaId) {
@@ -323,9 +536,26 @@ const TransporteService = {
     if (!cfg) return [];
     return prisma.reservaTransporte.findMany({
       where: { ruta: { configTransporteId: cfg.id }, ...(estado ? { estado } : {}) },
-      include: { ruta: true, cliente: { select: { id: true, nombre: true, email: true } } },
+      include: { salida: true, ruta: true, cliente: { select: { id: true, nombre: true, email: true } } },
       orderBy: { fechaViaje: "desc" },
     });
+  },
+
+  async manifiestoSalida(comercioId, salidaId) {
+    const salida = await prisma.salidaTransporte.findFirst({
+      where: { id: salidaId, ruta: { configTransporte: { comercioId } } },
+      include: {
+        ruta: { include: { configTransporte: { select: { nombre: true, tipo: true } } } },
+        reservas: {
+          where: { estado: { in: ["PENDIENTE", "CONFIRMADA"] } },
+          include: { cliente: { select: { id: true, nombre: true, email: true } } },
+          orderBy: { creadoAt: "asc" },
+        },
+      },
+    });
+    if (!salida) throw new ErrorNoEncontrado("Salida no encontrada");
+    const asientosReservados = salida.reservas.reduce((total, reserva) => total + reserva.asientos, 0);
+    return { ...salida, asientosReservados, capacidadTotal: salida.capacidad ?? salida.ruta.capacidad };
   },
 
   async cambiarEstado(comercioId, reservaId, nuevoEstado) {

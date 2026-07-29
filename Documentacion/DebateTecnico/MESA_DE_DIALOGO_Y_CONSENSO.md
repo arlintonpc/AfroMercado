@@ -207,3 +207,33 @@ La Mesa 11 está aprobada únicamente para su Fase 1. El estado de cada fase, su
 * **Criterio provisional para avanzar sin riesgo:** el resultado operativo se presenta en base de caja; los impuestos son informativos y los descuentos por cupón quedan excluidos del P&L oficial mientras no exista una regla aprobada de financiación por comercio.
 * **Salvaguarda:** esta política no altera pagos, liquidaciones, comisiones ni saldos de usuarios. Su propósito es evitar mostrar una utilidad oficial potencialmente incorrecta.
 * **Pendiente de decisión del dueño:** definir si el cupón lo asume la plataforma, el comercio o ambos; y si el cierre oficial usará caja o devengo.
+
+### MESA 20: Transporte - Buscador de trayectos por fases
+* **Estado:** `FASES 1, 2A Y 2B IMPLEMENTADAS - EN VERIFICACION INTEGRADA`.
+* **Fase 1, descubrimiento:** la pagina publica ahora ofrece origen, destino, intercambio de trayecto, fecha y cantidad de pasajeros. El filtrado usa las rutas activas existentes y destaca la ruta coincidente dentro de cada tarjeta. La busqueda libre se conserva para empresa, municipio o tipo de transporte.
+* **Fase 2A, disponibilidad semanal confiable:** se agregaron punto de abordaje, punto de descenso, hora de llegada y duracion estimada. El comerciante los administra desde su ruta; la ficha publica los expone. El servicio valida que la ruta opere en el dia seleccionado y la portada consulta cupos reales para fecha y pasajeros antes de reservar.
+* **Limite honesto de Fase 2A:** el calendario actual es semanal recurrente. Aun no existe una salida individual con excepciones, cambios de horario o capacidad distinta en una fecha especifica.
+* **Fase 2B, salidas calendarizadas:** implementada la entidad `SalidaTransporte` por ruta, fecha y hora, con capacidad propia, notas operativas y estado `PROGRAMADA`/`CANCELADA`. El comerciante puede programar una salida puntual al guardar la ruta; el viajero la elige al reservar. La reserva se asocia a la salida elegida y el cupo se bloquea por salida dentro de la transaccion.
+* **Fase 3, operacion:** vehiculo/asientos, equipaje, politicas de cambios y cancelacion, manifiesto, comprobante o QR, alertas de cambios y seguimiento del viaje.
+* **Evidencia local:** TypeScript sin errores; `node --check` correcto; pruebas de Transporte 12/12. ESLint focalizado no reporta errores y conserva advertencias heredadas. Prisma Client se regenero y el backend se reinicio; la API publica respondio `HTTP 200`.
+
+### MESA 21: Transporte - Operacion por salida (Fase 3A)
+* **Estado:** `IMPLEMENTADA - PENDIENTE DE PRUEBA INTEGRADA CON CUENTAS REALES`.
+* **Pase del viajero:** una reserva activa puede generar un QR desde `Mis viajes reservados`. El QR contiene un identificador de comprobante y se entrega solo al titular autenticado; no es una autorizacion publica ni sustituye la validacion del operador.
+* **Manifiesto del comercio:** desde una reserva asociada a salida puntual, el comerciante puede abrir el manifiesto con pasajeros activos, telefonos de contacto, codigos de reserva, numero de asientos y las notas de equipaje/necesidades registradas por el viajero.
+* **Alertas de cambio:** al cancelar una salida puntual, el sistema avisa a todos los viajeros con reserva activa vinculada a esa salida y los dirige a sus reservas.
+* **Limite deliberado:** no se implementa aun mapa visual de sillas ni asignacion de puesto. Para hacerlo de manera confiable se requiere primero modelar vehiculo, configuracion fisica y reglas de ocupacion; no se debe simular esa capacidad con un campo de texto.
+* **Politicas:** la cancelacion sigue siendo gestionada por el operador y el viajero conserva el flujo de cancelacion existente. Una politica comercial configurable por empresa queda para la siguiente iteracion, junto con reprogramacion y check-in/abordaje.
+
+### MESA 22: Transporte - Seleccion de asientos por salida (Fase 3B)
+* **Estado:** `IMPLEMENTADA - PENDIENTE DE PRUEBA INTEGRADA`.
+* **Alcance:** las salidas programadas ofrecen un plano numerado de asientos. El viajero elige exactamente la cantidad de puestos que reserva; los puestos ocupados aparecen bloqueados.
+* **Integridad:** cada asignacion se registra en `AsientoReservaTransporte` y la base de datos impone unicidad por salida y numero de asiento. La reserva bloquea la salida antes de asignar; ante una carrera concurrente se rechaza la seleccion que ya fue tomada.
+* **Compatibilidad:** las rutas recurrentes que aun no tienen una salida puntual conservan la reserva por cantidad. No se inventa un plano para ellas porque no existe una fecha/capacidad operativa concreta.
+
+### MESA 23: Transporte - Operacion, flota y seguimiento (Fase 3C/3D/4 - base)
+* **Estado:** `IMPLEMENTADA PARCIALMENTE - EN VERIFICACION`.
+* **Operacion:** el comercio puede registrar `ABORDO` o `NO_SHOW` sobre reservas confirmadas. Las salidas aceptan estados operativos `PROGRAMADA`, `EN_ABORDAJE`, `EN_RUTA` y `FINALIZADA`; cada cambio notifica a los viajeros activos.
+* **Flota:** se incorpora una entidad de vehiculo por comercio con nombre, tipo, placa y capacidad. Una salida puede asociar vehiculo y conductor, sin modificar reservas existentes.
+* **Politica:** la configuracion de transporte incorpora el campo de politica de cancelacion para que la siguiente interfaz publica y de comerciante la edite y muestre sin reglas duplicadas.
+* **Pendiente de interfaz:** formulario/listado de flota, selector de vehiculo/conductor al crear salida, reprogramacion asistida y una politica de reembolso configurable. No se declara cerrado hasta exponer esas operaciones con UX completa y pruebas de integracion.

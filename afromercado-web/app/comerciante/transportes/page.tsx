@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 import {
-  obtenerMiTransporte, actualizarMiTransporte, agregarRuta, actualizarRuta, eliminarRuta,
-  reservasOperadorTransporte, cambiarEstadoReservaTransporte, subirFotosTransporte,
+  obtenerMiTransporte, actualizarMiTransporte, agregarRuta, actualizarRuta, eliminarRuta, crearSalidaTransporte, manifiestoSalidaTransporte, listarVehiculosTransporte, crearVehiculoTransporte, actualizarVehiculoTransporte, listarSalidasOperadorTransporte, cambiarOperacionSalidaTransporte,
+  reservasOperadorTransporte, cambiarEstadoReservaTransporte, registrarAbordajeTransporte, subirFotosTransporte,
   subirVideoTransporte, quitarVideoTransporte, guardarVideoLinkTransporte,
   estadisticasTransporte,
   listarCuponesTransporte, crearCuponTransporte, eliminarCuponTransporte,
   type ConfigTransporte, type RutaTransporte, type ReservaTransporte, type EstadoReservaTransporte, type EstadisticasTransporte,
-  type CuponTransporte,
+  type CuponTransporte, type ManifiestoSalidaTransporte, type VehiculoTransporte, type SalidaTransporte,
 } from '@/lib/api/transporte'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
@@ -56,7 +56,10 @@ const ACCIONES: Record<string, { label: string; estado: EstadoReservaTransporte 
   CONFIRMADA: [{ label: '✈️ Completar', estado: 'COMPLETADA' }, { label: '❌ Cancelar', estado: 'CANCELADA' }],
 }
 
-const RUTA_VACIA = { origen: '', destino: '', horario: '', diasSemana: [] as string[], capacidad: 10, precioAsiento: 0, activo: true }
+const RUTA_VACIA = {
+  origen: '', destino: '', puntoAbordaje: '', puntoDescenso: '', horario: '', horaLlegada: '',
+  duracionMinutos: undefined as number | undefined, diasSemana: [] as string[], capacidad: 10, precioAsiento: 0, activo: true,
+}
 
 function FormNuevoCuponTransporte({ onCreado, onCancelar }: { onCreado: () => void; onCancelar: () => void }) {
   const [form, setForm] = useState({
@@ -168,7 +171,7 @@ function FormNuevoCuponTransporte({ onCreado, onCancelar }: { onCreado: () => vo
 }
 
 export default function ComercianteTransportesPage() {
-  const [tab, setTab] = useState<'reservas' | 'rutas' | 'cupones' | 'estadisticas' | 'config'>('reservas')
+  const [tab, setTab] = useState<'reservas' | 'rutas' | 'salidas' | 'flota' | 'cupones' | 'estadisticas' | 'config'>('reservas')
   const [cfg, setCfg] = useState<ConfigTransporte | null>(null)
   const [reservas, setReservas] = useState<ReservaTransporte[]>([])
   const [cargando, setCargando] = useState(true)
@@ -176,6 +179,9 @@ export default function ComercianteTransportesPage() {
   const [guardando, setGuardando] = useState(false)
   const [editCfg, setEditCfg] = useState<Partial<ConfigTransporte>>({})
   const [formRuta, setFormRuta] = useState<Partial<RutaTransporte>>(RUTA_VACIA)
+  const [fechaHoraSalida, setFechaHoraSalida] = useState('')
+  const [vehiculoSalidaId, setVehiculoSalidaId] = useState<number | null>(null)
+  const [conductorSalida, setConductorSalida] = useState('')
   const [editandoRutaId, setEditandoRutaId] = useState<number | null>(null)
   const [mostrarFormRuta, setMostrarFormRuta] = useState(false)
   const [stats, setStats] = useState<EstadisticasTransporte | null>(null)
@@ -185,7 +191,13 @@ export default function ComercianteTransportesPage() {
   const [cupones, setCupones] = useState<CuponTransporte[]>([])
   const [mostrarFormCupon, setMostrarFormCupon] = useState(false)
   const [pendienteDesactivarRutaId, setPendienteDesactivarRutaId] = useState<number | null>(null)
+  const [manifiesto, setManifiesto] = useState<ManifiestoSalidaTransporte | null>(null)
+  const [cargandoManifiesto, setCargandoManifiesto] = useState<number | null>(null)
   const [desactivandoRuta, setDesactivandoRuta] = useState(false)
+  const [vehiculos, setVehiculos] = useState<VehiculoTransporte[]>([])
+  const [salidasOperativas, setSalidasOperativas] = useState<Array<SalidaTransporte & { ruta: RutaTransporte; vehiculo?: VehiculoTransporte | null }>>([])
+  const [formVehiculo, setFormVehiculo] = useState({ nombre: '', tipo: 'LANCHA', placa: '', capacidad: 10 })
+  const [guardandoVehiculo, setGuardandoVehiculo] = useState(false)
   const inputFotoRef = useRef<HTMLInputElement>(null)
   const reservasRef = useRef<ReservaTransporte[]>([])
   const [videoEstadoTransporte, setVideoEstadoTransporte] = useState<VideoEstado>({
@@ -198,8 +210,8 @@ export default function ComercianteTransportesPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [t, rs] = await Promise.all([obtenerMiTransporte(), reservasOperadorTransporte()])
-        setCfg(t); setEditCfg(t); setReservas(rs); reservasRef.current = rs
+        const [t, rs, vs, ss] = await Promise.all([obtenerMiTransporte(), reservasOperadorTransporte(), listarVehiculosTransporte(), listarSalidasOperadorTransporte()])
+        setCfg(t); setEditCfg(t); setReservas(rs); setVehiculos(vs); setSalidasOperativas(ss); reservasRef.current = rs
         setVideoEstadoTransporte({
           videoUrl: t.videoUrl ?? null,
           videoPosterUrl: t.videoPosterUrl ?? null,
@@ -260,6 +272,20 @@ export default function ComercianteTransportesPage() {
     catch (e: any) { alert(e.message) }
   }
 
+  async function registrarAbordaje(id: number, tipo: 'ABORDO' | 'NO_SHOW') {
+    try {
+      const actualizada = await registrarAbordajeTransporte(id, tipo)
+      setReservas(prev => prev.map(r => r.id === id ? { ...r, ...actualizada } : r))
+    } catch (e: any) { alert(e.message) }
+  }
+
+  async function verManifiesto(salidaId: number) {
+    setCargandoManifiesto(salidaId)
+    try { setManifiesto(await manifiestoSalidaTransporte(salidaId)) }
+    catch (e: any) { alert(e.message) }
+    finally { setCargandoManifiesto(null) }
+  }
+
   async function guardarConfig() {
     setGuardando(true)
     try { const t = await actualizarMiTransporte(editCfg); setCfg(t) }
@@ -267,17 +293,41 @@ export default function ComercianteTransportesPage() {
     finally { setGuardando(false) }
   }
 
+  async function guardarVehiculo() {
+    setGuardandoVehiculo(true)
+    try { const v = await crearVehiculoTransporte(formVehiculo); setVehiculos(prev => [v, ...prev]); setFormVehiculo({ nombre: '', tipo: 'LANCHA', placa: '', capacidad: 10 }) }
+    catch (e: any) { alert(e.message) }
+    finally { setGuardandoVehiculo(false) }
+  }
+
+  async function desactivarVehiculo(id: number) {
+    try { const v = await actualizarVehiculoTransporte(id, { activo: false }); setVehiculos(prev => prev.map(x => x.id === id ? v : x)) }
+    catch (e: any) { alert(e.message) }
+  }
+
+  async function cambiarOperacionSalida(id: number, estadoOperacion: NonNullable<SalidaTransporte['estadoOperacion']>) {
+    try { const salida = await cambiarOperacionSalidaTransporte(id, estadoOperacion); setSalidasOperativas(prev => prev.map(s => s.id === id ? { ...s, ...salida } : s)) }
+    catch (e: any) { alert(e.message) }
+  }
+
   async function guardarRuta() {
     setGuardando(true)
     try {
+      let rutaGuardada: RutaTransporte
       if (editandoRutaId) {
         const r = await actualizarRuta(editandoRutaId, formRuta)
         setCfg(prev => prev ? { ...prev, rutas: prev.rutas.map(x => x.id === editandoRutaId ? r : x) } : prev)
+        rutaGuardada = r
       } else {
         const r = await agregarRuta(formRuta)
         setCfg(prev => prev ? { ...prev, rutas: [...prev.rutas, r] } : prev)
+        rutaGuardada = r
       }
-      setMostrarFormRuta(false); setFormRuta(RUTA_VACIA); setEditandoRutaId(null)
+      if (fechaHoraSalida) {
+        const vehiculo = vehiculos.find(v => v.id === vehiculoSalidaId)
+        await crearSalidaTransporte(rutaGuardada.id, { fechaHora: fechaHoraSalida, vehiculoId: vehiculoSalidaId ?? undefined, conductorNombre: conductorSalida || undefined, capacidad: vehiculo?.capacidad })
+      }
+      setMostrarFormRuta(false); setFormRuta(RUTA_VACIA); setEditandoRutaId(null); setFechaHoraSalida(''); setVehiculoSalidaId(null); setConductorSalida('')
     } catch (e: any) { alert(e.message) }
     finally { setGuardando(false) }
   }
@@ -329,6 +379,8 @@ export default function ComercianteTransportesPage() {
   const TABS = [
     { key: 'reservas',     label: `Reservas${pendientes.length > 0 ? ` (${pendientes.length})` : ''}` },
     { key: 'rutas',        label: 'Rutas' },
+    { key: 'salidas',      label: 'Salidas' },
+    { key: 'flota',        label: 'Flota' },
     { key: 'cupones',      label: 'Cupones' },
     { key: 'estadisticas', label: 'Estadísticas' },
     { key: 'config',       label: 'Configuración' },
@@ -387,6 +439,20 @@ export default function ComercianteTransportesPage() {
                     ))}
                   </div>
                 )}
+                {r.estado === 'CONFIRMADA' && !r.abordadoAt && !r.noShowAt && (
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button onClick={() => registrarAbordaje(r.id, 'ABORDO')} className="rounded-xl bg-[#1B4332] py-2 text-xs font-semibold text-white hover:bg-[#15362A]">Registrar abordaje</button>
+                    <button onClick={() => registrarAbordaje(r.id, 'NO_SHOW')} className="rounded-xl border border-amber-200 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50">No se presento</button>
+                  </div>
+                )}
+                {r.abordadoAt && <p className="mt-2 text-xs font-semibold text-[#2D6A4F]">Abordado</p>}
+                {r.noShowAt && <p className="mt-2 text-xs font-semibold text-amber-700">No se presento</p>}
+                {r.salidaTransporteId && (
+                  <button onClick={() => verManifiesto(r.salidaTransporteId!)} disabled={cargandoManifiesto === r.salidaTransporteId}
+                    className="mt-3 w-full py-2 rounded-xl text-xs font-semibold text-[#023E8A] border border-[#023E8A]/20 hover:bg-[#023E8A]/5 disabled:opacity-50">
+                    {cargandoManifiesto === r.salidaTransporteId ? 'Cargando manifiesto...' : 'Ver manifiesto de salida'}
+                  </button>
+                )}
                 <p className="text-[10px] text-gray-300 mt-2 font-mono">{r.codigo}</p>
               </div>
             )
@@ -395,6 +461,14 @@ export default function ComercianteTransportesPage() {
       )}
 
       {/* ── Rutas ── */}
+      {tab === 'salidas' && (
+        <div className="space-y-3">{salidasOperativas.map(s => <div key={s.id} className="rounded-2xl border border-gray-100 bg-white p-4"><p className="font-bold">{s.ruta.origen} - {s.ruta.destino}</p><p className="mt-1 text-xs text-gray-500">{new Date(s.fechaHora).toLocaleString('es-CO')} · {s.vehiculo?.nombre ?? 'Vehículo sin asignar'} · {s.conductorNombre ?? 'Conductor pendiente'}</p><div className="mt-3 flex flex-wrap gap-2">{(['EN_ABORDAJE', 'EN_RUTA', 'FINALIZADA'] as const).map(estado => <button key={estado} onClick={() => cambiarOperacionSalida(s.id, estado)} disabled={s.estadoOperacion === estado} className="rounded-lg border border-[#023E8A]/20 px-2 py-1 text-xs font-semibold text-[#023E8A] disabled:bg-[#023E8A] disabled:text-white">{estado.replace('_', ' ').toLowerCase()}</button>)}</div></div>)}{salidasOperativas.length === 0 && <p className="py-10 text-center text-sm text-gray-400">No hay salidas futuras programadas.</p>}</div>
+      )}
+
+      {tab === 'flota' && (
+        <div className="space-y-4"><div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3"><h2 className="font-semibold">Registrar vehículo</h2><input value={formVehiculo.nombre} onChange={e => setFormVehiculo(p => ({ ...p, nombre: e.target.value }))} placeholder="Nombre o referencia" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" /><div className="grid grid-cols-2 gap-3"><select value={formVehiculo.tipo} onChange={e => setFormVehiculo(p => ({ ...p, tipo: e.target.value }))} className="border border-gray-200 rounded-xl px-3 py-2 text-sm">{TIPO_OPCIONES.map(tipo => <option key={tipo} value={tipo}>{TIPO_LABEL[tipo] ?? tipo}</option>)}</select><input type="number" min={1} value={formVehiculo.capacidad} onChange={e => setFormVehiculo(p => ({ ...p, capacidad: Number(e.target.value) }))} className="border border-gray-200 rounded-xl px-3 py-2 text-sm" /></div><input value={formVehiculo.placa} onChange={e => setFormVehiculo(p => ({ ...p, placa: e.target.value.toUpperCase() }))} placeholder="Placa (opcional)" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" /><button onClick={guardarVehiculo} disabled={guardandoVehiculo} className="w-full rounded-xl bg-[#023E8A] py-2.5 text-sm font-bold text-white disabled:opacity-50">{guardandoVehiculo ? 'Guardando...' : 'Guardar vehículo'}</button></div><div className="space-y-2">{vehiculos.map(v => <div key={v.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex justify-between"><div><p className="font-semibold">{v.nombre}</p><p className="text-xs text-gray-500">{TIPO_LABEL[v.tipo] ?? v.tipo}{v.placa ? ` · ${v.placa}` : ''}</p></div><div className="text-right"><span className="block text-sm font-bold text-[#1B4332]">{v.capacidad} puestos</span>{v.activo ? <button onClick={() => desactivarVehiculo(v.id)} className="mt-2 text-xs text-red-500 hover:underline">Desactivar</button> : <span className="mt-2 block text-xs text-gray-400">Inactivo</span>}</div></div>)}{vehiculos.length === 0 && <p className="py-8 text-center text-sm text-gray-400">Registra el primer vehículo para programar sus salidas.</p>}</div></div>
+      )}
+
       {tab === 'rutas' && (
         <div>
           <div className="flex justify-between items-center mb-3">
@@ -446,6 +520,16 @@ export default function ComercianteTransportesPage() {
                       className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#023E8A]" />
                   </div>
                 ))}
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Punto de abordaje</label>
+                  <input value={formRuta.puntoAbordaje ?? ''} onChange={e => setFormRuta(p => ({ ...p, puntoAbordaje: e.target.value }))}
+                    placeholder="Ej: Muelle principal, Quibdo" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#023E8A]" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Punto de descenso</label>
+                  <input value={formRuta.puntoDescenso ?? ''} onChange={e => setFormRuta(p => ({ ...p, puntoDescenso: e.target.value }))}
+                    placeholder="Ej: Muelle turistico, Nuqui" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#023E8A]" />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Horario (HH:MM)</label>
@@ -453,10 +537,20 @@ export default function ComercianteTransportesPage() {
                       className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#023E8A]" />
                   </div>
                   <div>
+                    <label className="block text-xs text-gray-500 mb-1">Llegada estimada</label>
+                    <input type="time" value={formRuta.horaLlegada ?? ''} onChange={e => setFormRuta(p => ({ ...p, horaLlegada: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#023E8A]" />
+                  </div>
+                  <div>
                     <label className="block text-xs text-gray-500 mb-1">Capacidad</label>
                     <input type="number" min={1} value={formRuta.capacidad ?? 10} onChange={e => setFormRuta(p => ({ ...p, capacidad: Number(e.target.value) }))}
                       className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#023E8A]" />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Duracion estimada (minutos)</label>
+                  <input type="number" min={1} value={formRuta.duracionMinutos ?? ''} onChange={e => setFormRuta(p => ({ ...p, duracionMinutos: e.target.value ? Number(e.target.value) : undefined }))}
+                    placeholder="Ej: 90" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#023E8A]" />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Precio por asiento</label>
@@ -478,6 +572,18 @@ export default function ComercianteTransportesPage() {
                     })}
                   </div>
                 </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Programar salida puntual (opcional)</label>
+                  <input type="datetime-local" value={fechaHoraSalida} onChange={e => setFechaHoraSalida(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#023E8A]" />
+                  <p className="mt-1 text-[11px] text-gray-400">Crea una salida con cupos propios para esta fecha y hora.</p>
+                </div>
+                {fechaHoraSalida && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className="block text-xs text-gray-500 mb-1">Vehículo</label><select value={vehiculoSalidaId ?? ''} onChange={e => setVehiculoSalidaId(e.target.value ? Number(e.target.value) : null)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"><option value="">Sin asignar</option>{vehiculos.filter(v => v.activo).map(v => <option key={v.id} value={v.id}>{v.nombre} ({v.capacidad})</option>)}</select></div>
+                    <div><label className="block text-xs text-gray-500 mb-1">Conductor</label><input value={conductorSalida} onChange={e => setConductorSalida(e.target.value)} placeholder="Nombre" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" /></div>
+                  </div>
+                )}
                 <div className="flex gap-2 pt-1">
                   <button onClick={() => setMostrarFormRuta(false)} className="flex-1 border border-gray-200 py-2.5 rounded-xl text-sm">Cancelar</button>
                   <button onClick={guardarRuta} disabled={guardando} className="flex-1 bg-[#023E8A] text-white py-2.5 rounded-xl text-sm font-bold disabled:opacity-50">
@@ -729,6 +835,13 @@ export default function ComercianteTransportesPage() {
               <textarea value={editCfg.descripcion ?? ''} onChange={e => setEditCfg(p => ({ ...p, descripcion: e.target.value }))}
                 rows={3} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#023E8A] resize-none" />
             </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Política de cancelación y cambios</label>
+              <textarea value={editCfg.politicaCancelacion ?? ''} onChange={e => setEditCfg(p => ({ ...p, politicaCancelacion: e.target.value }))}
+                placeholder="Ej: Los cambios deben solicitarse con 24 horas de anticipación. Las devoluciones se revisan con el comercio."
+                rows={3} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#023E8A] resize-none" />
+              <p className="mt-1 text-[11px] text-gray-400">No activa reembolsos automáticos; informa las condiciones del servicio.</p>
+            </div>
           </div>
 
           {/* Fotos */}
@@ -777,6 +890,19 @@ export default function ComercianteTransportesPage() {
           confirmando={desactivandoRuta}
           destructivo={true}
         />
+      )}
+      {manifiesto && (
+        <div className="fixed inset-0 z-50 bg-black/60 p-4 flex items-center justify-center" onClick={() => setManifiesto(null)}>
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
+              <div><p className="text-xs font-semibold uppercase tracking-wide text-[#2D6A4F]">Manifiesto de salida</p><h2 className="mt-1 font-bold">{manifiesto.ruta.origen} - {manifiesto.ruta.destino}</h2><p className="mt-1 text-xs text-gray-500">{new Date(manifiesto.fechaHora).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}</p></div>
+              <button className="text-xl text-gray-400" onClick={() => setManifiesto(null)} aria-label="Cerrar">x</button>
+            </div>
+            <div className="my-4 grid grid-cols-2 gap-3 text-center"><div className="rounded-xl bg-[#F0F7F3] p-3"><p className="text-xs text-gray-500">Asientos reservados</p><p className="text-xl font-bold text-[#1B4332]">{manifiesto.asientosReservados}/{manifiesto.capacidadTotal}</p></div><div className="rounded-xl bg-gray-50 p-3"><p className="text-xs text-gray-500">Pasajeros</p><p className="text-xl font-bold">{manifiesto.reservas.length}</p></div></div>
+            <div className="space-y-2">{manifiesto.reservas.map((reserva, index) => <div key={reserva.id} className="rounded-xl border border-gray-100 p-3"><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold">{index + 1}. {reserva.nombreContacto}</p><span className="text-xs font-medium text-[#2D6A4F]">{reserva.asientos} asiento{reserva.asientos !== 1 ? 's' : ''}</span></div><p className="mt-1 text-xs text-gray-500">{reserva.telefonoContacto} · {reserva.codigo}</p>{reserva.notasCliente && <p className="mt-2 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-800">Equipaje o nota: {reserva.notasCliente}</p>}</div>)}</div>
+            {manifiesto.reservas.length === 0 && <p className="py-8 text-center text-sm text-gray-400">No hay reservas activas para esta salida.</p>}
+          </div>
+        </div>
       )}
     </div>
   )

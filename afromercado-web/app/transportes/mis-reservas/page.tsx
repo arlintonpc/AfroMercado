@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { misReservasTransporte, cancelarReservaTransporte, type ReservaTransporte } from '@/lib/api/transporte'
+import { misReservasTransporte, cancelarReservaTransporte, obtenerTicketTransporte, listarSalidasTransporte, listarAsientosSalidaTransporte, reprogramarReservaTransporte, type ReservaTransporte, type SalidaTransporte } from '@/lib/api/transporte'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { useAuth } from '@/context/AuthContext'
 import ModalReportarProblema from '@/components/disputas/ModalReportarProblema'
@@ -16,12 +16,35 @@ const ESTADO_INFO: Record<string, { label: string; color: string }> = {
   RECHAZADA:  { label: '🚫 Rechazada',   color: 'bg-red-100 text-red-600'    },
 }
 
+function ModalReprogramar({ reserva, onCerrar, onExito }: { reserva: ReservaTransporte; onCerrar: () => void; onExito: (reserva: ReservaTransporte) => void }) {
+  const [salidas, setSalidas] = useState<SalidaTransporte[]>([])
+  const [salidaId, setSalidaId] = useState<number | null>(null)
+  const [ocupados, setOcupados] = useState<string[]>([])
+  const [capacidad, setCapacidad] = useState(0)
+  const [puestos, setPuestos] = useState<string[]>([])
+  const [error, setError] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const fecha = reserva.fechaViaje.slice(0, 10)
+
+  useEffect(() => { if (reserva.ruta) listarSalidasTransporte(reserva.ruta.id, fecha).then(setSalidas).catch(() => setError('No fue posible cargar salidas')) }, [reserva.ruta, fecha])
+  useEffect(() => { if (!salidaId) return; listarAsientosSalidaTransporte(salidaId).then(data => { setCapacidad(data.capacidad); setOcupados(data.ocupados); setPuestos([]) }).catch(() => setError('No fue posible cargar puestos')) }, [salidaId])
+  async function confirmar() {
+    if (!salidaId || puestos.length !== reserva.asientos) { setError('Selecciona una salida y todos los nuevos asientos'); return }
+    setGuardando(true); setError('')
+    try { onExito(await reprogramarReservaTransporte(reserva.id, salidaId, puestos)) } catch (e: any) { setError(e.message) } finally { setGuardando(false) }
+  }
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" onClick={onCerrar}><div className="w-full max-w-md rounded-t-3xl bg-white p-5 sm:rounded-3xl" onClick={e => e.stopPropagation()}><div className="flex justify-between"><div><p className="text-xs font-semibold text-[#2D6A4F]">Reprogramar viaje</p><h2 className="font-bold">{reserva.ruta?.origen} - {reserva.ruta?.destino}</h2></div><button onClick={onCerrar}>x</button></div><select className="mt-4 w-full rounded-xl border p-3 text-sm" value={salidaId ?? ''} onChange={e => setSalidaId(Number(e.target.value))}><option value="">Elige una salida</option>{salidas.map(s => <option key={s.id} value={s.id}>{new Date(s.fechaHora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</option>)}</select>{salidaId && <div className="mt-4"><p className="mb-2 text-xs font-semibold">Elige {reserva.asientos} asiento(s)</p><div className="grid grid-cols-4 gap-2">{Array.from({ length: capacidad }, (_, i) => String(i + 1)).map(p => <button key={p} disabled={ocupados.includes(p)} onClick={() => setPuestos(prev => prev.includes(p) ? prev.filter(x => x !== p) : prev.length < reserva.asientos ? [...prev, p] : prev)} className={`h-10 rounded-lg text-sm font-bold ${ocupados.includes(p) ? 'bg-gray-200 text-gray-400' : puestos.includes(p) ? 'bg-[#1B4332] text-white' : 'border'}`}>{p}</button>)}</div></div>}{error && <p className="mt-3 text-sm text-red-600">{error}</p>}<button onClick={confirmar} disabled={guardando} className="mt-5 w-full rounded-xl bg-[#1B4332] py-3 font-bold text-white disabled:opacity-50">{guardando ? 'Reprogramando...' : 'Confirmar cambio'}</button></div></div>
+}
+
 export default function MisReservasTransportePage() {
   const { usuario } = useAuth()
   const [reservas, setReservas] = useState<ReservaTransporte[]>([])
   const [cargando, setCargando] = useState(true)
   const [cancelando, setCancelando] = useState<number | null>(null)
   const [reservaACancelar, setReservaACancelar] = useState<number | null>(null)
+  const [ticket, setTicket] = useState<{ reserva: ReservaTransporte; qrDataUrl: string } | null>(null)
+  const [cargandoTicket, setCargandoTicket] = useState<number | null>(null)
+  const [reservaAReprogramar, setReservaAReprogramar] = useState<ReservaTransporte | null>(null)
 
   useEffect(() => {
     if (!usuario) return
@@ -30,6 +53,13 @@ export default function MisReservasTransportePage() {
 
   function cancelar(id: number) {
     setReservaACancelar(id)
+  }
+
+  async function verTicket(id: number) {
+    setCargandoTicket(id)
+    try { setTicket(await obtenerTicketTransporte(id)) }
+    catch (e: any) { alert(e.message) }
+    finally { setCargandoTicket(null) }
   }
 
   async function confirmarCancelar() {
@@ -79,8 +109,24 @@ export default function MisReservasTransportePage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-3">
+        {r.salida && (
+          <div className="mt-3 rounded-xl bg-[#F0F7F3] px-3 py-2 text-xs text-[#1B4332]">
+            <p className="font-semibold">Estado: {(r.salida.estadoOperacion ?? 'PROGRAMADA').replace('_', ' ').toLowerCase()}</p>
+            {r.salida.vehiculo?.nombre && <p className="mt-1">Vehículo: {r.salida.vehiculo.nombre}</p>}
+            {r.salida.conductorNombre && <p className="mt-1">Conductor: {r.salida.conductorNombre}</p>}
+          </div>
+        )}
+        {cfg?.politicaCancelacion && <p className="mt-3 text-xs leading-4 text-gray-500">Cambios y cancelación: {cfg.politicaCancelacion}</p>}
+
+        <div className="flex items-center justify-between gap-3 mt-3">
           <span className="text-[10px] text-gray-400 font-mono">{r.codigo}</span>
+          {r.salidaTransporteId && ['PENDIENTE', 'CONFIRMADA'].includes(r.estado) && <button onClick={() => setReservaAReprogramar(r)} className="text-xs font-semibold text-[#2D6A4F] hover:underline">Reprogramar</button>}
+          {['PENDIENTE', 'CONFIRMADA'].includes(r.estado) && (
+            <button onClick={() => verTicket(r.id)} disabled={cargandoTicket === r.id}
+              className="text-xs font-semibold text-[#023E8A] hover:underline disabled:opacity-50">
+              {cargandoTicket === r.id ? 'Generando...' : 'Ver pase QR'}
+            </button>
+          )}
           {['PENDIENTE', 'CONFIRMADA'].includes(r.estado) && (
             <button onClick={() => cancelar(r.id)} disabled={cancelando === r.id}
               className="text-xs text-red-500 hover:underline disabled:opacity-50">
@@ -166,6 +212,20 @@ export default function MisReservasTransportePage() {
           confirmando={cancelando === reservaACancelar}
         />
       )}
+      {ticket && (
+        <div className="fixed inset-0 z-50 bg-black/60 p-4 flex items-center justify-center" onClick={() => setTicket(null)}>
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 text-left">
+              <div><p className="text-xs font-semibold uppercase tracking-wide text-[#2D6A4F]">Pase de viaje</p><h2 className="mt-1 text-lg font-bold text-[#1A1A1A]">{ticket.reserva.ruta?.origen} - {ticket.reserva.ruta?.destino}</h2></div>
+              <button className="text-xl text-gray-400" onClick={() => setTicket(null)} aria-label="Cerrar">x</button>
+            </div>
+            <img className="mx-auto my-5 h-52 w-52 rounded-xl border border-gray-100 p-2" src={ticket.qrDataUrl} alt={`QR de la reserva ${ticket.reserva.codigo}`} />
+            <p className="font-mono text-sm font-bold text-[#023E8A]">{ticket.reserva.codigo}</p>
+            <p className="mt-3 text-xs leading-5 text-gray-500">Muestralo al operador al abordar. El codigo se verifica contra el manifiesto de la salida.</p>
+          </div>
+        </div>
+      )}
+      {reservaAReprogramar && <ModalReprogramar reserva={reservaAReprogramar} onCerrar={() => setReservaAReprogramar(null)} onExito={actualizada => { setReservas(prev => prev.map(r => r.id === actualizada.id ? { ...r, ...actualizada } : r)); setReservaAReprogramar(null) }} />}
     </div>
   )
 }

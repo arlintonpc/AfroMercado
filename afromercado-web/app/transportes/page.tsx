@@ -5,7 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
-import { listarTransportes, type ConfigTransporte } from '@/lib/api/transporte'
+import { listarTransportes, verificarDisponibilidadTransporte, type ConfigTransporte, type RutaTransporte } from '@/lib/api/transporte'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 import { optimizarImagenPequena } from '@/lib/cloudinary'
 import BannerDisplay from '@/components/publicidad/BannerDisplay'
@@ -47,7 +47,26 @@ function SkeletonTransporte() {
   )
 }
 
-function TarjetaTransporte({ t, userLat, userLon }: { t: ConfigTransporte; userLat: number | null; userLon: number | null }) {
+function CupoRuta({ ruta, fecha, pasajeros }: { ruta: RutaTransporte; fecha: string; pasajeros: number }) {
+  const [estado, setEstado] = useState<{ disponibles: number; opera: boolean } | null>(null)
+
+  useEffect(() => {
+    if (!fecha) { setEstado(null); return }
+    let vigente = true
+    verificarDisponibilidadTransporte(ruta.id, fecha)
+      .then(d => { if (vigente) setEstado(d) })
+      .catch(() => { if (vigente) setEstado(null) })
+    return () => { vigente = false }
+  }, [ruta.id, fecha])
+
+  if (!fecha) return <p className="mt-2 text-[11px] text-gray-400">Selecciona una fecha para ver cupos.</p>
+  if (!estado) return <p className="mt-2 text-[11px] text-gray-400">Consultando cupos...</p>
+  if (!estado.opera) return <p className="mt-2 text-[11px] font-semibold text-red-600">No opera en la fecha seleccionada.</p>
+  if (estado.disponibles < pasajeros) return <p className="mt-2 text-[11px] font-semibold text-red-600">Solo quedan {estado.disponibles} cupos para esta salida.</p>
+  return <p className="mt-2 text-[11px] font-semibold text-emerald-700">{estado.disponibles} cupos disponibles para {fecha}.</p>
+}
+
+function TarjetaTransporte({ t, userLat, userLon, rutaDestacada, fechaViaje, pasajeros }: { t: ConfigTransporte; userLat: number | null; userLon: number | null; rutaDestacada?: RutaTransporte; fechaViaje: string; pasajeros: number }) {
   const dist = userLat && userLon && t.comercio.latitud && t.comercio.longitud
     ? distanciaKm(userLat, userLon, t.comercio.latitud, t.comercio.longitud)
     : null
@@ -111,8 +130,8 @@ function TarjetaTransporte({ t, userLat, userLon }: { t: ConfigTransporte; userL
       {/* Rutas preview */}
       {rutas.length > 0 && (
         <div className="px-4 pt-3 space-y-1.5">
-          {rutas.slice(0, 2).map(r => (
-            <div key={r.id} className="flex items-center justify-between text-xs bg-[#1B4332]/6 rounded-xl px-3 py-2">
+          {(rutaDestacada ? [rutaDestacada] : rutas.slice(0, 2)).map(r => (
+            <div key={r.id} className={`flex items-center justify-between text-xs rounded-xl px-3 py-2 ${rutaDestacada ? 'bg-[#D4A017]/15 ring-1 ring-[#D4A017]/30' : 'bg-[#1B4332]/6'}`}>
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className="text-[#2D6A4F] font-semibold truncate">{r.origen}</span>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5" className="flex-shrink-0"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -121,9 +140,10 @@ function TarjetaTransporte({ t, userLat, userLon }: { t: ConfigTransporte; userL
               <span className="text-gray-400 flex-shrink-0 ml-2 text-[10px]">{r.horario}</span>
             </div>
           ))}
-          {rutas.length > 2 && (
+          {!rutaDestacada && rutas.length > 2 && (
             <p className="text-[11px] text-[#2D6A4F] font-medium px-1 pb-1">+{rutas.length - 2} rutas más</p>
           )}
+          {rutaDestacada && <CupoRuta ruta={rutaDestacada} fecha={fechaViaje} pasajeros={pasajeros} />}
         </div>
       )}
 
@@ -162,6 +182,10 @@ export default function TransportesPage() {
   const [cargando, setCargando]       = useState(true)
   const [error, setError]             = useState('')
   const [tardando, setTardando]       = useState(false)
+  const [origen, setOrigen]           = useState('')
+  const [destino, setDestino]         = useState('')
+  const [fechaViaje, setFechaViaje]   = useState('')
+  const [pasajeros, setPasajeros]     = useState(1)
   const [busqueda, setBusqueda]       = useState('')
   const [userLat, setUserLat]         = useState<number | null>(null)
   const [userLon, setUserLon]         = useState<number | null>(null)
@@ -219,13 +243,22 @@ export default function TransportesPage() {
 
   const banners = transportes.filter((t: any) => t.esBannerDisplay)
   const organicos = transportes.filter((t: any) => !t.esBannerDisplay)
+  const normalizar = (valor: string) => valor.trim().toLocaleLowerCase()
+  const origenConsulta = normalizar(origen)
+  const destinoConsulta = normalizar(destino)
+  const hayBusquedaRuta = Boolean(origenConsulta || destinoConsulta)
 
   let filtrados = organicos.filter((t: any) => {
     if (tipoFiltro && t.tipo !== tipoFiltro) return false
-    if (!busqueda) return true
-    const q = busqueda.toLowerCase()
-    return t.nombre?.toLowerCase().includes(q) || t.comercio?.municipio?.toLowerCase().includes(q) ||
-      (t.rutas && t.rutas.some((r: any) => r.origen.toLowerCase().includes(q) || r.destino.toLowerCase().includes(q)))
+    const coincideTrayecto = !hayBusquedaRuta || t.rutas?.some((r: RutaTransporte) =>
+      (!origenConsulta || normalizar(r.origen).includes(origenConsulta)) &&
+      (!destinoConsulta || normalizar(r.destino).includes(destinoConsulta))
+    )
+    if (!coincideTrayecto) return false
+    if (!busqueda.trim()) return true
+    const consultaLibre = normalizar(busqueda)
+    return t.nombre?.toLocaleLowerCase().includes(consultaLibre) || t.comercio?.municipio?.toLocaleLowerCase().includes(consultaLibre) ||
+      t.rutas?.some((r: RutaTransporte) => normalizar(r.origen).includes(consultaLibre) || normalizar(r.destino).includes(consultaLibre))
   })
 
   if (userLat && userLon) {
@@ -255,6 +288,23 @@ export default function TransportesPage() {
   }
 
   const tiposDisponibles = TIPOS.filter(tp => transportes.some(t => t.tipo === tp))
+
+  function intercambiarTrayecto() {
+    setOrigen(destino)
+    setDestino(origen)
+  }
+
+  function limpiarBusquedaRuta() {
+    setOrigen('')
+    setDestino('')
+    setFechaViaje('')
+    setPasajeros(1)
+    setTipoFiltro('')
+  }
+
+  const rutasEncontradas = cercanos.reduce((total, transporte) => total + transporte.rutas.filter(r =>
+    r.activo && (!origenConsulta || normalizar(r.origen).includes(origenConsulta)) && (!destinoConsulta || normalizar(r.destino).includes(destinoConsulta))
+  ).length, 0)
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F7F5F2]">
@@ -309,11 +359,23 @@ export default function TransportesPage() {
           </div>
 
           {/* Búsqueda */}
-          <div className="mt-6 bg-white shadow-2xl rounded-2xl p-2 flex flex-col sm:flex-row gap-2 border border-gray-100 relative z-10">
+          <div className="mt-6 bg-white shadow-2xl rounded-2xl p-3 flex flex-col gap-2 border border-gray-100 relative z-10">
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr_150px_120px]">
+              <input value={origen} onChange={e => setOrigen(e.target.value)} placeholder="Origen" aria-label="Origen" className="min-w-0 rounded-xl bg-gray-50 px-3 py-2.5 text-gray-900 placeholder-gray-400 text-sm font-medium outline-none ring-1 ring-transparent focus:ring-[#2D6A4F]" />
+              <button type="button" onClick={intercambiarTrayecto} aria-label="Intercambiar origen y destino" className="hidden sm:flex h-9 w-9 self-center items-center justify-center rounded-full text-[#1B4332] hover:bg-[#1B4332]/10 transition-colors">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m7 7 3-3 3 3M10 4v11M17 17l-3 3-3-3M14 20V9"/></svg>
+              </button>
+              <input value={destino} onChange={e => setDestino(e.target.value)} placeholder="Destino" aria-label="Destino" className="min-w-0 rounded-xl bg-gray-50 px-3 py-2.5 text-gray-900 placeholder-gray-400 text-sm font-medium outline-none ring-1 ring-transparent focus:ring-[#2D6A4F]" />
+              <input type="date" value={fechaViaje} onChange={e => setFechaViaje(e.target.value)} aria-label="Fecha de viaje" className="min-w-0 rounded-xl bg-gray-50 px-3 py-2.5 text-gray-700 text-sm font-medium outline-none ring-1 ring-transparent focus:ring-[#2D6A4F]" />
+              <select value={pasajeros} onChange={e => setPasajeros(Number(e.target.value))} aria-label="Pasajeros" className="min-w-0 rounded-xl bg-gray-50 px-3 py-2.5 text-gray-700 text-sm font-medium outline-none ring-1 ring-transparent focus:ring-[#2D6A4F]">
+                {[1, 2, 3, 4, 5, 6].map(cantidad => <option key={cantidad} value={cantidad}>{cantidad} pasajero{cantidad !== 1 ? 's' : ''}</option>)}
+              </select>
+              <button type="button" onClick={intercambiarTrayecto} className="sm:hidden text-xs font-semibold text-[#1B4332]">Intercambiar origen y destino</button>
+            </div>
             <div className="flex-1 relative">
               <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
-                placeholder="Ruta, origen, destino o municipio…"
+                placeholder="Buscar empresa, municipio o tipo de transporte…"
                 className="w-full pl-10 pr-4 py-2.5 bg-transparent text-gray-900 placeholder-gray-400 text-sm font-medium focus:outline-none" />
             </div>
             <button onClick={activarGPS}
@@ -352,6 +414,11 @@ export default function TransportesPage() {
       {/* ── TOOLBAR ───────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex items-center justify-between">
+          {hayBusquedaRuta && (
+            <div className="rounded-full bg-[#1B4332] px-3 py-1 text-xs font-semibold text-white shadow-sm">
+              {rutasEncontradas} ruta{rutasEncontradas !== 1 ? 's' : ''}: {origen || 'cualquier origen'} a {destino || 'cualquier destino'}
+            </div>
+          )}
           <p className="text-sm text-gray-500">
             {cargando ? 'Buscando…' : (
               <><span className="font-semibold text-gray-800">{cercanos.length}</span> servicio{cercanos.length !== 1 ? 's' : ''}{userLat ? <span className="text-[#2D6A4F]"> · a menos de {RADIO_CERCA_KM}km</span> : ''}</>
@@ -411,7 +478,7 @@ export default function TransportesPage() {
             </p>
             <div className="flex gap-3 mt-4 justify-center">
               {(busqueda || tipoFiltro) && (
-                <button onClick={() => { setBusqueda(''); setTipoFiltro('') }}
+                <button onClick={() => { setBusqueda(''); limpiarBusquedaRuta() }}
                   className="px-5 py-2 bg-[#1B4332] text-white text-sm rounded-full font-medium">
                   Limpiar filtros
                 </button>
@@ -432,7 +499,9 @@ export default function TransportesPage() {
                   <BannerDisplay banner={t} />
                 </div>
               ) : (
-                <TarjetaTransporte key={t.id} t={t} userLat={userLat} userLon={userLon} />
+                <TarjetaTransporte key={t.id} t={t} userLat={userLat} userLon={userLon}
+                  rutaDestacada={hayBusquedaRuta ? t.rutas.find((r: RutaTransporte) => r.activo && (!origenConsulta || normalizar(r.origen).includes(origenConsulta)) && (!destinoConsulta || normalizar(r.destino).includes(destinoConsulta))) : undefined}
+                  fechaViaje={fechaViaje} pasajeros={pasajeros} />
               )
             ))}
           </div>

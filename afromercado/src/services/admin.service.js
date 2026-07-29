@@ -10,6 +10,7 @@ const {
 } = require("../utils/errores");
 const NotificacionService = require("./notificacion.service");
 const VisibilidadRepository = require("../repositories/visibilidad.repository");
+const InventarioService = require("./inventario.service");
 const { bloquearPedido } = require("../utils/bloqueos-transaccionales");
 
 const ACCIONES_VALIDAS = ["APROBAR", "RECHAZAR"];
@@ -119,22 +120,16 @@ const AdminService = {
           );
         }
 
-        // 1. Descontar stock real y liberar el reservado de cada item, de forma
-        //    atómica. Cada item pertenece a un subPedido del pedido.
+        // 1. Descontar stock real y liberar el reservado de cada item, y
+        //    registrar el movimiento de Kardex correspondiente (misma ruta
+        //    que usa la confirmación por pasarela digital, para que las
+        //    ventas aprobadas manualmente también queden trazadas).
         for (const sub of pedido.subPedidos) {
           for (const item of sub.items) {
-            const result = await tx.$executeRaw`
-              UPDATE "Producto"
-              SET "stock" = "stock" - ${item.cantidad},
-                  "stockReservado" = GREATEST("stockReservado" - ${item.cantidad}, 0)
-              WHERE id = ${item.productoId}
-                AND "stock" >= ${item.cantidad}
-            `;
-            if (result === 0) {
-              throw new ErrorValidacion(
-                `Stock insuficiente para confirmar el producto #${item.productoId}`
-              );
-            }
+            await InventarioService.registrarVentaConfirmadaEnTx(tx, {
+              comercioId: sub.comercioId,
+              pedidoItem: item,
+            });
           }
         }
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { obtenerTransporte, verificarDisponibilidadTransporte, crearReservaTransporte, misReservasTransporte, toggleFavoritoTransporte, validarCuponTransporte, type ConfigTransporte, type RutaTransporte, type ValidacionCuponTransporte } from '@/lib/api/transporte'
+import { obtenerTransporte, verificarDisponibilidadTransporte, listarSalidasTransporte, listarAsientosSalidaTransporte, crearReservaTransporte, misReservasTransporte, toggleFavoritoTransporte, validarCuponTransporte, type ConfigTransporte, type RutaTransporte, type SalidaTransporte, type ValidacionCuponTransporte } from '@/lib/api/transporte'
 import { reviewsTransporte, crearReviewTransporte, type ReviewTransporte } from '@/lib/api/review'
 import SeccionReviews, { type ReviewItem } from '@/components/ui/SeccionReviews'
 import ReproductorVideo from '@/components/comerciante/ReproductorVideo'
@@ -149,7 +149,14 @@ function TarjetaRuta({ ruta, onReservar }: { ruta: RutaTransporte; onReservar: (
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               Cap. {ruta.capacidad} asientos
             </span>
+            {ruta.duracionMinutos && <span>{ruta.duracionMinutos} min aprox.</span>}
+            {ruta.horaLlegada && <span>Llega {ruta.horaLlegada}</span>}
           </div>
+          {(ruta.puntoAbordaje || ruta.puntoDescenso) && (
+            <p className="mt-2 text-xs text-gray-500">
+              {ruta.puntoAbordaje ? `Abordaje: ${ruta.puntoAbordaje}` : ''}{ruta.puntoAbordaje && ruta.puntoDescenso ? ' · ' : ''}{ruta.puntoDescenso ? `Descenso: ${ruta.puntoDescenso}` : ''}
+            </p>
+          )}
           {ruta.diasSemana.length > 0 && (
             <div className="flex gap-1 mt-2.5">
               {ruta.diasSemana.map(d => (
@@ -221,6 +228,10 @@ function WidgetReservaTransporte({ transporte, rutas, onReservar, autenticado, r
           <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Capacidad</span>
           <span className="font-semibold">{ruta.capacidad} asientos</span>
         </div>
+        {ruta.puntoAbordaje && <div className="flex items-center justify-between gap-3"><span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Abordaje</span><span className="font-semibold text-right">{ruta.puntoAbordaje}</span></div>}
+        {ruta.puntoDescenso && <div className="flex items-center justify-between gap-3"><span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Descenso</span><span className="font-semibold text-right">{ruta.puntoDescenso}</span></div>}
+        {ruta.duracionMinutos && <div className="flex items-center justify-between"><span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Duracion</span><span className="font-semibold">{ruta.duracionMinutos} min aprox.</span></div>}
+        {ruta.horaLlegada && <div className="flex items-center justify-between"><span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Llegada</span><span className="font-semibold">{ruta.horaLlegada}</span></div>}
         {ruta.diasSemana.length > 0 && (
           <div className="flex items-center justify-between">
             <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Días</span>
@@ -263,12 +274,17 @@ function FormReservaTransporte({ transporte, ruta, onClose, onSuccess }: {
   const [manana] = useState(() => obtenerFechaManana())
 
   const [fecha, setFecha]           = useState(manana)
+  const [salidas, setSalidas]       = useState<SalidaTransporte[]>([])
+  const [salidaId, setSalidaId]     = useState<number | null>(null)
+  const [puestos, setPuestos]       = useState<string[]>([])
+  const [ocupados, setOcupados]     = useState<string[]>([])
+  const [capacidadSalida, setCapacidadSalida] = useState<number | null>(null)
   const [asientos, setAsientos]     = useState(1)
   const [metodoPago, setMetodoPago] = useState('EFECTIVO')
   const [notas, setNotas]           = useState('')
   const [nombre, setNombre]         = useState(usuario?.nombre ?? '')
   const [telefono, setTelefono]     = useState(usuario?.telefono?.replace(/\D/g, '').replace(/^57/, '') ?? '')
-  const [disponibilidad, setD]      = useState<{ disponibles: number; capacidad: number } | null>(null)
+  const [disponibilidad, setD]      = useState<{ disponibles: number; capacidad: number; opera: boolean } | null>(null)
   const [cargando, setCargando]     = useState(false)
   const [error, setError]           = useState('')
   const [codigoCupon, setCodigoCupon] = useState('')
@@ -281,8 +297,20 @@ function FormReservaTransporte({ transporte, ruta, onClose, onSuccess }: {
 
   useEffect(() => {
     if (!fecha) return
-    verificarDisponibilidadTransporte(ruta.id, fecha).then(setD).catch(() => setD(null))
+    listarSalidasTransporte(ruta.id, fecha).then(s => { setSalidas(s); setSalidaId(s[0]?.id ?? null) }).catch(() => { setSalidas([]); setSalidaId(null) })
   }, [fecha, ruta.id])
+
+  useEffect(() => {
+    if (!fecha) return
+    verificarDisponibilidadTransporte(ruta.id, fecha, salidaId ?? undefined).then(setD).catch(() => setD(null))
+  }, [fecha, ruta.id, salidaId])
+
+  useEffect(() => {
+    if (!salidaId) { setPuestos([]); setOcupados([]); setCapacidadSalida(null); return }
+    listarAsientosSalidaTransporte(salidaId).then(data => {
+      setOcupados(data.ocupados); setCapacidadSalida(data.capacidad); setPuestos([])
+    }).catch(() => { setOcupados([]); setCapacidadSalida(null) })
+  }, [salidaId])
 
   async function aplicarCupon() {
     if (!codigoCupon.trim()) return
@@ -304,11 +332,14 @@ function FormReservaTransporte({ transporte, ruta, onClose, onSuccess }: {
   }
 
   async function handleReservar() {
+    if (salidaId && puestos.length !== asientos) { setError('Selecciona exactamente los asientos que deseas reservar'); return }
     if (!nombre.trim() || !telefono.trim()) { setError('Completa nombre y teléfono'); return }
     setError(''); setCargando(true)
     try {
       await crearReservaTransporte({
         rutaTransporteId: ruta.id,
+        salidaTransporteId: salidaId,
+        puestos: salidaId ? puestos : undefined,
         fechaViaje: fecha,
         asientos,
         metodoPago,
@@ -330,6 +361,15 @@ function FormReservaTransporte({ transporte, ruta, onClose, onSuccess }: {
             <h3 className="font-bold text-xl text-gray-900">{ruta.origen} → {ruta.destino}</h3>
             <p className="text-sm text-[#1B4332] font-semibold mt-0.5">{ruta.horario} · {formatearPrecio(Number(ruta.precioAsiento))}<span className="text-gray-400 font-normal"> / asiento</span></p>
           </div>
+
+          {salidas.length > 0 && (
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Salida disponible</label>
+              <select value={salidaId ?? ''} onChange={e => setSalidaId(Number(e.target.value))} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#1B4332] bg-white">
+                {salidas.map(salida => <option key={salida.id} value={salida.id}>{new Date(salida.fechaHora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}{salida.capacidad ? ` · ${salida.capacidad} cupos` : ''}</option>)}
+              </select>
+            </div>
+          )}
           <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors text-xl leading-none font-bold">×</button>
         </div>
 
@@ -368,6 +408,22 @@ function FormReservaTransporte({ transporte, ruta, onClose, onSuccess }: {
               <button onClick={() => setAsientos(a => { setCuponAplicado(null); return Math.min(ruta.capacidad, disponibilidad?.disponibles ?? ruta.capacidad, a + 1) })} className="w-9 h-9 rounded-full bg-[#ECFDF5] flex items-center justify-center font-bold text-[#16A34A] hover:bg-[#D1FAE5] transition-colors">+</button>
             </div>
           </div>
+
+          {salidaId && capacidadSalida !== null && (
+            <div>
+              <div className="flex items-center justify-between mb-2"><label className="block text-xs font-bold text-gray-400 uppercase tracking-widest">Elige tus asientos</label><span className="text-xs font-semibold text-[#1B4332]">{puestos.length}/{asientos} seleccionados</span></div>
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                <div className="mb-3 text-center text-[10px] font-bold tracking-[0.2em] text-gray-400">FRENTE</div>
+                <div className="grid grid-cols-4 gap-2">
+                  {Array.from({ length: capacidadSalida }, (_, index) => String(index + 1)).map(puesto => {
+                    const ocupado = ocupados.includes(puesto); const seleccionado = puestos.includes(puesto)
+                    return <button key={puesto} type="button" disabled={ocupado} onClick={() => setPuestos(prev => seleccionado ? prev.filter(p => p !== puesto) : prev.length < asientos ? [...prev, puesto] : prev)} className={`h-10 rounded-lg text-sm font-bold transition-colors ${ocupado ? 'cursor-not-allowed bg-gray-200 text-gray-400 line-through' : seleccionado ? 'bg-[#1B4332] text-white' : 'bg-white text-gray-700 border border-gray-200 hover:border-[#2D6A4F]'}`}>{puesto}</button>
+                  })}
+                </div>
+                <p className="mt-3 text-[11px] text-gray-500">Verde: seleccionado. Gris: ocupado.</p>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

@@ -166,6 +166,61 @@ const STATEMENTS = [
     "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "RutaTransporte_configTransporteId_fkey" FOREIGN KEY ("configTransporteId") REFERENCES "ConfigTransporte"("id") ON DELETE CASCADE ON UPDATE CASCADE
   )`,
+  `ALTER TABLE "RutaTransporte" ADD COLUMN IF NOT EXISTS "puntoAbordaje" TEXT`,
+  `ALTER TABLE "RutaTransporte" ADD COLUMN IF NOT EXISTS "puntoDescenso" TEXT`,
+  `ALTER TABLE "RutaTransporte" ADD COLUMN IF NOT EXISTS "horaLlegada" TEXT`,
+  `ALTER TABLE "RutaTransporte" ADD COLUMN IF NOT EXISTS "duracionMinutos" INTEGER`,
+  `ALTER TABLE "ConfigTransporte" ADD COLUMN IF NOT EXISTS "politicaCancelacion" TEXT`,
+  `CREATE TABLE IF NOT EXISTS "SalidaTransporte" (
+    "id" SERIAL PRIMARY KEY,
+    "rutaTransporteId" INTEGER NOT NULL,
+    "fechaHora" TIMESTAMP(3) NOT NULL,
+    "capacidad" INTEGER,
+    "estado" TEXT NOT NULL DEFAULT 'PROGRAMADA',
+    "notasOperativas" TEXT,
+    "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "SalidaTransporte_rutaTransporteId_fkey" FOREIGN KEY ("rutaTransporteId") REFERENCES "RutaTransporte"("id") ON DELETE CASCADE
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "SalidaTransporte_ruta_fecha_unique" ON "SalidaTransporte" ("rutaTransporteId", "fechaHora")`,
+  `CREATE INDEX IF NOT EXISTS "SalidaTransporte_ruta_fecha_estado_idx" ON "SalidaTransporte" ("rutaTransporteId", "fechaHora", "estado")`,
+  `ALTER TABLE "SalidaTransporte" ADD COLUMN IF NOT EXISTS "vehiculoId" INTEGER`,
+  `ALTER TABLE "SalidaTransporte" ADD COLUMN IF NOT EXISTS "conductorNombre" TEXT`,
+  `ALTER TABLE "SalidaTransporte" ADD COLUMN IF NOT EXISTS "estadoOperacion" TEXT NOT NULL DEFAULT 'PROGRAMADA'`,
+  `CREATE TABLE IF NOT EXISTS "VehiculoTransporte" (
+    "id" SERIAL PRIMARY KEY,
+    "configTransporteId" INTEGER NOT NULL,
+    "nombre" TEXT NOT NULL,
+    "tipo" TEXT NOT NULL,
+    "placa" TEXT,
+    "capacidad" INTEGER NOT NULL,
+    "activo" BOOLEAN NOT NULL DEFAULT true,
+    "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "VehiculoTransporte_config_fkey" FOREIGN KEY ("configTransporteId") REFERENCES "ConfigTransporte"("id") ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS "VehiculoTransporte_config_activo_idx" ON "VehiculoTransporte" ("configTransporteId", "activo")`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'SalidaTransporte_vehiculoId_fkey') THEN ALTER TABLE "SalidaTransporte" ADD CONSTRAINT "SalidaTransporte_vehiculoId_fkey" FOREIGN KEY ("vehiculoId") REFERENCES "VehiculoTransporte"("id") ON DELETE SET NULL; END IF; END $$`,
+  `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "salidaTransporteId" INTEGER`,
+  `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "abordadoAt" TIMESTAMP(3)`,
+  `ALTER TABLE "ReservaTransporte" ADD COLUMN IF NOT EXISTS "noShowAt" TIMESTAMP(3)`,
+  `CREATE INDEX IF NOT EXISTS "ReservaTransporte_salida_idx" ON "ReservaTransporte" ("salidaTransporteId")`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ReservaTransporte_salidaTransporteId_fkey') THEN
+      ALTER TABLE "ReservaTransporte" ADD CONSTRAINT "ReservaTransporte_salidaTransporteId_fkey" FOREIGN KEY ("salidaTransporteId") REFERENCES "SalidaTransporte"("id") ON DELETE SET NULL;
+    END IF;
+  END $$`,
+  `CREATE TABLE IF NOT EXISTS "AsientoReservaTransporte" (
+    "id" SERIAL PRIMARY KEY,
+    "salidaTransporteId" INTEGER NOT NULL,
+    "reservaTransporteId" INTEGER NOT NULL,
+    "codigoAsiento" TEXT NOT NULL,
+    "creadoAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "AsientoReservaTransporte_salida_fkey" FOREIGN KEY ("salidaTransporteId") REFERENCES "SalidaTransporte"("id") ON DELETE CASCADE,
+    CONSTRAINT "AsientoReservaTransporte_reserva_fkey" FOREIGN KEY ("reservaTransporteId") REFERENCES "ReservaTransporte"("id") ON DELETE CASCADE
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "AsientoReservaTransporte_salida_asiento_unique" ON "AsientoReservaTransporte" ("salidaTransporteId", "codigoAsiento")`,
+  `CREATE INDEX IF NOT EXISTS "AsientoReservaTransporte_reserva_idx" ON "AsientoReservaTransporte" ("reservaTransporteId")`,
 
   // Módulo Cultura
   `DO $$ BEGIN
