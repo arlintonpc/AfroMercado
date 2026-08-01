@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { cifrarNumeroCuenta } = require("../src/utils/cuentas-dispersion");
+
+// wompi.provider.js lee configuración vía ConfigRepository (Prisma → DB real).
+// Se simula ANTES de requerir el provider para que el test quede aislado y no
+// dependa de conectividad a la base de datos, siguiendo la convención del
+// resto de la suite (mutar el módulo antes de requerir el servicio probado).
+const ConfigRepository = require("../src/repositories/config.repository");
+ConfigRepository.obtenerVarios = vi.fn(async () => ({}));
+
 const WompiPaymentProvider = require(
   "../src/services/payments/providers/wompi.provider"
 );
