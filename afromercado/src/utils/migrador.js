@@ -511,6 +511,36 @@ const STATEMENTS = [
     CONSTRAINT "MovimientoCaja_cuentaOperativaId_fkey" FOREIGN KEY ("cuentaOperativaId") REFERENCES "CuentaOperativa"("id") ON DELETE RESTRICT ON UPDATE CASCADE
   )`,
   `CREATE INDEX IF NOT EXISTS "MovimientoCaja_comercioId_fecha_idx" ON "MovimientoCaja"("comercioId", "fecha")`,
+
+  // Denuncia directa a un Comercio (protección adicional: hasta ahora solo se
+  // podía denunciar productos/inmuebles/ofertas de empleo/publicaciones
+  // culturales, pero no al comercio en sí).
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'MotivoDenunciaComercio') THEN
+      CREATE TYPE "MotivoDenunciaComercio" AS ENUM ('SUPLANTACION_IDENTIDAD','DOCUMENTOS_FALSOS','COMERCIO_INEXISTENTE','ESTAFA_REITERADA','OTRO');
+    END IF;
+  END $$`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EstadoDenunciaComercio') THEN
+      CREATE TYPE "EstadoDenunciaComercio" AS ENUM ('PENDIENTE','DESESTIMADA','COMERCIO_SUSPENDIDO');
+    END IF;
+  END $$`,
+  `CREATE TABLE IF NOT EXISTS "DenunciaComercio" (
+    "id" SERIAL PRIMARY KEY,
+    "comercioId" INTEGER NOT NULL,
+    "denuncianteId" INTEGER NOT NULL,
+    "motivo" "MotivoDenunciaComercio" NOT NULL,
+    "descripcion" TEXT,
+    "estado" "EstadoDenunciaComercio" NOT NULL DEFAULT 'PENDIENTE',
+    "revisadoPor" INTEGER,
+    "revisadoAt" TIMESTAMP(3),
+    "notaRevision" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "DenunciaComercio_comercioId_fkey" FOREIGN KEY ("comercioId") REFERENCES "Comercio"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "DenunciaComercio_denuncianteId_fkey" FOREIGN KEY ("denuncianteId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "DenunciaComercio_comercioId_denuncianteId_key" ON "DenunciaComercio"("comercioId", "denuncianteId")`,
+  `CREATE INDEX IF NOT EXISTS "DenunciaComercio_estado_createdAt_idx" ON "DenunciaComercio"("estado", "createdAt")`,
 ];
 
 async function asegurarTablaLog() {

@@ -278,6 +278,7 @@ model Usuario {
   denunciasPublicacionCulturalHechas DenunciaPublicacionCultural[]
   likesPublicacionesCultura          LikePublicacionCultural[]
   denunciasProductoHechas   DenunciaProducto[]       @relation("DenunciasProductoHechas")
+  denunciasComercioHechas   DenunciaComercio[]       @relation("DenunciasComercioHechas")
   comerciosSeguidos         SeguidorComercio[]
   vistasPublicacionCultural VistaPublicacionCultural[] @relation("VistasPublicacionUsuario")
   comentariosPublicacionCultural ComentarioPublicacionCultural[]
@@ -375,6 +376,7 @@ model Comercio {
   gastosOperativos      GastoOperativo[]
   cuentasOperativas     CuentaOperativa[]
   movimientosCaja       MovimientoCaja[]
+  denuncias             DenunciaComercio[]
 }
 
 // IVA configurable por comercio (Fase 1.1) — apagado por defecto, solo el ADMIN
@@ -506,6 +508,39 @@ model DenunciaProducto {
   denunciante Usuario  @relation("DenunciasProductoHechas", fields: [denuncianteId], references: [id])
 
   @@unique([productoId, denuncianteId])
+  @@index([estado, createdAt])
+}
+
+enum MotivoDenunciaComercio {
+  SUPLANTACION_IDENTIDAD
+  DOCUMENTOS_FALSOS
+  COMERCIO_INEXISTENTE
+  ESTAFA_REITERADA
+  OTRO
+}
+
+enum EstadoDenunciaComercio {
+  PENDIENTE
+  DESESTIMADA
+  COMERCIO_SUSPENDIDO
+}
+
+model DenunciaComercio {
+  id            Int      @id @default(autoincrement())
+  comercioId    Int
+  denuncianteId Int
+  motivo        MotivoDenunciaComercio
+  descripcion   String?
+  estado        EstadoDenunciaComercio @default(PENDIENTE)
+  revisadoPor   Int?
+  revisadoAt    DateTime?
+  notaRevision  String?
+  createdAt     DateTime @default(now())
+
+  comercio    Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  denunciante Usuario  @relation("DenunciasComercioHechas", fields: [denuncianteId], references: [id])
+
+  @@unique([comercioId, denuncianteId])
   @@index([estado, createdAt])
 }
 

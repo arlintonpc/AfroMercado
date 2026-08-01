@@ -16,6 +16,7 @@ import { useAuth } from '@/context/AuthContext'
 import { iniciarConversacion } from '@/lib/api/chat'
 import { normalizarUrlMedia } from '@/lib/api/client'
 import ModalAvatarLightbox from '@/components/ui/ModalAvatarLightbox'
+import ModalDenunciarComercio from '@/components/comercio/ModalDenunciarComercio'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')
 
@@ -38,6 +39,7 @@ interface ComercioPublico {
   totalVentas: number
   verificado: boolean
   alianzasActivas?: { id: number; nombre: string; codigoCompartido: string }[]
+  usuarioId?: number
 }
 
 async function fetchComercio(id: string): Promise<ComercioPublico | null> {
@@ -371,6 +373,9 @@ export default function PaginaComercio({ params }: { params: Promise<{ id: strin
   const esComprador = autenticado && usuario?.rol === 'COMPRADOR'
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null)
   const [orden, setOrden] = useState<'recientes' | 'precio-asc' | 'precio-desc'>('recientes')
+  const [mostrarModalDenuncia, setMostrarModalDenuncia] = useState(false)
+  const [denunciaEnviada, setDenunciaEnviada] = useState(false)
+  const esDueno = Boolean(autenticado && comercio?.usuarioId != null && String(comercio.usuarioId) === usuario?.id)
 
   async function handleChatear() {
     if (!comercio) return
@@ -500,6 +505,23 @@ export default function PaginaComercio({ params }: { params: Promise<{ id: strin
           <div className="flex flex-col gap-6">
             <CabeceraComercio c={comercio} onChatear={esComprador ? handleChatear : undefined} />
 
+            {/* Reportar comercio */}
+            {autenticado && !esDueno && (
+              <div className="-mt-4 text-center">
+                {denunciaEnviada ? (
+                  <span className="text-xs font-medium text-[#1A1A1A]/35">Ya reportaste este comercio</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setMostrarModalDenuncia(true)}
+                    className="text-xs font-medium text-[#1A1A1A]/35 hover:text-[#C0392B] transition-colors underline-offset-2 hover:underline"
+                  >
+                    🚩 Reportar este comercio
+                  </button>
+                )}
+              </div>
+            )}
+
             <div>
               {/* Encabezado con conteo y ordenar */}
               <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
@@ -573,6 +595,14 @@ export default function PaginaComercio({ params }: { params: Promise<{ id: strin
 
             <SeccionResenas comercioId={comercio.id} />
           </div>
+        )}
+
+        {mostrarModalDenuncia && comercio && (
+          <ModalDenunciarComercio
+            comercioId={comercio.id}
+            onCerrar={() => setMostrarModalDenuncia(false)}
+            onExito={() => setDenunciaEnviada(true)}
+          />
         )}
       </main>
 

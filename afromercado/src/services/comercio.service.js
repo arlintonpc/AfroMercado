@@ -10,6 +10,11 @@ const prisma = require("../config/prisma");
 const { eliminarDeCloudinary } = require("../utils/cloudinary");
 const { eliminarArchivoLocalDesdeUrl } = require("../utils/video-media");
 const { validarUbicacion } = require("../utils/ubicacion");
+const AdminService = require("./admin.service");
+const NotificacionService = require("./notificacion.service");
+
+const MOTIVOS_DENUNCIA_COMERCIO = ["SUPLANTACION_IDENTIDAD", "DOCUMENTOS_FALSOS", "COMERCIO_INEXISTENTE", "ESTAFA_REITERADA", "OTRO"];
+const ACCIONES_RESOLVER_DENUNCIA_COMERCIO = ["DESESTIMAR", "SUSPENDER_COMERCIO"];
 
 const CAMPOS_EDITABLES = [
   "nombre",
@@ -396,6 +401,82 @@ const ComercioService = {
       where: { usuarioId_comercioId: { usuarioId, comercioId: Number(comercioId) } },
     });
     return { siguiendo: !!existe };
+  },
+
+  // ── Denuncias ─────────────────────────────────────────────────
+  // Canal de protección que faltaba: hasta ahora solo se podía denunciar
+  // productos/inmuebles/ofertas de empleo/publicaciones culturales, pero no
+  // al comercio en sí (ej. un comercio que suplanta identidad o presenta
+  // documentos falsos, más allá de un producto puntual).
+  async denunciar(usuarioId, comercioId, { motivo, descripcion }) {
+    if (!MOTIVOS_DENUNCIA_COMERCIO.includes(motivo)) {
+      throw new ErrorValidacion(`Motivo inválido. Opciones: ${MOTIVOS_DENUNCIA_COMERCIO.join(", ")}`);
+    }
+    const cId = Number(comercioId);
+    const comercio = await ComercioRepository.buscarPorId(cId);
+    if (!comercio) throw new ErrorNoEncontrado("Comercio no encontrado");
+    if (comercio.usuarioId === usuarioId) {
+      throw new ErrorProhibido("No puedes denunciar tu propio comercio");
+    }
+    const existente = await ComercioRepository.buscarDenuncia(cId, usuarioId);
+    if (existente) throw new ErrorValidacion("Ya denunciaste este comercio");
+
+    return ComercioRepository.crearDenuncia({
+      comercioId: cId,
+      denuncianteId: usuarioId,
+      motivo,
+      descripcion: descripcion?.trim() || null,
+    });
+  },
+
+  async listarDenunciasPendientes() {
+    return ComercioRepository.listarDenunciasPendientes();
+  },
+
+  async resolverDenuncia(adminId, denunciaId, { accion, motivo }) {
+    if (!ACCIONES_RESOLVER_DENUNCIA_COMERCIO.includes(accion)) {
+      throw new ErrorValidacion(`Acción inválida. Opciones: ${ACCIONES_RESOLVER_DENUNCIA_COMERCIO.join(", ")}`);
+    }
+    const denuncia = await ComercioRepository.buscarDenunciaPorId(denunciaId);
+    if (!denuncia) throw new ErrorNoEncontrado("Denuncia no encontrada");
+    if (denuncia.estado !== "PENDIENTE") {
+      throw new ErrorValidacion("Esta denuncia ya fue resuelta");
+    }
+
+    if (accion === "SUSPENDER_COMERCIO") {
+      await AdminService.verificarComerciante(adminId, denuncia.comercioId, {
+        accion: "SUSPENDER",
+        motivo: motivo?.trim() || "Denuncias de comercio",
+      });
+      const resultado = await ComercioRepository.actualizarDenuncia(denunciaId, {
+        estado: "COMERCIO_SUSPENDIDO",
+        revisadoPor: adminId,
+        revisadoAt: new Date(),
+        notaRevision: motivo?.trim() || null,
+      });
+
+      const usuarioIdComercio = denuncia.comercio?.usuarioId;
+      if (usuarioIdComercio) {
+        setImmediate(() => {
+          NotificacionService.crearYEnviar({
+            usuarioId: usuarioIdComercio,
+            tipo: "COMERCIO_SUSPENDIDO",
+            titulo: "Tu comercio fue suspendido",
+            mensaje: `Tu comercio "${denuncia.comercio.nombre}" fue suspendido tras una denuncia. ${motivo?.trim() || "Contacta a soporte si crees que esto es un error."}`,
+          }).catch((e) => console.error("[NOTIF] resolverDenuncia comercio:", e.message));
+        });
+      }
+
+      return resultado;
+    }
+
+    // DESESTIMAR
+    return ComercioRepository.actualizarDenuncia(denunciaId, {
+      estado: "DESESTIMADA",
+      revisadoPor: adminId,
+      revisadoAt: new Date(),
+      notaRevision: motivo?.trim() || null,
+    });
   },
 };
 

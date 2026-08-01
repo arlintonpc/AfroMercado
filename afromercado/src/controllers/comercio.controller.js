@@ -545,7 +545,10 @@ const ComercioController = {
     try {
       const comercio = await ComercioService.obtenerMiComercio(req.usuario.id);
       const subPedidos = await prisma.subPedido.findMany({
-        where: { comercioId: comercio.id },
+        where: {
+          comercioId: comercio.id,
+          pedido: { estado: { notIn: ["VERIFICANDO_PAGO", "PENDIENTE_PAGO", "PAGO_FALLIDO", "EXPIRADO"] } },
+        },
         orderBy: { pedido: { createdAt: "desc" } },
         include: {
           pedido: {
@@ -899,6 +902,36 @@ const ComercioController = {
         next(e);
       }
     });
+  },
+
+  // POST /comercios/:id/denunciar - cualquier usuario autenticado puede reportar un comercio sospechoso
+  async denunciar(req, res, next) {
+    try {
+      const data = await ComercioService.denunciar(req.usuario.id, Number(req.params.id), req.body);
+      res.status(201).json({ ok: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  // GET /comercios/admin/denuncias - denuncias pendientes contra comercios
+  async listarDenunciasPendientes(req, res, next) {
+    try {
+      const data = await ComercioService.listarDenunciasPendientes();
+      res.json({ ok: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  // PATCH /comercios/admin/denuncias/:id/resolver
+  async resolverDenuncia(req, res, next) {
+    try {
+      const data = await ComercioService.resolverDenuncia(req.usuario.id, Number(req.params.id), req.body);
+      res.json({ ok: true, data });
+    } catch (e) {
+      next(e);
+    }
   },
 };
 

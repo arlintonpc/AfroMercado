@@ -3,9 +3,80 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listarComerciosAdmin, cambiarEstadoComercio, type ComercioAdmin } from '@/lib/api/admin'
 import { activarIva, desactivarIva } from '@/lib/api/config-fiscal'
+import {
+  adminDenunciasComercios,
+  adminResolverDenunciaComercio,
+  type DenunciaComercio,
+  type MotivoDenunciaComercio,
+  type AccionResolverDenunciaComercio,
+} from '@/lib/api/comercios'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
+import ModalConfirmacion from '@/components/ui/ModalConfirmacion'
+
+// ─── Denuncias de comercio ──────────────────────────────────────────────────
+
+const MOTIVO_DENUNCIA_COMERCIO_LABEL: Record<MotivoDenunciaComercio, string> = {
+  SUPLANTACION_IDENTIDAD: 'Suplanta la identidad de otra persona o negocio',
+  DOCUMENTOS_FALSOS: 'Documentos de identidad o registro falsos',
+  COMERCIO_INEXISTENTE: 'El comercio no existe o no opera realmente',
+  ESTAFA_REITERADA: 'Estafas repetidas a compradores',
+  OTRO: 'Otro motivo',
+}
+
+function fmtFechaDenuncia(iso: string): string {
+  return new Date(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function TarjetaDenunciaComercio({ denuncia, onResuelta }: { denuncia: DenunciaComercio; onResuelta: (id: number) => void }) {
+  const [mostrarConfirmSuspender, setMostrarConfirmSuspender] = useState(false)
+  const [procesando, setProcesando] = useState(false)
+
+  async function resolver(accion: AccionResolverDenunciaComercio) {
+    setProcesando(true)
+    try {
+      await adminResolverDenunciaComercio(denuncia.id, { accion })
+      onResuelta(denuncia.id)
+    } finally {
+      setProcesando(false)
+      setMostrarConfirmSuspender(false)
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-red-200 bg-red-50/40 p-5">
+      <p className="font-semibold text-[#1A1A1A]">{denuncia.comercio?.nombre ?? `Comercio #${denuncia.comercioId}`}</p>
+      <p className="text-xs text-[#1A1A1A]/50 mt-0.5">
+        Denunciado por {denuncia.denunciante?.nombre ?? 'Desconocido'}
+      </p>
+      <p className="text-xs font-bold text-red-700 mt-2">Motivo: {MOTIVO_DENUNCIA_COMERCIO_LABEL[denuncia.motivo]}</p>
+      {denuncia.descripcion && <p className="text-sm text-[#1A1A1A]/70 mt-1 whitespace-pre-wrap">{denuncia.descripcion}</p>}
+      <p className="text-xs text-[#1A1A1A]/40 mt-2">Denunciada el {fmtFechaDenuncia(denuncia.createdAt)}</p>
+
+      <div className="flex flex-wrap gap-2 mt-3">
+        <button onClick={() => resolver('DESESTIMAR')} disabled={procesando} className="rounded-lg bg-[#2D6A4F] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#235540] disabled:opacity-50">
+          Desestimar
+        </button>
+        <button onClick={() => setMostrarConfirmSuspender(true)} disabled={procesando} className="rounded-lg border border-red-300 bg-red-100 px-3 py-1.5 text-xs font-bold text-red-800 hover:bg-red-200 disabled:opacity-50">
+          Suspender comercio
+        </button>
+      </div>
+
+      {mostrarConfirmSuspender && (
+        <ModalConfirmacion
+          titulo="Suspender comercio"
+          mensaje="Esta acción suspende el comercio completo — todos sus productos desaparecerán del catálogo de inmediato. Es una acción severa e irreversible desde esta pantalla."
+          onCancelar={() => setMostrarConfirmSuspender(false)}
+          onConfirmar={() => resolver('SUSPENDER_COMERCIO')}
+          confirmando={procesando}
+          textoConfirmar="Confirmar suspensión"
+          destructivo
+        />
+      )}
+    </div>
+  )
+}
 
 // ─── Modal de IVA ─────────────────────────────────────────────────────────────
 
@@ -146,6 +217,7 @@ function modulosBadges(c: ComercioAdmin) {
 // ─── Página ───────────────────────────────────────────────────────────────────
 
 export default function AdminComerciosPage() {
+  const [tab, setTab] = useState<'COMERCIOS' | 'DENUNCIAS'>('COMERCIOS')
   const [comercios, setComercios] = useState<ComercioAdmin[]>([])
   const [total, setTotal] = useState(0)
   const [paginaActual, setPaginaActual] = useState(1)
@@ -158,6 +230,17 @@ export default function AdminComerciosPage() {
   const [procesandoId, setProcesandoId] = useState<number | null>(null)
   const [aviso, setAviso] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null)
   const [comercioIva, setComercioIva] = useState<ComercioAdmin | null>(null)
+
+  const [denuncias, setDenuncias] = useState<DenunciaComercio[]>([])
+  const [cargandoDenuncias, setCargandoDenuncias] = useState(true)
+
+  useEffect(() => {
+    adminDenunciasComercios().then(setDenuncias).finally(() => setCargandoDenuncias(false))
+  }, [])
+
+  function handleResueltaDenuncia(id: number) {
+    setDenuncias((prev) => prev.filter((d) => d.id !== id))
+  }
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -251,6 +334,45 @@ export default function AdminComerciosPage() {
         </div>
       )}
 
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-[#1A1A1A]/8">
+        <button
+          onClick={() => setTab('COMERCIOS')}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+            tab === 'COMERCIOS' ? 'border-[#2D6A4F] text-[#2D6A4F]' : 'border-transparent text-[#1A1A1A]/50 hover:text-[#1A1A1A]'
+          }`}
+        >
+          Comercios
+        </button>
+        <button
+          onClick={() => setTab('DENUNCIAS')}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+            tab === 'DENUNCIAS' ? 'border-[#2D6A4F] text-[#2D6A4F]' : 'border-transparent text-[#1A1A1A]/50 hover:text-[#1A1A1A]'
+          }`}
+        >
+          Denuncias{denuncias.length > 0 ? ` (${denuncias.length})` : ''}
+        </button>
+      </div>
+
+      {tab === 'DENUNCIAS' ? (
+        <div>
+          <p className="text-sm text-[#1A1A1A]/55">Reportes de usuarios sobre comercios sospechosos.</p>
+          {cargandoDenuncias ? (
+            <div className="flex flex-col gap-4">
+              {[1, 2].map((i) => <div key={i} className="h-32 animate-pulse rounded-2xl bg-[#1A1A1A]/6" />)}
+            </div>
+          ) : denuncias.length === 0 ? (
+            <div className="rounded-3xl border border-[#1A1A1A]/8 bg-white px-5 py-10 text-center text-sm text-[#1A1A1A]/55">
+              No hay denuncias pendientes de revisión.
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {denuncias.map((d) => <TarjetaDenunciaComercio key={d.id} denuncia={d} onResuelta={handleResueltaDenuncia} />)}
+            </div>
+          )}
+        </div>
+      ) : (
+      <>
       {/* Filtros */}
       <div className="flex flex-wrap gap-3">
         <form onSubmit={buscar} className="flex gap-2">
@@ -424,6 +546,8 @@ export default function AdminComerciosPage() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {comercioIva && (
         <ModalIva

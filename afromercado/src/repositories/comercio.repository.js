@@ -44,6 +44,39 @@ const ComercioRepository = {
 
     return { total, pagina, porPagina, items };
   },
+
+  // ── Denuncias ─────────────────────────────────────────────────
+  async crearDenuncia(data) {
+    return prisma.denunciaComercio.create({ data });
+  },
+
+  async buscarDenuncia(comercioId, denuncianteId) {
+    return prisma.denunciaComercio.findUnique({
+      where: { comercioId_denuncianteId: { comercioId, denuncianteId } },
+    });
+  },
+
+  async buscarDenunciaPorId(id) {
+    return prisma.denunciaComercio.findUnique({
+      where: { id },
+      include: { comercio: { select: { id: true, nombre: true, usuarioId: true } } },
+    });
+  },
+
+  async listarDenunciasPendientes() {
+    return prisma.denunciaComercio.findMany({
+      where: { estado: "PENDIENTE" },
+      orderBy: { createdAt: "asc" },
+      include: {
+        comercio: { select: { id: true, nombre: true, usuarioId: true } },
+        denunciante: { select: { id: true, nombre: true, email: true } },
+      },
+    });
+  },
+
+  async actualizarDenuncia(id, data) {
+    return prisma.denunciaComercio.update({ where: { id }, data });
+  },
 };
 
 module.exports = ComercioRepository;

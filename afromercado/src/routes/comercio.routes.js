@@ -175,6 +175,29 @@ router.post(
   ComercioController.toggleSeguir,
 );
 
+// POST /comercios/:id/denunciar - cualquier usuario autenticado puede reportar un comercio sospechoso
+router.post(
+  "/:id/denunciar",
+  autenticar,
+  ComercioController.denunciar,
+);
+
+// GET /comercios/admin/denuncias - denuncias pendientes contra comercios (debe ir antes de "/:id")
+router.get(
+  "/admin/denuncias",
+  autenticar,
+  autorizar("ADMIN"),
+  ComercioController.listarDenunciasPendientes,
+);
+
+// PATCH /comercios/admin/denuncias/:id/resolver
+router.patch(
+  "/admin/denuncias/:id/resolver",
+  autenticar,
+  autorizar("ADMIN"),
+  ComercioController.resolverDenuncia,
+);
+
 // GET /comercios/:id - ver cualquier comercio (publico)
 router.get("/:id", ComercioController.obtener);
 
