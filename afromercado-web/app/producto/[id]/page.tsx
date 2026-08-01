@@ -3,7 +3,6 @@
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import ProductoGaleria from '@/components/catalogo/ProductoGaleria'
-import VideoDestacado from '@/components/catalogo/VideoDestacado'
 import EstimadorEnvio from '@/components/catalogo/EstimadorEnvio'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
@@ -291,7 +290,6 @@ export default function PaginaProducto({
   )
   const videoUrl = producto.videoUrl ?? producto.comercio.videoUrl ?? null
   const videoPosterUrl = producto.videoPosterUrl ?? producto.comercio.videoPosterUrl ?? null
-  const videoDuracion = producto.videoDuracionSegundos ?? producto.comercio.videoDuracionSegundos ?? null
   const videoMimeType = producto.videoMimeType ?? producto.comercio.videoMimeType ?? null
   const historia = producto.historia ?? producto.comercio.historia
 
@@ -387,23 +385,10 @@ export default function PaginaProducto({
                   nombre={producto.nombre}
                   productoId={producto.id}
                   gradiente={gradiente}
+                  videoUrl={videoUrl}
+                  videoPoster={videoPosterUrl}
+                  videoMimeType={videoMimeType}
                 />
-                {videoUrl && (
-                  <div className="p-4 md:p-8">
-                    <VideoDestacado
-                      titulo={producto.videoUrl ? 'Video del producto' : 'Video del comercio'}
-                      descripcion={
-                        producto.videoUrl
-                          ? 'Un clip corto para mostrar el producto en uso o en contexto.'
-                          : 'Un vistazo rapido al comercio, la finca o la experiencia detras del producto.'
-                      }
-                      src={videoUrl}
-                      poster={videoPosterUrl}
-                      duracionSegundos={videoDuracion}
-                      mimeType={videoMimeType}
-                    />
-                  </div>
-                )}
               </div>
 
               {/* SECCIÓN "EL PRODUCTOR" */}

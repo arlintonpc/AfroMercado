@@ -1,7 +1,8 @@
 'use client'
 
 import Image from 'next/image'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import ReproductorVideo, { detectar } from '@/components/comerciante/ReproductorVideo'
 
 interface ProductoGaleriaProps {
   imagenes: string[]
@@ -11,12 +12,21 @@ interface ProductoGaleriaProps {
   gradiente: string
   comercioNombre?: string
   comercioVerificado?: boolean
+  /** Video del producto o del comercio — se integra como un slide más del carrusel. */
+  videoUrl?: string | null
+  videoPoster?: string | null
+  videoMimeType?: string | null
 }
 
+type Slide =
+  | { tipo: 'foto'; url: string }
+  | { tipo: 'video'; url: string }
+
 /**
- * Galería de producto inspirada en e-commerce de alto nivel (MercadoLibre/Amazon):
- * Imagen principal sobre fondo blanco pulcro, miniaturas, insignia de vendedor verificado,
- * contador deslizante (1/N) y lightbox con zoom táctil.
+ * Galería de producto inspirada en e-commerce de alto nivel (Instagram/Airbnb/Amazon):
+ * fotos y video comparten un mismo carrusel con contador (1/N), swipe táctil,
+ * miniaturas e insignia de vendedor verificado. El lightbox de zoom es solo
+ * para fotos (el video se reproduce directamente en el marco principal).
  */
 export default function ProductoGaleria({
   imagenes,
@@ -25,30 +35,48 @@ export default function ProductoGaleria({
   gradiente,
   comercioNombre,
   comercioVerificado,
+  videoUrl,
+  videoPoster,
+  videoMimeType,
 }: ProductoGaleriaProps) {
   const fotos = imagenes.filter(Boolean)
-  const hayFotos = fotos.length > 0
+  const slides: Slide[] = [
+    ...fotos.map((url) => ({ tipo: 'foto' as const, url })),
+    ...(videoUrl ? [{ tipo: 'video' as const, url: videoUrl }] : []),
+  ]
+  const haySlides = slides.length > 0
 
   const [activa, setActiva] = useState(0)
   const [errores, setErrores] = useState<Record<number, boolean>>({})
   const [lightbox, setLightbox] = useState(false)
   const [zoom, setZoom] = useState(false)
   const [origen, setOrigen] = useState('center center')
+  const [videoReproduciendo, setVideoReproduciendo] = useState(false)
+  const touchStartX = useRef<number | null>(null)
 
-  const indiceValido = Math.min(activa, Math.max(0, fotos.length - 1))
+  const indiceValido = Math.min(activa, Math.max(0, slides.length - 1))
+  const slideActual = slides[indiceValido] as Slide | undefined
+  const esVideoActual = slideActual?.tipo === 'video'
+  const videoEsExterno = esVideoActual && slideActual ? detectar(slideActual.url).plataforma !== 'directo' : false
 
-  const cerrar = useCallback(() => {
+  function cerrar() {
     setLightbox(false)
     setZoom(false)
-  }, [])
+  }
 
-  const ir = useCallback(
-    (delta: number) => {
-      setZoom(false)
-      setActiva((i) => (i + delta + fotos.length) % fotos.length)
-    },
-    [fotos.length],
-  )
+  // Navegación del carrusel principal — recorre fotos y video.
+  function ir(delta: number) {
+    setZoom(false)
+    setVideoReproduciendo(false)
+    setActiva((i) => (i + delta + slides.length) % slides.length)
+  }
+
+  // Navegación dentro del lightbox — solo fotos, el video no tiene zoom.
+  function irLightbox(delta: number) {
+    if (fotos.length === 0) return
+    setZoom(false)
+    setActiva((i) => (i + delta + fotos.length) % fotos.length)
+  }
 
   useEffect(() => {
     if (!lightbox) return
@@ -56,15 +84,15 @@ export default function ProductoGaleria({
     document.body.style.overflow = 'hidden'
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') cerrar()
-      else if (e.key === 'ArrowRight') ir(1)
-      else if (e.key === 'ArrowLeft') ir(-1)
+      else if (e.key === 'ArrowRight') irLightbox(1)
+      else if (e.key === 'ArrowLeft') irLightbox(-1)
     }
     window.addEventListener('keydown', onKey)
     return () => {
       document.body.style.overflow = anterior
       window.removeEventListener('keydown', onKey)
     }
-  }, [lightbox, cerrar, ir])
+  }, [lightbox, cerrar, irLightbox])
 
   function alternarZoom(e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -74,7 +102,18 @@ export default function ProductoGaleria({
     setZoom((z) => !z)
   }
 
-  if (!hayFotos) {
+  function onTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0]?.clientX ?? null
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null) return
+    const deltaX = (e.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current
+    touchStartX.current = null
+    if (Math.abs(deltaX) > 40) ir(deltaX < 0 ? 1 : -1)
+  }
+
+  if (!haySlides) {
     return (
       <div className="w-full rounded-3xl overflow-hidden aspect-square sm:aspect-[4/3] relative ring-1 ring-[#1A1A1A]/5 shadow-sm bg-white">
         <div className={`absolute inset-0 bg-gradient-to-br ${gradiente} flex flex-col items-center justify-center gap-3`}>
@@ -92,26 +131,70 @@ export default function ProductoGaleria({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Contenedor principal de fotografía en fondo blanco pulcro estilo MercadoLibre */}
-      <button
-        type="button"
-        onClick={() => setLightbox(true)}
-        className="group relative w-full rounded-3xl overflow-hidden aspect-square sm:aspect-[4/3] bg-white border border-gray-100 dark:border-white/10 shadow-sm cursor-zoom-in flex items-center justify-center p-2"
-        aria-label="Ampliar imagen"
+      {/* Contenedor principal: fotos y video comparten el mismo marco */}
+      <div
+        className="group relative w-full rounded-3xl overflow-hidden aspect-square sm:aspect-[4/3] bg-white border border-gray-100 dark:border-white/10 shadow-sm select-none"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
       >
-        <Image
-          src={fotos[indiceValido]}
-          alt={`${nombre} — imagen ${indiceValido + 1}`}
-          fill
-          sizes="(max-width: 768px) 100vw, 50vw"
-          className="object-contain transition-transform duration-300 group-hover:scale-[1.02] p-2"
-          priority
-          onError={() => setErrores((e) => ({ ...e, [indiceValido]: true }))}
-        />
+        {esVideoActual && slideActual ? (
+          <div className="absolute inset-0 bg-black flex items-center justify-center">
+            {videoReproduciendo ? (
+              videoEsExterno ? (
+                <ReproductorVideo url={slideActual.url} autoPlay className="w-full h-full" />
+              ) : (
+                <video
+                  className="w-full h-full object-contain bg-black"
+                  controls
+                  autoPlay
+                  playsInline
+                  poster={videoPoster ?? undefined}
+                >
+                  <source src={slideActual.url} type={videoMimeType ?? undefined} />
+                  Tu navegador no soporta el reproductor de video.
+                </video>
+              )
+            ) : (
+              <button
+                type="button"
+                onClick={() => setVideoReproduciendo(true)}
+                className="absolute inset-0 flex items-center justify-center cursor-pointer"
+                aria-label="Reproducir video"
+              >
+                {videoPoster ? (
+                  <Image src={videoPoster} alt={`${nombre} — video`} fill className="object-cover" />
+                ) : (
+                  <div className="absolute inset-0 bg-[#1B4332]" />
+                )}
+                <span className="absolute inset-0 bg-black/25 transition-colors group-hover:bg-black/35" />
+                <span className="relative z-10 w-16 h-16 rounded-full bg-white/95 flex items-center justify-center shadow-lg transition-transform group-hover:scale-105">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="#1B4332"><path d="M8 5v14l11-7z" /></svg>
+                </span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setLightbox(true)}
+            className="absolute inset-0 cursor-zoom-in"
+            aria-label="Ampliar imagen"
+          >
+            <Image
+              src={slideActual!.url}
+              alt={`${nombre} — imagen ${indiceValido + 1}`}
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
+              className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+              priority
+              onError={() => setErrores((e) => ({ ...e, [indiceValido]: true }))}
+            />
+          </button>
+        )}
 
         {/* Insignia de Tienda / Vendedor en esquina inferior izquierda */}
         {comercioNombre && (
-          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 bg-white/90 dark:bg-black/80 backdrop-blur-md text-gray-800 dark:text-gray-200 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm border border-gray-200/60 dark:border-white/20">
+          <span className="absolute bottom-3 left-3 z-10 inline-flex items-center gap-1.5 bg-white/90 dark:bg-black/80 backdrop-blur-md text-gray-800 dark:text-gray-200 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm border border-gray-200/60 dark:border-white/20 pointer-events-none">
             <span>{comercioNombre}</span>
             {comercioVerificado && (
               <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#2D6A4F] text-white text-[9px] font-black">
@@ -122,36 +205,69 @@ export default function ProductoGaleria({
         )}
 
         {/* Contador deslizante (1 / N) en esquina inferior derecha */}
-        {fotos.length > 1 && (
-          <span className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-md text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">
-            {indiceValido + 1} / {fotos.length}
+        {slides.length > 1 && (
+          <span className="absolute bottom-3 right-3 z-10 bg-black/60 backdrop-blur-md text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm pointer-events-none">
+            {indiceValido + 1} / {slides.length}
           </span>
         )}
-      </button>
+
+        {/* Flechas de navegación (visibles en hover/desktop, además del swipe táctil) */}
+        {slides.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); ir(-1) }}
+              aria-label="Anterior"
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/80 hover:bg-white text-[#1A1A1A] items-center justify-center shadow-sm hidden sm:flex opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); ir(1) }}
+              aria-label="Siguiente"
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/80 hover:bg-white text-[#1A1A1A] items-center justify-center shadow-sm hidden sm:flex opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Tiras de miniaturas deslizantes */}
-      {fotos.length > 1 && (
+      {slides.length > 1 && (
         <div className="flex gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
-          {fotos.map((url, i) => (
+          {slides.map((slide, i) => (
             <button
-              key={url + i}
+              key={slide.url + i}
               type="button"
               onClick={() => setActiva(i)}
-              aria-label={`Ver imagen ${i + 1}`}
+              aria-label={slide.tipo === 'video' ? 'Ver video' : `Ver imagen ${i + 1}`}
               aria-current={i === indiceValido}
-              className={`relative flex-shrink-0 w-16 h-16 rounded-2xl overflow-hidden border-2 transition-all bg-white p-1 ${
+              className={`relative flex-shrink-0 w-16 h-16 rounded-2xl overflow-hidden border-2 transition-all bg-white ${
                 i === indiceValido ? 'border-[#2D6A4F] shadow-sm scale-105' : 'border-transparent opacity-60 hover:opacity-100'
               }`}
             >
-              {errores[i] ? (
+              {slide.tipo === 'video' ? (
+                <>
+                  {videoPoster ? (
+                    <Image src={videoPoster} alt="Video" fill sizes="64px" className="object-cover" />
+                  ) : (
+                    <span className="absolute inset-0 bg-[#1B4332]" />
+                  )}
+                  <span className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z" /></svg>
+                  </span>
+                </>
+              ) : errores[i] ? (
                 <span className="absolute inset-0 bg-gray-100" />
               ) : (
                 <Image
-                  src={url}
+                  src={slide.url}
                   alt={`${nombre} miniatura ${i + 1}`}
                   fill
                   sizes="64px"
-                  className="object-contain p-1"
+                  className="object-cover"
                   onError={() => setErrores((e) => ({ ...e, [i]: true }))}
                 />
               )}
@@ -160,8 +276,8 @@ export default function ProductoGaleria({
         </div>
       )}
 
-      {/* Lightbox a pantalla completa */}
-      {lightbox && (
+      {/* Lightbox a pantalla completa — solo fotos */}
+      {lightbox && fotos.length > 0 && (
         <div
           className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center backdrop-blur-md"
           onClick={cerrar}
@@ -190,7 +306,7 @@ export default function ProductoGaleria({
             <>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); ir(-1) }}
+                onClick={(e) => { e.stopPropagation(); irLightbox(-1) }}
                 aria-label="Imagen anterior"
                 className="absolute left-4 z-10 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-sm"
               >
@@ -198,7 +314,7 @@ export default function ProductoGaleria({
               </button>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); ir(1) }}
+                onClick={(e) => { e.stopPropagation(); irLightbox(1) }}
                 aria-label="Imagen siguiente"
                 className="absolute right-4 z-10 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-sm"
               >
@@ -221,7 +337,7 @@ export default function ProductoGaleria({
               onClick={alternarZoom}
             >
               <Image
-                src={fotos[indiceValido]}
+                src={fotos[Math.min(indiceValido, fotos.length - 1)]}
                 alt={`${nombre} — imagen ${indiceValido + 1}`}
                 fill
                 sizes="92vw"
