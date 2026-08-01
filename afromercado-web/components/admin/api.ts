@@ -500,6 +500,7 @@ export interface AdminPedidoDetalle extends AdminPedidoResumen {
     monto: number
     metodo: string
     estado: string
+    proveedor?: string | null
     referencia?: string | null
     comprobanteUrl?: string | null
     notas?: string | null
@@ -542,4 +543,16 @@ export async function listarPedidosAdmin(params?: {
 export async function obtenerPedidoAdmin(id: number): Promise<AdminPedidoDetalle> {
   const res = await apiFetch<RespuestaOk<AdminPedidoDetalle>>(`/admin/pedidos/${id}`)
   return res.data
+}
+
+/**
+ * GET /api/admin/pagos/:id/estado-wompi
+ *
+ * Consulta directa (solo lectura) del estado de una transaccion en Wompi,
+ * usando el endpoint GET /v1/transactions/:id con la llave publica. No
+ * cambia el estado del pago; es una herramienta de diagnostico para el admin.
+ */
+export async function consultarPagoEnWompiAdmin(pagoId: number): Promise<unknown> {
+  const r = await apiFetch<{ ok: boolean; data: unknown }>(`/admin/pagos/${pagoId}/estado-wompi`)
+  return r.data
 }

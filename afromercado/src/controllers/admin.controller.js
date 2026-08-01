@@ -13,6 +13,7 @@ const { hashearPassword } = require("../utils/auth");
 const ConfigRepository = require("../repositories/config.repository");
 const Reglas = require("../config/reglas");
 const PaymentConfigService = require("../services/payment-config.service");
+const PagoDigitalService = require("../services/pago-digital.service");
 const { recalcularCalificacionComercio } = require("../utils/resena");
 const NotificacionService = require("../services/notificacion.service");
 const UsuarioService = require("../services/usuario.service");
@@ -594,6 +595,16 @@ const AdminController = {
       const data = await PaymentConfigService.probarConfiguracion();
       res.json({ ok: data.ok, data });
     } catch (e) { next(e); }
+  },
+
+  // GET /admin/pagos/:id/estado-wompi — consulta directa de solo lectura contra Wompi
+  async consultarPagoEnWompi(req, res, next) {
+    try {
+      const data = await PagoDigitalService.consultarEnProveedor(req.params.id);
+      res.json({ ok: true, data });
+    } catch (e) {
+      next(e);
+    }
   },
 
   // GET /admin/pedidos — lista paginada con filtros opcionales

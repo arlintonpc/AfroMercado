@@ -277,6 +277,19 @@ async function confirmarPedidoPorPago(tx, pago) {
 }
 
 const PagoDigitalService = {
+  async consultarEnProveedor(pagoId) {
+    const pago = await prisma.pago.findUnique({ where: { id: Number(pagoId) } });
+    if (!pago) throw new ErrorNoEncontrado("Pago no encontrado");
+    if (pago.proveedor !== "WOMPI") {
+      throw new ErrorValidacion("Esta consulta solo aplica a pagos procesados por Wompi.");
+    }
+    const proveedor = obtenerProveedor(pago.proveedor);
+    if (typeof proveedor.consultarTransaccion !== "function") {
+      throw new ErrorValidacion("El proveedor actual no soporta consulta directa de transaccion.");
+    }
+    return proveedor.consultarTransaccion(pago.providerPaymentId);
+  },
+
   async crearCheckout(usuarioId, { pedidoId, idempotencyKey }) {
     if (!idempotencyKey) throw new ErrorValidacion("El idempotencyKey es obligatorio");
     if (!pedidoId) throw new ErrorValidacion("El pedidoId es obligatorio");
@@ -398,7 +411,7 @@ const PagoDigitalService = {
           }),
           reutilizado: false,
         };
-      });
+      }, { timeout: 20000, maxWait: 10000 });
       pago = resultadoCreacion.pago;
       if (resultadoCreacion.reutilizado) {
         return esperarCheckoutConcurrente(idempotencyKey, pago);
@@ -456,7 +469,7 @@ const PagoDigitalService = {
           where: { pagoId: pago.id },
           data: { estado: "FALLIDA", errorMensaje: e.message },
         });
-      });
+      }, { timeout: 20000, maxWait: 10000 });
       throw e;
     }
 
@@ -575,7 +588,7 @@ const PagoDigitalService = {
         productosStockBajo,
         compradorId: pago.pedido.compradorId,
       };
-    });
+    }, { timeout: 20000, maxWait: 10000 });
 
     if (!resultado.yaConfirmado && !resultado.requiereConciliacion) {
       try {
@@ -675,7 +688,7 @@ const PagoDigitalService = {
         where: { id: pago.id },
         data: { estado: "FALLIDO", providerStatus: "FAILED", notas: motivo },
       });
-    });
+    }, { timeout: 20000, maxWait: 10000 });
     return resultado;
   },
 

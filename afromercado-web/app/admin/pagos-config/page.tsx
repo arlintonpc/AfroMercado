@@ -116,6 +116,7 @@ function VariableRow({ item }: { item: VariablePagoAdmin }) {
 
 type WompiForm = {
   WOMPI_PUBLIC_KEY: string
+  WOMPI_PRIVATE_KEY: string
   WOMPI_INTEGRITY_SECRET: string
   WOMPI_EVENTS_SECRET: string
   WOMPI_PAYOUTS_API_URL: string
@@ -128,6 +129,7 @@ type WompiForm = {
 
 const WOMPI_FORM_INICIAL: WompiForm = {
   WOMPI_PUBLIC_KEY: '',
+  WOMPI_PRIVATE_KEY: '',
   WOMPI_INTEGRITY_SECRET: '',
   WOMPI_EVENTS_SECRET: '',
   WOMPI_PAYOUTS_API_URL: '',
@@ -164,6 +166,7 @@ function CampoWompi({
           onChange={(v) => onChange(name, v)}
           placeholder={placeholder}
           inputClassName={inputClassName}
+          autoComplete="new-password"
         />
       ) : (
         <input
@@ -171,6 +174,11 @@ function CampoWompi({
           onChange={(e) => onChange(name, e.target.value)}
           placeholder={placeholder}
           className={inputClassName}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          name={`wompi-${name}`}
         />
       )}
     </label>
@@ -419,9 +427,12 @@ export default function PaginaConfiguracionPagos() {
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#1A1A1A]/40">
                   Formulario Wompi
                 </p>
-                <h2 className="mt-2 text-xl font-bold text-[#1A1A1A]">Credenciales de produccion</h2>
+                <h2 className="mt-2 text-xl font-bold text-[#1A1A1A]">Credenciales de Wompi</h2>
                 <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#1A1A1A]/55">
-                  Pega solo los campos que quieras crear o cambiar. Los campos vacios no modifican la configuracion guardada.
+                  Un solo lugar para las credenciales, sea que estes probando o cobrando de verdad: pega llaves con
+                  prefijo <code className="rounded bg-white px-1">test_</code> / <code className="rounded bg-white px-1">pub_test_</code> para
+                  pruebas en sandbox, o <code className="rounded bg-white px-1">prod_</code> / <code className="rounded bg-white px-1">pub_prod_</code> para
+                  cobrar dinero real. Pega solo los campos que quieras crear o cambiar; los campos vacios no modifican la configuracion guardada.
                 </p>
               </div>
               <span className="rounded-full bg-[#F8F5F0] px-3 py-1 text-xs font-semibold text-[#1A1A1A]/50">
@@ -438,16 +449,27 @@ export default function PaginaConfiguracionPagos() {
                     name="WOMPI_PUBLIC_KEY"
                     value={wompi.WOMPI_PUBLIC_KEY}
                     onChange={cambiarWompi}
-                    placeholder="pub_prod_..."
+                    placeholder="pub_test_... o pub_prod_..."
                   />
                   <CampoWompi
                     label="Secreto de integridad"
                     name="WOMPI_INTEGRITY_SECRET"
                     value={wompi.WOMPI_INTEGRITY_SECRET}
                     onChange={cambiarWompi}
-                    placeholder="prod_integrity_..."
+                    placeholder="test_integrity_... o prod_integrity_..."
                     secreto
                   />
+                  <CampoWompi
+                    label="Llave privada"
+                    name="WOMPI_PRIVATE_KEY"
+                    value={wompi.WOMPI_PRIVATE_KEY}
+                    onChange={cambiarWompi}
+                    placeholder="prv_test_... o prv_prod_..."
+                    secreto
+                  />
+                  <p className="rounded-xl bg-white px-3 py-2 text-xs leading-relaxed text-[#1A1A1A]/50">
+                    Reservada para operaciones futuras (anular, reembolsar). La consulta de estado usa la llave publica.
+                  </p>
                 </div>
               </div>
 
@@ -459,7 +481,7 @@ export default function PaginaConfiguracionPagos() {
                     name="WOMPI_EVENTS_SECRET"
                     value={wompi.WOMPI_EVENTS_SECRET}
                     onChange={cambiarWompi}
-                    placeholder="prod_events_..."
+                    placeholder="test_events_... o prod_events_..."
                     secreto
                   />
                   <p className="rounded-xl bg-white px-3 py-2 text-xs leading-relaxed text-[#1A1A1A]/50">

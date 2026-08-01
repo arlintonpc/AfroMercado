@@ -114,6 +114,13 @@ async function checkoutConfig() {
   };
 }
 
+async function baseUrlTransacciones() {
+  const publicKey = await requerido("WOMPI_PUBLIC_KEY");
+  return publicKey.startsWith("pub_test_")
+    ? "https://sandbox.wompi.co/v1"
+    : "https://production.wompi.co/v1";
+}
+
 async function payoutsConfig() {
   return {
     apiUrl: (await payoutsApiUrl()).replace(/\/$/, ""),
@@ -497,6 +504,24 @@ const WompiPaymentProvider = {
         errorMensaje: tx.errorMessage || tx.error || null,
       };
     });
+  },
+
+  async consultarTransaccion(transactionId) {
+    if (!transactionId) {
+      throw new ErrorValidacion("No hay un ID de transaccion de Wompi para consultar todavia.");
+    }
+    const publicKey = await requerido("WOMPI_PUBLIC_KEY");
+    const baseUrl = await baseUrlTransacciones();
+    const respuesta = await fetch(`${baseUrl}/transactions/${encodeURIComponent(transactionId)}`, {
+      headers: { Authorization: `Bearer ${publicKey}` },
+    });
+    const texto = await respuesta.text();
+    let datos;
+    try { datos = texto ? JSON.parse(texto) : null; } catch { datos = { raw: texto }; }
+    if (!respuesta.ok) {
+      throw new ErrorValidacion(`Wompi respondio ${respuesta.status} al consultar la transaccion: ${datos?.error?.reason || datos?.error?.type || respuesta.statusText}`);
+    }
+    return datos?.data || datos;
   },
 };
 

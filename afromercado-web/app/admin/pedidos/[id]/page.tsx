@@ -7,6 +7,7 @@ import { formatearPrecio } from '@/lib/formatearPrecio'
 import {
   obtenerPedidoAdmin,
   obtenerComprobanteObjectUrl,
+  consultarPagoEnWompiAdmin,
   type AdminPedidoDetalle,
   type EstadoPedido,
 } from '@/components/admin/api'
@@ -125,6 +126,74 @@ function Comprobante({ pagoId }: { pagoId: number }) {
     >
       {cargando ? 'Cargando comprobante…' : error ? 'Error al cargar — reintentar' : 'Ver comprobante'}
     </button>
+  )
+}
+
+// ── Verificación directa contra Wompi (diagnóstico admin) ──────
+
+function extraerCampos(data: unknown): { id?: string; status?: string; reference?: string; amount_in_cents?: number } {
+  if (!data || typeof data !== 'object') return {}
+  const d = data as Record<string, unknown>
+  return {
+    id: typeof d.id === 'string' ? d.id : undefined,
+    status: typeof d.status === 'string' ? d.status : undefined,
+    reference: typeof d.reference === 'string' ? d.reference : undefined,
+    amount_in_cents: typeof d.amount_in_cents === 'number' ? d.amount_in_cents : undefined,
+  }
+}
+
+function VerificarConWompi({ pagoId }: { pagoId: number }) {
+  const [cargando, setCargando] = useState(false)
+  const [resultado, setResultado] = useState<unknown>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function verificar() {
+    setCargando(true)
+    setError(null)
+    setResultado(null)
+    try {
+      const data = await consultarPagoEnWompiAdmin(pagoId)
+      setResultado(data)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo consultar Wompi.')
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  const campos = extraerCampos(resultado)
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={verificar}
+        disabled={cargando}
+        className="text-xs font-semibold text-[#2D6A4F] hover:underline disabled:opacity-50"
+      >
+        {cargando ? 'Consultando Wompi…' : 'Verificar con Wompi directamente'}
+      </button>
+
+      {error && (
+        <p className="mt-1 text-xs text-red-600">{error}</p>
+      )}
+
+      {resultado != null && (
+        <div className="mt-2 rounded-xl border border-[#1A1A1A]/8 bg-[#F8F5F0]/60 p-3 text-xs text-[#1A1A1A]/80">
+          <div className="flex flex-col gap-0.5">
+            {campos.id && <span>ID: <span className="font-semibold">{campos.id}</span></span>}
+            {campos.status && <span>Status: <span className="font-semibold">{campos.status}</span></span>}
+            {campos.reference && <span>Referencia: <span className="font-semibold">{campos.reference}</span></span>}
+            {campos.amount_in_cents != null && (
+              <span>Monto: <span className="font-semibold">{campos.amount_in_cents} centavos</span></span>
+            )}
+          </div>
+          <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all text-[10px] text-[#1A1A1A]/50">
+            {JSON.stringify(resultado, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -369,6 +438,7 @@ export default function AdminPedidoDetallePage() {
                   {pago.notas && <span>Notas: {pago.notas}</span>}
                 </div>
                 {pago.comprobanteUrl && <Comprobante pagoId={pago.id} />}
+                {pago.proveedor === 'WOMPI' && <VerificarConWompi pagoId={pago.id} />}
               </div>
             ))}
           </div>

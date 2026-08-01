@@ -12,6 +12,7 @@ const PROVEEDORES = ["SANDBOX", "WOMPI"];
 
 const VARIABLES_WOMPI = [
   { nombre: "WOMPI_PUBLIC_KEY", grupo: "checkout", requerida: true },
+  { nombre: "WOMPI_PRIVATE_KEY", grupo: "checkout", requerida: false },
   { nombre: "WOMPI_INTEGRITY_SECRET", alternativa: "WOMPI_SIGNATURE_SECRET", grupo: "checkout", requerida: true },
   { nombre: "WOMPI_EVENTS_SECRET", grupo: "webhook", requerida: true },
   { nombre: "WOMPI_PAYOUTS_API_URL", grupo: "dispersion", requerida: false, defaultValue: "https://api.payouts.wompi.co/v1" },
@@ -23,6 +24,7 @@ const VARIABLES_WOMPI = [
 
 const CAMPOS_WOMPI_EDITABLES = new Set([
   "WOMPI_PUBLIC_KEY",
+  "WOMPI_PRIVATE_KEY",
   "WOMPI_INTEGRITY_SECRET",
   "WOMPI_EVENTS_SECRET",
   "WOMPI_PAYOUTS_API_URL",

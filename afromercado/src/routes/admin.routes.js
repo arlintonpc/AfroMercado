@@ -23,6 +23,9 @@ router.post("/pagos/configuracion/probar", ...soloAdmin, AdminController.probarC
 // Aprobar / rechazar un pago
 router.patch("/pagos/:id/verificar", ...soloAdmin, AdminController.verificarPago);
 
+// Consulta directa (solo lectura) del estado de una transaccion en Wompi
+router.get("/pagos/:id/estado-wompi", ...soloAdmin, AdminController.consultarPagoEnWompi);
+
 // Ver el comprobante (imagen) de un pago
 router.get("/pagos/:id/comprobante", ...soloAdmin, AdminController.comprobante);
 

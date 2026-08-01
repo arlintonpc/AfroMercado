@@ -13,6 +13,7 @@ interface PasswordInputProps {
   disabled?: boolean
   className?: string
   inputClassName?: string
+  autoComplete?: string
 }
 
 export function PasswordInput({
@@ -25,6 +26,7 @@ export function PasswordInput({
   disabled = false,
   className = '',
   inputClassName = '',
+  autoComplete,
 }: PasswordInputProps) {
   const [visible, setVisible] = useState(false)
 
@@ -39,6 +41,7 @@ export function PasswordInput({
         required={required}
         minLength={minLength}
         disabled={disabled}
+        autoComplete={autoComplete}
         className={[
           'w-full pr-11',
           inputClassName,
