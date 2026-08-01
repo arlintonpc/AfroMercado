@@ -124,25 +124,6 @@ export function BotonesLoginSocial({ onExito, onError }: Props) {
         <span>Continuar con Google (Gmail)</span>
       </button>
 
-      {/* Botón Microsoft / Hotmail */}
-      <button
-        type="button"
-        onClick={handleMicrosoftClick}
-        disabled={cargandoGoogle || cargandoMs}
-        className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-semibold shadow-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
-      >
-        {cargandoMs ? (
-          <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-        ) : (
-          <svg className="w-5 h-5 shrink-0" viewBox="0 0 23 23">
-            <path fill="#f35325" d="M1 1h10v10H1z" />
-            <path fill="#81bc06" d="M12 1h10v10H12z" />
-            <path fill="#05a6f0" d="M1 12h10v10H1z" />
-            <path fill="#ffba08" d="M12 12h10v10H12z" />
-          </svg>
-        )}
-        <span>Continuar con Hotmail / Outlook</span>
-      </button>
 
       <div className="relative my-2">
         <div className="absolute inset-0 flex items-center">

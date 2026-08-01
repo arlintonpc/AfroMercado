@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
@@ -13,9 +13,30 @@ type Modo = 'login' | 'registro'
 
 export default function ComercianteIngresarPage() {
   const router = useRouter()
-  const { login, registro } = useAuth()
+  const { login, registro, autenticado, cargando: cargandoAuth, usuario } = useAuth()
 
   const [modo, setModo] = useState<Modo>('login')
+  const [verificandoSesion, setVerificandoSesion] = useState(true)
+
+  // Si el usuario ya tiene sesión iniciada (comprador, otra pestaña, sesión
+  // previa, etc.), no mostramos el formulario de login/registro: verificamos
+  // si ya tiene comercio y lo llevamos directo al paso que corresponde.
+  useEffect(() => {
+    if (cargandoAuth) return
+    if (!autenticado) {
+      setVerificandoSesion(false)
+      return
+    }
+    if (usuario?.rol === 'ADMIN') {
+      setVerificandoSesion(false)
+      return
+    }
+    obtenerMiComercio()
+      .then((comercio) => {
+        router.replace(comercio ? '/comerciante/dashboard' : '/comerciante/registro-comercio')
+      })
+      .catch(() => setVerificandoSesion(false))
+  }, [autenticado, cargandoAuth, usuario, router])
 
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
@@ -125,6 +146,14 @@ export default function ComercianteIngresarPage() {
       }
       setEnviando(false)
     }
+  }
+
+  if (autenticado && verificandoSesion) {
+    return (
+      <main className="min-h-screen bg-[#F8F5F0] flex items-center justify-center">
+        <p className="text-sm text-[#1A1A1A]/50">Revisando tu sesión…</p>
+      </main>
+    )
   }
 
   return (
