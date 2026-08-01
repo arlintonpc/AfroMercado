@@ -161,7 +161,7 @@ function TarjetaRuta({ ruta, onReservar }: { ruta: RutaTransporte; onReservar: (
             <div className="flex gap-1 mt-2.5">
               {ruta.diasSemana.map(d => (
                 <span key={d} className="text-[10px] bg-[#F0FDF4] text-[#1B4332] border border-[#BBF7D0] px-2 py-0.5 rounded-full font-medium">
-                  {DIAS_LABEL[d] ?? d}
+                  {DIAS_LABEL[d.toLowerCase()] ?? d}
                 </span>
               ))}
             </div>
@@ -238,7 +238,7 @@ function WidgetReservaTransporte({ transporte, rutas, onReservar, autenticado, r
             <div className="flex gap-1">
               {ruta.diasSemana.map(d => (
                 <span key={d} className="text-[10px] bg-[#F0FDF4] text-[#1B4332] border border-[#BBF7D0] px-1.5 py-0.5 rounded font-medium">
-                  {DIAS_LABEL[d] ?? d}
+                  {DIAS_LABEL[d.toLowerCase()] ?? d}
                 </span>
               ))}
             </div>

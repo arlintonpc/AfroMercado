@@ -1135,14 +1135,15 @@ export default function HotelDetallePage() {
     if (!autenticado) { router.push('/ingresar'); return }
     const idx = hotel?.habitaciones.findIndex(x => x.id === h.id) ?? 0
     if (idx >= 0) setWidgetHabIdx(idx)
-    const widget = document.querySelector('[data-widget]')
-    if (widget) {
+    const widget = document.querySelector('[data-widget]') as HTMLElement | null
+    const widgetVisible = widget && widget.offsetParent !== null
+    if (widgetVisible) {
       // Desktop: scroll al widget para que el usuario confirme fechas ahí
       widget.scrollIntoView({ behavior: 'smooth', block: 'start' })
       widget.classList.add('ring-2', 'ring-[#1B4332]', 'ring-offset-2')
       setTimeout(() => widget.classList.remove('ring-2', 'ring-[#1B4332]', 'ring-offset-2'), 1500)
     } else {
-      // Mobile: no hay widget, abrir formulario directamente
+      // Mobile (o el widget está oculto por CSS): abrir formulario directamente
       setHabSelec(h)
     }
   }

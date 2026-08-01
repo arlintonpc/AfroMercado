@@ -143,7 +143,7 @@ export default function RegistroComercioPage() {
           >
             ¡Tu tienda ya está lista!
           </h2>
-          <p className="mt-2 text-[#1A1A1A]/60 text-sm max-w-sm mx-auto">
+          <p className="mt-2 text-[#1A1A1A]/60 dark:text-white/70 text-sm max-w-sm mx-auto">
             Ya puedes publicar tu primer producto y empezar a vender en Teravia.
           </p>
           <Link href="/comerciante/publicar" className="mt-5 inline-block">

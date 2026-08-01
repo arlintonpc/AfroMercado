@@ -114,7 +114,12 @@ export default function InventarioOperativo() {
 
   const productos = useMemo(() => {
     const texto = busqueda.trim().toLocaleLowerCase('es-CO')
-    return (data?.productos ?? []).filter((producto) => (!texto || producto.nombre.toLocaleLowerCase('es-CO').includes(texto)) && (filtro === 'TODOS' || filtro === 'AGOTADO' ? producto.stockDisponible <= 0 : producto.stockDisponible > 0 && producto.stockDisponible <= producto.stockMinimo))
+    return (data?.productos ?? []).filter((producto) => {
+      if (texto && !producto.nombre.toLocaleLowerCase('es-CO').includes(texto)) return false
+      if (filtro === 'AGOTADO') return producto.stockDisponible <= 0
+      if (filtro === 'BAJO') return producto.stockDisponible > 0 && producto.stockDisponible <= producto.stockMinimo
+      return true // TODOS
+    })
   }, [busqueda, filtro, data?.productos])
   const historial = useMemo(() => tipoMovimiento === 'TODOS' ? movimientos : movimientos.filter((movimiento) => movimiento.tipo === tipoMovimiento), [movimientos, tipoMovimiento])
 

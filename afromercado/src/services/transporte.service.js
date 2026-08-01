@@ -24,7 +24,8 @@ function operaEnFecha(ruta, fecha) {
   // Una ruta sin dias configurados conserva el comportamiento heredado: opera todos los dias.
   if (!ruta.diasSemana || ruta.diasSemana.length === 0) return true;
   const fechaLocal = new Date(`${fecha}T12:00:00`);
-  return ruta.diasSemana.includes(DIAS_SEMANA[fechaLocal.getDay()]);
+  const diasNormalizados = ruta.diasSemana.map((d) => String(d).toLowerCase());
+  return diasNormalizados.includes(DIAS_SEMANA[fechaLocal.getDay()]);
 }
 
 function datosRutaPermitidos(datos) {
