@@ -146,3 +146,44 @@ export async function actualizarCategoriaAdmin(
 export async function eliminarCategoriaAdmin(id: number): Promise<void> {
   await apiFetch(`/admin/categorias/${id}`, { method: 'DELETE' })
 }
+
+// ── Unidades de venta (antes un enum fijo, ahora administrable) ──
+
+export interface UnidadAdmin {
+  id: number
+  codigo: string
+  etiqueta: string
+  activa: boolean
+  orden: number
+}
+
+export async function listarUnidadesAdmin(): Promise<UnidadAdmin[]> {
+  const r = await apiFetch<{ ok: boolean; data: UnidadAdmin[] }>('/admin/unidades')
+  return r.data
+}
+
+export async function crearUnidadAdmin(data: { etiqueta: string; orden?: number }): Promise<UnidadAdmin> {
+  const r = await apiFetch<{ ok: boolean; data: UnidadAdmin }>('/admin/unidades', {
+    method: 'POST',
+    body: data as any,
+  })
+  return r.data
+}
+
+export async function actualizarUnidadAdmin(
+  id: number,
+  data: { etiqueta?: string; orden?: number },
+): Promise<UnidadAdmin> {
+  const r = await apiFetch<{ ok: boolean; data: UnidadAdmin }>(`/admin/unidades/${id}`, {
+    method: 'PATCH',
+    body: data as any,
+  })
+  return r.data
+}
+
+export async function toggleActivoUnidadAdmin(id: number): Promise<UnidadAdmin> {
+  const r = await apiFetch<{ ok: boolean; data: UnidadAdmin }>(`/admin/unidades/${id}/activo`, {
+    method: 'PATCH',
+  })
+  return r.data
+}

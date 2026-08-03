@@ -65,6 +65,7 @@ export interface ProductoCrudo {
   stock?: number
   stockReservado?: number
   pesoKg?: number | string | null
+  envioGratis?: boolean
   diasAlistamientoMin?: number
   diasAlistamientoMax?: number
   alcance?: Producto['alcance']
@@ -120,6 +121,7 @@ export function mapearProducto(crudo: any): Producto {
     stock: aNumero(crudo.stock),
     stockReservado: aNumero(crudo.stockReservado),
     pesoKg: crudo.pesoKg != null ? aNumero(crudo.pesoKg) : null,
+    envioGratis: crudo.envioGratis ?? false,
     diasAlistamientoMin: aNumero(crudo.diasAlistamientoMin),
     diasAlistamientoMax: aNumero(crudo.diasAlistamientoMax),
     alcance: crudo.alcance ?? 'LOCAL',

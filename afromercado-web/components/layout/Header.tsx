@@ -9,7 +9,7 @@ import { useTheme } from '@/context/ThemeContext'
 import { apiFetch, normalizarUrlMedia } from '@/lib/api/client'
 import { obtenerReglasPublicas } from '@/lib/api/config'
 import { DEPARTAMENTOS } from '@/lib/data/colombia'
-import { Utensils, Hotel, Map, Ship, Ticket, Clapperboard, Briefcase, Home, Leaf, Sparkles } from 'lucide-react'
+import { Utensils, Hotel, Map, Ship, Ticket, Clapperboard, Briefcase, Home, Leaf, Sparkles, MoreHorizontal } from 'lucide-react'
 import ModalAvatarLightbox from '@/components/ui/ModalAvatarLightbox'
 import CampanaNotificaciones from './CampanaNotificaciones'
 import BuscadorGlobal from './BuscadorGlobal'
@@ -28,6 +28,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
   const badge = itemsCarrito ?? cantidadTotal
 
   const [menuAbierto, setMenuAbierto] = useState(false)
+  const [masAbierto, setMasAbierto] = useState(false)
   const [avatarModalAbierto, setAvatarModalAbierto] = useState(false)
   const [regionMenuAbierto, setRegionMenuAbierto] = useState(false)
   const [busqueda, setBusqueda] = useState('')
@@ -102,9 +103,34 @@ export default function Header({ itemsCarrito }: HeaderProps) {
     return () => document.removeEventListener('mousedown', onClick)
   }, [mostrarSugerencias])
 
+  useEffect(() => {
+    if (!masAbierto) return
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [masAbierto])
+
+  // Móvil: los 4 módulos principales (documentados en CLAUDE.md) quedan visibles
+  // sin scroll; el resto vive detrás de "Más" para no perder espacio ni orden.
+  type EnlaceNav = { href: string; label: string; Icono: typeof Utensils; dorado?: boolean; negrita?: boolean }
+  const enlacesPrimarios: EnlaceNav[] = [
+    (!reglas || reglas.flagModuloExpress) && { href: '/express', label: 'Sabores', Icono: Utensils },
+    (!reglas || reglas.flagModuloHoteles) && { href: '/hoteles', label: 'Hoteles', Icono: Hotel },
+    (!reglas || reglas.flagModuloTours) && { href: '/tours', label: 'Tours', Icono: Map },
+    (!reglas || reglas.flagModuloTransportes) && { href: '/transportes', label: 'Transp.', Icono: Ship },
+  ].filter(Boolean) as EnlaceNav[]
+  const enlacesSecundarios: EnlaceNav[] = [
+    { href: '/cultura', label: 'Cultura', Icono: Ticket },
+    (!reglas || reglas.flagModuloVitrinaReels) && { href: '/vitrina', label: 'Vitrina', Icono: Clapperboard },
+    (!reglas || reglas.flagModuloEmpleo) && { href: '/empleo', label: 'Empleo', Icono: Briefcase },
+    (!reglas || reglas.flagModuloInmuebles) && { href: '/bienes-raices', label: 'Bienes Raíces', Icono: Home },
+    { href: '/agro', label: 'Agro', Icono: Leaf },
+    { href: '/temporada', label: 'Temporada', Icono: Sparkles, dorado: true },
+    { href: '/mapa', label: 'Mapa', Icono: Map, negrita: true },
+  ].filter(Boolean) as EnlaceNav[]
+
   return (
     <header className="sticky top-0 z-50 bg-[#F8F5F0] dark:bg-[#15201A] shadow-[0_2px_8px_rgba(0,0,0,0.12)] border-b border-transparent dark:border-white/10 transition-colors">
-      <div className="w-full max-w-6xl mx-auto px-4 md:px-6 flex items-center justify-between h-14 md:h-16">
+      <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 md:px-6 flex items-center justify-between h-14 md:h-16">
 
         {/* Logo */}
         <Link href="/" className="flex items-center min-h-[44px]">
@@ -129,7 +155,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
             className="flex items-center gap-1 min-h-[36px] px-2 md:px-2.5 rounded-lg text-xs md:text-sm font-semibold text-[#1B4332] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 border border-[#2D6A4F]/20 dark:border-white/20"
           >
             <span aria-hidden="true">📍</span>
-            <span className="max-w-[90px] md:max-w-[140px] truncate">
+            <span className="hidden sm:inline max-w-[90px] md:max-w-[140px] truncate">
               {regionActiva ?? 'Todo el país'}
             </span>
             <svg className="w-3 h-3 text-[#1A1A1A]/50 dark:text-white/60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -182,7 +208,7 @@ export default function Header({ itemsCarrito }: HeaderProps) {
 
 
         {/* Íconos derecha */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-0.5 sm:gap-2">
           {/* Búsqueda móvil */}
           <button
             onClick={() => router.push('/buscar')}
@@ -285,18 +311,18 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                   </div>
                   {usuario?.rol === 'ADMIN' && (
                     <Link href="/admin" role="menuitem" onClick={() => setMenuAbierto(false)}
-                      className="block px-4 py-2 text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10">
+                      className="block px-4 py-2 text-sm font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                       Panel de administración
                     </Link>
                   )}
                   {usuario?.rol === 'COMERCIANTE' && (
                     <>
                       <Link href="/comerciante" role="menuitem" onClick={() => setMenuAbierto(false)}
-                        className="block px-4 py-2 text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10">
+                        className="block px-4 py-2 text-sm font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                         Mi tienda
                       </Link>
                       <Link href="/mis-liquidaciones" role="menuitem" onClick={() => setMenuAbierto(false)}
-                        className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                        className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                         Mis liquidaciones
                       </Link>
                     </>
@@ -304,11 +330,11 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                   {usuario?.rol === 'REPARTIDOR' && (
                     <>
                       <Link href="/repartidor" role="menuitem" onClick={() => setMenuAbierto(false)}
-                        className="block px-4 py-2 text-sm font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10">
+                        className="block px-4 py-2 text-sm font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                         Panel repartidor
                       </Link>
                       <Link href="/mis-liquidaciones" role="menuitem" onClick={() => setMenuAbierto(false)}
-                        className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                        className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                         Mis liquidaciones
                       </Link>
                     </>
@@ -316,73 +342,73 @@ export default function Header({ itemsCarrito }: HeaderProps) {
                   {usuario?.rol === 'COMPRADOR' && (
                     <>
                       <Link href="/comerciante/registro-comercio" role="menuitem" onClick={() => setMenuAbierto(false)}
-                        className="block px-4 py-2 text-sm font-semibold text-[#D4A017] hover:bg-[#D4A017]/10">
+                        className="block px-4 py-2 text-sm font-semibold text-[#D4A017] dark:text-[#F3C242] hover:bg-[#D4A017]/10 dark:hover:bg-white/10">
                         🏪 Abre tu tienda
                       </Link>
                       <Link href="/ser-repartidor" role="menuitem" onClick={() => setMenuAbierto(false)}
-                        className="block px-4 py-2 text-sm font-semibold text-[#D4A017] hover:bg-[#D4A017]/10">
+                        className="block px-4 py-2 text-sm font-semibold text-[#D4A017] dark:text-[#F3C242] hover:bg-[#D4A017]/10 dark:hover:bg-white/10">
                         🚴 Sé repartidor
                       </Link>
                     </>
                   )}
                   <Link href="/perfil" role="menuitem" onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                     Mi perfil
                   </Link>
                   <Link href="/mis-pedidos" role="menuitem" onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                     Mis pedidos
                   </Link>
                   <Link href="/mis-direcciones" role="menuitem" onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                     Mis direcciones
                   </Link>
                   <Link href="/mis-favoritos" role="menuitem" onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                     Mis favoritos
                   </Link>
-                  <div className="border-t border-[#1A1A1A]/10 my-1" />
+                  <div className="border-t border-[#1A1A1A]/10 dark:border-white/10 my-1" />
                   <Link href="/hoteles/mis-reservas" role="menuitem" onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                     🏨 Reservas hotel
                   </Link>
                   <Link href="/tours/mis-reservas" role="menuitem" onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                     🗺️ Reservas tour
                   </Link>
                   <Link href="/transportes/mis-reservas" role="menuitem" onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                     🛥️ Reservas transporte
                   </Link>
                   <Link href="/cultura/mis-reservas" role="menuitem" onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                     🎭 Reservas cultura
                   </Link>
                   <Link href="/empleo/mi-hoja-de-vida" role="menuitem" onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                     💼 Mi hoja de vida
                   </Link>
                   <Link href="/empleo/mis-postulaciones" role="menuitem" onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                     💼 Mis postulaciones
                   </Link>
                   <Link href="/empleo/mis-ofertas" role="menuitem" onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                     💼 Ofertas que publiqué
                   </Link>
                   <Link href="/empleo/favoritos" role="menuitem" onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                     💼 Empleos favoritos
                   </Link>
-                  <div className="border-t border-[#1A1A1A]/10 my-1" />
+                  <div className="border-t border-[#1A1A1A]/10 dark:border-white/10 my-1" />
                   <Link href="/chat" role="menuitem" onClick={() => setMenuAbierto(false)}
-                    className="block px-4 py-2 text-sm text-[#1A1A1A] hover:bg-[#2D6A4F]/10">
+                    className="block px-4 py-2 text-sm text-[#1A1A1A] dark:text-white/90 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10">
                     Mensajes
                   </Link>
                   <button
                     role="menuitem"
                     onClick={() => { setMenuAbierto(false); logout() }}
-                    className="block w-full text-left px-4 py-2 text-sm text-[#B85A1A] hover:bg-[#2D6A4F]/10"
+                    className="block w-full text-left px-4 py-2 text-sm text-[#B85A1A] dark:text-[#E87A2A] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10"
                   >
                     Cerrar sesión
                   </button>
@@ -393,8 +419,67 @@ export default function Header({ itemsCarrito }: HeaderProps) {
         </div>
       </div>
 
-      {/* Fila Inferior: Menú de Navegación Completo (Scrollable en móviles, distribuido en desktop) */}
-      <div className="flex bg-[#2D6A4F]/5 border-t border-black/5">
+      {/* Fila Inferior móvil: solo los 4 módulos principales + botón "Más" — sin scroll oculto */}
+      <div className="sm:hidden flex bg-[#2D6A4F]/5 border-t border-black/5">
+        <nav className="flex w-full items-stretch" aria-label="Navegación principal">
+          {enlacesPrimarios.map(({ href, label, Icono }) => (
+            <Link
+              key={href}
+              href={href}
+              className="flex-1 min-w-0 flex items-center justify-center gap-1 min-h-[36px] px-1 text-[11px] font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 transition-colors"
+            >
+              <Icono className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">{label}</span>
+            </Link>
+          ))}
+          <button
+            type="button"
+            onClick={() => setMasAbierto(true)}
+            aria-haspopup="menu"
+            aria-expanded={masAbierto}
+            className="flex-1 min-w-0 flex items-center justify-center gap-1 min-h-[36px] px-1 text-[11px] font-semibold text-[#1A1A1A]/70 dark:text-white/70 hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 transition-colors"
+          >
+            <MoreHorizontal className="w-4 h-4 flex-shrink-0" />
+            Más
+          </button>
+        </nav>
+      </div>
+
+      {masAbierto && (
+        <div
+          className="sm:hidden fixed inset-0 z-[60] bg-black/40"
+          onClick={() => setMasAbierto(false)}
+          role="presentation"
+        >
+          <div
+            role="menu"
+            aria-label="Más secciones"
+            onClick={(e) => e.stopPropagation()}
+            className="absolute bottom-0 left-0 right-0 bg-white dark:bg-[#1A241F] rounded-t-2xl pt-3 px-4 pb-6 shadow-[0_-8px_30px_rgba(0,0,0,0.15)]"
+          >
+            <div className="w-10 h-1 rounded-full bg-black/15 dark:bg-white/20 mx-auto mb-4" />
+            <div className="grid grid-cols-3 gap-3">
+              {enlacesSecundarios.map(({ href, label, Icono, dorado, negrita }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  role="menuitem"
+                  onClick={() => setMasAbierto(false)}
+                  className={`flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 transition-colors ${
+                    dorado ? 'text-[#D4A017]' : negrita ? 'text-[#1B4332] dark:text-[#52B788] font-bold' : 'text-[#2D6A4F] dark:text-[#52B788]'
+                  }`}
+                >
+                  <Icono className="w-5 h-5" />
+                  <span className="text-xs font-semibold text-center leading-tight">{label}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fila Inferior desktop/tablet: Menú de Navegación Completo (distribuido, sin scroll) */}
+      <div className="hidden sm:flex bg-[#2D6A4F]/5 border-t border-black/5">
         <div className="w-full max-w-6xl mx-auto px-2 md:px-6">
           <nav className="flex items-center gap-2 lg:justify-between py-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }} aria-label="Navegación principal">
             {(!reglas || reglas.flagModuloExpress) && (
@@ -431,11 +516,11 @@ export default function Header({ itemsCarrito }: HeaderProps) {
               </Link>
             )}
             {(!reglas || reglas.flagModuloInmuebles) && (
-              <Link href="/bienes-raices" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+              <Link href="/bienes-raices" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 flex items-center gap-1.5 transition-colors">
                 <Home className="w-4 h-4" /> Bienes Raíces
               </Link>
             )}
-            <Link href="/agro" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] hover:bg-[#2D6A4F]/10 flex items-center gap-1.5 transition-colors">
+            <Link href="/agro" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#2D6A4F] dark:text-[#52B788] hover:bg-[#2D6A4F]/10 dark:hover:bg-white/10 flex items-center gap-1.5 transition-colors">
               <Leaf className="w-4 h-4" /> Agro
             </Link>
             <Link href="/temporada" className="flex-shrink-0 min-h-[36px] px-2 rounded-lg text-[13px] font-semibold text-[#D4A017] hover:bg-[#D4A017]/10 flex items-center gap-1.5 transition-colors">

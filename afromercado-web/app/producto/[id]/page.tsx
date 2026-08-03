@@ -748,7 +748,7 @@ export default function PaginaProducto({
                   )}
 
                   {/* 10. Estimador de envío */}
-                  <EstimadorEnvio pesoKg={producto.pesoKg} />
+                  <EstimadorEnvio pesoKg={producto.pesoKg} envioGratis={producto.envioGratis} />
                 </div>
 
                 {/* 11. Reportar producto */}

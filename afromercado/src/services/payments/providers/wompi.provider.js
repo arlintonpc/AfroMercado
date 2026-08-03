@@ -99,8 +99,38 @@ function limpiarIdempotency(valor) {
     .slice(0, 64);
 }
 
-async function firmaIntegridad({ reference, amountInCents, currency, expirationTime }) {
-  const secreto = await requerido("WOMPI_INTEGRITY_SECRET", "WOMPI_SIGNATURE_SECRET");
+function validarCredencialesCheckout(publicKey, integritySecret) {
+  const clave = String(publicKey || "");
+  const secreto = String(integritySecret || "");
+  const ambienteClave = clave.startsWith("pub_test_")
+    ? "test"
+    : clave.startsWith("pub_prod_")
+      ? "production"
+      : null;
+  const ambienteSecreto = secreto.startsWith("test_integrity_")
+    ? "test"
+    : secreto.startsWith("prod_integrity_")
+      ? "production"
+      : null;
+
+  if (ambienteClave && ambienteSecreto && ambienteClave !== ambienteSecreto) {
+    throw new ErrorValidacion(
+      `Las credenciales de checkout Wompi no pertenecen al mismo ambiente (${ambienteClave} vs ${ambienteSecreto})`
+    );
+  }
+}
+
+function normalizarExpirationTime(valor) {
+  if (valor == null || valor === "") return null;
+  const fecha = new Date(valor);
+  if (Number.isNaN(fecha.getTime())) {
+    throw new ErrorValidacion("La fecha de expiracion del checkout Wompi no es valida");
+  }
+  return fecha.toISOString();
+}
+
+async function firmaIntegridad({ reference, amountInCents, currency, expirationTime, integritySecret }) {
+  const secreto = integritySecret || await requerido("WOMPI_INTEGRITY_SECRET", "WOMPI_SIGNATURE_SECRET");
   const partes = [reference, amountInCents, currency];
   if (expirationTime) partes.push(expirationTime);
   partes.push(secreto);
@@ -108,8 +138,12 @@ async function firmaIntegridad({ reference, amountInCents, currency, expirationT
 }
 
 async function checkoutConfig() {
+  const publicKey = await requerido("WOMPI_PUBLIC_KEY");
+  const integritySecret = await requerido("WOMPI_INTEGRITY_SECRET", "WOMPI_SIGNATURE_SECRET");
+  validarCredencialesCheckout(publicKey, integritySecret);
   return {
-    publicKey: await requerido("WOMPI_PUBLIC_KEY"),
+    publicKey,
+    integritySecret,
     checkoutUrl: await env("WOMPI_CHECKOUT_URL") || CHECKOUT_URL,
   };
 }
@@ -352,8 +386,14 @@ const WompiPaymentProvider = {
     const currency = pago.moneda || "COP";
     const amountInCents = montoEnCentavos(pago.monto);
     const reference = pago.providerReference;
-    const expirationTime = pago.expiraAt ? new Date(pago.expiraAt).toISOString() : null;
-    const signature = await firmaIntegridad({ reference, amountInCents, currency, expirationTime });
+    const expirationTime = normalizarExpirationTime(pago.expiraAt);
+    const signature = await firmaIntegridad({
+      reference,
+      amountInCents,
+      currency,
+      expirationTime,
+      integritySecret: config.integritySecret,
+    });
 
     const params = new URLSearchParams({
       "public-key": config.publicKey,
@@ -365,6 +405,7 @@ const WompiPaymentProvider = {
     });
 
     if (expirationTime) params.set("expiration-time", expirationTime);
+
     if (pedido.comprador?.email) params.set("customer-data:email", pedido.comprador.email);
     if (pedido.comprador?.nombre) params.set("customer-data:full-name", pedido.comprador.nombre);
     if (pedido.comprador?.telefono) params.set("customer-data:phone-number", pedido.comprador.telefono);
@@ -388,8 +429,14 @@ const WompiPaymentProvider = {
     const currency = "COP";
     const amountInCents = montoEnCentavos(solicitud.pagoMontoCOP || solicitud.presupuestoCOP);
     const reference = solicitud.pagoProviderReference || solicitud.pagoReferencia;
-    const expirationTime = solicitud.pagoExpiraAt ? new Date(solicitud.pagoExpiraAt).toISOString() : null;
-    const signature = await firmaIntegridad({ reference, amountInCents, currency, expirationTime });
+    const expirationTime = normalizarExpirationTime(solicitud.pagoExpiraAt);
+    const signature = await firmaIntegridad({
+      reference,
+      amountInCents,
+      currency,
+      expirationTime,
+      integritySecret: config.integritySecret,
+    });
 
     const params = new URLSearchParams({
       "public-key": config.publicKey,
@@ -401,6 +448,7 @@ const WompiPaymentProvider = {
     });
 
     if (expirationTime) params.set("expiration-time", expirationTime);
+
     if (usuario?.email) params.set("customer-data:email", usuario.email);
     if (usuario?.nombre || comercio?.nombre) params.set("customer-data:full-name", usuario?.nombre || comercio.nombre);
     if (usuario?.telefono || comercio?.whatsapp) params.set("customer-data:phone-number", usuario?.telefono || comercio.whatsapp);

@@ -46,7 +46,7 @@ export default function ModalCrearHistoria({
   const [error, setError] = useState<string | null>(null)
 
   // Recortador de video
-  const [archivoVideoRecortar, setArchivoVideoRecortar] = useState<File | null>(null)
+  const [videosPendientes, setVideosPendientes] = useState<File[]>([])
   const mediaActual = medias[indiceVista] ?? null
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export default function ModalCrearHistoria({
     setIndiceVista(0)
     setTexto('')
     setError(null)
-    setArchivoVideoRecortar(null)
+    setVideosPendientes([])
   }, [isOpen])
 
   if (!isOpen) return null
@@ -73,13 +73,17 @@ export default function ModalCrearHistoria({
 
     setSubiendoMedia(true)
     try {
+      const videosAgregados: File[] = []
       for (const file of archivos) {
         if (file.type.startsWith('video/')) {
-          await ejecutarSubidaVideo(file)
+          videosAgregados.push(file)
         } else if (file.type.startsWith('image/')) {
           const res = await subirFotoHistoria(file)
           setMedias((actuales) => [...actuales, { url: res.url, tipo: 'FOTO', duracion: 5 }])
         }
+      }
+      if (videosAgregados.length > 0) {
+        setVideosPendientes(prev => [...prev, ...videosAgregados])
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron subir todos los archivos.')
@@ -92,9 +96,8 @@ export default function ModalCrearHistoria({
     setError(null)
     try {
       const res = await subirVideoHistoria(file, recorte)
-      const dur = recorte ? Math.max(5, Math.min(15, recorte.finSegundos - recorte.inicioSegundos)) : 15
+      const dur = recorte ? Math.max(5, Math.min(45, recorte.finSegundos - recorte.inicioSegundos)) : 45
       setMedias((actuales) => [...actuales, { url: res.url, tipo: 'VIDEO', duracion: dur }])
-      setArchivoVideoRecortar(null)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'No se pudo subir el video.'
       setError(msg)
@@ -298,15 +301,16 @@ export default function ModalCrearHistoria({
         </div>
       </div>
 
-      {/* Modal Recortador de Video si supera los 15s */}
-      {archivoVideoRecortar && (
+      {/* Modal Recortador de Video si supera los 45s o para elegir el fragmento */}
+      {videosPendientes.length > 0 && (
         <RecortadorVideoModal
-          archivo={archivoVideoRecortar}
-          duracionMaxima={15}
+          archivo={videosPendientes[0]}
+          duracionMaxima={45}
           onConfirmar={async (recorte) => {
-            await ejecutarSubidaVideo(archivoVideoRecortar, recorte)
+            await ejecutarSubidaVideo(videosPendientes[0], recorte)
+            setVideosPendientes(v => v.slice(1))
           }}
-          onCancelar={() => setArchivoVideoRecortar(null)}
+          onCancelar={() => setVideosPendientes(v => v.slice(1))}
         />
       )}
     </>

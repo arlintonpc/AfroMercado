@@ -126,12 +126,12 @@ const AdminController = {
       const PESO_POR_UNIDAD = { KG: 1, LITRO: 1, MANOJO: 3, PAQUETE: 0.5, DOCENA: 1, UNIDAD: 1 };
       const sinPeso = await prisma.producto.findMany({
         where: { pesoKg: null },
-        select: { id: true, unidad: true },
+        select: { id: true, unidad: { select: { codigo: true } } },
       });
       for (const p of sinPeso) {
         await prisma.producto.update({
           where: { id: p.id },
-          data: { pesoKg: PESO_POR_UNIDAD[p.unidad] ?? 1 },
+          data: { pesoKg: PESO_POR_UNIDAD[p.unidad.codigo] ?? 1 },
         });
       }
       res.json({ ok: true, actualizados: sinPeso.length });
@@ -279,12 +279,13 @@ const AdminController = {
           take: limite,
           select: {
             id: true, nombre: true, precio: true, stock: true,
-            activo: true, fotoUrl: true, unidad: true,
+            activo: true, fotoUrl: true, unidad: { select: { codigo: true } },
             comercio: { select: { id: true, nombre: true, municipio: true } },
           },
         }),
       ]);
-      res.json({ ok: true, data: items, total, pagina, limite });
+      const itemsPlanos = items.map((p) => ({ ...p, unidad: p.unidad.codigo }));
+      res.json({ ok: true, data: itemsPlanos, total, pagina, limite });
     } catch (e) { next(e); }
   },
 
@@ -919,18 +920,29 @@ const AdminController = {
   // GET /admin/categorias
   async listarCategorias(req, res, next) {
     try {
-      const data = await prisma.categoria.findMany({ orderBy: { nombre: "asc" } });
+      const data = await prisma.categoria.findMany({
+        orderBy: { nombre: "asc" },
+        include: { padre: { select: { id: true, nombre: true } } },
+      });
       res.json({ ok: true, data });
     } catch (e) { next(e); }
   },
 
   // POST /admin/categorias
+  // padreId ausente/null => crea un Departamento (categor\u00eda contenedora, sin productos propios).
   async crearCategoria(req, res, next) {
     try {
-      const { nombre, icono, grupo } = req.body;
+      const { nombre, icono, grupo, padreId } = req.body;
       if (!nombre?.trim()) throw new ErrorValidacion("El nombre es obligatorio");
       if (grupo !== undefined && !["ANCESTRAL", "LOCAL", "AGRO"].includes(grupo)) {
         throw new ErrorValidacion("grupo debe ser ANCESTRAL, LOCAL o AGRO");
+      }
+      let padreIdNum = null;
+      if (padreId !== undefined && padreId !== null && padreId !== "") {
+        padreIdNum = Number(padreId);
+        const padre = await prisma.categoria.findUnique({ where: { id: padreIdNum } });
+        if (!padre) throw new ErrorValidacion("El departamento seleccionado no existe.");
+        if (padre.padreId !== null) throw new ErrorValidacion("Un departamento no puede ser hijo de otra categor\u00eda.");
       }
       const slug = nombre
         .trim()
@@ -940,7 +952,7 @@ const AdminController = {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
       const data = await prisma.categoria.create({
-        data: { nombre: nombre.trim(), slug, icono: icono?.trim() ?? null, activa: true, grupo: grupo ?? "ANCESTRAL" },
+        data: { nombre: nombre.trim(), slug, icono: icono?.trim() ?? null, activa: true, grupo: grupo ?? "ANCESTRAL", padreId: padreIdNum },
       });
       res.status(201).json({ ok: true, data });
     } catch (e) { next(e); }
@@ -949,10 +961,27 @@ const AdminController = {
   // PATCH /admin/categorias/:id
   async actualizarCategoria(req, res, next) {
     try {
-      const { nombre, icono } = req.body;
+      const { nombre, icono, padreId } = req.body;
       const upd = {};
       if (nombre !== undefined) upd.nombre = nombre.trim();
       if (icono  !== undefined) upd.icono  = icono?.trim() ?? null;
+      if (padreId !== undefined) {
+        if (padreId === null || padreId === "") {
+          upd.padreId = null;
+        } else {
+          const idNum = Number(req.params.id);
+          const padreIdNum = Number(padreId);
+          if (padreIdNum === idNum) throw new ErrorValidacion("Una categor\u00eda no puede ser su propio departamento.");
+          const [padre, hijasExistentes] = await Promise.all([
+            prisma.categoria.findUnique({ where: { id: padreIdNum } }),
+            prisma.categoria.count({ where: { padreId: idNum } }),
+          ]);
+          if (!padre) throw new ErrorValidacion("El departamento seleccionado no existe.");
+          if (padre.padreId !== null) throw new ErrorValidacion("Un departamento no puede ser hijo de otra categor\u00eda.");
+          if (hijasExistentes > 0) throw new ErrorValidacion("Esta categor\u00eda tiene subcategor\u00edas propias; reas\u00edgnalas antes de convertirla en hija de otro departamento.");
+          upd.padreId = padreIdNum;
+        }
+      }
       const data = await prisma.categoria.update({
         where: { id: Number(req.params.id) },
         data: upd,
@@ -987,6 +1016,64 @@ const AdminController = {
         where: { id: c.id },
         data: { grupo },
       });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // ── Unidades de venta (antes un enum fijo, ahora administrable) ──
+
+  // GET /admin/unidades
+  async listarUnidades(req, res, next) {
+    try {
+      const data = await prisma.unidadDeVenta.findMany({ orderBy: { orden: "asc" } });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // POST /admin/unidades  body: { codigo, etiqueta, orden? }
+  async crearUnidad(req, res, next) {
+    try {
+      const { etiqueta, orden } = req.body;
+      if (!etiqueta?.trim()) throw new ErrorValidacion("La etiqueta es obligatoria");
+      const codigo = etiqueta
+        .trim()
+        .toUpperCase()
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/[^A-Z0-9]+/g, "_")
+        .replace(/^_|_$/g, "");
+      if (!codigo) throw new ErrorValidacion("La etiqueta debe tener al menos una letra o número");
+      const data = await prisma.unidadDeVenta.create({
+        data: { codigo, etiqueta: etiqueta.trim(), activa: true, orden: orden !== undefined ? Number(orden) : 0 },
+      });
+      res.status(201).json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // PATCH /admin/unidades/:id  body: { etiqueta?, orden? }
+  async actualizarUnidad(req, res, next) {
+    try {
+      const { etiqueta, orden } = req.body;
+      const upd = {};
+      if (etiqueta !== undefined) upd.etiqueta = etiqueta.trim();
+      if (orden !== undefined) upd.orden = Number(orden);
+      const data = await prisma.unidadDeVenta.update({ where: { id: Number(req.params.id) }, data: upd });
+      res.json({ ok: true, data });
+    } catch (e) { next(e); }
+  },
+
+  // PATCH /admin/unidades/:id/activo
+  async toggleActivoUnidad(req, res, next) {
+    try {
+      const u = await prisma.unidadDeVenta.findUnique({ where: { id: Number(req.params.id) } });
+      if (!u) throw new ErrorNoEncontrado("Unidad no encontrada");
+      if (u.activa) {
+        const enUso = await prisma.producto.count({ where: { unidadId: u.id, deletedAt: null } });
+        if (enUso > 0) {
+          throw new ErrorValidacion(`No puedes desactivar esta unidad: ${enUso} producto(s) todavía la usan.`);
+        }
+      }
+      const data = await prisma.unidadDeVenta.update({ where: { id: u.id }, data: { activa: !u.activa } });
       res.json({ ok: true, data });
     } catch (e) { next(e); }
   },

@@ -44,6 +44,9 @@ export default function AdminHeroPage() {
   const [modo,     setModo]     = useState<Modo>('FIJAS')
   const [fuente,   setFuente]   = useState<Fuente>('ORGANICO')
   const [intervalo,setIntervalo]= useState(10)
+  const [badge,    setBadge]    = useState('🌿 LA PLATAFORMA DE LOS TERRITORIOS DE COLOMBIA')
+  const [titulo,   setTitulo]   = useState('Descubre todo lo que un territorio\nproduce, ofrece y vive.')
+  const [subtitulo,setSubtitulo]= useState('Compra productos locales, encuentra hoteles, tours, transporte, empleo, cultura y servicios. Conecta con quienes impulsan la economía de cada territorio.')
   const [cargando, setCargando] = useState(true)
   const [guardando,setGuardando]= useState(false)
   const [aviso,    setAviso]    = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
@@ -52,7 +55,14 @@ export default function AdminHeroPage() {
     fetch(`${API_URL}/config/hero`)
       .then(r => r.json())
       .then(j => {
-        if (j.ok) { setModo(j.modo); setIntervalo(j.intervaloSegundos); setFuente(j.fuente) }
+        if (j.ok) { 
+          setModo(j.modo); 
+          setIntervalo(j.intervaloSegundos); 
+          setFuente(j.fuente);
+          if (j.badge) setBadge(j.badge);
+          if (j.titulo) setTitulo(j.titulo);
+          if (j.subtitulo) setSubtitulo(j.subtitulo);
+        }
       })
       .catch(() => {})
       .finally(() => setCargando(false))
@@ -66,9 +76,12 @@ export default function AdminHeroPage() {
       const r = await fetch(`${API_URL}/config/hero`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ modo, intervaloSegundos: intervalo, fuente }),
+        body: JSON.stringify({ modo, intervaloSegundos: intervalo, fuente, badge, titulo, subtitulo }),
       })
-      if (!r.ok) throw new Error('No se pudo guardar')
+      if (!r.ok) {
+        const errorData = await r.json().catch(() => null)
+        throw new Error(errorData?.error || errorData?.message || `Error del servidor (${r.status})`)
+      }
       setAviso({ tipo: 'ok', texto: 'Configuración guardada. Los cambios se ven al recargar la página principal.' })
     } catch (e) {
       setAviso({ tipo: 'error', texto: e instanceof Error ? e.message : 'Error al guardar' })
@@ -103,6 +116,45 @@ export default function AdminHeroPage() {
         <div className="h-48 rounded-2xl bg-white border border-[#1A1A1A]/5 animate-pulse" />
       ) : (
         <>
+          {/* Textos del Hero */}
+          <section className="rounded-2xl border border-[#1A1A1A]/5 bg-white p-6 shadow-sm">
+            <h2 className="text-base font-semibold text-[#1A1A1A] mb-4">Textos Principales</h2>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-[#1A1A1A] mb-1">Insignia (Badge)</label>
+                <input
+                  type="text"
+                  value={badge}
+                  onChange={e => setBadge(e.target.value)}
+                  className="w-full rounded-xl border border-[#1A1A1A]/10 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 bg-[#FAFAFA]"
+                  placeholder="Ej: 🌿 LA PLATAFORMA..."
+                />
+                <p className="text-xs text-[#1A1A1A]/50 mt-1">Texto pequeño que aparece arriba del título. Déjalo en blanco para ocultarlo.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-[#1A1A1A] mb-1">Título</label>
+                <textarea
+                  value={titulo}
+                  onChange={e => setTitulo(e.target.value)}
+                  className="w-full rounded-xl border border-[#1A1A1A]/10 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 bg-[#FAFAFA]"
+                  rows={2}
+                  placeholder="Ej: Descubre todo lo que tu territorio..."
+                />
+                <p className="text-xs text-[#1A1A1A]/50 mt-1">Usa un salto de línea (Enter) para separar la primera parte de la segunda (que aparecerá en dorado).</p>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-[#1A1A1A] mb-1">Subtítulo</label>
+                <textarea
+                  value={subtitulo}
+                  onChange={e => setSubtitulo(e.target.value)}
+                  className="w-full rounded-xl border border-[#1A1A1A]/10 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 bg-[#FAFAFA]"
+                  rows={3}
+                  placeholder="Ej: Compra productos locales..."
+                />
+              </div>
+            </div>
+          </section>
+
           {/* Fuente de contenido */}
           <section className="rounded-2xl border border-[#1A1A1A]/5 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">

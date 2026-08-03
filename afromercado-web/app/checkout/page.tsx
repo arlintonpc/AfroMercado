@@ -84,8 +84,10 @@ export default function PaginaCheckout() {
       const cid = Number(it.producto?.comercioId)
       if (!cid) continue
       const linea = precioVigente(it.producto) * it.cantidad
+      // Un producto marcado con envío gratis no aporta peso a la cotización de
+      // este comercio: el vendedor absorbe el costo de enviar ese producto.
       const p = it.producto?.pesoKg
-      const peso = (p != null && Number(p) > 0 ? Number(p) : 1) * it.cantidad
+      const peso = it.producto?.envioGratis ? 0 : (p != null && Number(p) > 0 ? Number(p) : 1) * it.cantidad
       if (!m[cid]) m[cid] = { subtotal: 0, peso: 0, sinOferta: 0 }
       m[cid].subtotal += linea
       m[cid].peso += peso
@@ -137,15 +139,19 @@ export default function PaginaCheckout() {
   // Peso total del carrito = suma de (peso por unidad × cantidad).
   // Si un producto no tiene peso configurado, se asume 1 kg por unidad
   // (mismo criterio que el backend), para que la cantidad siempre cuente.
+  // Los productos marcados con envío gratis no aportan peso: si el resultado
+  // da 0, significa que TODO el pedido es de envío gratis (se maneja aparte,
+  // no se fuerza a 1 como antes porque aquí 0 sí tiene un significado real).
   const pesoTotalKg = useMemo(() => {
     if (items.length === 0) return 1
     let total = 0
     for (const it of items) {
+      if (it.producto?.envioGratis) continue
       const peso = it.producto?.pesoKg
       const unidad = peso != null && Number(peso) > 0 ? Number(peso) : 1
       total += unidad * it.cantidad
     }
-    return total > 0 ? total : 1
+    return total
   }, [items])
 
   // Calcular costo de envío cuando el departamento tiene texto (debounce 900ms)
@@ -162,13 +168,19 @@ export default function PaginaCheckout() {
           precio = 0
         } else if (politicaEnvio === 'por_comercio' && ids.length > 1) {
           // Un envío por cada tienda (cada productor despacha por separado).
+          // Si el peso de un comercio quedó en 0, todos sus productos en el
+          // carrito son de envío gratis: ese comercio no cobra envío.
           const partes = await Promise.all(
             ids.map((cid) => {
               const d = datosPorComercio[cid]
-              return calcularEnvio(dep, d.peso, { subtotal: d.subtotal, comercioId: cid })
+              if (d.peso <= 0) return Promise.resolve(0)
+              return calcularEnvio(dep, d.peso, { subtotal: d.subtotal, comercioId: cid }).then((r) => r.precio)
             }),
           )
-          precio = partes.reduce((a, r) => a + r.precio, 0)
+          precio = partes.reduce((a, r) => a + r, 0)
+        } else if (pesoTotalKg <= 0) {
+          // Todo el pedido es de productos con envío gratis.
+          precio = 0
         } else {
           const r = await calcularEnvio(dep, pesoTotalKg, {
             subtotal,

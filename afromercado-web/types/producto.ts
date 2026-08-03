@@ -48,6 +48,7 @@ export interface Producto {
   comercioId?: string
   categoria?: { id: string; nombre: string; slug?: string; grupo?: 'ANCESTRAL' | 'LOCAL' }
   pesoKg?: number | null
+  envioGratis?: boolean
   esExpress?: boolean
   tiempoEntregaMin?: number | null
   oferta?: {

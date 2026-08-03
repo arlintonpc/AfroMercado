@@ -96,7 +96,7 @@ const ReporteRepository = {
         include: {
           items: {
             include: {
-              producto: { select: { id: true, nombre: true, fotoUrl: true, unidad: true } },
+              producto: { select: { id: true, nombre: true, fotoUrl: true } },
             },
           },
           pedido: {
@@ -129,7 +129,7 @@ const ReporteRepository = {
         include: {
           items: {
             include: {
-              producto: { select: { nombre: true, unidad: true } },
+              producto: { select: { nombre: true } },
             },
           },
           pedido: {
@@ -185,7 +185,7 @@ const ReporteRepository = {
           nombre: true,
           precio: true,
           fotoUrl: true,
-          unidad: true,
+          unidad: { select: { codigo: true } },
           stock: true,
           stockReservado: true,
           activo: true,
@@ -215,7 +215,7 @@ const ReporteRepository = {
         nombre: p.nombre,
         precio: Number(p.precio),
         fotoUrl: p.fotoUrl,
-        unidad: p.unidad,
+        unidad: p.unidad.codigo,
         stock: p.stock,
         stockReservado: p.stockReservado,
         stockDisponible: p.stock - p.stockReservado,
@@ -1015,7 +1015,7 @@ const ReporteRepository = {
         take: lote,
         ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
         include: {
-          items: { include: { producto: { select: { nombre: true, unidad: true } } } },
+          items: { include: { producto: { select: { nombre: true } } } },
           comercio: { select: { nombre: true, municipio: true } },
           pedido: {
             select: {

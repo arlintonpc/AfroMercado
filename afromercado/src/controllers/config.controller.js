@@ -39,7 +39,7 @@ const ConfigController = {
   async heroGet(req, res, next) {
     try {
       const rows = await prisma.config.findMany({
-        where: { clave: { in: ["hero.modo", "hero.intervaloSegundos", "hero.fuente"] } },
+        where: { clave: { in: ["hero.modo", "hero.intervaloSegundos", "hero.fuente", "hero.titulo", "hero.subtitulo", "hero.badge"] } },
       });
       const map = Object.fromEntries(rows.map(r => [r.clave, r.valor]));
       res.json({
@@ -47,6 +47,9 @@ const ConfigController = {
         modo:               map["hero.modo"]               ?? "FIJAS",
         intervaloSegundos:  Number(map["hero.intervaloSegundos"] ?? 10),
         fuente:             map["hero.fuente"]              ?? "ORGANICO",
+        badge:              map["hero.badge"]               ?? "🌿 LA PLATAFORMA DE LOS TERRITORIOS DE COLOMBIA",
+        titulo:             map["hero.titulo"]              ?? "Descubre todo lo que un territorio\nproduce, ofrece y vive.",
+        subtitulo:          map["hero.subtitulo"]           ?? "Compra productos locales, encuentra hoteles, tours, transporte, empleo, cultura y servicios. Conecta con quienes impulsan la economía de cada territorio.",
       });
     } catch (err) { next(err); }
   },
@@ -64,7 +67,7 @@ const ConfigController = {
 
   async heroPut(req, res, next) {
     try {
-      const { modo, intervaloSegundos, fuente } = req.body;
+      const { modo, intervaloSegundos, fuente, titulo, subtitulo, badge } = req.body;
       if (modo   && !MODOS_VALIDOS.includes(modo))    return res.status(400).json({ error: "Modo inválido." });
       if (fuente && !FUENTES_VALIDAS.includes(fuente)) return res.status(400).json({ error: "Fuente inválida." });
 
@@ -72,10 +75,16 @@ const ConfigController = {
       const ops = [];
       if (modo)   ops.push(upsert("hero.modo", modo));
       if (fuente) ops.push(upsert("hero.fuente", fuente));
+      if (badge !== undefined) ops.push(upsert("hero.badge", badge));
+      if (titulo !== undefined) ops.push(upsert("hero.titulo", titulo));
+      if (subtitulo !== undefined) ops.push(upsert("hero.subtitulo", subtitulo));
       ops.push(upsert("hero.intervaloSegundos", String(intervalo)));
       await Promise.all(ops);
       res.json({ ok: true });
-    } catch (err) { next(err); }
+    } catch (err) { 
+      require('fs').appendFileSync('debug.log', new Date().toISOString() + ' ERROR en heroPut: ' + err.stack + '\n');
+      next(err); 
+    }
   },
 
   // GET /config → Listar todas las configuraciones (Admin)

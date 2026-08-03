@@ -51,7 +51,7 @@ function mapearItem(item) {
       id: String(p.id),
       nombre: p.nombre,
       precio,
-      unidad: p.unidad,
+      unidad: p.unidad.codigo,
       stock: p.stock,
       stockReservado: p.stockReservado,
       fotoUrl: p.fotoUrl ?? undefined,

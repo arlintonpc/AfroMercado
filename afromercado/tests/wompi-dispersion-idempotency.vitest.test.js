@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const crypto = require("crypto");
 const { cifrarNumeroCuenta } = require("../src/utils/cuentas-dispersion");
 
 // wompi.provider.js lee configuración vía ConfigRepository (Prisma → DB real).
@@ -14,6 +15,11 @@ const WompiPaymentProvider = require(
 );
 
 const VARIABLES = [
+  "WOMPI_PUBLIC_KEY",
+  "WOMPI_INTEGRITY_SECRET",
+  "WOMPI_SIGNATURE_SECRET",
+  "WOMPI_CHECKOUT_URL",
+  "FRONTEND_URL",
   "WOMPI_PAYOUTS_API_KEY",
   "WOMPI_PAYOUTS_USER_PRINCIPAL_ID",
   "WOMPI_PAYOUTS_ACCOUNT_ID",
@@ -45,6 +51,9 @@ function dispersion(overrides = {}) {
 }
 
 beforeEach(() => {
+  process.env.WOMPI_PUBLIC_KEY = "pub_test_checkout_qa";
+  process.env.WOMPI_INTEGRITY_SECRET = "test_integrity_checkout_qa";
+  process.env.FRONTEND_URL = "https://shop.example.test";
   process.env.WOMPI_PAYOUTS_API_KEY = "wompi-payout-key";
   process.env.WOMPI_PAYOUTS_USER_PRINCIPAL_ID = "principal-qa";
   process.env.WOMPI_PAYOUTS_ACCOUNT_ID = "account-qa";
@@ -151,5 +160,73 @@ describe("Wompi - idempotencia de dispersion", () => {
         dispersiones: [dispersion()],
       })
     ).rejects.toMatchObject({ envioIncierto: true });
+  });
+});
+
+function firmaEsperada({ reference, amountInCents, currency, expirationTime }) {
+  const valores = [reference, amountInCents, currency];
+  if (expirationTime) valores.push(expirationTime);
+  valores.push(process.env.WOMPI_INTEGRITY_SECRET);
+  return crypto.createHash("sha256").update(valores.join(""), "utf8").digest("hex");
+}
+
+describe("Wompi - firma de integridad del Web Checkout", () => {
+  it("firma exactamente los parametros enviados cuando no hay expiracion", async () => {
+    const resultado = await WompiPaymentProvider.crearCheckout({
+      pago: {
+        monto: 1234.56,
+        moneda: "COP",
+        providerReference: "PED-QA-SIN-EXPIRACION",
+        expiraAt: null,
+      },
+      pedido: { id: 9001, comprador: {} },
+    });
+    const url = new URL(resultado.checkoutUrl);
+    const reference = url.searchParams.get("reference");
+    const amountInCents = url.searchParams.get("amount-in-cents");
+    const currency = url.searchParams.get("currency");
+
+    expect(url.searchParams.get("signature:integrity")).toBe(
+      firmaEsperada({ reference, amountInCents, currency })
+    );
+    expect(url.searchParams.has("expiration-time")).toBe(false);
+  });
+
+  it("incluye la expiracion en la URL y en la firma con el mismo ISO8601", async () => {
+    const expirationTime = "2026-08-01T20:30:00.000Z";
+    const resultado = await WompiPaymentProvider.crearCheckout({
+      pago: {
+        monto: 45000,
+        moneda: "COP",
+        providerReference: "PED-QA-CON-EXPIRACION",
+        expiraAt: expirationTime,
+      },
+      pedido: { id: 9002, comprador: {} },
+    });
+    const url = new URL(resultado.checkoutUrl);
+    const reference = url.searchParams.get("reference");
+    const amountInCents = url.searchParams.get("amount-in-cents");
+    const currency = url.searchParams.get("currency");
+
+    expect(url.searchParams.get("expiration-time")).toBe(expirationTime);
+    expect(url.searchParams.get("signature:integrity")).toBe(
+      firmaEsperada({ reference, amountInCents, currency, expirationTime })
+    );
+    expect(resultado.payload.expirationTime).toBe(expirationTime);
+  });
+
+  it("rechaza mezclar llave publica de prueba con secreto productivo", async () => {
+    process.env.WOMPI_INTEGRITY_SECRET = "prod_integrity_checkout_qa";
+
+    await expect(
+      WompiPaymentProvider.crearCheckout({
+        pago: {
+          monto: 1000,
+          moneda: "COP",
+          providerReference: "PED-QA-AMBIENTES-MIXTOS",
+        },
+        pedido: { id: 9003, comprador: {} },
+      })
+    ).rejects.toThrow(/mismo ambiente/i);
   });
 });

@@ -36,7 +36,9 @@ app.use(helmet());                          // cabeceras de seguridad
 app.use(cookieParser());
 app.use(
   cors({
-    origin: origenesPermitidos.length > 0 ? origenesPermitidos : true,
+    origin: origenesPermitidos.length > 0 
+      ? origenesPermitidos 
+      : (process.env.NODE_ENV === "development" ? true : false),
     credentials: true,
   })
 );
@@ -140,9 +142,9 @@ app.use(
   express.static(path.join(__dirname, "..", "uploads", "publicaciones-cultura"))
 );
 
-// Rate limiting — se omite completamente en desarrollo para no interferir con hot-reload
-const esProd = process.env.NODE_ENV === "production";
-const saltarEnDev = () => !esProd;
+// Rate limiting — se omite solo en desarrollo explícito para no interferir con hot-reload
+// Si NODE_ENV no está definido o es cualquier otra cosa ("staging", "test"), se aplica el límite por seguridad.
+const saltarEnDev = () => process.env.NODE_ENV === "development";
 
 // Aviso de arranque: el rate limiting solo se activa cuando NODE_ENV es
 // exactamente "production". Un typo o valor no estándar (ej. "staging") en

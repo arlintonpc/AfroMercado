@@ -124,6 +124,12 @@ router.patch("/categorias/:id",          ...soloAdmin, AdminController.actualiza
 router.patch("/categorias/:id/activo",   ...soloAdmin, AdminController.toggleActivoCategoria);
 router.patch("/categorias/:id/grupo",    ...soloAdmin, AdminController.cambiarGrupoCategoria);
 
+// Unidades de venta
+router.get("/unidades",                  ...soloAdmin, AdminController.listarUnidades);
+router.post("/unidades",                 ...soloAdmin, AdminController.crearUnidad);
+router.patch("/unidades/:id",            ...soloAdmin, AdminController.actualizarUnidad);
+router.patch("/unidades/:id/activo",     ...soloAdmin, AdminController.toggleActivoUnidad);
+
 // Pedidos (vista admin)
 router.get("/pedidos",     ...soloAdmin, AdminController.listarPedidos);
 router.get("/pedidos/:id", ...soloAdmin, AdminController.obtenerPedidoAdmin);

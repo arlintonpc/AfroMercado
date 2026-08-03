@@ -61,7 +61,7 @@ const VisibilidadRepository = {
         campana: { include: { comercio: { select: { id: true, nombre: true } } } },
         producto: {
           select: {
-            id: true, nombre: true, precio: true, fotoUrl: true, unidad: true,
+            id: true, nombre: true, precio: true, fotoUrl: true, unidad: { select: { codigo: true } },
             comercio: { select: { id: true, nombre: true, municipio: true, verificado: true, calificacion: true, totalVentas: true } },
           },
         },
@@ -71,7 +71,8 @@ const VisibilidadRepository = {
     return anuncios.map(a => ({
       ...a,
       tipo: a.etiqueta,
-      comercio: a.campana?.comercio
+      comercio: a.campana?.comercio,
+      producto: a.producto ? { ...a.producto, unidad: a.producto.unidad.codigo } : a.producto,
     }));
   },
 

@@ -2,8 +2,27 @@
 const prisma = require("../config/prisma");
 const { filtroComercioVisible } = require("../utils/comercio-publicacion");
 
+// "unidad" pasó de ser un enum escaneado automático a una relación
+// (tabla UnidadDeVenta administrable). Para no romper a los ~19 lugares del
+// código que leen `producto.unidad` como string ("KG", "MANOJO"...), se
+// aplana aquí mismo antes de devolver el producto: sigue viéndose como el
+// mismo string de siempre en toda la API.
+function aplanarUnidad(producto) {
+  if (!producto) return producto;
+  if (producto.unidad && typeof producto.unidad === "object") {
+    producto.unidad = producto.unidad.codigo;
+  }
+  return producto;
+}
+
+function aplanarUnidadLista(productos) {
+  productos.forEach(aplanarUnidad);
+  return productos;
+}
+
 function includeProductoPublico(ahora = new Date()) {
   return {
+    unidad: true,
     comercio: {
       select: {
         id: true,
@@ -46,18 +65,20 @@ function includeProductoPublico(ahora = new Date()) {
 const ProductoRepository = {
   async crear(data, tx) {
     const db = tx || prisma;
-    return db.producto.create({ data });
+    const creado = await db.producto.create({ data, include: { unidad: true } });
+    return aplanarUnidad(creado);
   },
 
   async buscarPorId(id) {
-    return prisma.producto.findUnique({
+    const producto = await prisma.producto.findUnique({
       where: { id: Number(id) },
       include: includeProductoPublico(),
     });
+    return aplanarUnidad(producto);
   },
 
   async buscarPublicoPorId(id) {
-    return prisma.producto.findFirst({
+    const producto = await prisma.producto.findFirst({
       where: {
         id: Number(id),
         activo: true,
@@ -66,6 +87,7 @@ const ProductoRepository = {
       },
       include: includeProductoPublico(),
     });
+    return aplanarUnidad(producto);
   },
 
   async listar({
@@ -172,6 +194,7 @@ const ProductoRepository = {
       prisma.producto.findMany({
         where,
         include: {
+          unidad: true,
           comercio: {
             select: {
               id: true,
@@ -205,20 +228,22 @@ const ProductoRepository = {
     ]);
 
     const paginas = Math.ceil(total / porPagina);
-    return { items, total, paginas, pagina };
+    return { items: aplanarUnidadLista(items), total, paginas, pagina };
   },
 
   async listarPorComercio(comercioId) {
-    return prisma.producto.findMany({
+    const productos = await prisma.producto.findMany({
       where: { comercioId },
       orderBy: { createdAt: "desc" },
-      include: { categoria: { select: { id: true, nombre: true } } },
+      include: { unidad: true, categoria: { select: { id: true, nombre: true } } },
     });
+    return aplanarUnidadLista(productos);
   },
 
   async actualizar(id, data, tx) {
     const db = tx || prisma;
-    return db.producto.update({ where: { id: Number(id) }, data });
+    const actualizado = await db.producto.update({ where: { id: Number(id) }, data, include: { unidad: true } });
+    return aplanarUnidad(actualizado);
   },
 
   async desactivar(id) {

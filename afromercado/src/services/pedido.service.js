@@ -36,6 +36,10 @@ function extraerDepartamentoDesdeDireccionTexto(direccionTexto) {
 
 function pesoDeItems(items) {
   return items.reduce((acum, item) => {
+    // Un producto marcado con envío gratis no aporta peso a la cotización:
+    // el vendedor absorbe el costo de enviar ESE producto puntual, pero el
+    // resto del pedido del mismo comercio sigue pagando envío por su propio peso.
+    if (item.producto.envioGratis) return acum;
     const pu = item.producto.pesoKg != null ? Number(item.producto.pesoKg) : 1;
     return acum + (Number.isFinite(pu) ? pu : 1) * item.cantidad;
   }, 0);
@@ -85,7 +89,10 @@ async function calcularCostoEnvioServidor({ usuarioId, direccionId, departamento
       const cid = g.comercio.id;
       const subC = subtotalesPorComercio?.get(cid) ?? 0;
       if (vendedorPermitido && (await comercioRegalaEnvio(cid, subC))) continue;
-      const base = await cotizarEnvio({ departamento: departamentoEnvio, pesoKg: pesoDeItems(g.items), accionSinTarifa });
+      const pesoGrupo = pesoDeItems(g.items);
+      // Todos los productos de este comercio en el pedido son de envío gratis: nada que cobrar.
+      if (pesoGrupo <= 0) continue;
+      const base = await cotizarEnvio({ departamento: departamentoEnvio, pesoKg: pesoGrupo, accionSinTarifa });
       if (base === null) throw new ErrorValidacion(SIN_ENVIO);
       total += base;
     }
@@ -93,7 +100,9 @@ async function calcularCostoEnvioServidor({ usuarioId, direccionId, departamento
   }
 
   // 3) Consolidado: un solo envío para todo el pedido.
-  const precioBase = await cotizarEnvio({ departamento: departamentoEnvio, pesoKg: pesoDeItems(itemsConPrecio), accionSinTarifa });
+  const pesoTotal = pesoDeItems(itemsConPrecio);
+  if (pesoTotal <= 0) return 0; // todo el pedido es de productos con envío gratis
+  const precioBase = await cotizarEnvio({ departamento: departamentoEnvio, pesoKg: pesoTotal, accionSinTarifa });
   if (precioBase === null) throw new ErrorValidacion(SIN_ENVIO);
   if (vendedorPermitido && subtotalesPorComercio && subtotalesPorComercio.size === 1) {
     const [[cid, subC]] = subtotalesPorComercio;

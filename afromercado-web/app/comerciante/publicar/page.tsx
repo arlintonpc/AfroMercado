@@ -8,18 +8,20 @@ import { CampoTexto, CampoArea, CampoSelect } from '@/components/comerciante/Cam
 import {
   crearProducto,
   listarCategorias,
+  listarUnidades,
   obtenerMiComercio,
   obtenerCuentaDispersion,
   subirVideoProducto,
   quitarVideoProducto,
   guardarVideoLinkProducto,
   type CategoriaComerciante,
+  type UnidadComerciante,
   type Comercio,
   type CuentaDispersion,
 } from '@/components/comerciante/api'
 import SubidorImagenes from '@/components/comerciante/SubidorImagenes'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
-import { UNIDADES, ALCANCES, type Alcance } from '@/components/comerciante/constantes'
+import { ALCANCES, type Alcance } from '@/components/comerciante/constantes'
 import Toggle from '@/components/ui/Toggle'
 import { formatearPrecio } from '@/lib/formatearPrecio'
 
@@ -42,6 +44,7 @@ export default function PublicarProductoPage() {
 
   const [verificando, setVerificando] = useState(true)
   const [categorias, setCategorias] = useState<CategoriaComerciante[]>([])
+  const [unidades, setUnidades] = useState<UnidadComerciante[]>([])
   const [bloqueosPublicacion, setBloqueosPublicacion] = useState<string[]>([])
 
   // Paso 2: ID del producto recién creado
@@ -59,6 +62,7 @@ export default function PublicarProductoPage() {
   const [diasMax, setDiasMax] = useState('')
   const [alcance, setAlcance] = useState<Alcance | ''>('')
   const [pesoKg, setPesoKg] = useState('')
+  const [envioGratis, setEnvioGratis] = useState(false)
   const [esExpress, setEsExpress] = useState(false)
   const [tiempoEntregaMin, setTiempoEntregaMin] = useState('20')
 
@@ -88,6 +92,14 @@ export default function PublicarProductoPage() {
     let activo = true
     listarCategorias()
       .then((cats) => { if (activo) setCategorias(cats.filter((c) => c.activa)) })
+      .catch(() => { /* silencioso */ })
+    return () => { activo = false }
+  }, [])
+
+  useEffect(() => {
+    let activo = true
+    listarUnidades()
+      .then((u) => { if (activo) setUnidades(u) })
       .catch(() => { /* silencioso */ })
     return () => { activo = false }
   }, [])
@@ -141,6 +153,7 @@ export default function PublicarProductoPage() {
         fotoUrl: '',
         categoriaId: categoriaId ? Number(categoriaId) : undefined,
         ...(pesoKgNum !== undefined && pesoKgNum > 0 ? { pesoKg: pesoKgNum } : {}),
+        envioGratis,
         esExpress,
         ...(esExpress && tiempoEntregaMin ? { tiempoEntregaMin: Number(tiempoEntregaMin) } : {}),
       })
@@ -360,7 +373,7 @@ export default function PublicarProductoPage() {
           placeholder="Elige una opción"
           value={unidad}
           onChange={setUnidad}
-          opciones={UNIDADES.map((u) => ({ valor: u.valor, etiqueta: u.etiqueta }))}
+          opciones={unidades.map((u) => ({ valor: u.codigo, etiqueta: u.etiqueta }))}
           error={errores.unidad}
           hint="Por ejemplo: por kilo, por unidad, por manojo…"
         />
@@ -393,6 +406,13 @@ export default function PublicarProductoPage() {
           value={pesoKg}
           onChange={(v) => setPesoKg(v.replace(/[^0-9.]/g, ''))}
           hint="Opcional. Se usa para calcular el costo de envío."
+        />
+
+        <Toggle
+          activo={envioGratis}
+          onChange={setEnvioGratis}
+          etiqueta="🚚 Envío gratis en este producto"
+          descripcion="Tú asumes el costo de enviarlo; el resto de tu pedido sigue cobrando envío normal."
         />
 
         <div>

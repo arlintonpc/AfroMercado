@@ -89,9 +89,6 @@ export default function CarruselHistorias() {
               Historias del Territorio
             </h2>
           </div>
-          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-            Videos en vivo del Chocó y Colombia
-          </span>
         </div>
 
         {/* Burbujas de historias */}

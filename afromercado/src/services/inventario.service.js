@@ -369,13 +369,13 @@ const InventarioService = {
     const [productos, movimientos, compras] = await Promise.all([
       prisma.producto.findMany({
         where: { comercioId: comercio.id, deletedAt: null },
-        select: { id: true, nombre: true, stock: true, stockReservado: true, stockMinimo: true, costoPromedio: true },
+        select: { id: true, nombre: true, stock: true, stockReservado: true, stockMinimo: true, costoPromedio: true, unidad: { select: { codigo: true } } },
       }),
       prisma.movimientoInventario.findMany({
         where: { comercioId: comercio.id },
         orderBy: { createdAt: "desc" },
         take: 25,
-        include: { producto: { select: { nombre: true, unidad: true } } },
+        include: { producto: { select: { nombre: true, unidad: { select: { codigo: true } } } } },
       }),
       prisma.compraInventario.findMany({
         where: { comercioId: comercio.id },
@@ -384,13 +384,18 @@ const InventarioService = {
         include: { proveedor: { select: { nombre: true } }, items: true },
       }),
     ]);
-    const valorInventario = productos.reduce(
+    const productosPlanos = productos.map((p) => ({ ...p, unidad: p.unidad.codigo }));
+    const movimientosPlanos = movimientos.map((m) => ({
+      ...m,
+      producto: m.producto ? { ...m.producto, unidad: m.producto.unidad.codigo } : m.producto,
+    }));
+    const valorInventario = productosPlanos.reduce(
       (suma, producto) => suma + producto.stock * numero(producto.costoPromedio),
       0
     );
     return {
-      productos,
-      movimientos,
+      productos: productosPlanos,
+      movimientos: movimientosPlanos,
       compras,
       resumen: {
         productos: productos.length,
@@ -410,12 +415,16 @@ const InventarioService = {
       ...(filtros.productoId ? { productoId: Number(filtros.productoId) } : {}),
       ...(filtros.tipo ? { tipo: filtros.tipo } : {}),
     };
-    return prisma.movimientoInventario.findMany({
+    const movimientos = await prisma.movimientoInventario.findMany({
       where,
       orderBy: { createdAt: "desc" },
       take: Math.min(Math.max(Number(filtros.limite) || 100, 1), 250),
-      include: { producto: { select: { id: true, nombre: true, fotoUrl: true, unidad: true } } },
+      include: { producto: { select: { id: true, nombre: true, fotoUrl: true, unidad: { select: { codigo: true } } } } },
     });
+    return movimientos.map((m) => ({
+      ...m,
+      producto: m.producto ? { ...m.producto, unidad: m.producto.unidad.codigo } : m.producto,
+    }));
   },
 
   async crearGasto(usuarioId, datos) {
@@ -552,12 +561,12 @@ const InventarioService = {
     const comercio = await comercioDeUsuario(usuarioId);
     const where = { comercioId: comercio.id, ...(filtros.productoId ? { productoId: Number(filtros.productoId) } : {}) };
     const [productos, movimientos] = await Promise.all([
-      prisma.producto.findMany({ where: { comercioId: comercio.id, deletedAt: null, ...(filtros.productoId ? { id: Number(filtros.productoId) } : {}) }, select: { id: true, nombre: true, unidad: true, stock: true, stockReservado: true, costoPromedio: true, stockMinimo: true } }),
-      prisma.movimientoInventario.findMany({ where: { ...where, ...(rangoFechas(filtros) ? { createdAt: rangoFechas(filtros) } : {}) }, orderBy: { createdAt: 'desc' }, take: 500, include: { producto: { select: { nombre: true, unidad: true } } } }),
+      prisma.producto.findMany({ where: { comercioId: comercio.id, deletedAt: null, ...(filtros.productoId ? { id: Number(filtros.productoId) } : {}) }, select: { id: true, nombre: true, unidad: { select: { codigo: true } }, stock: true, stockReservado: true, costoPromedio: true, stockMinimo: true } }),
+      prisma.movimientoInventario.findMany({ where: { ...where, ...(rangoFechas(filtros) ? { createdAt: rangoFechas(filtros) } : {}) }, orderBy: { createdAt: 'desc' }, take: 500, include: { producto: { select: { nombre: true, unidad: { select: { codigo: true } } } } } }),
     ]);
     return {
-      existencias: productos.map((p) => ({ ...p, costoPromedio: numero(p.costoPromedio), valorInventario: Number((p.stock * numero(p.costoPromedio)).toFixed(2)), disponible: p.stock - p.stockReservado })),
-      movimientos,
+      existencias: productos.map((p) => ({ ...p, unidad: p.unidad.codigo, costoPromedio: numero(p.costoPromedio), valorInventario: Number((p.stock * numero(p.costoPromedio)).toFixed(2)), disponible: p.stock - p.stockReservado })),
+      movimientos: movimientos.map((m) => ({ ...m, producto: m.producto ? { ...m.producto, unidad: m.producto.unidad.codigo } : m.producto })),
     };
   },
 

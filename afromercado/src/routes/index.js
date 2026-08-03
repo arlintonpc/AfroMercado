@@ -36,6 +36,7 @@ router.use("/pedidos", pedidoRoutes);
 router.use("/direcciones", direccionRoutes);
 router.use("/reviews", reviewRoutes);
 router.use("/categorias", require("./categorias.routes"));
+router.use("/unidades", require("./unidades.routes"));
 router.use("/pagos", require("./pago.routes"));
 router.use("/admin", require("./admin.routes"));
 router.use("/config", require("./config.routes"));

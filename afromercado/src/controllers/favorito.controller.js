@@ -7,7 +7,7 @@ const prisma = require("../config/prisma");
 
 const SELECT_PRODUCTO = {
   id: true, nombre: true, precio: true, fotoUrl: true,
-  imagenes: true, unidad: true, activo: true,
+  imagenes: true, unidad: { select: { codigo: true } }, activo: true,
   comercio: { select: { id: true, nombre: true, municipio: true } },
   ofertas: {
     where: { activa: true, fin: { gte: new Date() } },
@@ -15,6 +15,11 @@ const SELECT_PRODUCTO = {
     take: 1,
   },
 };
+
+function aplanarUnidad(producto) {
+  if (!producto) return producto;
+  return { ...producto, unidad: producto.unidad?.codigo ?? producto.unidad };
+}
 
 const FavoritoController = {
   // GET /api/favoritos  — lista favoritos del usuario
@@ -27,7 +32,7 @@ const FavoritoController = {
       const productos = favs.length
         ? await prisma.producto.findMany({ where: { id: { in: favs.map((f) => f.entidadId) } }, select: SELECT_PRODUCTO })
         : [];
-      const porId = new Map(productos.map((p) => [p.id, p]));
+      const porId = new Map(productos.map((p) => [p.id, aplanarUnidad(p)]));
       const favoritos = favs
         .map((f) => ({ id: f.id, productoId: f.entidadId, createdAt: f.createdAt, producto: porId.get(f.entidadId) }))
         .filter((f) => f.producto);

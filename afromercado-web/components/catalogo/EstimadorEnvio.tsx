@@ -9,7 +9,7 @@ import { formatearPrecio } from '@/lib/formatearPrecio'
  * el envío de este producto. Reusa el cálculo real del backend. El valor final
  * se confirma en el checkout.
  */
-export default function EstimadorEnvio({ pesoKg }: { pesoKg?: number | null }) {
+export default function EstimadorEnvio({ pesoKg, envioGratis }: { pesoKg?: number | null; envioGratis?: boolean }) {
   const peso = pesoKg && pesoKg > 0 ? pesoKg : 1
   const [departamentos, setDepartamentos] = useState<string[]>([])
   const [depto, setDepto] = useState('')
@@ -17,6 +17,7 @@ export default function EstimadorEnvio({ pesoKg }: { pesoKg?: number | null }) {
   const [estado, setEstado] = useState<'idle' | 'cargando' | 'ok' | 'nodisp'>('idle')
 
   useEffect(() => {
+    if (envioGratis) return
     listarTarifas()
       .then((grupos) => {
         const deps = Object.keys(grupos)
@@ -25,7 +26,20 @@ export default function EstimadorEnvio({ pesoKg }: { pesoKg?: number | null }) {
         setDepartamentos(deps)
       })
       .catch(() => {})
-  }, [])
+  }, [envioGratis])
+
+  if (envioGratis) {
+    return (
+      <div className="rounded-2xl border border-[#52B788]/30 bg-[#52B788]/10 p-4">
+        <p className="flex items-center gap-1.5 text-sm font-bold text-[#1B4332]">
+          <span aria-hidden>🚚</span> ¡Este producto tiene envío gratis! 🎉
+        </p>
+        <p className="mt-1 text-[11px] text-[#1A1A1A]/45">
+          El vendedor asume el costo de enviarlo, sin importar tu departamento.
+        </p>
+      </div>
+    )
+  }
 
   async function calcular(d: string) {
     setDepto(d)

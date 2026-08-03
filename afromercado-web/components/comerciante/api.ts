@@ -113,6 +113,7 @@ export interface ProductoComerciante {
   diasAlistamientoMax: number
   alcance: 'LOCAL' | 'NACIONAL' | 'AMBOS'
   pesoKg?: string | number | null
+  envioGratis?: boolean
   esExpress?: boolean
   tiempoEntregaMin?: number | null
   categoria?: { id: number; nombre: string } | null
@@ -124,6 +125,15 @@ export interface CategoriaComerciante {
   slug: string
   icono?: string | null
   activa: boolean
+}
+
+/** Unidad de venta (administrable por el admin, ya no un enum fijo). */
+export interface UnidadComerciante {
+  id: number
+  codigo: string
+  etiqueta: string
+  activa: boolean
+  orden: number
 }
 
 export type TipoDocumento = 'CC' | 'TI' | 'CE' | 'PEP' | 'PASAPORTE' | 'NIT'
@@ -209,6 +219,7 @@ export interface DatosProducto {
   fotoUrl?: string
   categoriaId?: number
   pesoKg?: number
+  envioGratis?: boolean
   esExpress?: boolean
   tiempoEntregaMin?: number
 }
@@ -357,11 +368,15 @@ export interface DatosActualizarProducto {
   nombre?: string
   descripcion?: string
   precio?: number
+  unidad?: string
   stock?: number
   stockMinimo?: number
+  diasAlistamientoMin?: number
+  diasAlistamientoMax?: number
   alcance?: 'LOCAL' | 'NACIONAL' | 'AMBOS'
   fotoUrl?: string
   pesoKg?: number | null
+  envioGratis?: boolean
   categoriaId?: number
   esExpress?: boolean
   tiempoEntregaMin?: number | null
@@ -405,6 +420,15 @@ export async function listarCategorias(): Promise<CategoriaComerciante[]> {
     categorias?: CategoriaComerciante[]
   }>('/categorias', { auth: false })
   return datos.categorias ?? []
+}
+
+/**
+ * Lista las unidades de venta activas (antes un enum fijo, ahora las crea el admin).
+ * GET /unidades → { unidades }
+ */
+export async function listarUnidades(): Promise<UnidadComerciante[]> {
+  const datos = await apiFetch<{ unidades?: UnidadComerciante[] }>('/unidades', { auth: false })
+  return datos.unidades ?? []
 }
 
 /**

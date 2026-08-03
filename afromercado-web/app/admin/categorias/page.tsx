@@ -14,13 +14,14 @@ interface Categoria {
   icono: string | null
   activa: boolean
   grupo: 'ANCESTRAL' | 'LOCAL' | 'AGRO'
+  padreId: number | null
+  padre?: { id: number; nombre: string } | null
 }
 
-const LABEL_GRUPO: Record<Categoria['grupo'], string> = {
-  ANCESTRAL: '🌿 Ancestral',
-  LOCAL: '🛍️ Tienda Local',
-  AGRO: '🌾 Agro',
-}
+// "Grupo" es un enum viejo de 3 valores fijos (Ancestral/Tienda Local/Agro)
+// que ya no se puede extender. Hoy solo "AGRO" tiene efecto real: decide si
+// la categoría aparece en la vitrina /agro. Por eso la UI lo simplifica a
+// un único interruptor "Agro sí/no" en vez de mostrar las 3 opciones.
 
 // ─── Página ───────────────────────────────────────────────────────────────────
 
@@ -33,14 +34,34 @@ export default function AdminCategoriasPage() {
   // Formulario crear
   const [nombre, setNombre]             = useState('')
   const [icono, setIcono]               = useState('')
-  const [grupo, setGrupo]               = useState<Categoria['grupo']>('ANCESTRAL')
+  const [esAgro, setEsAgro]             = useState(false)
+  const [padreIdNuevo, setPadreIdNuevo] = useState('')
   const [creando, setCreando]           = useState(false)
 
   // Edición inline
   const [editandoId, setEditandoId]     = useState<number | null>(null)
   const [editNombre, setEditNombre]     = useState('')
   const [editIcono, setEditIcono]       = useState('')
+  const [editPadreId, setEditPadreId]   = useState('')
   const [guardandoEdit, setGuardandoEdit] = useState(false)
+
+  // Departamentos = categorías activas sin padre (contenedores de agrupación).
+  // No incluye las categorías huérfanas desactivadas (residuos de antes de
+  // existir esta jerarquía), esas solo aparecen en la tabla para su gestión.
+  const departamentos = categorias.filter((c) => c.padreId === null && c.activa)
+
+  // Filas de la tabla agrupadas visualmente: cada departamento seguido de sus
+  // categorías hijas (en vez de una lista alfabética plana que mezcla todo).
+  const filasAgrupadas = (() => {
+    const todosLosPadres = categorias.filter((c) => c.padreId === null).sort((a, b) => a.nombre.localeCompare(b.nombre))
+    const filas: Categoria[] = []
+    for (const dep of todosLosPadres) {
+      filas.push(dep)
+      const hijas = categorias.filter((c) => c.padreId === dep.id).sort((a, b) => a.nombre.localeCompare(b.nombre))
+      filas.push(...hijas)
+    }
+    return filas
+  })()
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -67,8 +88,11 @@ export default function AdminCategoriasPage() {
     if (!nombre.trim()) return
     setCreando(true)
     try {
-      await apiFetch('/admin/categorias', { method: 'POST', body: { nombre: nombre.trim(), icono: icono.trim() || null, grupo } })
-      setNombre(''); setIcono(''); setGrupo('ANCESTRAL')
+      await apiFetch('/admin/categorias', {
+        method: 'POST',
+        body: { nombre: nombre.trim(), icono: icono.trim() || null, grupo: esAgro ? 'AGRO' : 'ANCESTRAL', padreId: padreIdNuevo || null },
+      })
+      setNombre(''); setIcono(''); setEsAgro(false); setPadreIdNuevo('')
       setAviso({ tipo: 'exito', texto: 'Categoría creada.' })
       void cargar()
     } catch (err) {
@@ -91,12 +115,28 @@ export default function AdminCategoriasPage() {
     }
   }
 
-  async function cambiarGrupo(c: Categoria, nuevoGrupo: Categoria['grupo']) {
+  async function toggleAgro(c: Categoria, marcar: boolean) {
+    const nuevoGrupo = marcar ? 'AGRO' : 'ANCESTRAL'
     if (nuevoGrupo === c.grupo) return
     setProcesando(c.id)
     try {
       await apiFetch(`/admin/categorias/${c.id}/grupo`, { method: 'PATCH', body: { grupo: nuevoGrupo } })
-      setAviso({ tipo: 'exito', texto: `Categoría movida a ${LABEL_GRUPO[nuevoGrupo]}.` })
+      setAviso({ tipo: 'exito', texto: marcar ? 'Ahora aparece en la vitrina de Agro.' : 'Ya no aparece en la vitrina de Agro.' })
+      void cargar()
+    } catch (err) {
+      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'Error al actualizar.' })
+    } finally {
+      setProcesando(null)
+    }
+  }
+
+  async function cambiarPadre(c: Categoria, nuevoPadreId: string) {
+    const nuevo = nuevoPadreId === '' ? null : Number(nuevoPadreId)
+    if (nuevo === c.padreId) return
+    setProcesando(c.id)
+    try {
+      await apiFetch(`/admin/categorias/${c.id}`, { method: 'PATCH', body: { padreId: nuevo } })
+      setAviso({ tipo: 'exito', texto: 'Departamento actualizado.' })
       void cargar()
     } catch (err) {
       setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'Error al actualizar.' })
@@ -109,6 +149,7 @@ export default function AdminCategoriasPage() {
     setEditandoId(c.id)
     setEditNombre(c.nombre)
     setEditIcono(c.icono ?? '')
+    setEditPadreId(c.padreId != null ? String(c.padreId) : '')
   }
 
   async function guardarEdicion(id: number) {
@@ -116,7 +157,7 @@ export default function AdminCategoriasPage() {
     try {
       await apiFetch(`/admin/categorias/${id}`, {
         method: 'PATCH',
-        body: { nombre: editNombre.trim(), icono: editIcono.trim() || null },
+        body: { nombre: editNombre.trim(), icono: editIcono.trim() || null, padreId: editPadreId || null },
       })
       setEditandoId(null)
       setAviso({ tipo: 'exito', texto: 'Cambios guardados.' })
@@ -175,19 +216,32 @@ export default function AdminCategoriasPage() {
             maxLength={4}
             className="w-32 rounded-lg border border-[#1A1A1A]/15 bg-white px-3 py-2 text-sm text-center"
           />
+          <label className="flex items-center gap-2 rounded-lg border border-[#1A1A1A]/15 bg-white px-3 py-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={esAgro}
+              onChange={(e) => setEsAgro(e.target.checked)}
+              className="w-4 h-4 rounded accent-[#2D6A4F]"
+            />
+            🌾 Aparece en Agro
+          </label>
           <select
-            value={grupo}
-            onChange={(e) => setGrupo(e.target.value as Categoria['grupo'])}
+            value={padreIdNuevo}
+            onChange={(e) => setPadreIdNuevo(e.target.value)}
             className="rounded-lg border border-[#1A1A1A]/15 bg-white px-3 py-2 text-sm"
           >
-            <option value="ANCESTRAL">🌿 Ancestral</option>
-            <option value="LOCAL">🛍️ Tienda Local</option>
-            <option value="AGRO">🌾 Agro</option>
+            <option value="">— Es un departamento —</option>
+            {departamentos.map((dep) => (
+              <option key={dep.id} value={dep.id}>{dep.icono ? `${dep.icono} ` : ''}{dep.nombre}</option>
+            ))}
           </select>
           <Button type="submit" variant="primary" size="sm" loading={creando} disabled={!nombre.trim()}>
             Crear
           </Button>
         </div>
+        <p className="mt-2 text-xs text-[#1A1A1A]/45">
+          Deja &quot;Departamento&quot; vacío para crear un departamento nuevo (ej. Tecnología); elige uno para crear una categoría hija dentro de él.
+        </p>
       </form>
 
       {/* Lista */}
@@ -208,23 +262,26 @@ export default function AdminCategoriasPage() {
                 <th className="px-4 py-3 font-semibold">Ícono</th>
                 <th className="px-4 py-3 font-semibold">Nombre / Slug</th>
                 <th className="px-4 py-3 font-semibold">Estado</th>
-                <th className="px-4 py-3 font-semibold">Grupo</th>
+                <th className="px-4 py-3 font-semibold">Departamento</th>
+                <th className="px-4 py-3 font-semibold">Agro</th>
                 <th className="px-4 py-3 text-right font-semibold">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {categorias.map((c) => {
+              {filasAgrupadas.map((c) => {
                 const editando = editandoId === c.id
+                const esDepartamento = c.padreId === null
                 return (
                   <tr
                     key={c.id}
                     className={[
                       'border-b border-[#1A1A1A]/5 last:border-0 transition-colors',
+                      esDepartamento ? 'bg-[#1B4332]/[0.04] border-t-2 border-t-[#1B4332]/10' : '',
                       c.activa ? 'hover:bg-[#F8F5F0]/60' : 'opacity-55',
                     ].join(' ')}
                   >
                     {/* Ícono */}
-                    <td className="px-4 py-3">
+                    <td className={`px-4 py-3 ${esDepartamento ? '' : 'pl-8'}`}>
                       {editando ? (
                         <input
                           value={editIcono}
@@ -247,7 +304,10 @@ export default function AdminCategoriasPage() {
                         />
                       ) : (
                         <>
-                          <p className="font-medium text-[#1A1A1A]">{c.nombre}</p>
+                          <p className={esDepartamento ? 'font-bold text-[#1B4332]' : 'font-medium text-[#1A1A1A]'}>
+                            {!esDepartamento && <span className="text-[#1A1A1A]/30 mr-1">↳</span>}
+                            {c.nombre}
+                          </p>
                           <p className="text-xs text-[#1A1A1A]/40 font-mono">{c.slug}</p>
                         </>
                       )}
@@ -265,18 +325,42 @@ export default function AdminCategoriasPage() {
                       </span>
                     </td>
 
-                    {/* Grupo */}
+                    {/* Departamento */}
                     <td className="px-4 py-3">
-                      <span className={[
-                        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold',
-                        c.grupo === 'LOCAL'
-                          ? 'border-[#D4A017]/40 bg-[#D4A017]/10 text-[#8A6410]'
-                          : c.grupo === 'AGRO'
-                          ? 'border-[#52B788]/40 bg-[#52B788]/10 text-[#1B4332]'
-                          : 'border-[#2D6A4F]/30 bg-[#2D6A4F]/10 text-[#1B4332]',
-                      ].join(' ')}>
-                        {LABEL_GRUPO[c.grupo]}
-                      </span>
+                      {c.padreId === null ? (
+                        <span className="inline-flex items-center rounded-full border border-[#1B4332]/25 bg-[#1B4332]/5 px-2.5 py-0.5 text-xs font-semibold text-[#1B4332]">
+                          Departamento
+                        </span>
+                      ) : (
+                        <select
+                          value={String(c.padreId)}
+                          onChange={(e) => cambiarPadre(c, e.target.value)}
+                          disabled={procesandoId !== null}
+                          className="rounded-lg border border-[#1A1A1A]/15 bg-white px-2 py-1.5 text-xs disabled:opacity-50"
+                        >
+                          {departamentos.filter((d) => d.id !== c.id).map((dep) => (
+                            <option key={dep.id} value={dep.id}>{dep.icono ? `${dep.icono} ` : ''}{dep.nombre}</option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+
+                    {/* Agro (único uso real que queda del viejo "grupo") */}
+                    <td className="px-4 py-3">
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={c.grupo === 'AGRO'}
+                          onChange={(e) => toggleAgro(c, e.target.checked)}
+                          disabled={procesandoId !== null}
+                          className="w-4 h-4 rounded accent-[#52B788] disabled:opacity-50"
+                        />
+                        {c.grupo === 'AGRO' && (
+                          <span className="inline-flex items-center rounded-full border border-[#52B788]/40 bg-[#52B788]/10 px-2.5 py-0.5 text-xs font-semibold text-[#1B4332]">
+                            🌾 Agro
+                          </span>
+                        )}
+                      </label>
                     </td>
 
                     {/* Acciones */}
@@ -311,16 +395,6 @@ export default function AdminCategoriasPage() {
                             >
                               Editar
                             </Button>
-                            <select
-                              value={c.grupo}
-                              onChange={(e) => cambiarGrupo(c, e.target.value as Categoria['grupo'])}
-                              disabled={procesandoId !== null}
-                              className="rounded-lg border border-[#1A1A1A]/15 bg-white px-2 py-1.5 text-xs disabled:opacity-50"
-                            >
-                              <option value="ANCESTRAL">{LABEL_GRUPO.ANCESTRAL}</option>
-                              <option value="LOCAL">{LABEL_GRUPO.LOCAL}</option>
-                              <option value="AGRO">{LABEL_GRUPO.AGRO}</option>
-                            </select>
                             <Button
                               variant={c.activa ? 'danger' : 'secondary'}
                               size="sm"

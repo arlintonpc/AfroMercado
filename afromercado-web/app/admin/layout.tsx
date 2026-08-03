@@ -12,6 +12,7 @@ type ContadorNav = keyof ConteosPendientesAdmin | readonly (keyof ConteosPendien
 const NAV_LINKS: { href: string; label: string; contador?: ContadorNav }[] = [
   { href: '/admin',                      label: 'Resumen'        },
   { href: '/admin/categorias',           label: 'Categorías'     },
+  { href: '/admin/unidades',             label: 'Unidades'       },
   { href: '/admin/usuarios',             label: 'Usuarios'       },
   { href: '/admin/comercios',            label: '🏪 Comercios',  contador: 'comercios' as const },
   { href: '/admin/comerciantes',         label: 'Comerciantes'   },

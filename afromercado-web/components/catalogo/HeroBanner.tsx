@@ -29,6 +29,9 @@ interface HeroConfig {
   modo:              ModoHero
   intervaloSegundos: number
   fuente:            FuenteHero
+  badge:             string
+  titulo:            string
+  subtitulo:         string
 }
 
 interface CampanaAPI {
@@ -72,8 +75,14 @@ function mezclar<T>(arr: T[]): T[] {
 /* ─── Componente principal ───────────────────────────────────── */
 export default function HeroBanner({ productos = [] }: { productos?: Producto[] }) {
   const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? 'https://afromercado-api.onrender.com/api' : 'http://localhost:3001/api')
-
-  const [config, setConfig] = useState<HeroConfig>({ modo: 'FIJAS', intervaloSegundos: 10, fuente: 'ORGANICO' })
+  const [config, setConfig] = useState<HeroConfig>({ 
+    modo: 'FIJAS', 
+    intervaloSegundos: 10, 
+    fuente: 'ORGANICO',
+    badge: '🌿 LA PLATAFORMA DE LOS TERRITORIOS DE COLOMBIA',
+    titulo: 'Descubre todo lo que un territorio\nproduce, ofrece y vive.',
+    subtitulo: 'Compra productos locales, encuentra hoteles, tours, transporte, empleo, cultura y servicios. Conecta con quienes impulsan la economía de cada territorio.'
+  })
   const [campanas, setCampanas] = useState<CampanaAPI[]>([])
   
   const [currentIdx, setCurrentIdx] = useState(0)
@@ -82,7 +91,18 @@ export default function HeroBanner({ productos = [] }: { productos?: Producto[] 
   useEffect(() => {
     fetch(`${API_URL}/config/hero`)
       .then(r => r.json())
-      .then(j => { if (j.ok) setConfig({ modo: j.modo, intervaloSegundos: j.intervaloSegundos, fuente: j.fuente }) })
+      .then(j => { 
+        if (j.ok) {
+          setConfig({ 
+            modo: j.modo, 
+            intervaloSegundos: j.intervaloSegundos, 
+            fuente: j.fuente,
+            badge: j.badge ?? '🌿 LA PLATAFORMA DE LOS TERRITORIOS DE COLOMBIA',
+            titulo: j.titulo ?? 'Descubre todo lo que un territorio\nproduce, ofrece y vive.',
+            subtitulo: j.subtitulo ?? 'Compra productos locales, encuentra hoteles, tours, transporte, empleo, cultura y servicios. Conecta con quienes impulsan la economía de cada territorio.'
+          }) 
+        } 
+      })
       .catch(() => {})
   }, [API_URL])
 
@@ -196,31 +216,31 @@ export default function HeroBanner({ productos = [] }: { productos?: Producto[] 
       {/* Capa de oscurecimiento (Overlay) para asegurar legibilidad */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#0f2419]/80 via-[#0f2419]/50 to-[#0f2419]/90 z-10" />
 
-      {/* ─── Contenido Centrado ─── */}
-      <div className="relative z-20 w-full max-w-5xl mx-auto px-4 flex flex-col items-center text-center mt-8 pb-24 md:pb-0">
-        
-        {/* Píldora Superior */}
-        <div className="inline-flex items-center gap-2 bg-white/10 border border-[#D4A017]/40 backdrop-blur-md rounded-full px-5 py-2 mb-8 shadow-2xl">
-          <span className="w-2 h-2 rounded-full bg-[#D4A017] animate-pulse" />
-          <span className="text-[#D4A017] text-[10px] sm:text-xs font-bold tracking-widest uppercase">
-            Plataforma Multiservicios de Colombia
-          </span>
-        </div>
+        {/* ─── Contenido Centrado ─── */}
+        <div className="relative z-20 w-full max-w-5xl mx-auto px-4 flex flex-col items-center text-center mt-8 pb-24 md:pb-0">
+          
+          {/* Píldora Superior (Badge) */}
+          {config.badge && config.badge.trim() !== '' && (
+            <div className="inline-flex items-center gap-2 bg-white/10 border border-[#D4A017]/40 backdrop-blur-md rounded-full px-5 py-2 mb-8 shadow-2xl">
+              <span className="text-[#D4A017] text-[10px] sm:text-xs font-bold tracking-widest uppercase">
+                {config.badge}
+              </span>
+            </div>
+          )}
 
-        {/* Título Principal */}
-        <h1 className="leading-[1.05] mb-6 drop-shadow-2xl" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
-          <span className="block text-white text-5xl md:text-7xl lg:text-[80px] font-normal mb-1">
-            Conectando territorios,
-          </span>
-          <span className="block text-4xl md:text-6xl lg:text-[70px] font-normal bg-gradient-to-r from-[#D4A017] via-[#F4C842] to-[#D4A017] bg-clip-text text-transparent">
-            creando oportunidades.
-          </span>
-        </h1>
+          {/* Título Principal */}
+          <h1 className="leading-[1.05] mb-6 drop-shadow-2xl whitespace-pre-line" style={{ fontFamily: 'var(--font-dm-serif), Georgia, serif' }}>
+            {config.titulo.split('\n').map((linea, i) => (
+              <span key={i} className={`block ${i === 0 ? 'text-white text-5xl md:text-7xl lg:text-[80px] font-normal mb-1' : 'text-4xl md:text-6xl lg:text-[70px] font-normal bg-gradient-to-r from-[#D4A017] via-[#F4C842] to-[#D4A017] bg-clip-text text-transparent'}`}>
+                {linea}
+              </span>
+            ))}
+          </h1>
 
-        {/* Subtítulo */}
-        <p className="text-white/80 text-sm md:text-lg lg:text-xl max-w-3xl mx-auto mb-10 md:mb-12 leading-relaxed drop-shadow-lg">
-          Descubre artesanías ancestrales, saborea la gastronomía local, hospédate en el territorio y vive experiencias inolvidables con nuestras comunidades.
-        </p>
+          {/* Subtítulo */}
+          <p className="text-white/80 text-sm md:text-lg lg:text-xl max-w-3xl mx-auto mb-10 md:mb-12 leading-relaxed drop-shadow-lg">
+            {config.subtitulo}
+          </p>
 
         {/* ─── Hub de Navegación "Glassmorphism" ─── */}
         <div className="w-full max-w-4xl bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-3 shadow-2xl">

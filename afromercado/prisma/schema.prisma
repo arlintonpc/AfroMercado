@@ -21,14 +21,17 @@ enum Rol {
   ADMIN
 }
 
-enum UnidadVenta {
-  KG
-  UNIDAD
-  LITRO
-  PAQUETE
-  DOCENA
-  MANOJO
-  ANIMAL
+// Antes era un enum fijo de 7 valores; ahora es una tabla administrable
+// (igual que Categoria/Departamento) para que el admin pueda agregar
+// unidades nuevas sin desplegar código.
+model UnidadDeVenta {
+  id       Int      @id @default(autoincrement())
+  codigo   String   @unique
+  etiqueta String
+  activa   Boolean  @default(true)
+  orden    Int      @default(0)
+
+  productos Producto[]
 }
 
 enum AlcanceVenta {
@@ -410,6 +413,13 @@ model Categoria {
   activa   Boolean        @default(true)
   grupo    GrupoCategoria @default(ANCESTRAL)
 
+  // Jerarquía de dos niveles (Departamento -> Categoría): un departamento es
+  // una Categoria con padreId null que agrupa varias categorías hijas. Solo
+  // las categorías hoja (padreId != null) son asignables a un Producto.
+  padreId Int?
+  padre   Categoria?  @relation("CategoriaJerarquia", fields: [padreId], references: [id], onDelete: SetNull)
+  hijas   Categoria[] @relation("CategoriaJerarquia")
+
   productos Producto[]
 }
 
@@ -420,7 +430,7 @@ model Producto {
   nombre              String
   descripcion         String?
   precio              Decimal      @db.Decimal(12, 2)
-  unidad              UnidadVenta
+  unidadId            Int
   stock               Int          @default(0)
   stockReservado      Int          @default(0)
   stockMinimo         Int          @default(0)
@@ -448,6 +458,7 @@ model Producto {
   diasAlistamientoMax Int          @default(3)
   alcance             AlcanceVenta @default(LOCAL)
   pesoKg              Decimal?     @db.Decimal(6, 2)
+  envioGratis         Boolean      @default(false)
   menuSeccionId       Int?
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
@@ -455,6 +466,7 @@ model Producto {
 
   comercio         Comercio           @relation(fields: [comercioId], references: [id])
   categoria        Categoria?         @relation(fields: [categoriaId], references: [id])
+  unidad           UnidadDeVenta        @relation(fields: [unidadId], references: [id])
   carrito          CarritoItem[]
   pedidoItems      PedidoItem[]
   historialPrecios PrecioHistorial[]

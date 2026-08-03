@@ -33,7 +33,14 @@ const config = {
 };
 
 advertirSiFalta("SENTRY_DSN", "el reporte de errores a Sentry");
-advertirSiFalta("CLOUDINARY_URL", "la subida de imágenes/videos a Cloudinary");
+
+// En producción (Render u hosts efímeros), requerimos Cloudinary para evitar pérdida de datos.
+if (process.env.NODE_ENV === "production" && !process.env.CLOUDINARY_URL) {
+  throw new Error("[CONFIG CRÍTICA] CLOUDINARY_URL es obligatorio en producción para evitar pérdida de archivos subidos.");
+} else if (process.env.NODE_ENV !== "production") {
+  advertirSiFalta("CLOUDINARY_URL", "la subida de imágenes/videos a Cloudinary");
+}
+
 advertirSiFalta("VAPID_PUBLIC_KEY", "las notificaciones push");
 advertirSiFalta("VAPID_PRIVATE_KEY", "las notificaciones push");
 advertirSiFalta("ANTHROPIC_API_KEY", "el asistente de IA sobre WhatsApp");

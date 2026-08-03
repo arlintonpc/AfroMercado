@@ -19,6 +19,7 @@ const CarritoRepository = {
       include: {
         producto: {
           include: {
+            unidad: true,
             comercio: { include: { configFiscal: { select: { ivaActivo: true, ivaPorcentaje: true } } } },
             ofertas: {
               where: { activa: true, inicio: { lte: ahora }, fin: { gte: ahora } },

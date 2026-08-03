@@ -1,8 +1,22 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import ReproductorVideo, { detectar } from '@/components/comerciante/ReproductorVideo'
+import Lightbox from 'yet-another-react-lightbox'
+import Zoom from 'yet-another-react-lightbox/plugins/zoom'
+import Video from 'yet-another-react-lightbox/plugins/video'
+import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails'
+import 'yet-another-react-lightbox/styles.css'
+import 'yet-another-react-lightbox/plugins/thumbnails.css'
+
+// Slide para videos de plataformas externas (YouTube/TikTok/Instagram/Facebook/Vimeo)
+// que el plugin Video oficial no reproduce — se renderiza vía ReproductorVideo.
+declare module 'yet-another-react-lightbox' {
+  interface SlideTypes {
+    externalVideo: { type: 'externalVideo'; src: string }
+  }
+}
 
 interface ProductoGaleriaProps {
   imagenes: string[]
@@ -25,8 +39,9 @@ type Slide =
 /**
  * Galería de producto inspirada en e-commerce de alto nivel (Instagram/Airbnb/Amazon):
  * fotos y video comparten un mismo carrusel con contador (1/N), swipe táctil,
- * miniaturas e insignia de vendedor verificado. El lightbox de zoom es solo
- * para fotos (el video se reproduce directamente en el marco principal).
+ * miniaturas e insignia de vendedor verificado. El visor a pantalla completa
+ * (yet-another-react-lightbox) recorre los mismos slides con swipe y pellizco
+ * para zoom.
  */
 export default function ProductoGaleria({
   imagenes,
@@ -49,57 +64,38 @@ export default function ProductoGaleria({
   const [activa, setActiva] = useState(0)
   const [errores, setErrores] = useState<Record<number, boolean>>({})
   const [lightbox, setLightbox] = useState(false)
-  const [zoom, setZoom] = useState(false)
-  const [origen, setOrigen] = useState('center center')
   const [videoReproduciendo, setVideoReproduciendo] = useState(false)
   const touchStartX = useRef<number | null>(null)
 
   const indiceValido = Math.min(activa, Math.max(0, slides.length - 1))
   const slideActual = slides[indiceValido] as Slide | undefined
   const esVideoActual = slideActual?.tipo === 'video'
-  const videoEsExterno = esVideoActual && slideActual ? detectar(slideActual.url).plataforma !== 'directo' : false
+  const videoEsExterno = videoUrl ? detectar(videoUrl).plataforma !== 'directo' : false
 
-  function cerrar() {
-    setLightbox(false)
-    setZoom(false)
-  }
+  // Slides para el visor a pantalla completa (yet-another-react-lightbox):
+  // recorre fotos y video con swipe, pellizco para zoom y miniaturas nativas.
+  const lightboxSlides = slides.map((s, i) => {
+    if (s.tipo === 'foto') {
+      return { type: 'image' as const, src: s.url, alt: `${nombre} — imagen ${i + 1}` }
+    }
+    if (videoEsExterno) {
+      return { type: 'externalVideo' as const, src: s.url, thumbnail: videoPoster ?? undefined }
+    }
+    return {
+      type: 'video' as const,
+      poster: videoPoster ?? undefined,
+      thumbnail: videoPoster ?? undefined,
+      autoPlay: true,
+      controls: true,
+      playsInline: true,
+      sources: [{ src: s.url, type: videoMimeType || 'video/mp4' }],
+    }
+  })
 
   // Navegación del carrusel principal — recorre fotos y video.
   function ir(delta: number) {
-    setZoom(false)
     setVideoReproduciendo(false)
     setActiva((i) => (i + delta + slides.length) % slides.length)
-  }
-
-  // Navegación dentro del lightbox — solo fotos, el video no tiene zoom.
-  function irLightbox(delta: number) {
-    if (fotos.length === 0) return
-    setZoom(false)
-    setActiva((i) => (i + delta + fotos.length) % fotos.length)
-  }
-
-  useEffect(() => {
-    if (!lightbox) return
-    const anterior = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') cerrar()
-      else if (e.key === 'ArrowRight') irLightbox(1)
-      else if (e.key === 'ArrowLeft') irLightbox(-1)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => {
-      document.body.style.overflow = anterior
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [lightbox, cerrar, irLightbox])
-
-  function alternarZoom(e: React.MouseEvent<HTMLDivElement>) {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = ((e.clientX - rect.left) / rect.width) * 100
-    const y = ((e.clientY - rect.top) / rect.height) * 100
-    setOrigen(`${x}% ${y}%`)
-    setZoom((z) => !z)
   }
 
   function onTouchStart(e: React.TouchEvent) {
@@ -232,6 +228,16 @@ export default function ProductoGaleria({
             </button>
           </>
         )}
+
+        {/* Ver a pantalla completa — única forma de abrir el visor desde el slide de video */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setLightbox(true) }}
+          aria-label="Ver a pantalla completa"
+          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-sm"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
       </div>
 
       {/* Tiras de miniaturas deslizantes */}
@@ -276,82 +282,31 @@ export default function ProductoGaleria({
         </div>
       )}
 
-      {/* Lightbox a pantalla completa — solo fotos */}
-      {lightbox && fotos.length > 0 && (
-        <div
-          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center backdrop-blur-md"
-          onClick={cerrar}
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Imágenes de ${nombre}`}
-        >
-          <button
-            type="button"
-            onClick={cerrar}
-            aria-label="Cerrar"
-            className="absolute top-5 right-5 z-10 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-sm"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-            </svg>
-          </button>
-
-          {fotos.length > 1 && (
-            <span className="absolute top-5 left-1/2 -translate-x-1/2 z-10 text-white font-bold text-sm bg-white/10 px-4 py-1.5 rounded-full backdrop-blur-sm">
-              {indiceValido + 1} / {fotos.length}
-            </span>
-          )}
-
-          {fotos.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); irLightbox(-1) }}
-                aria-label="Imagen anterior"
-                className="absolute left-4 z-10 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-sm"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); irLightbox(1) }}
-                aria-label="Imagen siguiente"
-                className="absolute right-4 z-10 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-sm"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </button>
-            </>
-          )}
-
-          <div
-            className="relative w-[92vw] h-[82vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className="absolute inset-0 transition-transform duration-200 ease-out"
-              style={{
-                transform: zoom ? 'scale(2.2)' : 'scale(1)',
-                transformOrigin: origen,
-                cursor: zoom ? 'zoom-out' : 'zoom-in',
-              }}
-              onClick={alternarZoom}
-            >
-              <Image
-                src={fotos[Math.min(indiceValido, fotos.length - 1)]}
-                alt={`${nombre} — imagen ${indiceValido + 1}`}
-                fill
-                sizes="92vw"
-                className="object-contain select-none"
-                priority
-              />
-            </div>
-          </div>
-
-          <span className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 text-white/70 text-xs">
-            Toca la imagen para {zoom ? 'alejar' : 'acercar'}
-          </span>
-        </div>
-      )}
+      {/* Visor a pantalla completa — fotos y video, swipe táctil, pellizco para zoom */}
+      <Lightbox
+        open={lightbox}
+        close={() => setLightbox(false)}
+        index={indiceValido}
+        slides={lightboxSlides}
+        plugins={[Zoom, Video, Thumbnails]}
+        on={{ view: ({ index }) => setActiva(index) }}
+        zoom={{ scrollToZoom: true }}
+        thumbnails={{ border: 2, borderColor: 'transparent', gap: 8, padding: 4, imageFit: 'cover' }}
+        render={{
+          slide: ({ slide }) =>
+            slide.type === 'externalVideo' ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <ReproductorVideo url={slide.src} autoPlay className="w-full h-full" />
+              </div>
+            ) : undefined,
+        }}
+        styles={{
+          container: {
+            backgroundColor: 'rgba(10, 28, 20, 0.97)',
+            '--yarl__thumbnails_thumbnail_active_border_color': '#D4A017',
+          },
+        }}
+      />
     </div>
   )
 }

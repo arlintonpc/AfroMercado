@@ -12,7 +12,6 @@ const prisma = require("../config/prisma");
 const cache = require("../utils/cache");
 const { bloquearProducto } = require("../utils/bloqueos-transaccionales");
 
-const UNIDADES_VALIDAS = ["KG", "UNIDAD", "LITRO", "PAQUETE", "DOCENA", "MANOJO", "ANIMAL"];
 const ALCANCES_VALIDOS = ["LOCAL", "NACIONAL", "AMBOS"];
 const MOTIVOS_DENUNCIA = ["PRODUCTO_FALSO", "ESTAFA_DINERO", "CONTENIDO_INAPROPIADO", "VENDEDOR_SOSPECHOSO", "OTRO"];
 const ACCIONES_RESOLVER_DENUNCIA = ["DESESTIMAR", "BLOQUEAR_PRODUCTO", "BLOQUEAR_CUENTA"];
@@ -29,6 +28,18 @@ function mapearComercioPublico(producto) {
   delete producto.comercio.fotoDocumentoFrenteUrl;
   delete producto.comercio.fotoDocumentoReversoUrl;
   return producto;
+}
+
+// Busca la unidad de venta activa por su código ("KG", "MANOJO"...). Las
+// unidades ahora viven en la tabla UnidadDeVenta (administrable desde el
+// panel admin), no en un enum fijo.
+async function buscarUnidadIdPorCodigo(codigo) {
+  const unidad = await prisma.unidadDeVenta.findFirst({ where: { codigo, activa: true } });
+  if (!unidad) {
+    const disponibles = await prisma.unidadDeVenta.findMany({ where: { activa: true }, select: { codigo: true } });
+    throw new ErrorValidacion(`Unidad inválida. Opciones: ${disponibles.map((u) => u.codigo).join(", ")}`);
+  }
+  return unidad.id;
 }
 
 async function limpiarVideoAnterior(producto) {
@@ -48,14 +59,12 @@ const ProductoService = {
     if (!comercio) throw new ErrorValidacion("Debes tener un comercio registrado para publicar productos");
     assertPuedePublicar(comercio);
 
-    const { nombre, descripcion, precio, unidad, stock, stockMinimo, diasAlistamientoMin, diasAlistamientoMax, alcance, fotoUrl, categoriaId, pesoKg, esExpress, tiempoEntregaMin } = datos;
+    const { nombre, descripcion, precio, unidad, stock, stockMinimo, diasAlistamientoMin, diasAlistamientoMax, alcance, fotoUrl, categoriaId, pesoKg, esExpress, tiempoEntregaMin, envioGratis } = datos;
 
     if (!nombre || !precio || !unidad) {
       throw new ErrorValidacion("Nombre, precio y unidad son obligatorios");
     }
-    if (!UNIDADES_VALIDAS.includes(unidad)) {
-      throw new ErrorValidacion(`Unidad inválida. Opciones: ${UNIDADES_VALIDAS.join(", ")}`);
-    }
+    const unidadId = await buscarUnidadIdPorCodigo(unidad);
     if (alcance && !ALCANCES_VALIDOS.includes(alcance)) {
       throw new ErrorValidacion(`Alcance inválido. Opciones: ${ALCANCES_VALIDOS.join(", ")}`);
     }
@@ -83,7 +92,7 @@ const ProductoService = {
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
         precio: parseFloat(precio),
-        unidad,
+        unidadId,
         stock: parseInt(stock ?? 0),
         stockMinimo: parseInt(stockMinimo ?? 0),
         diasAlistamientoMin: min,
@@ -94,6 +103,7 @@ const ProductoService = {
         ...(pesoKg !== undefined && pesoKg !== null ? { pesoKg: parseFloat(pesoKg) } : {}),
         esExpress: esExpress === true || esExpress === 'true',
         ...(tiempoEntregaMin ? { tiempoEntregaMin: parseInt(tiempoEntregaMin) } : {}),
+        envioGratis: envioGratis === true || envioGratis === 'true',
       }, tx);
       await tx.precioHistorial.create({
         data: {
@@ -210,6 +220,18 @@ const ProductoService = {
       if (!ALCANCES_VALIDOS.includes(datos.alcance)) throw new ErrorValidacion("Alcance inválido");
       campos.alcance = datos.alcance;
     }
+    if (datos.unidad) {
+      campos.unidadId = await buscarUnidadIdPorCodigo(datos.unidad);
+    }
+    if (datos.diasAlistamientoMin !== undefined || datos.diasAlistamientoMax !== undefined) {
+      const min = datos.diasAlistamientoMin !== undefined ? parseInt(datos.diasAlistamientoMin) : producto.diasAlistamientoMin;
+      const max = datos.diasAlistamientoMax !== undefined ? parseInt(datos.diasAlistamientoMax) : producto.diasAlistamientoMax;
+      if (min < 0 || max < min) {
+        throw new ErrorValidacion("Los días de alistamiento deben ser positivos y el máximo >= al mínimo");
+      }
+      campos.diasAlistamientoMin = min;
+      campos.diasAlistamientoMax = max;
+    }
     if (datos.activo !== undefined) {
       if (Boolean(datos.activo)) assertPuedePublicar(comercio);
       campos.activo = Boolean(datos.activo);
@@ -220,6 +242,7 @@ const ProductoService = {
     if (datos.categoriaId !== undefined) campos.categoriaId = datos.categoriaId ? parseInt(datos.categoriaId) : null;
     if (datos.esExpress !== undefined) campos.esExpress = datos.esExpress === true || datos.esExpress === 'true';
     if (datos.tiempoEntregaMin !== undefined) campos.tiempoEntregaMin = datos.tiempoEntregaMin ? parseInt(datos.tiempoEntregaMin) : null;
+    if (datos.envioGratis !== undefined) campos.envioGratis = datos.envioGratis === true || datos.envioGratis === 'true';
 
     if (campos.precio === undefined && campos.stock === undefined) {
       return ProductoRepository.actualizar(productoId, campos);

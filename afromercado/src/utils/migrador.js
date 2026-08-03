@@ -13,6 +13,12 @@ const crypto = require("crypto");
 const ADVISORY_LOCK_ID = 778899;
 
 const STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS "Config" (
+    "clave" TEXT NOT NULL,
+    "valor" TEXT NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "Config_pkey" PRIMARY KEY ("clave")
+  )`,
   `ALTER TABLE "Usuario" ADD COLUMN IF NOT EXISTS "departamento" TEXT`,
   `ALTER TABLE "Usuario" ADD COLUMN IF NOT EXISTS "googleId" TEXT`,
   `ALTER TABLE "Usuario" ADD COLUMN IF NOT EXISTS "microsoftId" TEXT`,
@@ -358,7 +364,7 @@ const STATEMENTS = [
   `DO $$ BEGIN
     IF to_regclass('public.historias_efimeras') IS NOT NULL THEN
       INSERT INTO "HistoriaEfimera" ("id", "autorId", "comercioId", "mediaUrl", "mediaTipo", "duracionSegundos", "texto", "fondoColor", "vistasCount", "expiraAt", "createdAt")
-      SELECT "id", "autorId", "comercioId", "mediaUrl", "mediaTipo", "duracionSegundos", "texto", "fondoColor", "vistasCount", "expiraAt", "createdAt"
+      SELECT "id", "autorId", "comercioId", "mediaUrl", "mediaTipo"::"TipoMediaHistoria", "duracionSegundos", "texto", "fondoColor", "vistasCount", "expiraAt", "createdAt"
       FROM "historias_efimeras"
       ON CONFLICT ("id") DO NOTHING;
     END IF;
@@ -541,6 +547,54 @@ const STATEMENTS = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "DenunciaComercio_comercioId_denuncianteId_key" ON "DenunciaComercio"("comercioId", "denuncianteId")`,
   `CREATE INDEX IF NOT EXISTS "DenunciaComercio_estado_createdAt_idx" ON "DenunciaComercio"("estado", "createdAt")`,
+
+  // Jerarquía de dos niveles para Categoria (Departamento -> Categoría),
+  // necesaria para escalar el catálogo mas alla de las categorias
+  // artesanales/agro iniciales (tecnologia, moda a mayor escala, etc.).
+  `ALTER TABLE "Categoria" ADD COLUMN IF NOT EXISTS "padreId" INTEGER`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Categoria_padreId_fkey') THEN
+      ALTER TABLE "Categoria" ADD CONSTRAINT "Categoria_padreId_fkey" FOREIGN KEY ("padreId") REFERENCES "Categoria"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+  END $$`,
+  `CREATE INDEX IF NOT EXISTS "Categoria_padreId_idx" ON "Categoria"("padreId")`,
+
+  // Unidad de venta: antes era un enum fijo de 7 valores (UnidadDeVenta),
+  // ahora es una tabla administrable igual que Categoria/Departamento.
+  // La columna vieja "unidad" (tipo enum) se conserva como dato legado sin
+  // uso, solo para el respaldo inicial; la nueva "unidadId" es la que usa
+  // Prisma desde ahora.
+  `CREATE TABLE IF NOT EXISTS "UnidadDeVenta" (
+    "id" SERIAL PRIMARY KEY,
+    "codigo" TEXT NOT NULL UNIQUE,
+    "etiqueta" TEXT NOT NULL,
+    "activa" BOOLEAN NOT NULL DEFAULT true,
+    "orden" INTEGER NOT NULL DEFAULT 0
+  )`,
+  `INSERT INTO "UnidadDeVenta" ("codigo", "etiqueta", "orden") VALUES
+    ('KG', 'Kilo', 1),
+    ('UNIDAD', 'Unidad', 2),
+    ('LITRO', 'Litro', 3),
+    ('PAQUETE', 'Paquete', 4),
+    ('DOCENA', 'Docena', 5),
+    ('MANOJO', 'Manojo', 6),
+    ('ANIMAL', 'Animal', 7)
+  ON CONFLICT ("codigo") DO NOTHING`,
+  `ALTER TABLE "Producto" ADD COLUMN IF NOT EXISTS "unidadId" INTEGER`,
+  `UPDATE "Producto" SET "unidadId" = (SELECT id FROM "UnidadDeVenta" WHERE codigo = "Producto"."unidad"::text) WHERE "unidadId" IS NULL`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Producto_unidadId_fkey') THEN
+      ALTER TABLE "Producto" ADD CONSTRAINT "Producto_unidadId_fkey" FOREIGN KEY ("unidadId") REFERENCES "UnidadDeVenta"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    END IF;
+  END $$`,
+  `ALTER TABLE "Producto" ALTER COLUMN "unidadId" SET NOT NULL`,
+  `ALTER TABLE "Producto" ALTER COLUMN "unidad" DROP NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS "Producto_unidadId_idx" ON "Producto"("unidadId")`,
+
+  // Envío gratis por producto individual: el comerciante puede marcar un
+  // producto puntual como "envío gratis" (no solo la tienda completa vía
+  // Config `envio_gratis_comercio:<id>`). Ver pedido.service.js pesoDeItems().
+  `ALTER TABLE "Producto" ADD COLUMN IF NOT EXISTS "envioGratis" BOOLEAN NOT NULL DEFAULT false`,
 ];
 
 async function asegurarTablaLog() {

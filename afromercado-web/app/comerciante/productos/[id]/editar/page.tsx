@@ -8,11 +8,13 @@ import {
   obtenerMiProducto,
   actualizarProducto,
   listarCategorias,
+  listarUnidades,
   subirVideoProducto,
   quitarVideoProducto,
   guardarVideoLinkProducto,
   type ProductoComerciante,
   type CategoriaComerciante,
+  type UnidadComerciante,
 } from '@/components/comerciante/api'
 import SubidorImagenes from '@/components/comerciante/SubidorImagenes'
 import SubidorVideoOLink from '@/components/comerciante/SubidorVideoOLink'
@@ -27,15 +29,21 @@ export default function EditarProductoPage() {
 
   const [producto, setProducto] = useState<ProductoComerciante | null>(null)
   const [categorias, setCategorias] = useState<CategoriaComerciante[]>([])
+  const [unidades, setUnidades] = useState<UnidadComerciante[]>([])
   const [cargando, setCargando] = useState(true)
   const [noEncontrado, setNoEncontrado] = useState(false)
 
+  const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [precio, setPrecio] = useState('')
+  const [unidad, setUnidad] = useState('')
   const [stock, setStock] = useState('')
   const [stockMinimo, setStockMinimo] = useState('')
+  const [diasMin, setDiasMin] = useState('')
+  const [diasMax, setDiasMax] = useState('')
   const [alcance, setAlcance] = useState<Alcance>('LOCAL')
   const [pesoKg, setPesoKg] = useState('')
+  const [envioGratis, setEnvioGratis] = useState(false)
   const [categoriaId, setCategoriaId] = useState('')
   const [esExpress, setEsExpress] = useState(false)
   const [tiempoEntregaMin, setTiempoEntregaMin] = useState('20')
@@ -56,9 +64,10 @@ export default function EditarProductoPage() {
     async function cargar() {
       setCargando(true)
       try {
-        const [p, cats] = await Promise.all([
+        const [p, cats, unids] = await Promise.all([
           Number.isFinite(idNum) ? obtenerMiProducto(idNum) : Promise.resolve(null),
           listarCategorias(),
+          listarUnidades(),
         ])
         if (!activo) return
         if (!p) {
@@ -66,13 +75,19 @@ export default function EditarProductoPage() {
           return
         }
         setCategorias(cats)
+        setUnidades(unids)
         setProducto(p)
+        setNombre(p.nombre)
         setDescripcion(p.descripcion ?? '')
         setPrecio(String(Number(p.precio)))
+        setUnidad(p.unidad)
         setStock(String(p.stock))
         setStockMinimo(p.stockMinimo ? String(p.stockMinimo) : '')
+        setDiasMin(String(p.diasAlistamientoMin ?? 1))
+        setDiasMax(String(p.diasAlistamientoMax ?? 3))
         setAlcance(p.alcance)
         setPesoKg(p.pesoKg !== undefined && p.pesoKg !== null ? String(Number(p.pesoKg)) : '')
+        setEnvioGratis(p.envioGratis ?? false)
         setCategoriaId(p.categoria?.id ? String(p.categoria.id) : '')
         setEsExpress(p.esExpress ?? false)
         setTiempoEntregaMin(p.tiempoEntregaMin ? String(p.tiempoEntregaMin) : '20')
@@ -93,10 +108,17 @@ export default function EditarProductoPage() {
 
   function validar(): boolean {
     const e: Record<string, string> = {}
+    if (!nombre.trim()) e.nombre = 'Escribe el nombre del producto.'
     const precioNum = Number(precio.replace(/\D/g, ''))
     if (!precio.trim()) e.precio = 'Escribe el precio.'
     else if (precioNum <= 0) e.precio = 'El precio debe ser mayor que cero.'
+    if (!unidad) e.unidad = '¿Cómo lo vendes? Elige una opción.'
     if (!stock.trim()) e.stock = 'Escribe cuántos tienes.'
+    const minNum = Number(diasMin.replace(/\D/g, ''))
+    const maxNum = Number(diasMax.replace(/\D/g, ''))
+    if (!diasMin.trim()) e.diasMin = 'Escribe los días mínimos.'
+    if (!diasMax.trim()) e.diasMax = 'Escribe los días máximos.'
+    else if (diasMin.trim() && maxNum < minNum) e.diasMax = 'El máximo no puede ser menor que el mínimo.'
     setErrores(e)
     return Object.keys(e).length === 0
   }
@@ -111,12 +133,17 @@ export default function EditarProductoPage() {
     try {
       const pesoKgNum = pesoKg.trim() ? Number(pesoKg) : null
       await actualizarProducto(producto.id, {
+        nombre: nombre.trim(),
         descripcion: descripcion.trim(),
         precio: Number(precio.replace(/\D/g, '')),
+        unidad,
         stock: Number(stock.replace(/\D/g, '')),
         stockMinimo: stockMinimo.trim() ? Number(stockMinimo.replace(/\D/g, '')) : 0,
+        diasAlistamientoMin: Number(diasMin.replace(/\D/g, '')),
+        diasAlistamientoMax: Number(diasMax.replace(/\D/g, '')),
         alcance,
         pesoKg: pesoKgNum !== null && pesoKgNum > 0 ? pesoKgNum : null,
+        envioGratis,
         categoriaId: categoriaId ? Number(categoriaId) : undefined,
         esExpress,
         tiempoEntregaMin: esExpress && tiempoEntregaMin ? Number(tiempoEntregaMin) : null,
@@ -173,7 +200,7 @@ export default function EditarProductoPage() {
         {producto && (
           <p className="mt-2 text-base text-[#1A1A1A]/65">
             {producto.nombre} · se vende por{' '}
-            {etiquetaUnidad(producto.unidad).toLowerCase()}
+            {(unidades.find((u) => u.codigo === producto.unidad)?.etiqueta ?? etiquetaUnidad(producto.unidad)).toLowerCase()}
           </p>
         )}
       </div>
@@ -212,6 +239,15 @@ export default function EditarProductoPage() {
           </>
         )}
 
+        <CampoTexto
+          label="¿Qué vas a vender?"
+          name="nombre"
+          placeholder="Ej: Borojó fresco"
+          value={nombre}
+          onChange={setNombre}
+          error={errores.nombre}
+        />
+
         {categorias.length > 0 && (
           <CampoSelect
             label="Categoría"
@@ -249,6 +285,17 @@ export default function EditarProductoPage() {
           )}
         </div>
 
+        <CampoSelect
+          label="¿Cómo lo vendes?"
+          name="unidad"
+          placeholder="Elige una opción"
+          value={unidad}
+          onChange={setUnidad}
+          opciones={unidades.map((u) => ({ valor: u.codigo, etiqueta: u.etiqueta }))}
+          error={errores.unidad}
+          hint="Por ejemplo: por kilo, por unidad, por manojo…"
+        />
+
         <CampoTexto
           label="¿Cuántos tienes disponibles?"
           name="stock"
@@ -278,6 +325,42 @@ export default function EditarProductoPage() {
           onChange={(v) => setPesoKg(v.replace(/[^0-9.]/g, ''))}
           hint="Opcional. Se usa para calcular el costo de envío."
         />
+
+        <Toggle
+          activo={envioGratis}
+          onChange={setEnvioGratis}
+          etiqueta="🚚 Envío gratis en este producto"
+          descripcion="Tú asumes el costo de enviarlo; el resto de tu pedido sigue cobrando envío normal."
+        />
+
+        <div>
+          <p className="mb-1.5 text-base font-semibold text-[#1A1A1A]">
+            ¿En cuántos días lo tienes listo?
+          </p>
+          <p className="mb-2 text-sm text-[#1A1A1A]/55">
+            Ej: el borojó necesita madurar unos días.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <CampoTexto
+              label="Mínimo (días)"
+              name="diasMin"
+              inputMode="numeric"
+              placeholder="1"
+              value={diasMin}
+              onChange={(v) => setDiasMin(v.replace(/\D/g, ''))}
+              error={errores.diasMin}
+            />
+            <CampoTexto
+              label="Máximo (días)"
+              name="diasMax"
+              inputMode="numeric"
+              placeholder="3"
+              value={diasMax}
+              onChange={(v) => setDiasMax(v.replace(/\D/g, ''))}
+              error={errores.diasMax}
+            />
+          </div>
+        </div>
 
         <fieldset>
           <legend className="mb-2 text-base font-semibold text-[#1A1A1A]">
