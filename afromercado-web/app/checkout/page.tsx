@@ -143,7 +143,6 @@ export default function PaginaCheckout() {
   // da 0, significa que TODO el pedido es de envío gratis (se maneja aparte,
   // no se fuerza a 1 como antes porque aquí 0 sí tiene un significado real).
   const pesoTotalKg = useMemo(() => {
-    if (items.length === 0) return 1
     let total = 0
     for (const it of items) {
       if (it.producto?.envioGratis) continue
