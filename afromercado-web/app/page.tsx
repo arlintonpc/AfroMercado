@@ -362,9 +362,17 @@ function SeccionDestacados({ productos, destacadosPagados, etiquetasPagadas }: {
                 <p className="text-[#52B788] text-[10px] font-semibold uppercase tracking-wide truncate mb-0.5">
                   {producto.comercio.nombre}
                 </p>
-                <p className="text-[#1A1A1A] text-sm font-semibold leading-snug line-clamp-2 mb-1">
-                  {producto.nombre}
-                </p>
+                <div className="flex flex-col gap-1 mb-1">
+                  <p className="text-[#1A1A1A] text-sm font-semibold leading-snug line-clamp-2">
+                    {producto.nombre}
+                  </p>
+                  {producto.envioGratis && (
+                    <p className="text-[10px] font-bold text-[#2D6A4F] uppercase tracking-wide flex items-center gap-1">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 18H3c-.6 0-1-.4-1-1V7c0-.6.4-1 1-1h10c.6 0 1 .4 1 1v11"/><path d="M14 9h4l4 4v4c0 .6-.4 1-1 1h-2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+                      Envío Gratis
+                    </p>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[#2D6A4F] text-sm font-bold">
                     {formatearPrecio(precioVigente(producto))}
@@ -443,6 +451,12 @@ function SeccionOfertas({ productos }: { productos: Producto[] }) {
                 <div className="px-3 py-2.5">
                   <p className="text-[10px] text-[#52B788] font-semibold uppercase tracking-wide truncate mb-0.5">{p.comercio.nombre}</p>
                   <p className="text-sm font-semibold text-[#1A1A1A] truncate mb-1">{p.nombre}</p>
+                  {p.envioGratis && (
+                    <p className="text-[10px] font-bold text-[#2D6A4F] uppercase tracking-wide mb-1 flex items-center gap-1">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 18H3c-.6 0-1-.4-1-1V7c0-.6.4-1 1-1h10c.6 0 1 .4 1 1v11"/><path d="M14 9h4l4 4v4c0 .6-.4 1-1 1h-2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+                      Envío Gratis
+                    </p>
+                  )}
                   {p.oferta?.etiqueta && (
                     <p className="text-[10px] text-[#2D6A4F] font-medium truncate mb-1">{p.oferta.etiqueta}</p>
                   )}

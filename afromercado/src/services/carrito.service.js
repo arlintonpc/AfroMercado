@@ -58,6 +58,10 @@ function mapearItem(item) {
       diasAlistamientoMin: p.diasAlistamientoMin,
       diasAlistamientoMax: p.diasAlistamientoMax,
       alcance: p.alcance,
+      pesoKg: p.pesoKg ? Number(p.pesoKg) : undefined,
+      envioGratis: p.envioGratis ?? false,
+      esExpress: p.esExpress ?? false,
+      tiempoEntregaMin: p.tiempoEntregaMin ?? undefined,
       oferta,
       comercio: c
         ? {
